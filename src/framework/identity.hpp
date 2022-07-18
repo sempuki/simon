@@ -1,4 +1,4 @@
-// Copyright 2022 -- CONTRIBUTORS.
+// Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
 #pragma once
 
@@ -12,9 +12,9 @@ namespace simon::framework {
 class Identity;
 
 class Name {
-  MARK_NON_DEFAULTABLE(Name);
-
  public:
+  DECLARE_NON_DEFAULTABLE(Name);
+
   bool operator==(const Name& that) const { return name_ == that.name_; }
   bool operator!=(const Name& that) const { return name_ != that.name_; }
   bool operator<(const Name& that) const { return name_ < that.name_; }
@@ -26,9 +26,9 @@ class Name {
 };
 
 class Identity {
-  MARK_NON_COPYABLE(Identity);
-
  public:
+  DECLARE_MOVE_ONLY(Identity);
+
   Identity();
   Name name() const { return Name{id_}; }
   bool operator==(const Identity& that) const { return name() == that.name(); }
