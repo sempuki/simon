@@ -1,10 +1,10 @@
-// Copyright 2022 -- CONTRIBUTORS.
+// Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
 #pragma once
 
 #include <source_location>
 
-namespace framework::contract {
+namespace simon::framework::contract {
 struct ContractError {
   std::source_location origin;
 };
@@ -12,7 +12,7 @@ struct ContractError {
 struct PreconditionError final : public ContractError {};
 struct PostconditionError final : public ContractError {};
 struct InvariantError final : public ContractError {};
-}  // namespace framework::contract
+}  // namespace simon::framework::contract
 
 #define EXPECTS(expr)                                                                \
   [&] {                                                                              \
