@@ -2,8 +2,9 @@
 
 #include "framework/type_macros.hpp"
 
-#include <catch2/catch.hpp>
 #include <type_traits>
+
+#include "catch2/catch.hpp"
 
 namespace simon::framework {
 
