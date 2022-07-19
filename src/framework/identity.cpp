@@ -3,6 +3,7 @@
 #include "framework/identity.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <random>
 
 namespace simon::framework {
@@ -14,9 +15,10 @@ struct Lcg32SeedSequence {
 
   template <typename I>
   void generate(I begin, I end) {
+    static_assert(sizeof(*begin) == sizeof(result_type));
     std::generate(begin, end, [this] {
-      // Assume the random device has finite but continual entropy.
-      if ((count++ % 13) == 0) {
+      // Inject entropy for long seed sequences.
+      if (((++count) % 13u) == 0u) {
         seeder.seed(device());
       }
       return uniform(seeder);
@@ -25,7 +27,7 @@ struct Lcg32SeedSequence {
 
   std::random_device device;
   // https://onlinelibrary.wiley.com/doi/10.1002/spe.3030
-  std::linear_congruential_engine<result_type, 0x915f77f5, 0x3c6ef35f, 0U> seeder;
+  std::linear_congruential_engine<result_type, 0x915f77f5, 0x1, 0x0> seeder;
   std::uniform_int_distribution<result_type> uniform;
   size_t count = 0;
 };

@@ -39,4 +39,18 @@ class Identity {
   std::size_t id_ = 0;
 };
 
+class PerObjectIdentity {
+ protected:
+  Identity id_;
+};
+
+template <typename Type>
+class PerTypeIdentity {
+ protected:
+  static Identity id_;
+};
+
+template <typename Type>
+Identity PerTypeIdentity<Type>::id_;
+
 }  // namespace simon::framework

@@ -56,3 +56,65 @@ cc_test(
     ],
 )
 
+cc_library(
+    name = "entity",
+    hdrs= ["entity.hpp"],
+    copts = COPTS,
+    deps = [
+        ":identity",
+        ":component",
+    ],
+)
+
+cc_test(
+    name = "entity_test",
+    srcs = ["entity_test.cpp"],
+    copts = COPTS,
+    defines = ["CATCH_CONFIG_MAIN"],
+    deps = [
+        "@catch2//:catch2",
+        ":entity",
+    ],
+)
+
+cc_library(
+    name = "component",
+    hdrs= ["component.hpp"],
+    copts = COPTS,
+    deps = [
+        ":identity",
+    ],
+)
+
+cc_test(
+    name = "component_test",
+    srcs = ["component_test.cpp"],
+    copts = COPTS,
+    defines = ["CATCH_CONFIG_MAIN"],
+    deps = [
+        "@catch2//:catch2",
+        ":component",
+    ],
+)
+
+cc_library(
+    name = "component_system",
+    hdrs= ["component_system.hpp"],
+    copts = COPTS,
+    deps = [
+        ":entity",
+        ":component",
+    ],
+)
+
+cc_test(
+    name = "component_system_test",
+    srcs = ["component_system_test.cpp"],
+    copts = COPTS,
+    defines = ["CATCH_CONFIG_MAIN"],
+    deps = [
+        "@catch2//:catch2",
+        ":component_system",
+    ],
+)
+
