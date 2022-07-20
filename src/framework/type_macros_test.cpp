@@ -4,7 +4,7 @@
 
 #include <type_traits>
 
-#include "catch2/catch.hpp"
+#include "framework/testing.hpp"
 
 namespace simon::framework {
 
