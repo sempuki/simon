@@ -6,12 +6,12 @@ cc_binary(
     copts = COPTS,
 )
 
-cc_test(
-    name = "hello_test",
-    srcs = ["hello_test.cpp"],
-    copts = COPTS,
-    defines = ["CATCH_CONFIG_MAIN"],
-    deps = [
-        "@catch2//:catch2",
-    ],
-)
+# cc_test(
+#     name = "hello_test",
+#     srcs = ["hello_test.cpp"],
+#     copts = COPTS,
+#     defines = ["CATCH_CONFIG_MAIN"],
+#     deps = [
+#         "@catch2//:catch2",
+#     ],
+# )

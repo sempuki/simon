@@ -19,8 +19,8 @@ TEST_CASE("ComponentSystem") {
     }
     std::vector<double>* times = nullptr;
   };
-  std::vector<double> called;
-  ComponentSystem<T, ComputeT> sys{ComputeT{&called}};
+  std::vector<double> was_called_at;
+  ComponentSystem<T, ComputeT> sys{ComputeT{&was_called_at}};
 
   SECTION("ShouldHaveSameComponentNameAsComponent") {
     CHECK(sys.component_name() == T::name());
@@ -51,8 +51,8 @@ TEST_CASE("ComponentSystem") {
     sys(time, step, nullptr);
 
     // Verify
-    REQUIRE(called.size());
-    CHECK(called.back() == time);
+    REQUIRE(was_called_at.size());
+    CHECK(was_called_at.back() == time);
   }
 }
 

@@ -2,6 +2,9 @@
 
 #pragma once
 
+#include <sstream>
+#include <vector>
+
 #include "catch2/catch.hpp"
 
 namespace simon::framework {
@@ -18,11 +21,12 @@ class SummaryReporter : public Catch::StreamingReporterBase<SummaryReporter> {
   void sectionStarting(Catch::SectionInfo const& info) override;
   void sectionEnded(Catch::SectionStats const& stats) override;
 
-  void assertionStarting(Catch::AssertionInfo const& info) override {}
-  bool assertionEnded(Catch::AssertionStats const& stats) override { return false; }
+  void assertionStarting(Catch::AssertionInfo const& info) override;
+  bool assertionEnded(Catch::AssertionStats const& stats) override;
 
  private:
   std::size_t depth_ = 0;
+  std::vector<std::stringstream> report_;
 };
 
 }  // namespace simon::framework
