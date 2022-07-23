@@ -1,21 +1,24 @@
 # Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
-load("//src:copts.bzl", "COPTS")
+load("//:bazel/copts.bzl", "COPTS")
+
+package(default_visibility = ["//visibility:public"])
 
 cc_library(
   name = "testing",
   hdrs= ["testing.hpp"],
   srcs= ["testing.cpp"],
   defines = ["CATCH_CONFIG_MAIN"],
-  copts = COPTS,
   deps = [
     "@catch2//:catch2",
-  ]
+  ],
+  copts = COPTS,
 )
 
 cc_library(
   name = "contract",
   hdrs= ["contract.hpp"],
+  copts = COPTS,
 )
 
 cc_test(
@@ -48,10 +51,10 @@ cc_library(
   name = "identity",
   srcs= ["identity.cpp"],
   hdrs= ["identity.hpp"],
-  copts = COPTS,
   deps = [
     ":type_macros",
   ],
+  copts = COPTS,
 )
 
 cc_test(
@@ -67,11 +70,11 @@ cc_test(
 cc_library(
   name = "entity",
   hdrs= ["entity.hpp"],
-  copts = COPTS,
   deps = [
     ":identity",
     ":component",
   ],
+  copts = COPTS,
 )
 
 cc_test(
@@ -87,10 +90,10 @@ cc_test(
 cc_library(
   name = "component",
   hdrs= ["component.hpp"],
-  copts = COPTS,
   deps = [
     ":identity",
   ],
+  copts = COPTS,
 )
 
 cc_test(
@@ -106,11 +109,11 @@ cc_test(
 cc_library(
   name = "component_system",
   hdrs= ["component_system.hpp"],
-  copts = COPTS,
   deps = [
     ":entity",
     ":component",
   ],
+  copts = COPTS,
 )
 
 cc_test(
