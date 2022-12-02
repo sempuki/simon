@@ -17,3 +17,11 @@ http_archive(
     build_file = "//:bazel/eigen.BUILD",
 )
 
+http_archive(
+    name = "imgui",
+    urls = ["https://github.com/ocornut/imgui/archive/refs/tags/v1.89.1.tar.gz"],
+    strip_prefix = "imgui-1.89.1",
+    sha256 = "6d02a0079514d869e4b5f8f590f9060259385fcddd93a07ef21298b6a9610cbd",
+    build_file = "//:bazel/imgui.BUILD",
+)
+
