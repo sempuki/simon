@@ -5,5 +5,15 @@ package(default_visibility = ["//visibility:public"])
 cc_binary(
     name = "hello",
     srcs = ["hello.cpp"],
-    copts = COPTS,
+    deps = [
+      "@imgui//:imgui",
+    ],
+    copts = COPTS + [
+      "-I/usr/local/include/SDL2",
+      "-D_THREAD_SAFE"
+    ],
+    linkopts = [
+      "-L/usr/local/lib",
+      "-lSDL2",
+    ],
 )
