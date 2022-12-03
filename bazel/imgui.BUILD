@@ -12,6 +12,7 @@ cc_library(
     ],
     copts = [
       "-O2",
+      "-I/usr/include/SDL2",
       "-I/usr/local/include/SDL2",
       "-D_THREAD_SAFE"
     ],

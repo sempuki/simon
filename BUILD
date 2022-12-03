@@ -9,7 +9,7 @@ cc_binary(
       "@imgui//:imgui",
     ],
     copts = COPTS + [
-      "-I/usr/local/include/SDL2",
+      "-I/usr/local/include",
       "-D_THREAD_SAFE"
     ],
     linkopts = [
