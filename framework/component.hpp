@@ -19,7 +19,7 @@ template <typename ComponentType>
 class Component : public ComponentBase, public PerTypeIdentity<ComponentType> {
  public:
   ComponentName component_name() const override { return Component::name(); }
-  static ComponentName name() { return PerTypeIdentity<ComponentType>::id_.name(); }
+  static ComponentName name() { return Component::id().name(); }
 };
 
 }  // namespace simon::framework

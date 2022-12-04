@@ -2,6 +2,7 @@
 
 #include "framework/identity.hpp"
 
+#include <sstream>
 #include <type_traits>
 
 #include "base/testing.hpp"
@@ -16,6 +17,20 @@ TEST_CASE("Name") {
   SECTION("ShouldBeCopyable") {
     CHECK(std::is_copy_constructible_v<Name>);
     CHECK(std::is_copy_assignable_v<Name>);
+  }
+
+  SECTION("ShouldOutputToStdOstream") {
+    std::stringstream s;
+    s << Identity{}.name();
+    CHECK(s);
+  }
+
+  SECTION("ShouldParseAsSizeT") {
+    std::size_t n;
+    std::stringstream s;
+    s << Identity{}.name();
+    s >> n;
+    CHECK(s);
   }
 }
 

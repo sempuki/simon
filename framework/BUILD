@@ -97,6 +97,26 @@ cc_test(
 )
 
 cc_library(
+  name = "event_queue",
+  hdrs= ["event_queue.hpp"],
+  deps = [
+    "//base:time",
+    ":event",
+  ],
+  copts = COPTS,
+)
+
+cc_test(
+  name = "event_queue_test",
+  srcs = ["event_queue_test.cpp"],
+  deps = [
+    "//base:testing",
+    ":event_queue",
+  ],
+  copts = COPTS,
+)
+
+cc_library(
   name = "component",
   hdrs= ["component.hpp"],
   deps = [
