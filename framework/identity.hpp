@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <ostream>
 
 #include "framework/type_macros.hpp"
 
@@ -23,6 +24,11 @@ class Name {
   friend class Identity;
   Name(std::size_t name) : name_{name} {}
   std::size_t name_ = 0;
+
+  friend std::ostream& operator<<(std::ostream& out, Name name) {
+    out << name.name_;
+    return out;
+  }
 };
 
 class Identity {
@@ -47,10 +53,10 @@ class PerObjectIdentity {
 template <typename Type>
 class PerTypeIdentity {
  protected:
-  static Identity id_;
+  static const Identity& id() {
+    static Identity id_;
+    return id_;
+  }
 };
-
-template <typename Type>
-Identity PerTypeIdentity<Type>::id_;
 
 }  // namespace simon::framework
