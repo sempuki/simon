@@ -16,7 +16,7 @@ int main(int, char**) {
   }
 
   // Setup window
-  SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+  SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE);
   SDL_Window* window = SDL_CreateWindow("Dear ImGui SDL2+SDL_Renderer example",
                                         SDL_WINDOWPOS_CENTERED,
                                         SDL_WINDOWPOS_CENTERED,
@@ -48,9 +48,7 @@ int main(int, char**) {
   ImGui_ImplSDLRenderer_Init(renderer);
 
   // Our state
-  bool show_demo_window = true;
-  bool show_another_window = false;
-  ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+  ImVec4 clear_color = ImVec4(0.35f, 0.45f, 0.50f, 1.00f);
 
   // Main loop
   bool done = false;
@@ -69,34 +67,13 @@ int main(int, char**) {
     ImGui_ImplSDL2_NewFrame();
     ImGui::NewFrame();
 
-    // Show a simple window that we create ourselves. We use a Begin/End pair to create a named
-    // window.
-    {
-      static float f = 0.0f;
-      static int counter = 0;
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    const ImU32 color = ImColor(ImVec4(1.0f, 1.0f, 0.4f, 1.0f));
 
-      ImGui::Begin("Hello, world!");  // Create a window called "Hello, world!" and append into it.
-
-      ImGui::Text(
-        "This is some useful text.");  // Display some text (you can use a format strings too)
-      ImGui::Checkbox("Demo Window",
-                      &show_demo_window);  // Edit bools storing our window open/close state
-      ImGui::Checkbox("Another Window", &show_another_window);
-
-      ImGui::SliderFloat("float", &f, 0.0f, 1.0f);  // Edit 1 float using a slider from 0.0f to 1.0f
-      ImGui::ColorEdit3("clear color", (float*)&clear_color);  // Edit 3 floats representing a color
-
-      if (ImGui::Button("Button"))  // Buttons return true when clicked (most widgets return true
-                                    // when edited/activated)
-        counter++;
-      ImGui::SameLine();
-      ImGui::Text("counter = %d", counter);
-
-      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-                  1000.0f / ImGui::GetIO().Framerate,
-                  ImGui::GetIO().Framerate);
-      ImGui::End();
-    }
+    ImGui::Begin("Window", nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration);
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    draw_list->AddCircleFilled(ImVec2(pos.x + 5.5f, pos.y + 5.5f), 50.5f, color, 12);
+    ImGui::End();
 
     // Rendering
     ImGui::Render();
