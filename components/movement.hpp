@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "core/math.hpp"
+#include "base/math.hpp"
 #include "framework/component.hpp"
 
 namespace simon::components {

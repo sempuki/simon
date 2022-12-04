@@ -7,7 +7,7 @@
 
 #include "catch2/catch.hpp"
 
-namespace simon::framework {
+namespace simon {
 
 // See: external/catch2/examples/210-Evt-EventListeners.cpp
 class SummaryReporter : public Catch::StreamingReporterBase<SummaryReporter> {
@@ -29,4 +29,4 @@ class SummaryReporter : public Catch::StreamingReporterBase<SummaryReporter> {
   std::vector<std::stringstream> report_;
 };
 
-}  // namespace simon::framework
+}  // namespace simon

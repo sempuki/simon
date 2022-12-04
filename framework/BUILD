@@ -5,17 +5,6 @@ load("//:bazel/copts.bzl", "COPTS")
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-  name = "testing",
-  hdrs= ["testing.hpp"],
-  srcs= ["testing.cpp"],
-  defines = ["CATCH_CONFIG_MAIN"],
-  deps = [
-    "@catch2//:catch2",
-  ],
-  copts = COPTS,
-)
-
-cc_library(
   name = "contract",
   hdrs= ["contract.hpp"],
   copts = COPTS,
@@ -25,7 +14,7 @@ cc_test(
   name = "contract_test",
   srcs = ["contract_test.cpp"],
   deps = [
-    ":testing",
+    "//base:testing",
     ":contract",
   ],
   copts = COPTS,
@@ -41,7 +30,7 @@ cc_test(
   name = "type_macros_test",
   srcs = ["type_macros_test.cpp"],
   deps = [
-    ":testing",
+    "//base:testing",
     ":type_macros",
   ],
   copts = COPTS,
@@ -61,7 +50,7 @@ cc_test(
   name = "identity_test",
   srcs = ["identity_test.cpp"],
   deps = [
-    ":testing",
+    "//base:testing",
     ":identity",
   ],
   copts = COPTS,
@@ -81,8 +70,28 @@ cc_test(
   name = "entity_test",
   srcs = ["entity_test.cpp"],
   deps = [
-    ":testing",
+    "//base:testing",
     ":entity",
+  ],
+  copts = COPTS,
+)
+
+cc_library(
+  name = "event",
+  hdrs= ["event.hpp"],
+  deps = [
+    "//base:time",
+    ":identity",
+  ],
+  copts = COPTS,
+)
+
+cc_test(
+  name = "event_test",
+  srcs = ["event_test.cpp"],
+  deps = [
+    "//base:testing",
+    ":event",
   ],
   copts = COPTS,
 )
@@ -100,7 +109,7 @@ cc_test(
   name = "component_test",
   srcs = ["component_test.cpp"],
   deps = [
-    ":testing",
+    "//base:testing",
     ":component",
   ],
   copts = COPTS,
@@ -120,7 +129,7 @@ cc_test(
   name = "component_system_test",
   srcs = ["component_system_test.cpp"],
   deps = [
-    ":testing",
+    "//base:testing",
     ":component_system",
   ],
   copts = COPTS,

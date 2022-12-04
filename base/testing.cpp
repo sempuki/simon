@@ -1,11 +1,11 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
-#include "framework/testing.hpp"
+#include "base/testing.hpp"
 
 #include <iomanip>
 #include <iostream>
 
-namespace simon::framework {
+namespace simon {
 
 constexpr const std::string_view test_marker{"\033[1;34m=\033[0m"};
 constexpr const std::string_view section_marker{"\033[1;33m-\033[0m"};
@@ -69,4 +69,4 @@ bool SummaryReporter::assertionEnded(Catch::AssertionStats const& stats) {
 
 CATCH_REGISTER_REPORTER("summary", SummaryReporter)
 
-}  // namespace simon::framework
+}  // namespace simon
