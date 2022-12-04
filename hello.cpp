@@ -7,7 +7,48 @@
 #include "backends/imgui_impl_sdlrenderer.h"
 #include "imgui.h"
 
-// Main code
+/*
+class Simulation final {
+ public:
+  template <typename ComponentType>
+  ComponentType* imbue(Entity* actor) {
+    return nullptr;
+  }
+
+  using ActorComponents = std::tuple<Environment*, Intelligent*, Physical*, Controls*, Movement*>;
+
+  ActorComponents insert(Entity actor);
+  Entity* find(EntityName name);
+
+  void operator()(double time, double step) {
+    static auto do_substep = [](auto& system, double time, double step, EventQueue* events) {
+      for (double substep = step * SUB_STEP_FACTOR, start = time; time < start + step;
+           time += substep) {
+        system(time, substep, events);
+      }
+    };
+
+    do_substep(environment_, time, step, &events);
+    do_substep(intelligent_, time, step, &events);
+    do_substep(physical_, time, step, &events);
+    do_substep(controls_, time, step, &events);
+    do_substep(movement_, time, step, &events);
+
+    events.process_until(time);
+  }
+
+  EventQueue events;
+
+ private:
+  System<Environment, ComputeBase<Environment>> environment_;
+  System<Intelligent, ComputeBase<Intelligent>> intelligent_;
+  System<Physical, DetectSphericalCollision> physical_;
+  System<Controls, ComputeControls> controls_;
+  System<Movement, ComputeMovement> movement_;
+  std::vector<std::unique_ptr<Entity>> entities_;
+};
+*/
+
 int main(int, char**) {
   // Setup SDL
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {

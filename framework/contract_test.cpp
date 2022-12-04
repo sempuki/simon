@@ -2,7 +2,7 @@
 
 #include "framework/contract.hpp"
 
-#include "framework/testing.hpp"
+#include "base/testing.hpp"
 
 namespace simon::framework {
 

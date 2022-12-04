@@ -4,10 +4,12 @@
 
 #include <type_traits>
 
-#include "framework/testing.hpp"
+#include "base/testing.hpp"
 
 namespace simon::components {
 
-TEST_CASE("Movement") {}
+TEST_CASE("Movement") {
+  //
+}
 
 }  // namespace simon::components
