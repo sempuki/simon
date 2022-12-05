@@ -1,2 +1,3 @@
 # simon
-Everyone loves our simian drugs.
+Out of the Box.
+bazel run hello

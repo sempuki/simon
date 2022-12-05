@@ -5,11 +5,11 @@
 #include "base/math.hpp"
 #include "framework/component.hpp"
 
-namespace simon::components {
+namespace simon::component {
 
-class Environment;
-class Physical;
-class Controls;
+struct Environment;
+struct Physical;
+struct Controls;
 
 struct Movement final : public framework::Component<Movement> {
   Vec3 position;
@@ -20,5 +20,5 @@ struct Movement final : public framework::Component<Movement> {
   Controls* controls = nullptr;
 };
 
-}  // namespace simon::components
+}  // namespace simon::component
 
