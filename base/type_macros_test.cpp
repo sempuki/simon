@@ -1,6 +1,6 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
-#include "framework/type_macros.hpp"
+#include "base/type_macros.hpp"
 
 #include <type_traits>
 

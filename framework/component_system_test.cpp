@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "base/testing.hpp"
+#include "base/time.hpp"
 
 namespace simon::framework {
 
@@ -14,12 +15,12 @@ TEST_CASE("ComponentSystem") {
   struct ComputeT {
     void prepare() {}
     void resolve() {}
-    void operator()(T* component, double time, double step, std::nullptr_t) {
+    void operator()(T* component, TimePoint time, Duration step, std::nullptr_t) {
       times->push_back(time);
     }
-    std::vector<double>* times = nullptr;
+    std::vector<TimePoint>* times = nullptr;
   };
-  std::vector<double> was_called_at;
+  std::vector<TimePoint> was_called_at;
   ComponentSystem<T, ComputeT> sys{ComputeT{&was_called_at}};
 
   SECTION("ShouldHaveSameComponentNameAsComponent") {
@@ -43,8 +44,8 @@ TEST_CASE("ComponentSystem") {
   SECTION("ShouldInvokeComputation") {
     // Setup
     Entity a;
-    double time = 0.0;
-    double step = 0.0;
+    TimePoint time;
+    Duration step;
     sys.attach(&a);
 
     // Act

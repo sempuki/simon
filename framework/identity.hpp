@@ -6,7 +6,7 @@
 #include <memory>
 #include <ostream>
 
-#include "framework/type_macros.hpp"
+#include "base/type_macros.hpp"
 
 namespace simon::framework {
 

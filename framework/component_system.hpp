@@ -6,6 +6,7 @@
 #include <memory>
 #include <vector>
 
+#include "base/time.hpp"
 #include "framework/component.hpp"
 #include "framework/entity.hpp"
 
@@ -41,9 +42,9 @@ struct ComponentSystem final : public TypedComponentSystemBase<ComponentType> {
     : compute_{std::forward<StatefulComputation>(compute)} {}
 
   template <typename EventSink>
-  void operator()(double time, double step, EventSink events) {
+  void operator()(TimePoint time, Duration step, EventSink events) {
     for (auto&& component : this->components_) {
-      compute_.prepare();
+      compute_.prepare(component.get());
     }
 
     for (auto&& component : this->components_) {
@@ -51,12 +52,23 @@ struct ComponentSystem final : public TypedComponentSystemBase<ComponentType> {
     }
 
     for (auto&& component : this->components_) {
-      compute_.resolve();
+      compute_.resolve(component.get());
     }
   }
 
   ComputationType compute_;
 };
 
+template <typename ComponentType>
+struct ComputeBase {
+  void prepare(ComponentType* component) {}
+  void resolve(ComponentType* component) {}
+};
+
+struct ComputeNone final {
+  void prepare(auto* component) {}
+  void operator()(auto* component, TimePoint time, Duration step, auto* events) {}
+  void resolve(auto* component) {}
+};
 }  // namespace simon::framework
 

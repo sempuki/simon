@@ -6,6 +6,14 @@ cc_binary(
     name = "hello",
     srcs = ["hello.cpp"],
     deps = [
+      "//base:time",
+      "//component:controls",
+      "//component:environment",
+      "//component:movement",
+      "//component:physical",
+      "//framework:entity",
+      "//framework:event_queue",
+      "//framework:component_system",
       "@imgui//:imgui",
     ],
     copts = COPTS + [

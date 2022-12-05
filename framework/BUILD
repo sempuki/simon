@@ -21,27 +21,11 @@ cc_test(
 )
 
 cc_library(
-  name = "type_macros",
-  hdrs= ["type_macros.hpp"],
-  copts = COPTS,
-)
-
-cc_test(
-  name = "type_macros_test",
-  srcs = ["type_macros_test.cpp"],
-  deps = [
-    "//base:testing",
-    ":type_macros",
-  ],
-  copts = COPTS,
-)
-
-cc_library(
   name = "identity",
   srcs= ["identity.cpp"],
   hdrs= ["identity.hpp"],
   deps = [
-    ":type_macros",
+    "//base:type_macros",
   ],
   copts = COPTS,
 )
@@ -139,6 +123,7 @@ cc_library(
   name = "component_system",
   hdrs= ["component_system.hpp"],
   deps = [
+    "//base:time",
     ":entity",
     ":component",
   ],
