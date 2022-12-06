@@ -14,14 +14,14 @@ struct PostconditionError final : public ContractError {};
 struct InvariantError final : public ContractError {};
 }  // namespace simon::framework::contract
 
-#define EXPECTS(expr)                                                                \
+#define EXPECT(expr)                                                                 \
   [&] {                                                                              \
     if (!(expr)) [[unlikely]] {                                                      \
       throw framework::contract::PreconditionError{std::source_location::current()}; \
     }                                                                                \
   }()
 
-#define ENSURES(expr)                                                                 \
+#define ENSURE(expr)                                                                  \
   [&] {                                                                               \
     if (!(expr)) [[unlikely]] {                                                       \
       throw framework::contract::PostconditionError{std::source_location::current()}; \

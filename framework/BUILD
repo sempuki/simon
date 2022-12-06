@@ -5,22 +5,6 @@ load("//:bazel/copts.bzl", "COPTS")
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-  name = "contract",
-  hdrs= ["contract.hpp"],
-  copts = COPTS,
-)
-
-cc_test(
-  name = "contract_test",
-  srcs = ["contract_test.cpp"],
-  deps = [
-    "//base:testing",
-    ":contract",
-  ],
-  copts = COPTS,
-)
-
-cc_library(
   name = "identity",
   srcs= ["identity.cpp"],
   hdrs= ["identity.hpp"],
