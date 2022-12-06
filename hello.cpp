@@ -197,7 +197,7 @@ int main(int, char**) {
   ball_a->component<component::Environment>()->wind = {-1.0, 0.0, 0.0};
   ball_a->component<component::Physical>()->wind_resistance_factor = 0.4;
   ball_a->component<component::Physical>()->radius = 10.0;
-  ball_a->component<component::Controls>()->acceleration = {0.0, (9.8 / 4.0), 0.0};
+  ball_a->component<component::Controls>()->acceleration = {0.0, 9.8, 0.0};
   ball_a->component<component::Movement>()->position = {360.0, 100.0, 0.0};
   ball_a->component<component::Movement>()->velocity = {10.0, -10.0, 0.0};
 
@@ -222,7 +222,7 @@ int main(int, char**) {
     }
 
     // Start simulation
-    TimePoint slice_time{curr_time + (10 * Simulation::STEP_SIZE)};
+    TimePoint slice_time{curr_time + Simulation::STEP_SIZE};
     for (; curr_time < slice_time; curr_time += Simulation::STEP_SIZE) {
       simulation(curr_time, Simulation::STEP_SIZE);
     }
@@ -236,7 +236,13 @@ int main(int, char**) {
     const ImU32 blue = ImColor(ImVec4(0.0f, 0.0f, 1.0f, 1.0f));
     const ImU32 sides = 12;
 
-    ImGui::Begin("Window", nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration);
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->WorkPos);
+    ImGui::SetNextWindowSize(viewport->WorkSize);
+    ImGui::Begin("Window",
+                 nullptr,
+                 ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration |
+                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     draw_list->AddCircleFilled(ImVec2(ball_a_movement->position[0], ball_a_movement->position[1]),
                                ball_a_physical->radius,
