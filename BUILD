@@ -7,6 +7,7 @@ cc_binary(
     srcs = ["hello.cpp"],
     deps = [
       "//base:time",
+      "//base:contract",
       "//component:controls",
       "//component:environment",
       "//component:movement",

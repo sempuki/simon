@@ -4,6 +4,7 @@
 
 #include "backends/imgui_impl_sdl.h"
 #include "backends/imgui_impl_sdlrenderer.h"
+#include "base/contract.hpp"
 #include "base/time.hpp"
 #include "component/controls.hpp"
 #include "component/environment.hpp"
@@ -209,8 +210,13 @@ int main(int, char**) {
   auto* ball_b_movement = ball_b->component<component::Movement>();
   auto* ball_b_physical = ball_a->component<component::Physical>();
 
-  // Main loop
   bool done = false;
+  simulation.events.subscribe<Collision>([&](TimePoint time, const Collision& event) {
+    ASSERT(event.a == ball_a_physical && event.b == ball_b_physical);
+    done = true;
+  });
+
+  // Main loop
   while (!done) {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {

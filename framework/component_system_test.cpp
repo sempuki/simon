@@ -13,8 +13,8 @@ namespace simon::framework {
 TEST_CASE("ComponentSystem") {
   struct T final : public Component<T> {};
   struct ComputeT {
-    void prepare() {}
-    void resolve() {}
+    void prepare(T* component) {}
+    void resolve(T* component) {}
     void operator()(T* component, TimePoint time, Duration step, std::nullptr_t) {
       times->push_back(time);
     }
