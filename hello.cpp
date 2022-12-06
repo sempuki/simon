@@ -208,11 +208,12 @@ int main(int, char**) {
   auto* ball_a_movement = ball_a->component<component::Movement>();
   auto* ball_a_physical = ball_a->component<component::Physical>();
   auto* ball_b_movement = ball_b->component<component::Movement>();
-  auto* ball_b_physical = ball_a->component<component::Physical>();
+  auto* ball_b_physical = ball_b->component<component::Physical>();
 
   bool done = false;
   simulation.events.subscribe<Collision>([&](TimePoint time, const Collision& event) {
-    ASSERT(event.a == ball_a_physical && event.b == ball_b_physical);
+    ASSERT((event.a == ball_a_physical || event.a == ball_b_physical) &&
+           (event.b == ball_a_physical || event.b == ball_b_physical));
     done = true;
   });
 
