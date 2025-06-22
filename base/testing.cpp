@@ -13,9 +13,7 @@ constexpr const std::string_view result_marker{"\033[1;33m*\033[0m"};
 constexpr const std::string_view passed{"\033[1;32mPASSED\033[0m."};
 constexpr const std::string_view failed{"\033[1;31mFAILED\033[0m."};
 
-std::string SummaryReporter::getDescription() {
-  return "Summary reporter";
-}
+std::string SummaryReporter::getDescription() { return "Summary reporter"; }
 
 void SummaryReporter::testRunStarting(Catch::TestRunInfo const& info) {
   report_.emplace_back();
@@ -23,6 +21,7 @@ void SummaryReporter::testRunStarting(Catch::TestRunInfo const& info) {
 }
 
 void SummaryReporter::testRunEnded(Catch::TestRunStats const& info) {
+  std::cout << "\n\n**** Test Run Results. ****\n\n";
   for (auto&& line : report_) {
     std::cout << line.str() << "\n";
   }
@@ -63,10 +62,8 @@ void SummaryReporter::sectionEnded(Catch::SectionStats const& stats) {
 }
 
 void SummaryReporter::assertionStarting(Catch::AssertionInfo const& info) {}
-bool SummaryReporter::assertionEnded(Catch::AssertionStats const& stats) {
-  return true;
-}
+void SummaryReporter::assertionEnded(Catch::AssertionStats const& stats) {}
 
-CATCH_REGISTER_REPORTER("summary", SummaryReporter)
+CATCH_REGISTER_LISTENER(SummaryReporter)
 
 }  // namespace simon

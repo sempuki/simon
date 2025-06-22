@@ -5,14 +5,17 @@
 #include <sstream>
 #include <vector>
 
-#include "catch2/catch.hpp"
+#include "catch2/catch_test_case_info.hpp"
+#include "catch2/catch_test_macros.hpp"
+#include "catch2/reporters/catch_reporter_event_listener.hpp"
+#include "catch2/reporters/catch_reporter_registrars.hpp"
 
 namespace simon {
 
 // See: external/catch2/examples/210-Evt-EventListeners.cpp
-class SummaryReporter : public Catch::StreamingReporterBase<SummaryReporter> {
- public:
-  using StreamingReporterBase<SummaryReporter>::StreamingReporterBase;
+struct SummaryReporter : Catch::EventListenerBase {
+  using EventListenerBase::EventListenerBase;
+
   static std::string getDescription();
 
   void testRunStarting(Catch::TestRunInfo const& info) override;
@@ -22,7 +25,7 @@ class SummaryReporter : public Catch::StreamingReporterBase<SummaryReporter> {
   void sectionEnded(Catch::SectionStats const& stats) override;
 
   void assertionStarting(Catch::AssertionInfo const& info) override;
-  bool assertionEnded(Catch::AssertionStats const& stats) override;
+  void assertionEnded(Catch::AssertionStats const& stats) override;
 
  private:
   std::size_t depth_ = 0;

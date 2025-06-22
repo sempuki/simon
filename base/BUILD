@@ -11,13 +11,14 @@ cc_library(
   defines = ["CATCH_CONFIG_MAIN"],
   deps = [
     "@catch2//:catch2",
+    "@catch2//:catch2_main",
   ],
   copts = COPTS,
 )
 
 cc_library(
-  name = "base",
-  hdrs= ["base.hpp"],
+  name = "core",
+  hdrs= ["core.hpp"],
   copts = COPTS,
 )
 
@@ -38,20 +39,21 @@ cc_test(
 )
 
 cc_library(
-    name = "result_code",
-    hdrs = ["result_code.hpp"],
+    name = "status",
+    hdrs = ["status.hpp"],
+    srcs = ["status.cpp"],
     deps = [
-      ":base",
+      ":core",
     ],
     copts = COPTS,
 )
 
 cc_test(
-  name = "error_test",
-  srcs = ["error_test.cpp"],
+  name = "status_test",
+  srcs = ["status_test.cpp"],
   deps = [
     ":testing",
-    ":error",
+    ":status",
   ],
   copts = COPTS,
 )

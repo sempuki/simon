@@ -5,7 +5,7 @@
 #include <ostream>
 #include <source_location>
 
-#include "base/base.hpp"
+#include "base/core.hpp"
 
 namespace simon {
 
@@ -15,9 +15,13 @@ class BitCode {
   BitCode(std::size_t domain,     //
           std::size_t condition,  //
           std::size_t incident)
-      : bits_{(narrow_cast<std::uint16_t>(domain) << DOMAIN_SHIFT) |        //
-              (narrow_cast<std::uint16_t>(condition) << CONDITION_SHIFT) |  //
-              (narrow_cast<std::uint16_t>(incident) << INCIDENT_SHIFT)} {}
+      : bits_{(least_16_bits_as_uint64(domain) << DOMAIN_SHIFT) |
+              (least_16_bits_as_uint64(condition) << CONDITION_SHIFT) |
+              (least_16_bits_as_uint64(incident) << INCIDENT_SHIFT)} {
+    CHECK_POSTCONDITION(std::cmp_equal(domain, domain_bits()));
+    CHECK_POSTCONDITION(std::cmp_equal(condition, condition_bits()));
+    CHECK_POSTCONDITION(std::cmp_equal(incident, incident_bits()));
+  }
 
   DECLARE_COPY_DEFAULT(BitCode);
   DECLARE_MOVE_DEFAULT(BitCode);
@@ -28,10 +32,13 @@ class BitCode {
   std::size_t domain_bits() const noexcept {
     return (bits_ & DOMAIN_MASK) >> DOMAIN_SHIFT;
   }
+
   void set_domain_bits(std::size_t bits) noexcept {
     bits_ &= ~DOMAIN_MASK;
-    bits_ |= narrow_cast<std::uint16_t>(bits) << DOMAIN_SHIFT;
+    bits_ |= least_16_bits_as_uint64(bits) << DOMAIN_SHIFT;
+    CHECK_POSTCONDITION(std::cmp_equal(bits, domain_bits()));
   }
+
   void set_domain_bits(BitCode code) noexcept {
     bits_ &= ~DOMAIN_MASK;
     bits_ |= code.bits_ & DOMAIN_MASK;
@@ -40,10 +47,13 @@ class BitCode {
   std::size_t condition_bits() const noexcept {
     return (bits_ & CONDITION_MASK) >> CONDITION_SHIFT;
   }
+
   void set_condition_bits(std::size_t bits) noexcept {
     bits_ &= ~CONDITION_MASK;
-    bits_ |= narrow_cast<std::uint16_t>(bits) << CONDITION_SHIFT;
+    bits_ |= least_16_bits_as_uint64(bits) << CONDITION_SHIFT;
+    CHECK_POSTCONDITION(std::cmp_equal(bits, condition_bits()));
   }
+
   void set_condition_bits(BitCode code) noexcept {
     bits_ &= ~CONDITION_MASK;
     bits_ |= code.bits_ & CONDITION_MASK;
@@ -52,10 +62,13 @@ class BitCode {
   std::size_t incident_bits() const noexcept {
     return (bits_ & INCIDENT_MASK) >> INCIDENT_SHIFT;
   }
+
   void set_incident_bits(std::size_t bits) noexcept {
     bits_ &= ~INCIDENT_MASK;
-    bits_ |= narrow_cast<std::uint16_t>(bits) << INCIDENT_SHIFT;
+    bits_ |= least_16_bits_as_uint64(bits) << INCIDENT_SHIFT;
+    CHECK_POSTCONDITION(std::cmp_equal(bits, incident_bits()));
   }
+
   void set_incident_bits(BitCode code) noexcept {
     bits_ &= ~INCIDENT_MASK;
     bits_ |= code.bits_ & INCIDENT_MASK;
@@ -96,6 +109,11 @@ class BitCode {
       DOMAIN_MASK | CONDITION_MASK;
   constexpr static std::uint64_t INCIDENT_COMPARE_MASK =
       DOMAIN_MASK | CONDITION_MASK | INCIDENT_MASK;
+
+  static std::uint64_t least_16_bits_as_uint64(std::size_t bits) {
+    constexpr std::uint64_t SHIFT = 64 - 16;
+    return ((reinterpret_cast<std::uint64_t>(bits) << SHIFT) >> SHIFT);
+  }
 };
 
 struct ConditionEntry final {
@@ -108,39 +126,41 @@ struct IncidentEntry final {
 };
 }  // namespace impl
 
-class ResultCode;
-class ResultCodeStored;
-class ResultCondition;
+class StatusCode;
+class StatusCodeLocal;
+class StatusCondition;
 
-class ResultDomainBase {
+class StatusDomainBase {
  public:
-  DECLARE_COPY_DELETE(ResultDomainBase);
-  DECLARE_MOVE_DELETE(ResultDomainBase);
+  DECLARE_COPY_DELETE(StatusDomainBase);
+  DECLARE_MOVE_DELETE(StatusDomainBase);
 
-  ResultDomainBase() = delete;
-  ~ResultDomainBase() = default;
+  StatusDomainBase() = delete;
+  ~StatusDomainBase() = default;
 
-  explicit ResultDomainBase(std::size_t domain_code,
+  explicit StatusDomainBase(std::size_t domain_code,
                             std::string_view domain_name)
       : code_{domain_code}, name_{domain_name} {}
 
   std::string_view name() const noexcept { return name_; }
 
-  virtual std::string_view message(ResultCode) const noexcept = 0;
-  virtual std::source_location location(ResultCode) const noexcept = 0;
-  virtual bool has_condition(ResultCode, ResultCondition) const noexcept = 0;
+  virtual std::string_view message_of(StatusCondition) const noexcept = 0;
+  virtual std::string_view message_of(StatusCode) const noexcept = 0;
+  virtual std::source_location location_of(StatusCode) const noexcept = 0;
+  virtual bool has_equivalent_condition(StatusCode,
+                                        StatusCondition) const noexcept = 0;
 
  protected:
-  friend class ResultCode;
-  ResultCode make_result_code(impl::BitCode) const noexcept;
-  std::size_t incident_code(ResultCode) const noexcept;
-  std::size_t condition_code(ResultCode) const noexcept;
-  std::size_t domain_code(ResultCode) const noexcept;
+  friend class StatusCode;
+  StatusCode make_status_code(impl::BitCode) const noexcept;
+  std::size_t incident_code(StatusCode) const noexcept;
+  std::size_t condition_code(StatusCode) const noexcept;
+  std::size_t domain_code(StatusCode) const noexcept;
 
-  friend class ResultCondition;
-  ResultCondition make_result_condition(impl::BitCode) const noexcept;
-  std::size_t condition_code(ResultCondition) const noexcept;
-  std::size_t domain_code(ResultCondition) const noexcept;
+  friend class StatusCondition;
+  StatusCondition make_status_condition(impl::BitCode) const noexcept;
+  std::size_t condition_code(StatusCondition) const noexcept;
+  std::size_t domain_code(StatusCondition) const noexcept;
 
   std::size_t domain_code() const noexcept { return code_; }
 
@@ -149,187 +169,195 @@ class ResultDomainBase {
   std::string name_;
 };
 
-class ResultCondition {
+class StatusCondition {
  public:
-  DECLARE_COPY_DELETE(ResultCondition);
-  DECLARE_MOVE_DELETE(ResultCondition);
+  DECLARE_COPY_DEFAULT(StatusCondition);
+  DECLARE_MOVE_DEFAULT(StatusCondition);
 
-  ResultCondition() = delete;
-  ~ResultCondition() = default;
+  StatusCondition() = delete;
+  ~StatusCondition() = default;
 
-  std::string_view message() const noexcept { return domain_->message(*this); }
+  std::string_view message() const noexcept {
+    return domain_->message_of(*this);
+  }
 
  private:
-  friend class ResultDomainBase;
-  explicit ResultCondition(impl::BitCode code, ResultDomainBase const *domain)
+  friend class StatusCode;
+  friend class StatusDomainBase;
+
+  explicit StatusCondition(impl::BitCode code, StatusDomainBase const *domain)
       : code_{code}, domain_{domain} {}
 
-  friend class ResultCode;
   impl::BitCode code_;
-  ResultDomainBase const *domain_ = nullptr;
+  StatusDomainBase const *domain_ = nullptr;
 
-  friend std::ostream &operator<<(std::ostream &out, ResultCondition self) {
+  friend std::ostream &operator<<(std::ostream &out, StatusCondition self) {
     out << self.message();
     return out;
   }
 };
 
-class ResultCode {
+class StatusCode {
  public:
-  DECLARE_COPY_DELETE(ResultCode);
-  DECLARE_MOVE_DELETE(ResultCode);
+  DECLARE_COPY_DEFAULT(StatusCode);
+  DECLARE_MOVE_DEFAULT(StatusCode);
 
-  ResultCode() = delete;
-  ~ResultCode() = default;
+  StatusCode() = delete;
+  ~StatusCode() = default;
 
-  std::string_view message() const noexcept { return domain_->message(*this); }
+  std::string_view message() const noexcept {
+    return domain_->message_of(*this);
+  }
   std::source_location location() const noexcept {
-    return domain_->location(*this);
+    return domain_->location_of(*this);
   }
 
-  bool has_condition(ResultCondition condition) const noexcept {
-    return operator==(condition) || domain_->has_condition(*this, condition);
+  bool has_condition(StatusCondition condition) const noexcept {
+    return operator==(condition) ||
+           domain_->has_equivalent_condition(*this, condition);
   }
 
-  bool operator==(ResultCode that) const noexcept {
+  bool operator==(StatusCode that) const noexcept {
     return code_.has_all_same_incident_bits(that.code_);
   }
 
-  bool operator==(ResultCondition that) const noexcept {
+  bool operator==(StatusCondition that) const noexcept {
     return code_.has_all_same_condition_bits(that.code_);
   }
 
-  ResultCodeStored make_result_code_stored() const noexcept {
-    return ResultCodeStored{
-        code_,
-        domain_,
-    };
-  }
+  StatusCodeLocal make_status_code_local() const noexcept;
 
  private:
-  friend class ResultDomainBase;
-  explicit ResultCode(impl::BitCode code, ResultDomainBase const *domain)
+  friend class StatusCodeLocal;
+  friend class StatusDomainBase;
+
+  explicit StatusCode(impl::BitCode code, StatusDomainBase const *domain)
       : code_{code}, domain_{domain} {}
 
   impl::BitCode code_;
-  ResultDomainBase const *domain_ = nullptr;
+  StatusDomainBase const *domain_ = nullptr;
 
-  friend bool operator==(ResultCode a, ResultCondition b) noexcept {
+  friend bool operator==(StatusCode a, StatusCondition b) noexcept {
     return a.operator==(b);
   }
 
-  friend bool operator==(ResultCondition a, ResultCode b) noexcept {
+  friend bool operator==(StatusCondition a, StatusCode b) noexcept {
     return b.operator==(a);
   }
 
-  friend std::ostream &operator<<(std::ostream &out, ResultCode self) {
+  friend std::ostream &operator<<(std::ostream &out, StatusCode self) {
     out << self.message();
     return out;
   }
 };
 
-class ResultCodeStored : public ResultCode {
+class StatusCodeLocal : public StatusCode {
  public:
-  DECLARE_COPY_DELETE(ResultCodeStored);
-  DECLARE_MOVE_DELETE(ResultCodeStored);
+  DECLARE_COPY_DEFAULT(StatusCodeLocal);
+  DECLARE_MOVE_DEFAULT(StatusCodeLocal);
 
-  ResultCodeStored() = delete;
-  ~ResultCodeStored() = default;
+  StatusCodeLocal() = delete;
+  ~StatusCodeLocal() = default;
 
-  std::string_view message() const noexcept { return entry_->message; }
+  std::string_view message() const noexcept { return entry_.message; }
   std::source_location location() const noexcept { return entry_.location; }
 
  private:
-  friend class ResultCode;
-  explicit ResultCodeStored(impl::BitCode code, ResultDomainBase const *domain)
-      : ResultCode{code, domain},
-        entry_{domain->source_location(*this), domain->message(*this)} {}
+  friend class StatusCode;
 
-  IncidentEntry entry_;
+  explicit StatusCodeLocal(impl::BitCode code, StatusDomainBase const *domain)
+      : StatusCode{code, domain} {
+    entry_.location = domain->location_of(*this);
+    entry_.message = domain->message_of(*this);
+  }
 
-  friend std::ostream &operator<<(std::ostream &out, ResultCodeStored self) {
+  impl::IncidentEntry entry_;
+
+  friend std::ostream &operator<<(std::ostream &out, StatusCodeLocal self) {
     out << self.message();
     return out;
   }
 };
 
-inline ResultCode ResultDomainBase::make_result_code(
+inline StatusCode StatusDomainBase::make_status_code(
     impl::BitCode code) const noexcept {
-  return ResultCode{code, this};
+  return StatusCode{code, this};
 }
 
-inline std::size_t ResultDomainBase::incident_code(
-    ResultCode incident) const noexcept {
+inline std::size_t StatusDomainBase::incident_code(
+    StatusCode incident) const noexcept {
   return incident.code_.incident_bits();
 }
 
-inline std::size_t ResultDomainBase::condition_code(
-    ResultCode incident) const noexcept {
+inline std::size_t StatusDomainBase::condition_code(
+    StatusCode incident) const noexcept {
   return incident.code_.condition_bits();
 }
 
-inline std::size_t ResultDomainBase::domain_code(
-    ResultCode incident) const noexcept {
+inline std::size_t StatusDomainBase::domain_code(
+    StatusCode incident) const noexcept {
   return incident.code_.domain_bits();
 }
 
-inline ResultCondition ResultDomainBase::make_result_condition(
+inline StatusCondition StatusDomainBase::make_status_condition(
     impl::BitCode code) const noexcept {
-  return ResultCondition{code};
+  return StatusCondition{code, this};
 }
 
-inline std::size_t ResultDomainBase::condition_code(
-    ResultCondition condition) const noexcept {
+inline std::size_t StatusDomainBase::condition_code(
+    StatusCondition condition) const noexcept {
   return condition.code_.condition_bits();
 }
 
-inline std::size_t ResultDomainBase::domain_code(
-    ResultCondition condition) const noexcept {
+inline std::size_t StatusDomainBase::domain_code(
+    StatusCondition condition) const noexcept {
   return condition.code_.domain_bits();
 }
 
-inline ResultCodeStored ResultCode::make_result_code_stored() const noexcept {
-  return ResultCodeStored{code_, domain_};
+inline StatusCodeLocal StatusCode::make_status_code_local() const noexcept {
+  return StatusCodeLocal{code_, domain_};
 }
 
 // NOTE: To avoid the cost of reference counting each return code's incident
 // location and message, the domain is limited to tracking `IncidentCountMax`
 // number of concurrent incidents, which are stored in a simple array-backed
-// ring buffer. If `ResultCode` incident information must be accurately stored
-// long enough that the buffer might overlap, then `ResultCodeStored` should be
-// used instead.
+// ring buffer. If `StatusCode` incident information must be accurately stored
+// for longer than the buffer might be expected to overlap, then
+// `StatusCodeLocal` should be used instead.
 //
 template <typename ConditionEnumType,  //
           std::size_t ConditionCount,  //
           std::size_t IncidentCountMax = 16>
-class EnumResultDomain final : public ResultDomainBase {
+class EnumStatusDomain : public StatusDomainBase {
  public:
-  DECLARE_COPY_DELETE(EnumResultDomain);
-  DECLARE_MOVE_DELETE(EnumResultDomain);
+  DECLARE_COPY_DELETE(EnumStatusDomain);
+  DECLARE_MOVE_DELETE(EnumStatusDomain);
 
-  EnumResultDomain() = delete;
-  ~EnumResultDomain() = default;
+  EnumStatusDomain() = delete;
+  ~EnumStatusDomain() = default;
 
-  explicit EnumResultDomainResultDomainBase(std::size_t domain_code,
-                                            std::string_view domain_name)
-      : ResultDomainBase{domain_code, domain_name} {}
+  explicit EnumStatusDomain(std::size_t domain_code,
+                            std::string_view domain_name)
+      : StatusDomainBase{domain_code, domain_name} {}
 
-  std::string_view message(ResultCondition condition) const noexcept override {
+  std::string_view message_of(
+      StatusCondition condition) const noexcept override {
     return conditions_[condition_code(condition)].message;
   }
 
-  std::string_view message(ResultCode incident) const noexcept override {
+  std::string_view message_of(StatusCode incident) const noexcept override {
     return incidents_[incident_code(incident)].message;
   }
 
-  std::source_location location(ResultCode incident) const noexcept override {
+  std::source_location location_of(
+      StatusCode incident) const noexcept override {
     return incidents_[incident_code(incident)].location;
   }
 
-  bool has_condition(ResultCode incident,
-                     ResultCondition condition) const noexcept override;
+  bool has_equivalent_condition(
+      StatusCode incident, StatusCondition condition) const noexcept override;
 
-  ResultCode raise(
+  StatusCode make_status_code(
       ConditionEnumType condition, std::string message = {},
       std::source_location location = std::source_location::current()) {
     std::size_t current = next_incident_++;
@@ -339,20 +367,22 @@ class EnumResultDomain final : public ResultDomainBase {
     incidents_[current].message = std::move(message);
 
     auto condition_code = static_cast<std::size_t>(condition);
-    return make_result_code(
+    return make_status_code(
         impl::BitCode{domain_code(), condition_code, current});
   }
 
-  ResultCondition expect(ConditionEnumType condition) {
+  StatusCondition make_status_condition(ConditionEnumType condition) {
     auto condition_code = static_cast<std::size_t>(condition);
-    return make_result_condition(
+    return make_status_condition(
         impl::BitCode{domain_code(), condition_code, 0U});
   }
 
  private:
-  static const std::array<impl::ConditionEntry, ConditionCount> conditions_;
-  std::array<impl::IncidentEntry, IncidentCountMax> incidents_;
   std::size_t next_incident_ = 0;
+  std::array<impl::IncidentEntry, IncidentCountMax> incidents_;
+
+ protected:
+  static const std::array<impl::ConditionEntry, ConditionCount> conditions_;
 };
 
 enum class PosixCondition : std::size_t {
@@ -449,14 +479,14 @@ constexpr std::size_t POSIX_CONDITION_COUNT =
 constexpr std::size_t POSIX_DOMAIN_CODE = 0x1;
 }  // namespace impl
 
-class PosixResultDomain final
-    : public EnumResultDomain<PosixCondition, impl::POSIX_CONDITION_COUNT> {
+class PosixStatusDomain final
+    : public EnumStatusDomain<PosixCondition, impl::POSIX_CONDITION_COUNT> {
  public:
-  DECLARE_COPY_DELETE(PosixResultDomain);
-  DECLARE_MOVE_DELETE(PosixResultDomain);
+  DECLARE_COPY_DELETE(PosixStatusDomain);
+  DECLARE_MOVE_DELETE(PosixStatusDomain);
 
-  PosixResultDomain() : EnumResultDomain{POSIX_DOMAIN_CODE, "posix"} {}
-  ~PosixResultDomain() = default;
+  PosixStatusDomain() : EnumStatusDomain{impl::POSIX_DOMAIN_CODE, "posix"} {}
+  ~PosixStatusDomain() = default;
 };
 
 enum class Win32Condition : std::size_t {
@@ -635,7 +665,7 @@ enum class Win32Condition : std::size_t {
   VC_DISCONNECTED,            // The session was canceled.
   INVALID_EA_NAME,            // The specified extended attribute name was
   EA_LIST_INCONSISTENT,       // The extended attributes are inconsistent.
-  IMEOUT,                     // The wait operation timed out.
+  WAIT_TIMEOUT,               // The wait operation timed out.
   NO_MORE_ITEMS,              // No more data is available.
   CANNOT_COPY,                // The copy functions cannot be used.
   DIRECTORY,                  // The directory name is invalid.
@@ -659,7 +689,8 @@ enum class Win32Condition : std::size_t {
   IO_INCOMPLETE,      // Overlapped I/O event is not in a signaled state.
   IO_PENDING,         // Overlapped I/O operation is in progress.
   NOACCESS,           // Invalid access to memory location.
-  SWAPERROR           // Error performing inpage operation.
+  SWAPERROR,          // Error performing inpage operation.
+  COUNT
 };
 
 namespace impl {
@@ -668,14 +699,14 @@ constexpr std::size_t WIN32_CONDITION_COUNT =
 constexpr std::size_t WIN32_DOMAIN_CODE = 0x2;
 }  // namespace impl
 
-class Win32ResultDomain final
-    : public EnumResultDomain<Win32Condition, impl::WIN32_CONDITION_COUNT> {
+class Win32StatusDomain final
+    : public EnumStatusDomain<Win32Condition, impl::WIN32_CONDITION_COUNT> {
  public:
-  DECLARE_COPY_DELETE(Win32ResultDomain);
-  DECLARE_MOVE_DELETE(Win32ResultDomain);
+  DECLARE_COPY_DELETE(Win32StatusDomain);
+  DECLARE_MOVE_DELETE(Win32StatusDomain);
 
-  Win32ResultDomain() : EnumResultDomain{impl::WIN32_DOMAIN_CODE, "win32"} {}
-  ~Win32ResultDomain() = default;
+  Win32StatusDomain() : EnumStatusDomain{impl::WIN32_DOMAIN_CODE, "win32"} {}
+  ~Win32StatusDomain() = default;
 };
 
 }  // namespace simon
