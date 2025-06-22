@@ -3,6 +3,7 @@
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <format>
 #include <functional>
 #include <iostream>
@@ -73,11 +74,11 @@
 #define CHECK_INVARIANT(invariant__) CHECK_CONTRACT__(invariant__, "Invariant")
 #define CHECK_UNREACHABLE() CHECK_CONTRACT__(false, "Unreachable")
 
-namespace volcano {
+namespace simon {
 
 template <std::integral ToType, std::integral FromType>
 ToType narrow_cast(FromType from) {
-  ToType to = static_cast<ToType>(from);
+  ToType to(from);
   CHECK_PRECONDITION(std::cmp_equal(to, from))
   return to;
 }
@@ -290,4 +291,4 @@ inline std::size_t stable_hash(std::string_view str) {
   return diffuse_(result, m2, ~m3);
 }
 
-}  // namespace volcano
+}  // namespace simon
