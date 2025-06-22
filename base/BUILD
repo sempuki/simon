@@ -16,18 +16,8 @@ cc_library(
 )
 
 cc_library(
-  name = "type_macros",
-  hdrs= ["type_macros.hpp"],
-  copts = COPTS,
-)
-
-cc_test(
-  name = "type_macros_test",
-  srcs = ["type_macros_test.cpp"],
-  deps = [
-    ":testing",
-    ":type_macros",
-  ],
+  name = "base",
+  hdrs= ["base.hpp"],
   copts = COPTS,
 )
 
@@ -43,6 +33,25 @@ cc_test(
   deps = [
     ":testing",
     ":contract",
+  ],
+  copts = COPTS,
+)
+
+cc_library(
+    name = "result_code",
+    hdrs = ["result_code.hpp"],
+    deps = [
+      ":base",
+    ],
+    copts = COPTS,
+)
+
+cc_test(
+  name = "error_test",
+  srcs = ["error_test.cpp"],
+  deps = [
+    ":testing",
+    ":error",
   ],
   copts = COPTS,
 )
