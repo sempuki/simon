@@ -74,17 +74,17 @@ class BitCode {
     bits_ |= code.bits_ & INCIDENT_MASK;
   }
 
-  bool has_all_same_domain_bits(BitCode that) const noexcept {
+  bool has_all_same_domain_bits_as(BitCode that) const noexcept {
     return (bits_ & DOMAIN_COMPARE_MASK) ==  //
            (that.bits_ & DOMAIN_COMPARE_MASK);
   }
 
-  bool has_all_same_condition_bits(BitCode that) const noexcept {
+  bool has_all_same_condition_bits_as(BitCode that) const noexcept {
     return (bits_ & CONDITION_COMPARE_MASK) ==  //
            (that.bits_ & CONDITION_COMPARE_MASK);
   }
 
-  bool has_all_same_incident_bits(BitCode that) const noexcept {
+  bool has_all_same_indicent_bits_as(BitCode that) const noexcept {
     return (bits_ & INCIDENT_COMPARE_MASK) ==  //
            (that.bits_ & INCIDENT_COMPARE_MASK);
   }
@@ -124,6 +124,11 @@ struct IncidentEntry final {
   std::source_location location;
   std::string message;
 };
+
+inline std::size_t allocate_static_increment() {
+  static std::size_t increment = 0;
+  return increment++;
+}
 }  // namespace impl
 
 class StatusCode;
@@ -147,22 +152,22 @@ class StatusDomainBase {
   virtual std::string_view message_of(StatusCondition) const noexcept = 0;
   virtual std::string_view message_of(StatusCode) const noexcept = 0;
   virtual std::source_location location_of(StatusCode) const noexcept = 0;
-  virtual bool has_equivalent_condition(StatusCode,
-                                        StatusCondition) const noexcept = 0;
+  virtual bool has_equivalent_condition_of(StatusCode,
+                                           StatusCondition) const noexcept = 0;
 
  protected:
+  std::size_t domain_code() const noexcept { return code_; }
+
   friend class StatusCode;
   StatusCode make_status_code(impl::BitCode) const noexcept;
-  std::size_t incident_code(StatusCode) const noexcept;
-  std::size_t condition_code(StatusCode) const noexcept;
-  std::size_t domain_code(StatusCode) const noexcept;
+  std::size_t incident_code_of(StatusCode) const noexcept;
+  std::size_t condition_code_of(StatusCode) const noexcept;
+  std::size_t domain_code_of(StatusCode) const noexcept;
 
   friend class StatusCondition;
   StatusCondition make_status_condition(impl::BitCode) const noexcept;
-  std::size_t condition_code(StatusCondition) const noexcept;
-  std::size_t domain_code(StatusCondition) const noexcept;
-
-  std::size_t domain_code() const noexcept { return code_; }
+  std::size_t condition_code_of(StatusCondition) const noexcept;
+  std::size_t domain_code_of(StatusCondition) const noexcept;
 
  private:
   std::size_t code_;
@@ -212,20 +217,20 @@ class StatusCode {
     return domain_->location_of(*this);
   }
 
-  bool has_condition(StatusCondition condition) const noexcept {
+  bool has_equivalent_condition_as(StatusCondition condition) const noexcept {
     return operator==(condition) ||
-           domain_->has_equivalent_condition(*this, condition);
+           domain_->has_equivalent_condition_of(*this, condition);
   }
 
   bool operator==(StatusCode that) const noexcept {
-    return code_.has_all_same_incident_bits(that.code_);
+    return code_.has_all_same_indicent_bits_as(that.code_);
   }
 
   bool operator==(StatusCondition that) const noexcept {
-    return code_.has_all_same_condition_bits(that.code_);
+    return code_.has_all_same_condition_bits_as(that.code_);
   }
 
-  StatusCodeLocal make_status_code_local() const noexcept;
+  StatusCodeLocal make_local_copy() const noexcept;
 
  private:
   friend class StatusCodeLocal;
@@ -237,12 +242,16 @@ class StatusCode {
   impl::BitCode code_;
   StatusDomainBase const *domain_ = nullptr;
 
-  friend bool operator==(StatusCode a, StatusCondition b) noexcept {
-    return a.operator==(b);
-  }
-
   friend bool operator==(StatusCondition a, StatusCode b) noexcept {
     return b.operator==(a);
+  }
+
+  friend bool operator!=(StatusCode a, StatusCondition b) noexcept {
+    return !a.operator==(b);
+  }
+
+  friend bool operator!=(StatusCondition a, StatusCode b) noexcept {
+    return !b.operator==(a);
   }
 
   friend std::ostream &operator<<(std::ostream &out, StatusCode self) {
@@ -284,17 +293,17 @@ inline StatusCode StatusDomainBase::make_status_code(
   return StatusCode{code, this};
 }
 
-inline std::size_t StatusDomainBase::incident_code(
+inline std::size_t StatusDomainBase::incident_code_of(
     StatusCode incident) const noexcept {
   return incident.code_.incident_bits();
 }
 
-inline std::size_t StatusDomainBase::condition_code(
+inline std::size_t StatusDomainBase::condition_code_of(
     StatusCode incident) const noexcept {
   return incident.code_.condition_bits();
 }
 
-inline std::size_t StatusDomainBase::domain_code(
+inline std::size_t StatusDomainBase::domain_code_of(
     StatusCode incident) const noexcept {
   return incident.code_.domain_bits();
 }
@@ -304,17 +313,17 @@ inline StatusCondition StatusDomainBase::make_status_condition(
   return StatusCondition{code, this};
 }
 
-inline std::size_t StatusDomainBase::condition_code(
+inline std::size_t StatusDomainBase::condition_code_of(
     StatusCondition condition) const noexcept {
   return condition.code_.condition_bits();
 }
 
-inline std::size_t StatusDomainBase::domain_code(
+inline std::size_t StatusDomainBase::domain_code_of(
     StatusCondition condition) const noexcept {
   return condition.code_.domain_bits();
 }
 
-inline StatusCodeLocal StatusCode::make_status_code_local() const noexcept {
+inline StatusCodeLocal StatusCode::make_local_copy() const noexcept {
   return StatusCodeLocal{code_, domain_};
 }
 
@@ -323,7 +332,7 @@ inline StatusCodeLocal StatusCode::make_status_code_local() const noexcept {
 // number of concurrent incidents, which are stored in a simple array-backed
 // ring buffer. If `StatusCode` incident information must be accurately stored
 // for longer than the buffer might be expected to overlap, then
-// `StatusCodeLocal` should be used instead.
+// `StatusCodeLocal` should be used instead, which keeps its own local copy.
 //
 template <typename ConditionEnumType,  //
           std::size_t ConditionCount,  //
@@ -342,24 +351,19 @@ class EnumStatusDomain : public StatusDomainBase {
 
   std::string_view message_of(
       StatusCondition condition) const noexcept override {
-    return conditions_[condition_code(condition)].message;
+    return conditions_[condition_code_of(condition)].message;
   }
 
   std::string_view message_of(StatusCode incident) const noexcept override {
-    return incidents_[incident_code(incident)].message;
+    return incidents_[incident_code_of(incident)].message;
   }
 
   std::source_location location_of(
       StatusCode incident) const noexcept override {
-    return incidents_[incident_code(incident)].location;
+    return incidents_[incident_code_of(incident)].location;
   }
 
-  bool has_equivalent_condition(
-      StatusCode incident, StatusCondition condition) const noexcept override {
-    return false;
-  }
-
-  StatusCode raise(
+  StatusCode raise_incident(
       ConditionEnumType condition, std::string message = {},
       std::source_location location = std::source_location::current()) {
     std::size_t current = next_incident_++;
@@ -373,7 +377,7 @@ class EnumStatusDomain : public StatusDomainBase {
         impl::BitCode{domain_code(), condition_code, current});
   }
 
-  StatusCondition watch(ConditionEnumType condition) {
+  StatusCondition watch_condition(ConditionEnumType condition) {
     auto condition_code = static_cast<std::size_t>(condition);
     return make_status_condition(
         impl::BitCode{domain_code(), condition_code, 0U});
@@ -386,79 +390,103 @@ class EnumStatusDomain : public StatusDomainBase {
   static const std::array<impl::ConditionEntry, ConditionCount> conditions_;
 };
 
+template <typename ConditionEnumType, std::size_t ConditionCount>
+EnumStatusDomain<ConditionEnumType, ConditionCount> &
+static_enum_status_domain() {
+  static std::size_t domain_code = impl::allocate_static_increment();
+  static EnumStatusDomain<ConditionEnumType, ConditionCount> _{
+      domain_code, std::format("static_enum_status_domain_{}", domain_code)};
+  return _;
+}
+
+template <typename ConditionEnumType>
+StatusCode raise(
+    ConditionEnumType condition, std::string message = {},
+    std::source_location location = std::source_location::current()) {
+  return static_enum_status_domain<ConditionEnumType,
+                                   static_cast<std::size_t>(
+                                       ConditionEnumType::COUNT)>()
+      .raise_incident(condition, std::move(message), std::move(location));
+}
+
+template <typename ConditionEnumType>
+StatusCondition watch(ConditionEnumType condition) {
+  return static_enum_status_domain<ConditionEnumType,
+                                   static_cast<std::size_t>(
+                                       ConditionEnumType::COUNT)>()
+      .watch_condition(condition);
+}
+
 enum class PosixCondition : std::size_t {
-  TOOBIG,        // Argument list too long.
-  ACCES,         // Permission denied.
-  ADDRINUSE,     // Address in use.
-  ADDRNOTAVAIL,  // Address not available.
-  AFNOSUPPORT,   // Address family not supported.
-  AGAIN,         // Resource unavailable, try again (may be the same value as
-                 // [EWOULDBLOCK]).
-  ALREADY,       // Connection already in progress.
-  BADF,          // Bad file descriptor.
-  BADMSG,        // Bad message.
-  BUSY,          // Device or resource busy.
-  CANCELED,      // Operation canceled.
-  CHILD,         // No child processes.
-  CONNABORTED,   // Connection aborted.
-  CONNREFUSED,   // Connection refused.
-  CONNRESET,     // Connection reset.
-  DEADLK,        // Resource deadlock would occur.
-  DESTADDRREQ,   // Destination address required.
-  DOM,           // Mathematics argument out of domain of function.
-  DQUOT,         // Reserved.
-  EXIST,         // File exists.
-  FAULT,         // Bad address.
-  FBIG,          // File too large.
-  HOSTUNREACH,   // Host is unreachable.
-  IDRM,          // Identifier removed.
-  ILSEQ,         // Illegal byte sequence.
-  INPROGRESS,    // Operation in progress.
-  INTR,          // Interrupted function.
-  INVAL,         // Invalid argument.
-  IO,            // I/O error.
-  ISCONN,        // Socket is connected.
-  ISDIR,         // Is a directory.
-  LOOP,          // Too many levels of symbolic links.
-  MFILE,         // File descriptor value too large.
-  MLINK,         // Too many links.
-  MSGSIZE,       // Message too large.
-  MULTIHOP,      // Reserved.
-  NAMETOOLONG,   // Filename too long.
-  NETDOWN,       // Network is down.
-  NETRESET,      // Connection aborted by network.
-  NETUNREACH,    // Network unreachable.
-  NFILE,         // Too many files open in system.
-  NOBUFS,        // No buffer space available.
-  NODATA,      // [OB XSR] [Option Start] No message is available on the STREAM
-               // head read queue. [Option End]
-  NODEV,       // No such device.
-  NOENT,       // No such file or directory.
-  NOEXEC,      // Executable file format error.
-  NOLCK,       // No locks available.
-  NOLINK,      // Reserved.
-  NOMEM,       // Not enough space.
-  NOMSG,       // No message of the desired type.
-  NOPROTOOPT,  // Protocol not available.
-  NOSPC,       // No space left on device.
-  NOSR,        // [OB XSR] [Option Start] No STREAM resources. [Option End]
-  NOSTR,       // [OB XSR] [Option Start] Not a STREAM. [Option End]
-  NOSYS,       // Functionality not supported.
-  NOTCONN,     // The socket is not connected.
-  NOTDIR,      // Not a directory or a symbolic link to a directory.
-  NOTEMPTY,    // Directory not empty.
+  TOOBIG,          // Argument list too long.
+  ACCES,           // Permission denied.
+  ADDRINUSE,       // Address in use.
+  ADDRNOTAVAIL,    // Address not available.
+  AFNOSUPPORT,     // Address family not supported.
+  AGAIN,           // Resource unavailable, try again.
+  ALREADY,         // Connection already in progress.
+  BADF,            // Bad file descriptor.
+  BADMSG,          // Bad message.
+  BUSY,            // Device or resource busy.
+  CANCELED,        // Operation canceled.
+  CHILD,           // No child processes.
+  CONNABORTED,     // Connection aborted.
+  CONNREFUSED,     // Connection refused.
+  CONNRESET,       // Connection reset.
+  DEADLK,          // Resource deadlock would occur.
+  DESTADDRREQ,     // Destination address required.
+  DOM,             // Mathematics argument out of domain of function.
+  DQUOT,           // Reserved.
+  EXIST,           // File exists.
+  FAULT,           // Bad address.
+  FBIG,            // File too large.
+  HOSTUNREACH,     // Host is unreachable.
+  IDRM,            // Identifier removed.
+  ILSEQ,           // Illegal byte sequence.
+  INPROGRESS,      // Operation in progress.
+  INTR,            // Interrupted function.
+  INVAL,           // Invalid argument.
+  IO,              // I/O error.
+  ISCONN,          // Socket is connected.
+  ISDIR,           // Is a directory.
+  LOOP,            // Too many levels of symbolic links.
+  MFILE,           // File descriptor value too large.
+  MLINK,           // Too many links.
+  MSGSIZE,         // Message too large.
+  MULTIHOP,        // Reserved.
+  NAMETOOLONG,     // Filename too long.
+  NETDOWN,         // Network is down.
+  NETRESET,        // Connection aborted by network.
+  NETUNREACH,      // Network unreachable.
+  NFILE,           // Too many files open in system.
+  NOBUFS,          // No buffer space available.
+  NODATA,          // No message is available on the STREAM head read queue.
+  NODEV,           // No such device.
+  NOENT,           // No such file or directory.
+  NOEXEC,          // Executable file format error.
+  NOLCK,           // No locks available.
+  NOLINK,          // Reserved.
+  NOMEM,           // Not enough space.
+  NOMSG,           // No message of the desired type.
+  NOPROTOOPT,      // Protocol not available.
+  NOSPC,           // No space left on device.
+  NOSR,            // No STREAM resources.
+  NOSTR,           // Not a STREAM.
+  NOSYS,           // Functionality not supported.
+  NOTCONN,         // The socket is not connected.
+  NOTDIR,          // Not a directory or a symbolic link to a directory.
+  NOTEMPTY,        // Directory not empty.
   NOTRECOVERABLE,  // State not recoverable.
   NOTSOCK,         // Not a socket.
-  NOTSUP,          // Not supported (may be the same value as [EOPNOTSUPP]).
+  NOTSUP,          // Not supported.
   NOTTY,           // Inappropriate I/O control operation.
   NXIO,            // No such device or address.
-  OPNOTSUPP,  // Operation not supported on socket (may be the same value as
-              // [ENOTSUP]).
-  OVERFLOW,   // Value too large to be stored in data type.
-  OWNERDEAD,  // Previous owner died.
-  PERM,       // Operation not permitted.
-  PIPE,       // Broken pipe.
-  PROTO,      // Protocol error.
+  OPNOTSUPP,       // Operation not supported on socket.
+  OVERFLOW,        // Value too large to be stored in data type.
+  OWNERDEAD,       // Previous owner died.
+  PERM,            // Operation not permitted.
+  PIPE,            // Broken pipe.
+  PROTO,           // Protocol error.
   PROTONOSUPPORT,  // Protocol not supported.
   PROTOTYPE,       // Protocol wrong type for socket.
   RANGE,           // Result too large.
@@ -466,11 +494,11 @@ enum class PosixCondition : std::size_t {
   SPIPE,           // Invalid seek.
   SRCH,            // No such process.
   STALE,           // Reserved.
-  TIME,        // [OB XSR] [Option Start] Stream ioctl() timeout. [Option End]
-  TIMEDOUT,    // Connection timed out.
-  TXTBSY,      // Text file busy.
-  WOULDBLOCK,  // Operation would block (may be the same value as [EAGAIN]).
-  XDEV,        // Cross-device link.
+  TIME,            // Stream ioctl() timeout.
+  TIMEDOUT,        // Connection timed out.
+  TXTBSY,          // Text file busy.
+  WOULDBLOCK,      // Operation would block.
+  XDEV,            // Cross-device link.
   COUNT,
 };
 
@@ -488,6 +516,9 @@ class PosixStatusDomain final
 
   PosixStatusDomain() : EnumStatusDomain{impl::POSIX_DOMAIN_CODE, "posix"} {}
   ~PosixStatusDomain() = default;
+
+  bool has_equivalent_condition_of(
+      StatusCode incident, StatusCondition condition) const noexcept override;
 };
 
 enum class Win32Condition : std::size_t {
@@ -618,14 +649,13 @@ enum class Win32Condition : std::size_t {
   DISCARDED,          // The segment is already discarded and cannot be locked.
   NOT_LOCKED,         // The segment is already unlocked.
   BAD_THREADID_ADDR,  // The address for the thread ID is not correct.
-  BAD_ARGUMENTS,      // The argument string passed to DosExecPgm is not
-                      // correct.
-  BAD_PATHNAME,       // The specified path is invalid.
-  SIGNAL_PENDING,     // A signal is already pending.
-  MAX_THRDS_REACHED,  // No more threads can be created in the system.
-  LOCK_FAILED,        // Unable to lock a region of a file.
-  BUSY,               // The requested resource is in use.
-  CANCEL_VIOLATION,   // A lock request was not outstanding for the
+  BAD_ARGUMENTS,   // The argument string passed to DosExecPgm is not correct.
+  BAD_PATHNAME,    // The specified path is invalid.
+  SIGNAL_PENDING,  // A signal is already pending.
+  MAX_THRDS_REACHED,           // No more threads can be created in the system.
+  LOCK_FAILED,                 // Unable to lock a region of a file.
+  BUSY,                        // The requested resource is in use.
+  CANCEL_VIOLATION,            // A lock request was not outstanding for the
   ATOMIC_LOCKS_NOT_SUPPORTED,  // The file system does not support
   INVALID_SEGMENT_NUMBER,      // The system detected a segment number that
   INVALID_ORDINAL,             // The operating system cannot run %1.
@@ -708,6 +738,9 @@ class Win32StatusDomain final
 
   Win32StatusDomain() : EnumStatusDomain{impl::WIN32_DOMAIN_CODE, "win32"} {}
   ~Win32StatusDomain() = default;
+
+  bool has_equivalent_condition_of(
+      StatusCode incident, StatusCondition condition) const noexcept override;
 };
 
 }  // namespace simon
