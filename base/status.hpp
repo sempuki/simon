@@ -355,9 +355,11 @@ class EnumStatusDomain : public StatusDomainBase {
   }
 
   bool has_equivalent_condition(
-      StatusCode incident, StatusCondition condition) const noexcept override;
+      StatusCode incident, StatusCondition condition) const noexcept override {
+    return false;
+  }
 
-  StatusCode make_status_code(
+  StatusCode raise(
       ConditionEnumType condition, std::string message = {},
       std::source_location location = std::source_location::current()) {
     std::size_t current = next_incident_++;
@@ -371,17 +373,16 @@ class EnumStatusDomain : public StatusDomainBase {
         impl::BitCode{domain_code(), condition_code, current});
   }
 
-  StatusCondition make_status_condition(ConditionEnumType condition) {
+  StatusCondition watch(ConditionEnumType condition) {
     auto condition_code = static_cast<std::size_t>(condition);
     return make_status_condition(
         impl::BitCode{domain_code(), condition_code, 0U});
   }
 
- private:
+ protected:
   std::size_t next_incident_ = 0;
   std::array<impl::IncidentEntry, IncidentCountMax> incidents_;
 
- protected:
   static const std::array<impl::ConditionEntry, ConditionCount> conditions_;
 };
 
