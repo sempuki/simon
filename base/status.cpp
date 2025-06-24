@@ -5,7 +5,17 @@
 namespace simon {
 
 bool PosixStatusDomain::has_equivalent_condition_of(
+    StatusCode incident, StatusCode other) const noexcept {
+  return false;
+}
+
+bool PosixStatusDomain::has_equivalent_condition_of(
     StatusCode incident, StatusCondition condition) const noexcept {
+  return false;
+}
+
+bool Win32StatusDomain::has_equivalent_condition_of(
+    StatusCode incident, StatusCode other) const noexcept {
   return false;
 }
 

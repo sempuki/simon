@@ -246,7 +246,7 @@ TEST_CASE("StatusCode") {
 
   SECTION("ShouldNotBeEqualForDifferentIncidentOfSameCondition") {
     // Under Test.
-    StatusCode other = domain.raise_incident(TestCondition::UP, message0);
+    StatusCode other = domain.raise_incident(TestCondition::UP);
 
     // Postconditions.
     REQUIRE(other != status);
@@ -254,10 +254,28 @@ TEST_CASE("StatusCode") {
 
   SECTION("ShouldNotBeEqualForDifferentIncidentOfDifferentCondition") {
     // Under Test.
-    StatusCode other = domain.raise_incident(TestCondition::DOWN, message0);
+    StatusCode other = domain.raise_incident(TestCondition::DOWN);
 
     // Postconditions.
     REQUIRE(other != status);
+  }
+
+  SECTION("ShouldBeEquivalentToIncidentOfSameCondition") {
+    // Under Test.
+    StatusCode other = domain.raise_incident(TestCondition::UP);
+
+    // Postconditions.
+    REQUIRE(status.has_equivalent_condition_as(other));
+    REQUIRE(other.has_equivalent_condition_as(status));
+  }
+
+  SECTION("ShouldNotBeEquivalentToIncidentOfDifferentCondition") {
+    // Under Test.
+    StatusCode other = domain.raise_incident(TestCondition::DOWN);
+
+    // Postconditions.
+    REQUIRE(!status.has_equivalent_condition_as(other));
+    REQUIRE(!other.has_equivalent_condition_as(status));
   }
 
   SECTION("ShouldBeOutStreamable") {
@@ -269,15 +287,16 @@ TEST_CASE("StatusCode") {
 
     // Postconditions.
     REQUIRE(ss.str().size() > 0u);
-    REQUIRE(ss.str() == message0);
+    REQUIRE(ss.str() == status.message());
   }
 }
 
 TEST_CASE("StatusCondition") {
-  SECTION("ShouldHaveMessageDescribingCondition") {
-    // Preconditions.
-    StatusCondition up = domain.watch_condition(TestCondition::UP);
+  StatusCondition down = domain.watch_condition(TestCondition::DOWN);
+  StatusCondition up = domain.watch_condition(TestCondition::UP);
+  StatusCode status = domain.raise_incident(TestCondition::UP);
 
+  SECTION("ShouldHaveMessageDescribingCondition") {
     // Under Test.
     std::string_view message = up.message();
 
@@ -285,22 +304,60 @@ TEST_CASE("StatusCondition") {
     REQUIRE(message == "UP");
   }
 
-  StatusCode status = domain.raise_incident(TestCondition::UP);
-
   SECTION("ShouldBeTrueWhenComparedWithIncidentOfSameCondition") {
-    // Under Test.
-    StatusCondition up = domain.watch_condition(TestCondition::UP);
-
     // Postconditions.
     REQUIRE(status == up);
+    REQUIRE(up == status);
   }
 
   SECTION("ShouldBeFalseWhenComparedWithIncidentOfDifferentCondition") {
-    // Under Test.
-    StatusCondition down = domain.watch_condition(TestCondition::DOWN);
-
     // Postconditions.
     REQUIRE(status != down);
+    REQUIRE(down != status);
+  }
+
+  SECTION("ShouldBeEquivalentToIncidentOfSameCondition") {
+    // Postconditions.
+    REQUIRE(status.has_equivalent_condition_as(up));
+  }
+
+  SECTION("ShouldNotBeEquivalentToIncidentOfDifferentCondition") {
+    // Postconditions.
+    REQUIRE(!status.has_equivalent_condition_as(down));
+  }
+
+  SECTION("ShouldBeOutStreamable") {
+    // Preconditions.
+    std::stringstream ss;
+
+    // Under Test.
+    ss << up;
+
+    // Postconditions.
+    REQUIRE(ss.str().size() > 0u);
+    REQUIRE(ss.str() == up.message());
+  }
+}
+
+TEST_CASE("StaticEnumStatusDomain") {
+  SECTION("ShouldRaiseStatusFromStaticDomain") {
+    // Preconditions.
+    StatusCode other = domain.raise_incident(TestCondition::TOP);
+
+    // Under Test.
+    StatusCode status = raise<TestCondition>(TestCondition::TOP);
+
+    // Postconditions.
+    REQUIRE(status != other);
+  }
+
+  SECTION("ShouldPass") {
+    // Preconditions.
+
+    // Under Test.
+
+    // Postconditions.
+    REQUIRE(true);
   }
 }
 
