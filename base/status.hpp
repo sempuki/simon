@@ -371,9 +371,26 @@ class EnumStatusDomain : public StatusDomainBase {
     return false;  // By default no enum statuses are equivalent to any others.
   };
 
-  Status raise_incident(
+  Status raise_incident(ConditionEnumType condition, std::string message = {}) {
+    std::source_location location{};  // Empty.
+    return raise_incident_impl(condition, std::move(message),
+                               std::move(location));
+  }
+  Status raise_incident_here(
       ConditionEnumType condition, std::string message = {},
       std::source_location location = std::source_location::current()) {
+    return raise_incident_impl(condition, std::move(message),
+                               std::move(location));
+  }
+
+  StatusKind watch_condition(ConditionEnumType condition) {
+    return watch_condition_impl(condition);
+  }
+
+ private:
+  Status raise_incident_impl(ConditionEnumType condition,  //
+                             std::string message,          //
+                             std::source_location location) {
     std::size_t current = next_incident_++;
     next_incident_ %= incidents_.size();
 
@@ -384,7 +401,7 @@ class EnumStatusDomain : public StatusDomainBase {
     return make_status_of(StatusCode{domain_code(), condition_code, current});
   }
 
-  StatusKind watch_condition(ConditionEnumType condition) {
+  StatusKind watch_condition_impl(ConditionEnumType condition) {
     auto condition_code = static_cast<std::size_t>(condition);
     return make_kind_of(StatusCode{domain_code(), condition_code, 0U});
   }
@@ -406,12 +423,21 @@ static_enum_status_domain() {
 }
 
 template <typename ConditionEnumType>
-Status raise(ConditionEnumType condition, std::string message = {},
-             std::source_location location = std::source_location::current()) {
+Status raise(ConditionEnumType condition, std::string message = {}) {
   return static_enum_status_domain<ConditionEnumType,
                                    static_cast<std::size_t>(
                                        ConditionEnumType::COUNT)>()
-      .raise_incident(condition, std::move(message), std::move(location));
+      .raise_incident(condition, std::move(message));
+}
+
+template <typename ConditionEnumType>
+Status raise_here(
+    ConditionEnumType condition, std::string message = {},
+    std::source_location location = std::source_location::current()) {
+  return static_enum_status_domain<ConditionEnumType,
+                                   static_cast<std::size_t>(
+                                       ConditionEnumType::COUNT)>()
+      .raise_incident_here(condition, std::move(message), std::move(location));
 }
 
 template <typename ConditionEnumType>
