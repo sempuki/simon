@@ -6,8 +6,8 @@
 
 namespace simon {
 
-TEST_CASE("BitCode") {
-  impl::BitCode code;
+TEST_CASE("StatusCode") {
+  StatusCode code;
 
   SECTION("ShouldDefaultToZero") {
     // Postconditions.
@@ -40,84 +40,79 @@ TEST_CASE("BitCode") {
     REQUIRE(code.incident_bits() == 5u);
   }
 
-  impl::BitCode other;
+  StatusCode other;
+  code.set_incident_bits(4u);
+  code.set_condition_bits(5u);
+  code.set_domain_bits(6u);
 
-  SECTION("ShouldHaveAllSameDomainBitsAsOtherWhenSetSame") {
-    // Preconditions.
-    other.set_domain_bits(5u);
-
+  SECTION("ShouldBeSameKindWithSameConditionAndDomain") {
     // Under Test.
-    code.set_domain_bits(5u);
-
-    // Postconditions.
-    REQUIRE(code.has_all_same_domain_bits_as(other));
-  }
-
-  SECTION("ShouldNotHaveAllSameDomainBitsAsOtherWhenSetDifferent") {
-    // Preconditions.
-    other.set_domain_bits(6u);
-
-    // Under Test.
-    code.set_domain_bits(5u);
-
-    // Postconditions.
-    REQUIRE(!code.has_all_same_domain_bits_as(other));
-  }
-
-  SECTION("ShouldHaveAllSameConditionBitsAsOtherWhenSetSame") {
-    // Preconditions.
-    other.set_domain_bits(5u);
-    other.set_condition_bits(6u);
-
-    // Under Test.
-    code.set_domain_bits(5u);
-    code.set_condition_bits(6u);
-
-    // Postconditions.
-    REQUIRE(code.has_all_same_condition_bits_as(other));
-  }
-
-  SECTION("ShouldNotHaveAllSameConditionBitsAsOtherWhenSetDifferent") {
-    // Preconditions.
-    other.set_domain_bits(6u);
-    other.set_condition_bits(5u);
-
-    // Under Test.
-    code.set_domain_bits(5u);
-    code.set_condition_bits(6u);
-
-    // Postconditions.
-    REQUIRE(!code.has_all_same_condition_bits_as(other));
-  }
-
-  SECTION("ShouldHaveAllSameIncidentBitsAsOtherWhenSetSame") {
-    // Preconditions.
-    other.set_domain_bits(5u);
-    other.set_condition_bits(6u);
     other.set_incident_bits(7u);
-
-    // Under Test.
-    code.set_domain_bits(5u);
-    code.set_condition_bits(6u);
-    code.set_incident_bits(7u);
+    other.set_condition_bits(5u);
+    other.set_domain_bits(6u);
 
     // Postconditions.
-    REQUIRE(code.has_all_same_indicent_bits_as(other));
+    REQUIRE(code.is_same_kind(other));
   }
 
-  SECTION("ShouldNotHaveAllSameIncidentBitsAsOtherWhenSetDifferent") {
-    // Preconditions.
-    other.set_domain_bits(6u);
-    other.set_condition_bits(5u);
-    other.set_incident_bits(7u);
-
+  SECTION("ShouldNotBeSameKindWithDifferentCondition") {
     // Under Test.
-    code.set_domain_bits(5u);
-    code.set_condition_bits(6u);
-    code.set_incident_bits(7u);
+    other.set_incident_bits(4u);
+    other.set_condition_bits(7u);
+    other.set_domain_bits(6u);
 
     // Postconditions.
-    REQUIRE(!code.has_all_same_indicent_bits_as(other));
+    REQUIRE(!code.is_same_kind(other));
+  }
+
+  SECTION("ShouldNotBeSameKindWithDifferentDomain") {
+    // Under Test.
+    other.set_incident_bits(4u);
+    other.set_condition_bits(5u);
+    other.set_domain_bits(7u);
+
+    // Postconditions.
+    REQUIRE(!code.is_same_kind(other));
+  }
+
+  SECTION("ShouldBeSameCodeWithSameIncidentConditionDomain") {
+    // Under Test.
+    other.set_incident_bits(4u);
+    other.set_condition_bits(5u);
+    other.set_domain_bits(6u);
+
+    // Postconditions.
+    REQUIRE(code.is_same_code(other));
+  }
+
+  SECTION("ShouldNotBeSameCodeWithDifferentIncident") {
+    // Under Test.
+    other.set_incident_bits(7u);
+    other.set_condition_bits(5u);
+    other.set_domain_bits(6u);
+
+    // Postconditions.
+    REQUIRE(!code.is_same_code(other));
+  }
+
+  SECTION("ShouldNotBeSameCodeWithDifferentCondition") {
+    // Under Test.
+    other.set_incident_bits(4u);
+    other.set_condition_bits(7u);
+    other.set_domain_bits(6u);
+
+    // Postconditions.
+    REQUIRE(!code.is_same_code(other));
+  }
+
+  SECTION("ShouldNotBeSameCodeWithDifferentDomain") {
+    // Under Test.
+    other.set_incident_bits(4u);
+    other.set_condition_bits(5u);
+    other.set_domain_bits(7u);
+
+    // Postconditions.
+    REQUIRE(!code.is_same_code(other));
   }
 }
 
@@ -130,25 +125,23 @@ class TestStatusDomain final
  public:
   using EnumStatusDomain<TestCondition, TEST_CONDITION_COUNT>::EnumStatusDomain;
 
-  std::string_view message_of(
-      StatusCondition condition) const noexcept override {
+  std::string_view message_of(StatusKind kind) const noexcept override {
     message_of_condition++;
-    return conditions_[condition_code_of(condition)].message;
+    return conditions_[condition_code_of(kind)].message;
   }
 
-  std::string_view message_of(StatusCode incident) const noexcept override {
+  std::string_view message_of(Status status) const noexcept override {
     message_of_incident++;
-    return incidents_[incident_code_of(incident)].message;
+    return incidents_[incident_code_of(status)].message;
   }
 
-  std::source_location location_of(
-      StatusCode incident) const noexcept override {
+  std::source_location location_of(Status status) const noexcept override {
     location_of_incident++;
-    return incidents_[incident_code_of(incident)].location;
+    return incidents_[incident_code_of(status)].location;
   }
 
-  bool has_equivalent_condition_of(
-      StatusCode incident, StatusCondition condition) const noexcept override {
+  bool has_equivalent_condition_of(Status status,
+                                   StatusKind kind) const noexcept override {
     equivalent_condition_of++;
     return false;
   }
@@ -177,7 +170,7 @@ std::string message1 = "bark";
 TEST_CASE("StatusDomain") {
   SECTION("ShouldNotGetLocationOfStatusCodeByDefault") {
     // Under Test.
-    StatusCode status = domain.raise_incident(TestCondition::UP);
+    Status status = domain.raise_incident(TestCondition::UP);
 
     // Postconditions.
     REQUIRE(domain.location_of_incident == 0u);
@@ -185,7 +178,7 @@ TEST_CASE("StatusDomain") {
 
   SECTION("ShouldNotGetMessageOfStatusCodeByDefault") {
     // Under Test.
-    StatusCode status = domain.raise_incident(TestCondition::UP);
+    Status status = domain.raise_incident(TestCondition::UP);
 
     // Postconditions.
     REQUIRE(domain.message_of_incident == 0u);
@@ -193,7 +186,7 @@ TEST_CASE("StatusDomain") {
 
   SECTION("ShouldGetLocationOfStatusCodeOnDemand") {
     // Preconditions.
-    StatusCode status = domain.raise_incident(TestCondition::UP);
+    Status status = domain.raise_incident(TestCondition::UP);
 
     // Under Test.
     std::source_location location = status.location();
@@ -205,7 +198,7 @@ TEST_CASE("StatusDomain") {
 
   SECTION("ShouldGetMessageOfStatusCodeOnDemand") {
     // Preconditions.
-    StatusCode status = domain.raise_incident(TestCondition::UP, message0);
+    Status status = domain.raise_incident(TestCondition::UP, message0);
 
     // Under Test.
     std::string_view message = status.message();
@@ -216,9 +209,9 @@ TEST_CASE("StatusDomain") {
   }
 }
 
-TEST_CASE("StatusCode") {
+TEST_CASE("Status") {
   std::source_location incident_location = std::source_location::current();
-  StatusCode status = domain.raise_incident(TestCondition::UP, message0);
+  Status status = domain.raise_incident(TestCondition::UP, message0);
 
   SECTION("ShouldHaveSameLocationAsRaisedIncident") {
     // Under Test.
@@ -238,7 +231,7 @@ TEST_CASE("StatusCode") {
 
   SECTION("ShouldBeEqualForSameIncident") {
     // Under Test.
-    StatusCode copy = status;
+    Status copy = status;
 
     // Postconditions.
     REQUIRE(copy == status);
@@ -246,7 +239,7 @@ TEST_CASE("StatusCode") {
 
   SECTION("ShouldNotBeEqualForDifferentIncidentOfSameCondition") {
     // Under Test.
-    StatusCode other = domain.raise_incident(TestCondition::UP);
+    Status other = domain.raise_incident(TestCondition::UP);
 
     // Postconditions.
     REQUIRE(other != status);
@@ -254,7 +247,7 @@ TEST_CASE("StatusCode") {
 
   SECTION("ShouldNotBeEqualForDifferentIncidentOfDifferentCondition") {
     // Under Test.
-    StatusCode other = domain.raise_incident(TestCondition::DOWN);
+    Status other = domain.raise_incident(TestCondition::DOWN);
 
     // Postconditions.
     REQUIRE(other != status);
@@ -262,7 +255,7 @@ TEST_CASE("StatusCode") {
 
   SECTION("ShouldBeEquivalentToIncidentOfSameCondition") {
     // Under Test.
-    StatusCode other = domain.raise_incident(TestCondition::UP);
+    Status other = domain.raise_incident(TestCondition::UP);
 
     // Postconditions.
     REQUIRE(status.has_equivalent_condition_as(other));
@@ -271,7 +264,7 @@ TEST_CASE("StatusCode") {
 
   SECTION("ShouldNotBeEquivalentToIncidentOfDifferentCondition") {
     // Under Test.
-    StatusCode other = domain.raise_incident(TestCondition::DOWN);
+    Status other = domain.raise_incident(TestCondition::DOWN);
 
     // Postconditions.
     REQUIRE(!status.has_equivalent_condition_as(other));
@@ -291,10 +284,10 @@ TEST_CASE("StatusCode") {
   }
 }
 
-TEST_CASE("StatusCondition") {
-  StatusCondition down = domain.watch_condition(TestCondition::DOWN);
-  StatusCondition up = domain.watch_condition(TestCondition::UP);
-  StatusCode status = domain.raise_incident(TestCondition::UP);
+TEST_CASE("StatusKind") {
+  StatusKind down = domain.watch_condition(TestCondition::DOWN);
+  StatusKind up = domain.watch_condition(TestCondition::UP);
+  Status status = domain.raise_incident(TestCondition::UP);
 
   SECTION("ShouldHaveMessageDescribingCondition") {
     // Under Test.
@@ -342,10 +335,10 @@ TEST_CASE("StatusCondition") {
 TEST_CASE("StaticEnumStatusDomain") {
   SECTION("ShouldRaiseStatusFromStaticDomain") {
     // Preconditions.
-    StatusCode other = domain.raise_incident(TestCondition::TOP);
+    Status other = domain.raise_incident(TestCondition::TOP);
 
     // Under Test.
-    StatusCode status = raise<TestCondition>(TestCondition::TOP);
+    Status status = raise<TestCondition>(TestCondition::TOP);
 
     // Postconditions.
     REQUIRE(status != other);
