@@ -196,18 +196,6 @@ TEST_CASE("StatusDomain") {
     REQUIRE(domain.message_of_incident == 0u);
   }
 
-  SECTION("ShouldGetLocationOfStatusCodeOnDemand") {
-    // Preconditions.
-    Status status = domain.raise_incident(TestCondition::UP);
-
-    // Under Test.
-    std::source_location location = status.location();
-
-    // Postconditions.
-    REQUIRE(domain.location_of_incident > 0u);
-    REQUIRE(location.line() > 0u);
-  }
-
   SECTION("ShouldGetMessageOfStatusCodeOnDemand") {
     // Preconditions.
     Status status = domain.raise_incident(TestCondition::UP, message0);
@@ -219,13 +207,25 @@ TEST_CASE("StatusDomain") {
     REQUIRE(domain.message_of_incident > 0u);
     REQUIRE(message.size() > 0u);
   }
+
+  SECTION("ShouldGetLocationOfStatusCodeOnDemand") {
+    // Preconditions.
+    Status status = domain.raise_incident_here(TestCondition::UP);
+
+    // Under Test.
+    std::source_location location = status.location();
+
+    // Postconditions.
+    REQUIRE(domain.location_of_incident > 0u);
+    REQUIRE(location.line() > 0u);
+  }
 }
 
 TEST_CASE("Status") {
-  SECTION("ShouldHaveCurrentLocationByDefault") {
+  SECTION("ShouldHaveCurrentLocationRaisedHereByDefault") {
     // Preconditions.
     auto raised_location = std::source_location::current();
-    Status status = domain.raise_incident(TestCondition::UP);
+    Status status = domain.raise_incident_here(TestCondition::UP);
 
     // Under Test.
     std::source_location location = status.location();
@@ -234,9 +234,10 @@ TEST_CASE("Status") {
     REQUIRE(location.line() - 1 == raised_location.line());
   }
 
-  Status status = domain.raise_incident(TestCondition::UP, message0, location0);
+  Status status =
+      domain.raise_incident_here(TestCondition::UP, message0, location0);
 
-  SECTION("ShouldHaveSameMessageAsRaisedIncident") {
+  SECTION("ShouldHaveSameMessageAsRaisedHereIncident") {
     // Under Test.
     std::string_view status_message = status.message();
 
@@ -244,7 +245,7 @@ TEST_CASE("Status") {
     REQUIRE(status_message == message0);
   }
 
-  SECTION("ShouldHaveSameLocationAsRaisedIncident") {
+  SECTION("ShouldHaveSameLocationAsRaisedHereIncident") {
     // Under Test.
     std::source_location location = status.location();
 
@@ -411,20 +412,20 @@ TEST_CASE("StaticEnumStatusDomain") {
     REQUIRE(status1.message() == message1);
   }
 
-  SECTION("ShouldRaiseStatusWithLocation") {
+  SECTION("ShouldRaiseStatusHereWithLocation") {
     // Under Test.
-    Status status0 = raise(TestCondition::TOP, message0, location0);
-    Status status1 = raise(TestCondition::TOP, message1, location1);
+    Status status0 = raise_here(TestCondition::TOP, message0, location0);
+    Status status1 = raise_here(TestCondition::TOP, message1, location1);
 
     // Postconditions.
     REQUIRE(status0.location().line() == location0.line());
     REQUIRE(status1.location().line() == location1.line());
   }
 
-  SECTION("ShouldRaiseStatusWithLocationByDefault") {
+  SECTION("ShouldRaiseStatusHereWithLocationByDefault") {
     // Under Test.
-    Status status0 = raise(TestCondition::TOP);
-    Status status1 = raise(TestCondition::TOP);
+    Status status0 = raise_here(TestCondition::TOP);
+    Status status1 = raise_here(TestCondition::TOP);
 
     // Postconditions.
     REQUIRE(status0.location().line() > 0u);
