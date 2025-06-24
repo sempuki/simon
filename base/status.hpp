@@ -153,6 +153,8 @@ class StatusDomainBase {
   virtual std::string_view message_of(StatusCode) const noexcept = 0;
   virtual std::source_location location_of(StatusCode) const noexcept = 0;
   virtual bool has_equivalent_condition_of(StatusCode,
+                                           StatusCode) const noexcept = 0;
+  virtual bool has_equivalent_condition_of(StatusCode,
                                            StatusCondition) const noexcept = 0;
 
  protected:
@@ -217,9 +219,14 @@ class StatusCode {
     return domain_->location_of(*this);
   }
 
-  bool has_equivalent_condition_as(StatusCondition condition) const noexcept {
-    return operator==(condition) ||
-           domain_->has_equivalent_condition_of(*this, condition);
+  bool has_equivalent_condition_as(StatusCode that) const noexcept {
+    return code_.has_all_same_condition_bits_as(that.code_) ||
+           domain_->has_equivalent_condition_of(*this, that);
+  }
+
+  bool has_equivalent_condition_as(StatusCondition that) const noexcept {
+    return code_.has_all_same_condition_bits_as(that.code_) ||
+           domain_->has_equivalent_condition_of(*this, that);
   }
 
   bool operator==(StatusCode that) const noexcept {
@@ -362,6 +369,16 @@ class EnumStatusDomain : public StatusDomainBase {
       StatusCode incident) const noexcept override {
     return incidents_[incident_code_of(incident)].location;
   }
+
+  bool has_equivalent_condition_of(StatusCode,
+                                   StatusCode) const noexcept override {
+    return false;  // By default no enum statuses are equivalent to any others.
+  };
+
+  bool has_equivalent_condition_of(StatusCode,
+                                   StatusCondition) const noexcept override {
+    return false;  // By default no enum statuses are equivalent to any others.
+  };
 
   StatusCode raise_incident(
       ConditionEnumType condition, std::string message = {},
@@ -517,8 +534,10 @@ class PosixStatusDomain final
   PosixStatusDomain() : EnumStatusDomain{impl::POSIX_DOMAIN_CODE, "posix"} {}
   ~PosixStatusDomain() = default;
 
-  bool has_equivalent_condition_of(
-      StatusCode incident, StatusCondition condition) const noexcept override;
+  bool has_equivalent_condition_of(StatusCode,
+                                   StatusCode) const noexcept override;
+  bool has_equivalent_condition_of(StatusCode,
+                                   StatusCondition) const noexcept override;
 };
 
 enum class Win32Condition : std::size_t {
@@ -739,8 +758,10 @@ class Win32StatusDomain final
   Win32StatusDomain() : EnumStatusDomain{impl::WIN32_DOMAIN_CODE, "win32"} {}
   ~Win32StatusDomain() = default;
 
-  bool has_equivalent_condition_of(
-      StatusCode incident, StatusCondition condition) const noexcept override;
+  bool has_equivalent_condition_of(StatusCode,
+                                   StatusCode) const noexcept override;
+  bool has_equivalent_condition_of(StatusCode,
+                                   StatusCondition) const noexcept override;
 };
 
 }  // namespace simon
