@@ -10,11 +10,26 @@
 namespace simon {
 
 namespace impl {
-class BitCode {
+struct ConditionEntry final {
+  std::string message;
+};
+
+struct IncidentEntry final {
+  std::source_location location;
+  std::string message;
+};
+
+inline std::size_t allocate_static_increment() {
+  static std::size_t increment = 0;
+  return increment++;
+}
+}  // namespace impl
+
+class StatusCode {
  public:
-  BitCode(std::size_t domain,     //
-          std::size_t condition,  //
-          std::size_t incident)
+  StatusCode(std::size_t domain,     //
+             std::size_t condition,  //
+             std::size_t incident)
       : bits_{(least_16_bits_as_uint64(domain) << DOMAIN_SHIFT) |
               (least_16_bits_as_uint64(condition) << CONDITION_SHIFT) |
               (least_16_bits_as_uint64(incident) << INCIDENT_SHIFT)} {
@@ -23,11 +38,11 @@ class BitCode {
     CHECK_POSTCONDITION(std::cmp_equal(incident, incident_bits()));
   }
 
-  DECLARE_COPY_DEFAULT(BitCode);
-  DECLARE_MOVE_DEFAULT(BitCode);
+  DECLARE_COPY_DEFAULT(StatusCode);
+  DECLARE_MOVE_DEFAULT(StatusCode);
 
-  BitCode() = default;
-  ~BitCode() = default;
+  StatusCode() = default;
+  ~StatusCode() = default;
 
   std::size_t domain_bits() const noexcept {
     return (bits_ & DOMAIN_MASK) >> DOMAIN_SHIFT;
@@ -39,7 +54,7 @@ class BitCode {
     CHECK_POSTCONDITION(std::cmp_equal(bits, domain_bits()));
   }
 
-  void set_domain_bits(BitCode code) noexcept {
+  void set_domain_bits(StatusCode code) noexcept {
     bits_ &= ~DOMAIN_MASK;
     bits_ |= code.bits_ & DOMAIN_MASK;
   }
@@ -54,7 +69,7 @@ class BitCode {
     CHECK_POSTCONDITION(std::cmp_equal(bits, condition_bits()));
   }
 
-  void set_condition_bits(BitCode code) noexcept {
+  void set_condition_bits(StatusCode code) noexcept {
     bits_ &= ~CONDITION_MASK;
     bits_ |= code.bits_ & CONDITION_MASK;
   }
@@ -69,24 +84,17 @@ class BitCode {
     CHECK_POSTCONDITION(std::cmp_equal(bits, incident_bits()));
   }
 
-  void set_incident_bits(BitCode code) noexcept {
+  void set_incident_bits(StatusCode code) noexcept {
     bits_ &= ~INCIDENT_MASK;
     bits_ |= code.bits_ & INCIDENT_MASK;
   }
 
-  bool has_all_same_domain_bits_as(BitCode that) const noexcept {
-    return (bits_ & DOMAIN_COMPARE_MASK) ==  //
-           (that.bits_ & DOMAIN_COMPARE_MASK);
+  bool is_same_kind(StatusCode that) const noexcept {
+    return (bits_ & KIND_COMPARE_MASK) == (that.bits_ & KIND_COMPARE_MASK);
   }
 
-  bool has_all_same_condition_bits_as(BitCode that) const noexcept {
-    return (bits_ & CONDITION_COMPARE_MASK) ==  //
-           (that.bits_ & CONDITION_COMPARE_MASK);
-  }
-
-  bool has_all_same_indicent_bits_as(BitCode that) const noexcept {
-    return (bits_ & INCIDENT_COMPARE_MASK) ==  //
-           (that.bits_ & INCIDENT_COMPARE_MASK);
+  bool is_same_code(StatusCode that) const noexcept {
+    return (bits_ & CODE_COMPARE_MASK) == (that.bits_ & CODE_COMPARE_MASK);
   }
 
  private:
@@ -104,10 +112,9 @@ class BitCode {
   constexpr static std::uint64_t INCIDENT_SIZE = 16;
   constexpr static std::uint64_t INCIDENT_SHIFT = 0;
 
-  constexpr static std::uint64_t DOMAIN_COMPARE_MASK = DOMAIN_MASK;
-  constexpr static std::uint64_t CONDITION_COMPARE_MASK =
+  constexpr static std::uint64_t KIND_COMPARE_MASK =
       DOMAIN_MASK | CONDITION_MASK;
-  constexpr static std::uint64_t INCIDENT_COMPARE_MASK =
+  constexpr static std::uint64_t CODE_COMPARE_MASK =
       DOMAIN_MASK | CONDITION_MASK | INCIDENT_MASK;
 
   static std::uint64_t least_16_bits_as_uint64(std::size_t bits) {
@@ -116,24 +123,9 @@ class BitCode {
   }
 };
 
-struct ConditionEntry final {
-  std::string message;
-};
-
-struct IncidentEntry final {
-  std::source_location location;
-  std::string message;
-};
-
-inline std::size_t allocate_static_increment() {
-  static std::size_t increment = 0;
-  return increment++;
-}
-}  // namespace impl
-
-class StatusCode;
-class StatusCodeLocal;
-class StatusCondition;
+class Status;
+class StatusLocal;
+class StatusKind;
 
 class StatusDomainBase {
  public:
@@ -149,68 +141,67 @@ class StatusDomainBase {
 
   std::string_view name() const noexcept { return name_; }
 
-  virtual std::string_view message_of(StatusCondition) const noexcept = 0;
-  virtual std::string_view message_of(StatusCode) const noexcept = 0;
-  virtual std::source_location location_of(StatusCode) const noexcept = 0;
-  virtual bool has_equivalent_condition_of(StatusCode,
-                                           StatusCode) const noexcept = 0;
-  virtual bool has_equivalent_condition_of(StatusCode,
-                                           StatusCondition) const noexcept = 0;
+  virtual std::string_view message_of(StatusKind) const noexcept = 0;
+  virtual std::string_view message_of(Status) const noexcept = 0;
+  virtual std::source_location location_of(Status) const noexcept = 0;
+  virtual bool has_equivalent_condition_of(Status, Status) const noexcept = 0;
+  virtual bool has_equivalent_condition_of(Status,
+                                           StatusKind) const noexcept = 0;
 
  protected:
   std::size_t domain_code() const noexcept { return code_; }
 
-  friend class StatusCode;
-  StatusCode make_status_code(impl::BitCode) const noexcept;
-  std::size_t incident_code_of(StatusCode) const noexcept;
-  std::size_t condition_code_of(StatusCode) const noexcept;
-  std::size_t domain_code_of(StatusCode) const noexcept;
+  friend class Status;
+  Status make_status(StatusCode) const noexcept;
+  std::size_t incident_code_of(Status) const noexcept;
+  std::size_t condition_code_of(Status) const noexcept;
+  std::size_t domain_code_of(Status) const noexcept;
 
-  friend class StatusCondition;
-  StatusCondition make_status_condition(impl::BitCode) const noexcept;
-  std::size_t condition_code_of(StatusCondition) const noexcept;
-  std::size_t domain_code_of(StatusCondition) const noexcept;
+  friend class StatusKind;
+  StatusKind make_status_kind(StatusCode) const noexcept;
+  std::size_t condition_code_of(StatusKind) const noexcept;
+  std::size_t domain_code_of(StatusKind) const noexcept;
 
  private:
   std::size_t code_;
   std::string name_;
 };
 
-class StatusCondition {
+class StatusKind {
  public:
-  DECLARE_COPY_DEFAULT(StatusCondition);
-  DECLARE_MOVE_DEFAULT(StatusCondition);
+  DECLARE_COPY_DEFAULT(StatusKind);
+  DECLARE_MOVE_DEFAULT(StatusKind);
 
-  StatusCondition() = delete;
-  ~StatusCondition() = default;
+  StatusKind() = delete;
+  ~StatusKind() = default;
 
   std::string_view message() const noexcept {
     return domain_->message_of(*this);
   }
 
  private:
-  friend class StatusCode;
+  friend class Status;
   friend class StatusDomainBase;
 
-  explicit StatusCondition(impl::BitCode code, StatusDomainBase const *domain)
+  explicit StatusKind(StatusCode code, StatusDomainBase const *domain)
       : code_{code}, domain_{domain} {}
 
-  impl::BitCode code_;
+  StatusCode code_;
   StatusDomainBase const *domain_ = nullptr;
 
-  friend std::ostream &operator<<(std::ostream &out, StatusCondition self) {
+  friend std::ostream &operator<<(std::ostream &out, StatusKind self) {
     out << self.message();
     return out;
   }
 };
 
-class StatusCode {
+class Status {
  public:
-  DECLARE_COPY_DEFAULT(StatusCode);
-  DECLARE_MOVE_DEFAULT(StatusCode);
+  DECLARE_COPY_DEFAULT(Status);
+  DECLARE_MOVE_DEFAULT(Status);
 
-  StatusCode() = delete;
-  ~StatusCode() = default;
+  Status() = delete;
+  ~Status() = default;
 
   std::string_view message() const noexcept {
     return domain_->message_of(*this);
@@ -219,127 +210,126 @@ class StatusCode {
     return domain_->location_of(*this);
   }
 
-  bool has_equivalent_condition_as(StatusCode that) const noexcept {
-    return code_.has_all_same_condition_bits_as(that.code_) ||
+  bool has_equivalent_condition_as(Status that) const noexcept {
+    return code_.is_same_kind(that.code_) ||
            domain_->has_equivalent_condition_of(*this, that);
   }
 
-  bool has_equivalent_condition_as(StatusCondition that) const noexcept {
-    return code_.has_all_same_condition_bits_as(that.code_) ||
+  bool has_equivalent_condition_as(StatusKind that) const noexcept {
+    return code_.is_same_kind(that.code_) ||
            domain_->has_equivalent_condition_of(*this, that);
   }
 
-  bool operator==(StatusCode that) const noexcept {
-    return code_.has_all_same_indicent_bits_as(that.code_);
+  bool operator==(Status that) const noexcept {
+    return code_.is_same_code(that.code_);
   }
 
-  bool operator==(StatusCondition that) const noexcept {
-    return code_.has_all_same_condition_bits_as(that.code_);
+  bool operator==(StatusKind that) const noexcept {
+    return code_.is_same_kind(that.code_);
   }
 
-  StatusCodeLocal make_local_copy() const noexcept;
+  StatusLocal make_local_copy() const noexcept;
 
  private:
-  friend class StatusCodeLocal;
+  friend class StatusLocal;
   friend class StatusDomainBase;
 
-  explicit StatusCode(impl::BitCode code, StatusDomainBase const *domain)
+  explicit Status(StatusCode code, StatusDomainBase const *domain)
       : code_{code}, domain_{domain} {}
 
-  impl::BitCode code_;
+  StatusCode code_;
   StatusDomainBase const *domain_ = nullptr;
 
-  friend bool operator==(StatusCondition a, StatusCode b) noexcept {
+  friend bool operator==(StatusKind a, Status b) noexcept {
     return b.operator==(a);
   }
 
-  friend bool operator!=(StatusCode a, StatusCondition b) noexcept {
+  friend bool operator!=(Status a, StatusKind b) noexcept {
     return !a.operator==(b);
   }
 
-  friend bool operator!=(StatusCondition a, StatusCode b) noexcept {
+  friend bool operator!=(StatusKind a, Status b) noexcept {
     return !b.operator==(a);
   }
 
-  friend std::ostream &operator<<(std::ostream &out, StatusCode self) {
+  friend std::ostream &operator<<(std::ostream &out, Status self) {
     out << self.message();
     return out;
   }
 };
 
-class StatusCodeLocal : public StatusCode {
+class StatusLocal : public Status {
  public:
-  DECLARE_COPY_DEFAULT(StatusCodeLocal);
-  DECLARE_MOVE_DEFAULT(StatusCodeLocal);
+  DECLARE_COPY_DEFAULT(StatusLocal);
+  DECLARE_MOVE_DEFAULT(StatusLocal);
 
-  StatusCodeLocal() = delete;
-  ~StatusCodeLocal() = default;
+  StatusLocal() = delete;
+  ~StatusLocal() = default;
 
   std::string_view message() const noexcept { return entry_.message; }
   std::source_location location() const noexcept { return entry_.location; }
 
  private:
-  friend class StatusCode;
+  friend class Status;
 
-  explicit StatusCodeLocal(impl::BitCode code, StatusDomainBase const *domain)
-      : StatusCode{code, domain} {
+  explicit StatusLocal(StatusCode code, StatusDomainBase const *domain)
+      : Status{code, domain} {
     entry_.location = domain->location_of(*this);
     entry_.message = domain->message_of(*this);
   }
 
   impl::IncidentEntry entry_;
 
-  friend std::ostream &operator<<(std::ostream &out, StatusCodeLocal self) {
+  friend std::ostream &operator<<(std::ostream &out, StatusLocal self) {
     out << self.message();
     return out;
   }
 };
 
-inline StatusCode StatusDomainBase::make_status_code(
-    impl::BitCode code) const noexcept {
-  return StatusCode{code, this};
+inline Status StatusDomainBase::make_status(StatusCode code) const noexcept {
+  return Status{code, this};
 }
 
 inline std::size_t StatusDomainBase::incident_code_of(
-    StatusCode incident) const noexcept {
+    Status incident) const noexcept {
   return incident.code_.incident_bits();
 }
 
 inline std::size_t StatusDomainBase::condition_code_of(
-    StatusCode incident) const noexcept {
+    Status incident) const noexcept {
   return incident.code_.condition_bits();
 }
 
 inline std::size_t StatusDomainBase::domain_code_of(
-    StatusCode incident) const noexcept {
+    Status incident) const noexcept {
   return incident.code_.domain_bits();
 }
 
-inline StatusCondition StatusDomainBase::make_status_condition(
-    impl::BitCode code) const noexcept {
-  return StatusCondition{code, this};
+inline StatusKind StatusDomainBase::make_status_kind(
+    StatusCode code) const noexcept {
+  return StatusKind{code, this};
 }
 
 inline std::size_t StatusDomainBase::condition_code_of(
-    StatusCondition condition) const noexcept {
-  return condition.code_.condition_bits();
+    StatusKind kind) const noexcept {
+  return kind.code_.condition_bits();
 }
 
 inline std::size_t StatusDomainBase::domain_code_of(
-    StatusCondition condition) const noexcept {
-  return condition.code_.domain_bits();
+    StatusKind kind) const noexcept {
+  return kind.code_.domain_bits();
 }
 
-inline StatusCodeLocal StatusCode::make_local_copy() const noexcept {
-  return StatusCodeLocal{code_, domain_};
+inline StatusLocal Status::make_local_copy() const noexcept {
+  return StatusLocal{code_, domain_};
 }
 
 // NOTE: To avoid the cost of reference counting each return code's incident
 // location and message, the domain is limited to tracking `IncidentCountMax`
 // number of concurrent incidents, which are stored in a simple array-backed
-// ring buffer. If `StatusCode` incident information must be accurately stored
+// ring buffer. If `Status` incident information must be accurately stored
 // for longer than the buffer might be expected to overlap, then
-// `StatusCodeLocal` should be used instead, which keeps its own local copy.
+// `StatusLocal` should be used instead, which keeps its own local copy.
 //
 template <typename ConditionEnumType,  //
           std::size_t ConditionCount,  //
@@ -356,31 +346,27 @@ class EnumStatusDomain : public StatusDomainBase {
                             std::string_view domain_name)
       : StatusDomainBase{domain_code, domain_name} {}
 
-  std::string_view message_of(
-      StatusCondition condition) const noexcept override {
-    return conditions_[condition_code_of(condition)].message;
+  std::string_view message_of(StatusKind kind) const noexcept override {
+    return conditions_[condition_code_of(kind)].message;
   }
 
-  std::string_view message_of(StatusCode incident) const noexcept override {
+  std::string_view message_of(Status incident) const noexcept override {
     return incidents_[incident_code_of(incident)].message;
   }
 
-  std::source_location location_of(
-      StatusCode incident) const noexcept override {
+  std::source_location location_of(Status incident) const noexcept override {
     return incidents_[incident_code_of(incident)].location;
   }
 
-  bool has_equivalent_condition_of(StatusCode,
-                                   StatusCode) const noexcept override {
+  bool has_equivalent_condition_of(Status, Status) const noexcept override {
     return false;  // By default no enum statuses are equivalent to any others.
   };
 
-  bool has_equivalent_condition_of(StatusCode,
-                                   StatusCondition) const noexcept override {
+  bool has_equivalent_condition_of(Status, StatusKind) const noexcept override {
     return false;  // By default no enum statuses are equivalent to any others.
   };
 
-  StatusCode raise_incident(
+  Status raise_incident(
       ConditionEnumType condition, std::string message = {},
       std::source_location location = std::source_location::current()) {
     std::size_t current = next_incident_++;
@@ -390,14 +376,12 @@ class EnumStatusDomain : public StatusDomainBase {
     incidents_[current].message = std::move(message);
 
     auto condition_code = static_cast<std::size_t>(condition);
-    return make_status_code(
-        impl::BitCode{domain_code(), condition_code, current});
+    return make_status(StatusCode{domain_code(), condition_code, current});
   }
 
-  StatusCondition watch_condition(ConditionEnumType condition) {
+  StatusKind watch_condition(ConditionEnumType condition) {
     auto condition_code = static_cast<std::size_t>(condition);
-    return make_status_condition(
-        impl::BitCode{domain_code(), condition_code, 0U});
+    return make_status_kind(StatusCode{domain_code(), condition_code, 0U});
   }
 
  protected:
@@ -417,9 +401,8 @@ static_enum_status_domain() {
 }
 
 template <typename ConditionEnumType>
-StatusCode raise(
-    ConditionEnumType condition, std::string message = {},
-    std::source_location location = std::source_location::current()) {
+Status raise(ConditionEnumType condition, std::string message = {},
+             std::source_location location = std::source_location::current()) {
   return static_enum_status_domain<ConditionEnumType,
                                    static_cast<std::size_t>(
                                        ConditionEnumType::COUNT)>()
@@ -427,7 +410,7 @@ StatusCode raise(
 }
 
 template <typename ConditionEnumType>
-StatusCondition watch(ConditionEnumType condition) {
+StatusKind watch(ConditionEnumType condition) {
   return static_enum_status_domain<ConditionEnumType,
                                    static_cast<std::size_t>(
                                        ConditionEnumType::COUNT)>()
@@ -534,10 +517,8 @@ class PosixStatusDomain final
   PosixStatusDomain() : EnumStatusDomain{impl::POSIX_DOMAIN_CODE, "posix"} {}
   ~PosixStatusDomain() = default;
 
-  bool has_equivalent_condition_of(StatusCode,
-                                   StatusCode) const noexcept override;
-  bool has_equivalent_condition_of(StatusCode,
-                                   StatusCondition) const noexcept override;
+  bool has_equivalent_condition_of(Status, Status) const noexcept override;
+  bool has_equivalent_condition_of(Status, StatusKind) const noexcept override;
 };
 
 enum class Win32Condition : std::size_t {
@@ -758,10 +739,8 @@ class Win32StatusDomain final
   Win32StatusDomain() : EnumStatusDomain{impl::WIN32_DOMAIN_CODE, "win32"} {}
   ~Win32StatusDomain() = default;
 
-  bool has_equivalent_condition_of(StatusCode,
-                                   StatusCode) const noexcept override;
-  bool has_equivalent_condition_of(StatusCode,
-                                   StatusCondition) const noexcept override;
+  bool has_equivalent_condition_of(Status, Status) const noexcept override;
+  bool has_equivalent_condition_of(Status, StatusKind) const noexcept override;
 };
 
 }  // namespace simon
