@@ -9,21 +9,14 @@
 
 namespace simon {
 
-namespace impl {
-struct ConditionEntry final {
+struct StatusConditionEntry final {
   std::string message;
 };
 
-struct IncidentEntry final {
+struct StatusIncidentEntry final {
   std::source_location location;
   std::string message;
 };
-
-inline std::size_t allocate_static_increment() {
-  static std::size_t increment = 0;
-  return increment++;
-}
-}  // namespace impl
 
 class StatusCode {
  public:
@@ -152,13 +145,13 @@ class StatusDomainBase {
   std::size_t domain_code() const noexcept { return code_; }
 
   friend class Status;
-  Status make_status(StatusCode) const noexcept;
+  Status make_status_of(StatusCode) const noexcept;
   std::size_t incident_code_of(Status) const noexcept;
   std::size_t condition_code_of(Status) const noexcept;
   std::size_t domain_code_of(Status) const noexcept;
 
   friend class StatusKind;
-  StatusKind make_status_kind(StatusCode) const noexcept;
+  StatusKind make_kind_of(StatusCode) const noexcept;
   std::size_t condition_code_of(StatusKind) const noexcept;
   std::size_t domain_code_of(StatusKind) const noexcept;
 
@@ -177,6 +170,10 @@ class StatusKind {
 
   std::string_view message() const noexcept {
     return domain_->message_of(*this);
+  }
+
+  bool operator==(StatusKind that) const noexcept {
+    return code_.is_same_kind(that.code_);
   }
 
  private:
@@ -210,6 +207,12 @@ class Status {
     return domain_->location_of(*this);
   }
 
+  StatusKind kind() const noexcept {
+    return domain_->make_kind_of(code_);  //
+  }
+
+  StatusLocal local_copy() const noexcept;
+
   bool has_equivalent_condition_as(Status that) const noexcept {
     return code_.is_same_kind(that.code_) ||
            domain_->has_equivalent_condition_of(*this, that);
@@ -227,8 +230,6 @@ class Status {
   bool operator==(StatusKind that) const noexcept {
     return code_.is_same_kind(that.code_);
   }
-
-  StatusLocal make_local_copy() const noexcept;
 
  private:
   friend class StatusLocal;
@@ -278,7 +279,7 @@ class StatusLocal : public Status {
     entry_.message = domain->message_of(*this);
   }
 
-  impl::IncidentEntry entry_;
+  StatusIncidentEntry entry_;
 
   friend std::ostream &operator<<(std::ostream &out, StatusLocal self) {
     out << self.message();
@@ -286,7 +287,7 @@ class StatusLocal : public Status {
   }
 };
 
-inline Status StatusDomainBase::make_status(StatusCode code) const noexcept {
+inline Status StatusDomainBase::make_status_of(StatusCode code) const noexcept {
   return Status{code, this};
 }
 
@@ -305,7 +306,7 @@ inline std::size_t StatusDomainBase::domain_code_of(
   return incident.code_.domain_bits();
 }
 
-inline StatusKind StatusDomainBase::make_status_kind(
+inline StatusKind StatusDomainBase::make_kind_of(
     StatusCode code) const noexcept {
   return StatusKind{code, this};
 }
@@ -320,7 +321,7 @@ inline std::size_t StatusDomainBase::domain_code_of(
   return kind.code_.domain_bits();
 }
 
-inline StatusLocal Status::make_local_copy() const noexcept {
+inline StatusLocal Status::local_copy() const noexcept {
   return StatusLocal{code_, domain_};
 }
 
@@ -376,25 +377,25 @@ class EnumStatusDomain : public StatusDomainBase {
     incidents_[current].message = std::move(message);
 
     auto condition_code = static_cast<std::size_t>(condition);
-    return make_status(StatusCode{domain_code(), condition_code, current});
+    return make_status_of(StatusCode{domain_code(), condition_code, current});
   }
 
   StatusKind watch_condition(ConditionEnumType condition) {
     auto condition_code = static_cast<std::size_t>(condition);
-    return make_status_kind(StatusCode{domain_code(), condition_code, 0U});
+    return make_kind_of(StatusCode{domain_code(), condition_code, 0U});
   }
 
  protected:
   std::size_t next_incident_ = 0;
-  std::array<impl::IncidentEntry, IncidentCountMax> incidents_;
+  std::array<StatusIncidentEntry, IncidentCountMax> incidents_;
 
-  static const std::array<impl::ConditionEntry, ConditionCount> conditions_;
+  static const std::array<StatusConditionEntry, ConditionCount> conditions_;
 };
 
 template <typename ConditionEnumType, std::size_t ConditionCount>
 EnumStatusDomain<ConditionEnumType, ConditionCount> &
 static_enum_status_domain() {
-  static std::size_t domain_code = impl::allocate_static_increment();
+  static std::size_t domain_code = allocate_static_increment();
   static EnumStatusDomain<ConditionEnumType, ConditionCount> _{
       domain_code, std::format("static_enum_status_domain_{}", domain_code)};
   return _;

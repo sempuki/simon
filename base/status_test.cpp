@@ -16,6 +16,16 @@ TEST_CASE("StatusCode") {
     REQUIRE(code.incident_bits() == 0u);
   }
 
+  SECTION("ShouldConstructWithIncidentConditionDomainBits") {
+    // Under Test.
+    StatusCode other{4u, 5u, 6u};
+
+    // Postconditions.
+    REQUIRE(other.domain_bits() == 4u);
+    REQUIRE(other.condition_bits() == 5u);
+    REQUIRE(other.incident_bits() == 6u);
+  }
+
   SECTION("ShouldHaveSameDomainBitsWhenSet") {
     // Under Test.
     code.set_domain_bits(5u);
@@ -153,14 +163,14 @@ class TestStatusDomain final
 };
 
 template <>
-const std::array<impl::ConditionEntry, TEST_CONDITION_COUNT>
+const std::array<StatusConditionEntry, TEST_CONDITION_COUNT>
     EnumStatusDomain<TestCondition, TEST_CONDITION_COUNT>::conditions_ = {
-        impl::ConditionEntry{"UP"},       //
-        impl::ConditionEntry{"DOWN"},     //
-        impl::ConditionEntry{"TOP"},      //
-        impl::ConditionEntry{"BOTTOM"},   //
-        impl::ConditionEntry{"STRANGE"},  //
-        impl::ConditionEntry{"CHARM"},    //
+        StatusConditionEntry{"UP"},       //
+        StatusConditionEntry{"DOWN"},     //
+        StatusConditionEntry{"TOP"},      //
+        StatusConditionEntry{"BOTTOM"},   //
+        StatusConditionEntry{"STRANGE"},  //
+        StatusConditionEntry{"CHARM"},    //
 };
 
 TestStatusDomain domain{42u, "test"};
@@ -333,7 +343,7 @@ TEST_CASE("StatusKind") {
 }
 
 TEST_CASE("StaticEnumStatusDomain") {
-  SECTION("ShouldRaiseStatusFromStaticDomain") {
+  SECTION("ShouldRaiseStatusFromDifferentDomain") {
     // Preconditions.
     Status other = domain.raise_incident(TestCondition::TOP);
 
@@ -341,7 +351,7 @@ TEST_CASE("StaticEnumStatusDomain") {
     Status status = raise<TestCondition>(TestCondition::TOP);
 
     // Postconditions.
-    REQUIRE(status != other);
+    REQUIRE(status.kind() != other.kind());
   }
 
   SECTION("ShouldPass") {
