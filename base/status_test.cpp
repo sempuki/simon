@@ -174,6 +174,8 @@ const std::array<StatusConditionEntry, TEST_CONDITION_COUNT>
 };
 
 TestStatusDomain domain{42u, "test"};
+std::source_location location0 = std::source_location::current();
+std::source_location location1 = std::source_location::current();
 std::string message0 = "mark";
 std::string message1 = "bark";
 
@@ -220,16 +222,19 @@ TEST_CASE("StatusDomain") {
 }
 
 TEST_CASE("Status") {
-  std::source_location incident_location = std::source_location::current();
-  Status status = domain.raise_incident(TestCondition::UP, message0);
+  SECTION("ShouldHaveCurrentLocationByDefault") {
+    // Preconditions.
+    auto raised_location = std::source_location::current();
+    Status status = domain.raise_incident(TestCondition::UP);
 
-  SECTION("ShouldHaveSameLocationAsRaisedIncident") {
     // Under Test.
     std::source_location location = status.location();
 
     // Postconditions.
-    REQUIRE(location.line() - 1 == incident_location.line());
+    REQUIRE(location.line() - 1 == raised_location.line());
   }
+
+  Status status = domain.raise_incident(TestCondition::UP, message0, location0);
 
   SECTION("ShouldHaveSameMessageAsRaisedIncident") {
     // Under Test.
@@ -237,6 +242,14 @@ TEST_CASE("Status") {
 
     // Postconditions.
     REQUIRE(status_message == message0);
+  }
+
+  SECTION("ShouldHaveSameLocationAsRaisedIncident") {
+    // Under Test.
+    std::source_location location = status.location();
+
+    // Postconditions.
+    REQUIRE(location.line() == location0.line());
   }
 
   SECTION("ShouldBeEqualForSameIncident") {
@@ -261,6 +274,38 @@ TEST_CASE("Status") {
 
     // Postconditions.
     REQUIRE(other != status);
+  }
+
+  SECTION("ShouldBeEqualToKindWithSameConditionAndDomain") {
+    // Under Test.
+    Status other = domain.raise_incident(TestCondition::UP);
+
+    // Postconditions.
+    REQUIRE(status == other.kind());
+  }
+
+  SECTION("ShouldNotBeEqualToKindWithDifferentCondition") {
+    // Under Test.
+    Status other = domain.raise_incident(TestCondition::DOWN);
+
+    // Postconditions.
+    REQUIRE(status != other.kind());
+  }
+
+  SECTION("ShouldHaveEqualKindWithSameConditionAndDomain") {
+    // Under Test.
+    Status other = domain.raise_incident(TestCondition::UP);
+
+    // Postconditions.
+    REQUIRE(status.kind() == other.kind());
+  }
+
+  SECTION("ShouldNotHaveEqualKindWithDifferentCondition") {
+    // Under Test.
+    Status other = domain.raise_incident(TestCondition::DOWN);
+
+    // Postconditions.
+    REQUIRE(status.kind() != other.kind());
   }
 
   SECTION("ShouldBeEquivalentToIncidentOfSameCondition") {
@@ -343,24 +388,62 @@ TEST_CASE("StatusKind") {
 }
 
 TEST_CASE("StaticEnumStatusDomain") {
-  SECTION("ShouldRaiseStatusFromDifferentDomain") {
+  SECTION("ShouldRaiseStatusFromStaticDomain") {
     // Preconditions.
     Status other = domain.raise_incident(TestCondition::TOP);
 
     // Under Test.
-    Status status = raise<TestCondition>(TestCondition::TOP);
+    Status status0 = raise(TestCondition::TOP);
+    Status status1 = raise(TestCondition::TOP);
 
     // Postconditions.
-    REQUIRE(status.kind() != other.kind());
+    REQUIRE(status0.kind() != other.kind());
+    REQUIRE(status0.kind() == status1.kind());
   }
 
-  SECTION("ShouldPass") {
-    // Preconditions.
-
+  SECTION("ShouldRaiseStatusWithMessage") {
     // Under Test.
+    Status status0 = raise(TestCondition::TOP, message0);
+    Status status1 = raise(TestCondition::TOP, message1);
 
     // Postconditions.
-    REQUIRE(true);
+    REQUIRE(status0.message() == message0);
+    REQUIRE(status1.message() == message1);
+  }
+
+  SECTION("ShouldRaiseStatusWithLocation") {
+    // Under Test.
+    Status status0 = raise(TestCondition::TOP, message0, location0);
+    Status status1 = raise(TestCondition::TOP, message1, location1);
+
+    // Postconditions.
+    REQUIRE(status0.location().line() == location0.line());
+    REQUIRE(status1.location().line() == location1.line());
+  }
+
+  SECTION("ShouldRaiseStatusWithLocationByDefault") {
+    // Under Test.
+    Status status0 = raise(TestCondition::TOP);
+    Status status1 = raise(TestCondition::TOP);
+
+    // Postconditions.
+    REQUIRE(status0.location().line() > 0u);
+    REQUIRE(status1.location().line() > 0u);
+  }
+
+  SECTION("ShouldWatchForCondition") {
+    // Preconditions.
+    Status status = raise(TestCondition::TOP);
+    StatusKind kind = watch(TestCondition::TOP);
+
+    // Under Test.
+    bool found = false;
+    if (status == kind || kind == status) {
+      found = true;
+    }
+
+    // Postconditions.
+    REQUIRE(found);
   }
 }
 

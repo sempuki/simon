@@ -186,6 +186,10 @@ class StatusKind {
   StatusCode code_;
   StatusDomainBase const *domain_ = nullptr;
 
+  friend bool operator!=(StatusKind a, StatusKind b) noexcept {
+    return !a.operator==(b);
+  }
+
   friend std::ostream &operator<<(std::ostream &out, StatusKind self) {
     out << self.message();
     return out;
