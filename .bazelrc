@@ -1,5 +1,4 @@
 common --enable_bzlmod
-common --cxxopt=-std=c++23
 common --cxxopt=-Wno-terminate
 build --experimental_ui_max_stdouterr_bytes=-1
 build --jobs=24

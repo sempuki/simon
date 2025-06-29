@@ -18,11 +18,11 @@ struct StatusIncidentEntry final {
   std::string message;
 };
 
-class StatusCode {
+class StatusCode final {
  public:
-  StatusCode(std::size_t domain,     //
-             std::size_t condition,  //
-             std::size_t incident)
+  constexpr explicit StatusCode(std::size_t domain,     //
+                                std::size_t condition,  //
+                                std::size_t incident)
       : bits_{(least_16_bits_as_uint64(domain) << DOMAIN_SHIFT) |
               (least_16_bits_as_uint64(condition) << CONDITION_SHIFT) |
               (least_16_bits_as_uint64(incident) << INCIDENT_SHIFT)} {
@@ -31,62 +31,65 @@ class StatusCode {
     CHECK_POSTCONDITION(std::cmp_equal(incident, incident_bits()));
   }
 
-  DECLARE_COPY_DEFAULT(StatusCode);
-  DECLARE_MOVE_DEFAULT(StatusCode);
+  constexpr StatusCode(const StatusCode &) noexcept = default;
+  constexpr StatusCode &operator=(const StatusCode &) noexcept = default;
 
-  StatusCode() = default;
-  ~StatusCode() = default;
+  constexpr StatusCode(StatusCode &&) noexcept = default;
+  constexpr StatusCode &operator=(StatusCode &&) noexcept = default;
 
-  std::size_t domain_bits() const noexcept {
+  constexpr StatusCode() = default;
+  constexpr ~StatusCode() = default;
+
+  constexpr std::size_t domain_bits() const noexcept {
     return (bits_ & DOMAIN_MASK) >> DOMAIN_SHIFT;
   }
 
-  void set_domain_bits(std::size_t bits) noexcept {
+  constexpr void set_domain_bits(std::size_t bits) noexcept {
     bits_ &= ~DOMAIN_MASK;
     bits_ |= least_16_bits_as_uint64(bits) << DOMAIN_SHIFT;
     CHECK_POSTCONDITION(std::cmp_equal(bits, domain_bits()));
   }
 
-  void set_domain_bits(StatusCode code) noexcept {
+  constexpr void set_domain_bits(StatusCode code) noexcept {
     bits_ &= ~DOMAIN_MASK;
     bits_ |= code.bits_ & DOMAIN_MASK;
   }
 
-  std::size_t condition_bits() const noexcept {
+  constexpr std::size_t condition_bits() const noexcept {
     return (bits_ & CONDITION_MASK) >> CONDITION_SHIFT;
   }
 
-  void set_condition_bits(std::size_t bits) noexcept {
+  constexpr void set_condition_bits(std::size_t bits) noexcept {
     bits_ &= ~CONDITION_MASK;
     bits_ |= least_16_bits_as_uint64(bits) << CONDITION_SHIFT;
     CHECK_POSTCONDITION(std::cmp_equal(bits, condition_bits()));
   }
 
-  void set_condition_bits(StatusCode code) noexcept {
+  constexpr void set_condition_bits(StatusCode code) noexcept {
     bits_ &= ~CONDITION_MASK;
     bits_ |= code.bits_ & CONDITION_MASK;
   }
 
-  std::size_t incident_bits() const noexcept {
+  constexpr std::size_t incident_bits() const noexcept {
     return (bits_ & INCIDENT_MASK) >> INCIDENT_SHIFT;
   }
 
-  void set_incident_bits(std::size_t bits) noexcept {
+  constexpr void set_incident_bits(std::size_t bits) noexcept {
     bits_ &= ~INCIDENT_MASK;
     bits_ |= least_16_bits_as_uint64(bits) << INCIDENT_SHIFT;
     CHECK_POSTCONDITION(std::cmp_equal(bits, incident_bits()));
   }
 
-  void set_incident_bits(StatusCode code) noexcept {
+  constexpr void set_incident_bits(StatusCode code) noexcept {
     bits_ &= ~INCIDENT_MASK;
     bits_ |= code.bits_ & INCIDENT_MASK;
   }
 
-  bool is_same_kind(StatusCode that) const noexcept {
+  constexpr bool is_same_kind(StatusCode that) const noexcept {
     return (bits_ & KIND_COMPARE_MASK) == (that.bits_ & KIND_COMPARE_MASK);
   }
 
-  bool is_same_code(StatusCode that) const noexcept {
+  constexpr bool is_same_code(StatusCode that) const noexcept {
     return (bits_ & CODE_COMPARE_MASK) == (that.bits_ & CODE_COMPARE_MASK);
   }
 
@@ -110,7 +113,7 @@ class StatusCode {
   constexpr static std::uint64_t CODE_COMPARE_MASK =
       DOMAIN_MASK | CONDITION_MASK | INCIDENT_MASK;
 
-  static std::uint64_t least_16_bits_as_uint64(std::size_t bits) {
+  constexpr static std::uint64_t least_16_bits_as_uint64(std::size_t bits) {
     constexpr std::uint64_t SHIFT = 64 - 16;
     return ((reinterpret_cast<std::uint64_t>(bits) << SHIFT) >> SHIFT);
   }
@@ -122,14 +125,18 @@ class StatusKind;
 
 class StatusDomainBase {
  public:
-  DECLARE_COPY_DELETE(StatusDomainBase);
-  DECLARE_MOVE_DELETE(StatusDomainBase);
+  constexpr StatusDomainBase(const StatusDomainBase &) noexcept = default;
+  constexpr StatusDomainBase &operator=(const StatusDomainBase &) noexcept =
+      default;
 
-  StatusDomainBase() = delete;
-  ~StatusDomainBase() = default;
+  constexpr StatusDomainBase(StatusDomainBase &&) noexcept = default;
+  constexpr StatusDomainBase &operator=(StatusDomainBase &&) noexcept = default;
 
-  explicit StatusDomainBase(std::size_t domain_code,
-                            std::string_view domain_name)
+  constexpr StatusDomainBase() = delete;
+  constexpr ~StatusDomainBase() = default;
+
+  constexpr explicit StatusDomainBase(std::size_t domain_code,
+                                      std::string_view domain_name)
       : code_{domain_code}, name_{domain_name} {}
 
   std::string_view name() const noexcept { return name_; }
@@ -142,7 +149,7 @@ class StatusDomainBase {
                                            StatusKind) const noexcept = 0;
 
  protected:
-  std::size_t domain_code() const noexcept { return code_; }
+  constexpr std::size_t domain_code() const noexcept { return code_; }
 
   friend class Status;
   Status make_status_of(StatusCode) const noexcept;
@@ -151,28 +158,31 @@ class StatusDomainBase {
   std::size_t domain_code_of(Status) const noexcept;
 
   friend class StatusKind;
-  StatusKind make_kind_of(StatusCode) const noexcept;
-  std::size_t condition_code_of(StatusKind) const noexcept;
-  std::size_t domain_code_of(StatusKind) const noexcept;
+  constexpr StatusKind make_kind_of(StatusCode) const noexcept;
+  constexpr std::size_t condition_code_of(StatusKind) const noexcept;
+  constexpr std::size_t domain_code_of(StatusKind) const noexcept;
 
  private:
   std::size_t code_;
-  std::string name_;
+  std::string_view name_;
 };
 
-class StatusKind {
+class StatusKind final {
  public:
-  DECLARE_COPY_DEFAULT(StatusKind);
-  DECLARE_MOVE_DEFAULT(StatusKind);
+  constexpr StatusKind(const StatusKind &) noexcept = default;
+  constexpr StatusKind &operator=(const StatusKind &) noexcept = default;
 
-  StatusKind() = delete;
-  ~StatusKind() = default;
+  constexpr StatusKind(StatusKind &&) noexcept = default;
+  constexpr StatusKind &operator=(StatusKind &&) noexcept = default;
+
+  constexpr StatusKind() = delete;
+  constexpr ~StatusKind() = default;
 
   std::string_view message() const noexcept {
     return domain_->message_of(*this);
   }
 
-  bool operator==(StatusKind that) const noexcept {
+  constexpr bool operator==(StatusKind that) const noexcept {
     return code_.is_same_kind(that.code_);
   }
 
@@ -180,13 +190,13 @@ class StatusKind {
   friend class Status;
   friend class StatusDomainBase;
 
-  explicit StatusKind(StatusCode code, StatusDomainBase const *domain)
+  constexpr explicit StatusKind(StatusCode code, StatusDomainBase const *domain)
       : code_{code}, domain_{domain} {}
 
   StatusCode code_;
   StatusDomainBase const *domain_ = nullptr;
 
-  friend bool operator!=(StatusKind a, StatusKind b) noexcept {
+  friend constexpr bool operator!=(StatusKind a, StatusKind b) noexcept {
     return !a.operator==(b);
   }
 
@@ -310,17 +320,17 @@ inline std::size_t StatusDomainBase::domain_code_of(
   return incident.code_.domain_bits();
 }
 
-inline StatusKind StatusDomainBase::make_kind_of(
+inline constexpr StatusKind StatusDomainBase::make_kind_of(
     StatusCode code) const noexcept {
   return StatusKind{code, this};
 }
 
-inline std::size_t StatusDomainBase::condition_code_of(
+inline constexpr std::size_t StatusDomainBase::condition_code_of(
     StatusKind kind) const noexcept {
   return kind.code_.condition_bits();
 }
 
-inline std::size_t StatusDomainBase::domain_code_of(
+inline constexpr std::size_t StatusDomainBase::domain_code_of(
     StatusKind kind) const noexcept {
   return kind.code_.domain_bits();
 }
@@ -341,14 +351,18 @@ template <typename ConditionEnumType,  //
           std::size_t IncidentCountMax = 16>
 class EnumStatusDomain : public StatusDomainBase {
  public:
-  DECLARE_COPY_DELETE(EnumStatusDomain);
-  DECLARE_MOVE_DELETE(EnumStatusDomain);
+  constexpr EnumStatusDomain(const EnumStatusDomain &) noexcept = default;
+  constexpr EnumStatusDomain &operator=(const EnumStatusDomain &) noexcept =
+      default;
 
-  EnumStatusDomain() = delete;
-  ~EnumStatusDomain() = default;
+  constexpr EnumStatusDomain(EnumStatusDomain &&) noexcept = default;
+  constexpr EnumStatusDomain &operator=(EnumStatusDomain &&) noexcept = default;
 
-  explicit EnumStatusDomain(std::size_t domain_code,
-                            std::string_view domain_name)
+  constexpr EnumStatusDomain() = delete;
+  constexpr ~EnumStatusDomain() = default;
+
+  constexpr explicit EnumStatusDomain(std::size_t domain_code,
+                                      std::string_view domain_name)
       : StatusDomainBase{domain_code, domain_name} {}
 
   std::string_view message_of(StatusKind kind) const noexcept override {
@@ -383,7 +397,7 @@ class EnumStatusDomain : public StatusDomainBase {
                                std::move(location));
   }
 
-  StatusKind watch_condition(ConditionEnumType condition) {
+  constexpr StatusKind watch_condition(ConditionEnumType condition) {
     return watch_condition_impl(condition);
   }
 
@@ -401,7 +415,7 @@ class EnumStatusDomain : public StatusDomainBase {
     return make_status_of(StatusCode{domain_code(), condition_code, current});
   }
 
-  StatusKind watch_condition_impl(ConditionEnumType condition) {
+  constexpr StatusKind watch_condition_impl(ConditionEnumType condition) {
     auto condition_code = static_cast<std::size_t>(condition);
     return make_kind_of(StatusCode{domain_code(), condition_code, 0U});
   }
