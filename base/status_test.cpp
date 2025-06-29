@@ -1,5 +1,6 @@
 #include "base/status.hpp"
 
+#include <functional>
 #include <sstream>
 
 #include "base/testing.hpp"
@@ -180,7 +181,7 @@ std::string message0 = "mark";
 std::string message1 = "bark";
 
 TEST_CASE("StatusDomain") {
-  SECTION("ShouldNotGetLocationOfStatusCodeByDefault") {
+  SECTION("ShouldNotFetchStatusLocationByDefault") {
     // Under Test.
     Status status = domain.raise_incident(TestCondition::UP);
 
@@ -188,7 +189,7 @@ TEST_CASE("StatusDomain") {
     REQUIRE(domain.location_of_incident == 0u);
   }
 
-  SECTION("ShouldNotGetMessageOfStatusCodeByDefault") {
+  SECTION("ShouldNotFetchStatusMessageByDefault") {
     // Under Test.
     Status status = domain.raise_incident(TestCondition::UP);
 
@@ -196,7 +197,7 @@ TEST_CASE("StatusDomain") {
     REQUIRE(domain.message_of_incident == 0u);
   }
 
-  SECTION("ShouldGetMessageOfStatusCodeOnDemand") {
+  SECTION("ShouldFetchStatusMessageOnDemand") {
     // Preconditions.
     Status status = domain.raise_incident(TestCondition::UP, message0);
 
@@ -208,7 +209,7 @@ TEST_CASE("StatusDomain") {
     REQUIRE(message.size() > 0u);
   }
 
-  SECTION("ShouldGetLocationOfStatusCodeOnDemand") {
+  SECTION("ShouldFetchStatusLocationOnDemand") {
     // Preconditions.
     Status status = domain.raise_incident_here(TestCondition::UP);
 
@@ -219,10 +220,18 @@ TEST_CASE("StatusDomain") {
     REQUIRE(domain.location_of_incident > 0u);
     REQUIRE(location.line() > 0u);
   }
+
+  // SECTION("ShouldBeConstexpr") {
+  //   // Under Test.
+  //   constexpr TestStatusDomain domain{42u, "test"};
+
+  //   // Postconditions.
+  //   REQUIRE(true);
+  // }
 }
 
 TEST_CASE("Status") {
-  SECTION("ShouldHaveCurrentLocationRaisedHereByDefault") {
+  SECTION("ShouldHaveCurrentLocationWhenRaisedHere") {
     // Preconditions.
     auto raised_location = std::source_location::current();
     Status status = domain.raise_incident_here(TestCondition::UP);
@@ -237,7 +246,7 @@ TEST_CASE("Status") {
   Status status =
       domain.raise_incident_here(TestCondition::UP, message0, location0);
 
-  SECTION("ShouldHaveSameMessageAsRaisedHereIncident") {
+  SECTION("ShouldHaveSameMessageWhenRaisedHere") {
     // Under Test.
     std::string_view status_message = status.message();
 
@@ -245,7 +254,7 @@ TEST_CASE("Status") {
     REQUIRE(status_message == message0);
   }
 
-  SECTION("ShouldHaveSameLocationAsRaisedHereIncident") {
+  SECTION("ShouldHaveSameLocationWhenRaisedHere") {
     // Under Test.
     std::source_location location = status.location();
 
@@ -253,28 +262,31 @@ TEST_CASE("Status") {
     REQUIRE(location.line() == location0.line());
   }
 
-  SECTION("ShouldBeEqualForSameIncident") {
+  SECTION("ShouldBeEqualToStatusWithSameIncident") {
     // Under Test.
     Status copy = status;
 
     // Postconditions.
     REQUIRE(copy == status);
+    REQUIRE(status == copy);
   }
 
-  SECTION("ShouldNotBeEqualForDifferentIncidentOfSameCondition") {
+  SECTION("ShouldNotBeEqualToStatusWithDifferentIncident") {
     // Under Test.
     Status other = domain.raise_incident(TestCondition::UP);
 
     // Postconditions.
     REQUIRE(other != status);
+    REQUIRE(status != other);
   }
 
-  SECTION("ShouldNotBeEqualForDifferentIncidentOfDifferentCondition") {
+  SECTION("ShouldNotBeEqualToStatusWithDifferentCondition") {
     // Under Test.
     Status other = domain.raise_incident(TestCondition::DOWN);
 
     // Postconditions.
     REQUIRE(other != status);
+    REQUIRE(status != other);
   }
 
   SECTION("ShouldBeEqualToKindWithSameConditionAndDomain") {
@@ -283,6 +295,7 @@ TEST_CASE("Status") {
 
     // Postconditions.
     REQUIRE(status == other.kind());
+    REQUIRE(other.kind() == status);
   }
 
   SECTION("ShouldNotBeEqualToKindWithDifferentCondition") {
@@ -291,6 +304,7 @@ TEST_CASE("Status") {
 
     // Postconditions.
     REQUIRE(status != other.kind());
+    REQUIRE(other.kind() != status);
   }
 
   SECTION("ShouldHaveEqualKindWithSameConditionAndDomain") {
@@ -299,6 +313,7 @@ TEST_CASE("Status") {
 
     // Postconditions.
     REQUIRE(status.kind() == other.kind());
+    REQUIRE(other.kind() == status.kind());
   }
 
   SECTION("ShouldNotHaveEqualKindWithDifferentCondition") {
@@ -307,9 +322,10 @@ TEST_CASE("Status") {
 
     // Postconditions.
     REQUIRE(status.kind() != other.kind());
+    REQUIRE(other.kind() != status.kind());
   }
 
-  SECTION("ShouldBeEquivalentToIncidentOfSameCondition") {
+  SECTION("ShouldBeEquivalentToStatusWithSameCondition") {
     // Under Test.
     Status other = domain.raise_incident(TestCondition::UP);
 
@@ -318,7 +334,7 @@ TEST_CASE("Status") {
     REQUIRE(other.has_equivalent_condition_as(status));
   }
 
-  SECTION("ShouldNotBeEquivalentToIncidentOfDifferentCondition") {
+  SECTION("ShouldNotBeEquivalentToStatusWithDifferentCondition") {
     // Under Test.
     Status other = domain.raise_incident(TestCondition::DOWN);
 
@@ -386,6 +402,14 @@ TEST_CASE("StatusKind") {
     REQUIRE(ss.str().size() > 0u);
     REQUIRE(ss.str() == up.message());
   }
+
+  // SECTION("ShouldBeConstexpr") {
+  //   // Under Test.
+  //   constexpr StatusKind kind = domain.watch_condition(TestCondition::UP);
+
+  //   // Postconditions.
+  //   REQUIRE(status == kind);
+  // }
 }
 
 TEST_CASE("StaticEnumStatusDomain") {
