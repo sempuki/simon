@@ -17,23 +17,6 @@ class StatusDomainInterface;
 class StatusDetached;
 class Status;
 
-namespace impl {
-
-Status make_status(StatusCode, StatusDomainInterface const *);
-StatusDetached make_status_detached(StatusCode, StatusDomainInterface const *);
-constexpr StatusKind make_status_kind(StatusCode,
-                                      StatusKindDomainInterface const *);
-
-constexpr std::size_t domain_code_of(StatusKind const *);
-constexpr std::size_t domain_code_of(StatusBase const *);
-
-constexpr std::size_t condition_code_of(StatusKind const *);
-constexpr std::size_t condition_code_of(StatusBase const *);
-
-constexpr std::size_t incident_code_of(StatusBase const *);
-
-}  // namespace impl
-
 struct StatusConditionEntry final {
   std::string message;
 };
@@ -139,6 +122,11 @@ class StatusCode final {
     constexpr std::uint64_t SHIFT = 64 - 16;
     return ((reinterpret_cast<std::uint64_t>(bits) << SHIFT) >> SHIFT);
   }
+
+  friend std::ostream &operator<<(std::ostream &out, StatusCode self) {
+    out << std::hex << self.bits_;
+    return out;
+  }
 };
 
 class StatusKindDomainInterface {
@@ -240,6 +228,20 @@ class StatusDomainBase : public StatusKindBuilderInterface,
   std::string name_;
 };
 
+namespace impl {
+
+Status make_status(StatusCode, StatusDomainInterface const *);
+StatusDetached make_status_detached(StatusCode, StatusDomainInterface const *);
+constexpr StatusKind make_status_kind(StatusCode,
+                                      StatusKindDomainInterface const *);
+}  // namespace impl
+
+constexpr std::size_t domain_code_of(StatusKind const *);
+constexpr std::size_t domain_code_of(StatusBase const *);
+constexpr std::size_t condition_code_of(StatusKind const *);
+constexpr std::size_t condition_code_of(StatusBase const *);
+constexpr std::size_t incident_code_of(StatusBase const *);
+
 class StatusKind final {
  public:
   DECLARE_COPY_DEFAULT_CONSTEXPR(StatusKind);
@@ -269,8 +271,8 @@ class StatusKind final {
   friend constexpr StatusKind impl::make_status_kind(
       StatusCode, StatusKindDomainInterface const *);
 
-  friend constexpr std::size_t impl::domain_code_of(StatusKind const *);
-  friend constexpr std::size_t impl::condition_code_of(StatusKind const *);
+  friend constexpr std::size_t domain_code_of(StatusKind const *);
+  friend constexpr std::size_t condition_code_of(StatusKind const *);
 
   friend constexpr bool operator!=(StatusKind a, StatusKind b) noexcept {
     return !a.operator==(b);
@@ -303,9 +305,9 @@ class StatusBase {
 
   StatusCode status_code_;
 
-  friend constexpr std::size_t impl::domain_code_of(StatusBase const *);
-  friend constexpr std::size_t impl::condition_code_of(StatusBase const *);
-  friend constexpr std::size_t impl::incident_code_of(StatusBase const *);
+  friend constexpr std::size_t domain_code_of(StatusBase const *);
+  friend constexpr std::size_t condition_code_of(StatusBase const *);
+  friend constexpr std::size_t incident_code_of(StatusBase const *);
 
   friend bool operator==(StatusKind a, StatusBase b) noexcept {
     return b.operator==(a);
@@ -409,6 +411,7 @@ inline constexpr StatusKind make_status_kind(  //
     StatusCode code, StatusKindDomainInterface const *domain) {
   return StatusKind{code, domain};
 }
+}  // namespace impl
 
 inline constexpr std::size_t domain_code_of(StatusKind const *self) {
   return self->kind_code_.domain_bits();
@@ -429,7 +432,6 @@ inline constexpr std::size_t condition_code_of(StatusBase const *self) {
 inline constexpr std::size_t incident_code_of(StatusBase const *self) {
   return self->status_code_.incident_bits();
 }
-}  // namespace impl
 
 template <typename ConditionEnumType, std::size_t ConditionCount>
 class EnumStatusKindDomain : public StatusKindBuilderInterface,
@@ -443,7 +445,7 @@ class EnumStatusKindDomain : public StatusKindBuilderInterface,
 
   constexpr std::string_view status_kind_message_of(
       StatusKind const *kind) const noexcept override {
-    return conditions_[impl::condition_code_of(kind)].message;
+    return conditions_[condition_code_of(kind)].message;
   }
 
   constexpr StatusKind watch_condition(ConditionEnumType condition) {
@@ -474,13 +476,13 @@ class RingStatusDomain : public StatusBuilderInterface,
   ~RingStatusDomain() = default;
 
   std::string_view status_base_message_of(
-      StatusBase const *status) const noexcept {
-    return incidents_[impl::incident_code_of(status)].message;
+      StatusBase const *status) const noexcept override {
+    return incidents_[incident_code_of(status)].message;
   }
 
   std::source_location status_base_location_of(
-      StatusBase const *status) const noexcept {
-    return incidents_[impl::incident_code_of(status)].location;
+      StatusBase const *status) const noexcept override {
+    return incidents_[incident_code_of(status)].location;
   }
 
   Status raise_incident(ConditionEnumType condition, std::string message = {}) {

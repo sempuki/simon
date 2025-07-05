@@ -139,19 +139,19 @@ class TestStatusDomain final
   std::string_view status_kind_message_of(
       const StatusKind* kind) const noexcept override {
     message_of_condition++;
-    return conditions_[impl::condition_code_of(kind)].message;
+    return conditions_[condition_code_of(kind)].message;
   }
 
   std::string_view status_base_message_of(
       const StatusBase* status) const noexcept override {
     message_of_incident++;
-    return incidents_[impl::incident_code_of(status)].message;
+    return incidents_[incident_code_of(status)].message;
   }
 
   std::source_location status_base_location_of(
       const StatusBase* status) const noexcept override {
     location_of_incident++;
-    return incidents_[impl::incident_code_of(status)].location;
+    return incidents_[incident_code_of(status)].location;
   }
 
   mutable std::size_t message_of_condition = 0;
@@ -326,8 +326,8 @@ TEST_CASE("Status") {
     Status other = domain.raise_incident(TestCondition::UP);
 
     // Postconditions.
-    REQUIRE(status.has_equivalent_condition_as(other));
-    REQUIRE(other.has_equivalent_condition_as(status));
+    REQUIRE(status.has_equivalent_condition_as(other.kind()));
+    REQUIRE(other.has_equivalent_condition_as(status.kind()));
   }
 
   SECTION("ShouldNotBeEquivalentToStatusWithDifferentCondition") {
@@ -335,8 +335,8 @@ TEST_CASE("Status") {
     Status other = domain.raise_incident(TestCondition::DOWN);
 
     // Postconditions.
-    REQUIRE(!status.has_equivalent_condition_as(other));
-    REQUIRE(!other.has_equivalent_condition_as(status));
+    REQUIRE(!status.has_equivalent_condition_as(other.kind()));
+    REQUIRE(!other.has_equivalent_condition_as(status.kind()));
   }
 
   SECTION("ShouldBeOutStreamable") {
