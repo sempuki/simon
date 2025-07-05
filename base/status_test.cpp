@@ -132,40 +132,36 @@ constexpr std::size_t TEST_CONDITION_COUNT =
     static_cast<std::size_t>(TestCondition::COUNT);
 
 class TestStatusDomain final
-    : public EnumStatusDomain<TestCondition, TEST_CONDITION_COUNT> {
+    : public StatusDomain<TestCondition, TEST_CONDITION_COUNT> {
  public:
-  using EnumStatusDomain<TestCondition, TEST_CONDITION_COUNT>::EnumStatusDomain;
+  using StatusDomain<TestCondition, TEST_CONDITION_COUNT>::StatusDomain;
 
-  std::string_view message_of(StatusKind kind) const noexcept override {
+  std::string_view status_kind_message_of(
+      const StatusKind* kind) const noexcept override {
     message_of_condition++;
-    return conditions_[condition_code_of(kind)].message;
+    return conditions_[impl::condition_code_of(kind)].message;
   }
 
-  std::string_view message_of(Status status) const noexcept override {
+  std::string_view status_base_message_of(
+      const StatusBase* status) const noexcept override {
     message_of_incident++;
-    return incidents_[incident_code_of(status)].message;
+    return incidents_[impl::incident_code_of(status)].message;
   }
 
-  std::source_location location_of(Status status) const noexcept override {
+  std::source_location status_base_location_of(
+      const StatusBase* status) const noexcept override {
     location_of_incident++;
-    return incidents_[incident_code_of(status)].location;
-  }
-
-  bool has_equivalent_condition_of(Status status,
-                                   StatusKind kind) const noexcept override {
-    equivalent_condition_of++;
-    return false;
+    return incidents_[impl::incident_code_of(status)].location;
   }
 
   mutable std::size_t message_of_condition = 0;
   mutable std::size_t message_of_incident = 0;
   mutable std::size_t location_of_incident = 0;
-  mutable std::size_t equivalent_condition_of = 0;
 };
 
 template <>
 const std::array<StatusConditionEntry, TEST_CONDITION_COUNT>
-    EnumStatusDomain<TestCondition, TEST_CONDITION_COUNT>::conditions_ = {
+    EnumStatusKindDomain<TestCondition, TEST_CONDITION_COUNT>::conditions_ = {
         StatusConditionEntry{"UP"},       //
         StatusConditionEntry{"DOWN"},     //
         StatusConditionEntry{"TOP"},      //

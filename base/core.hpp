@@ -36,6 +36,14 @@
   class_name__(class_name__&&) = delete;  \
   class_name__& operator=(class_name__&&) = delete;
 
+#define DECLARE_COPY_DEFAULT_CONSTEXPR(class_name__)              \
+  constexpr class_name__(const class_name__&) noexcept = default; \
+  constexpr class_name__& operator=(const class_name__&) noexcept = default;
+
+#define DECLARE_MOVE_DEFAULT_CONSTEXPR(class_name__)         \
+  constexpr class_name__(class_name__&&) noexcept = default; \
+  constexpr class_name__& operator=(class_name__&&) noexcept = default;
+
 #define DEFINE_MOVE_FROM_SWAP(class_name__)               \
   class_name__(class_name__&& that) noexcept {            \
     using std::swap;                                      \
