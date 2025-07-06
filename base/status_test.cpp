@@ -7,6 +7,17 @@
 
 namespace simon {
 
+constexpr bool StatusCodeShouldHaveSameBits() {
+  StatusCode code;
+  code.set_incident_bits(4u);
+  code.set_condition_bits(5u);
+  code.set_domain_bits(6u);
+
+  return code.incident_bits() == 4u &&   //
+         code.condition_bits() == 5u &&  //
+         code.domain_bits() == 6u;
+}
+
 TEST_CASE("StatusCode") {
   StatusCode code;
 
@@ -125,6 +136,14 @@ TEST_CASE("StatusCode") {
     // Postconditions.
     REQUIRE(!code.is_same_code(other));
   }
+
+  SECTION("ShouldBeConstexprBits") {
+    // Under Test.
+    constexpr bool pass = StatusCodeShouldHaveSameBits();
+
+    // Postconditions.
+    REQUIRE(pass);
+  }
 }
 
 enum class TestCondition { UP, DOWN, TOP, BOTTOM, STRANGE, CHARM, COUNT };
@@ -133,30 +152,40 @@ constexpr std::size_t TEST_CONDITION_COUNT =
 
 class TestStatusDomain final
     : public StatusDomain<TestCondition, TEST_CONDITION_COUNT> {
+  using BaseType = StatusDomain<TestCondition, TEST_CONDITION_COUNT>;
+
  public:
-  using StatusDomain<TestCondition, TEST_CONDITION_COUNT>::StatusDomain;
+  using BaseType::BaseType;
 
   std::string_view status_kind_message_of(
       const StatusKind* kind) const noexcept override {
     message_of_condition++;
-    return conditions_[condition_code_of(kind)].message;
+    return BaseType::status_kind_message_of(kind);
   }
 
   std::string_view status_base_message_of(
       const StatusBase* status) const noexcept override {
     message_of_incident++;
-    return incidents_[incident_code_of(status)].message;
+    return BaseType::status_base_message_of(status);
   }
 
   std::source_location status_base_location_of(
       const StatusBase* status) const noexcept override {
     location_of_incident++;
-    return incidents_[incident_code_of(status)].location;
+    return BaseType::status_base_location_of(status);
   }
 
   mutable std::size_t message_of_condition = 0;
   mutable std::size_t message_of_incident = 0;
   mutable std::size_t location_of_incident = 0;
+};
+
+class TestStatusKindDomain final
+    : public StatusKindDomain<TestCondition, TEST_CONDITION_COUNT> {
+  using BaseType = StatusKindDomain<TestCondition, TEST_CONDITION_COUNT>;
+
+ public:
+  using BaseType::BaseType;
 };
 
 template <>
@@ -216,16 +245,7 @@ TEST_CASE("StatusDomain") {
     REQUIRE(domain.location_of_incident > 0u);
     REQUIRE(location.line() > 0u);
   }
-
-  // SECTION("ShouldBeConstexpr") {
-  //   // Under Test.
-  //   constexpr TestStatusDomain domain{42u, "test"};
-
-  //   // Postconditions.
-  //   REQUIRE(true);
-  // }
 }
-
 TEST_CASE("Status") {
   SECTION("ShouldHaveCurrentLocationWhenRaisedHere") {
     // Preconditions.
@@ -398,13 +418,44 @@ TEST_CASE("StatusKind") {
     REQUIRE(ss.str().size() > 0u);
     REQUIRE(ss.str() == up.message());
   }
+}
 
-  // SECTION("ShouldBeConstexpr") {
+constexpr TestStatusKindDomain kind_domain{42u, "test"};
+
+constexpr bool StatusKindShouldHaveSameMessage() {
+  StatusKind kind = kind_domain.watch_condition(TestCondition::CHARM);
+  return kind.message() == "CHARM";
+}
+constexpr bool StatusKindShouldCompareSame() {
+  StatusKind kind_a = kind_domain.watch_condition(TestCondition::CHARM);
+  StatusKind kind_b = kind_domain.watch_condition(TestCondition::CHARM);
+  return kind_a == kind_b;
+}
+constexpr bool StatusKindShouldCompareDifferent() {
+  StatusKind kind_a = kind_domain.watch_condition(TestCondition::CHARM);
+  StatusKind kind_b = kind_domain.watch_condition(TestCondition::STRANGE);
+  return kind_a != kind_b;
+}
+
+TEST_CASE("StatusKindDomain") {
+  SECTION("ShouldBeConstexpr") {}
+
+  SECTION("ShouldHaveConstexprName") {
+    // Under Test.
+    constexpr std::string_view name = kind_domain.name();
+
+    // Postconditions.
+    REQUIRE(name == "test");
+  }
+
+  // SECTION("ShouldHaveConstexprKind") {
   //   // Under Test.
-  //   constexpr StatusKind kind = domain.watch_condition(TestCondition::UP);
+  //   constexpr bool pass = StatusKindShouldHaveSameMessage() &&
+  //                         StatusKindShouldCompareSame() &&
+  //                         StatusKindShouldCompareDifferent();
 
   //   // Postconditions.
-  //   REQUIRE(status == kind);
+  //   REQUIRE(pass);
   // }
 }
 

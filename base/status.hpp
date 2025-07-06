@@ -18,7 +18,7 @@ class StatusDetached;
 class Status;
 
 struct StatusConditionEntry final {
-  std::string message;
+  std::string_view message;
 };
 
 struct StatusIncidentEntry final {
@@ -184,7 +184,7 @@ class StatusKindDomainBase : public StatusKindBuilderInterface {
 
  private:
   StatusCode domain_code_;
-  std::string name_;
+  std::string_view name_;
 };
 
 class StatusBuilderInterface {
@@ -247,7 +247,7 @@ class StatusKind final {
   DECLARE_COPY_DEFAULT_CONSTEXPR(StatusKind);
   DECLARE_MOVE_DEFAULT_CONSTEXPR(StatusKind);
 
-  constexpr StatusKind() = delete;
+  constexpr StatusKind() = default;
   constexpr ~StatusKind() = default;
 
   constexpr std::string_view message() const noexcept {
@@ -448,13 +448,33 @@ class EnumStatusKindDomain : public StatusKindBuilderInterface,
     return conditions_[condition_code_of(kind)].message;
   }
 
-  constexpr StatusKind watch_condition(ConditionEnumType condition) {
+  constexpr StatusKind watch_condition(ConditionEnumType condition) const {
     auto condition_code = static_cast<std::size_t>(condition);
     return impl::make_status_kind(make_status_kind_code(condition_code), this);
   }
 
  protected:
   static const std::array<StatusConditionEntry, ConditionCount> conditions_;
+};
+
+template <typename ConditionEnumType,  //
+          std::size_t ConditionCount>
+class StatusKindDomain
+    : public StatusKindDomainBase,  //
+      public EnumStatusKindDomain<ConditionEnumType, ConditionCount> {
+ public:
+  using StatusKindDomainBase::StatusKindDomainBase;
+
+  constexpr std::string_view status_kind_message_of(
+      StatusKind const *kind) const noexcept override {
+    return EnumStatusKindDomain<ConditionEnumType,
+                                ConditionCount>::status_kind_message_of(kind);
+  }
+
+  constexpr StatusCode make_status_kind_code(
+      std::size_t condition_code) const noexcept override {
+    return StatusKindDomainBase::make_status_kind_code(condition_code);
+  }
 };
 
 // NOTE: To avoid the cost of reference counting each return code's incident
