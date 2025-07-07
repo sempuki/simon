@@ -146,13 +146,13 @@ TEST_CASE("StatusCode") {
   }
 }
 
-enum class TestCondition { UP, DOWN, TOP, BOTTOM, STRANGE, CHARM, COUNT };
-constexpr std::size_t TEST_CONDITION_COUNT =
-    static_cast<std::size_t>(TestCondition::COUNT);
+enum class Quark { UP, DOWN, TOP, BOTTOM, STRANGE, CHARM, COUNT };
+constexpr std::size_t QUARK_CONDITION_COUNT =
+    static_cast<std::size_t>(Quark::COUNT);
 
-class TestStatusDomain final
-    : public StatusDomain<TestCondition, TEST_CONDITION_COUNT> {
-  using BaseType = StatusDomain<TestCondition, TEST_CONDITION_COUNT>;
+class QuarkStatusDomain final
+    : public StatusDomain<Quark, QUARK_CONDITION_COUNT> {
+  using BaseType = StatusDomain<Quark, QUARK_CONDITION_COUNT>;
 
  public:
   using BaseType::BaseType;
@@ -180,17 +180,17 @@ class TestStatusDomain final
   mutable std::size_t location_of_incident = 0;
 };
 
-class TestStatusKindDomain final
-    : public StatusKindDomain<TestCondition, TEST_CONDITION_COUNT> {
-  using BaseType = StatusKindDomain<TestCondition, TEST_CONDITION_COUNT>;
+class QuarkKindDomain final
+    : public StatusKindDomain<Quark, QUARK_CONDITION_COUNT> {
+  using BaseType = StatusKindDomain<Quark, QUARK_CONDITION_COUNT>;
 
  public:
   using BaseType::BaseType;
 };
 
 template <>
-const std::array<StatusConditionEntry, TEST_CONDITION_COUNT>
-    EnumStatusKindDomain<TestCondition, TEST_CONDITION_COUNT>::conditions_ = {
+const std::array<StatusConditionEntry, QUARK_CONDITION_COUNT>
+    EnumStatusKindDomain<Quark, QUARK_CONDITION_COUNT>::conditions_ = {
         StatusConditionEntry{"UP"},       //
         StatusConditionEntry{"DOWN"},     //
         StatusConditionEntry{"TOP"},      //
@@ -199,7 +199,7 @@ const std::array<StatusConditionEntry, TEST_CONDITION_COUNT>
         StatusConditionEntry{"CHARM"},    //
 };
 
-TestStatusDomain domain{42u, "test"};
+QuarkStatusDomain domain{42u, "quark"};
 std::source_location location0 = std::source_location::current();
 std::source_location location1 = std::source_location::current();
 std::string message0 = "mark";
@@ -208,7 +208,7 @@ std::string message1 = "bark";
 TEST_CASE("StatusDomain") {
   SECTION("ShouldNotFetchStatusLocationByDefault") {
     // Under Test.
-    Status status = domain.raise_incident(TestCondition::UP);
+    Status status = domain.raise_status(Quark::UP);
 
     // Postconditions.
     REQUIRE(domain.location_of_incident == 0u);
@@ -216,7 +216,7 @@ TEST_CASE("StatusDomain") {
 
   SECTION("ShouldNotFetchStatusMessageByDefault") {
     // Under Test.
-    Status status = domain.raise_incident(TestCondition::UP);
+    Status status = domain.raise_status(Quark::UP);
 
     // Postconditions.
     REQUIRE(domain.message_of_incident == 0u);
@@ -224,7 +224,7 @@ TEST_CASE("StatusDomain") {
 
   SECTION("ShouldFetchStatusMessageOnDemand") {
     // Preconditions.
-    Status status = domain.raise_incident(TestCondition::UP, message0);
+    Status status = domain.raise_status(Quark::UP, message0);
 
     // Under Test.
     std::string_view message = status.message();
@@ -236,7 +236,7 @@ TEST_CASE("StatusDomain") {
 
   SECTION("ShouldFetchStatusLocationOnDemand") {
     // Preconditions.
-    Status status = domain.raise_incident_here(TestCondition::UP);
+    Status status = domain.raise_status_here(Quark::UP);
 
     // Under Test.
     std::source_location location = status.location();
@@ -250,7 +250,7 @@ TEST_CASE("Status") {
   SECTION("ShouldHaveCurrentLocationWhenRaisedHere") {
     // Preconditions.
     auto raised_location = std::source_location::current();
-    Status status = domain.raise_incident_here(TestCondition::UP);
+    Status status = domain.raise_status_here(Quark::UP);
 
     // Under Test.
     std::source_location location = status.location();
@@ -259,8 +259,7 @@ TEST_CASE("Status") {
     REQUIRE(location.line() - 1 == raised_location.line());
   }
 
-  Status status =
-      domain.raise_incident_here(TestCondition::UP, message0, location0);
+  Status status = domain.raise_status_here(Quark::UP, message0, location0);
 
   SECTION("ShouldHaveSameMessageWhenRaisedHere") {
     // Under Test.
@@ -289,7 +288,7 @@ TEST_CASE("Status") {
 
   SECTION("ShouldNotBeEqualToStatusWithDifferentIncident") {
     // Under Test.
-    Status other = domain.raise_incident(TestCondition::UP);
+    Status other = domain.raise_status(Quark::UP);
 
     // Postconditions.
     REQUIRE(other != status);
@@ -298,7 +297,7 @@ TEST_CASE("Status") {
 
   SECTION("ShouldNotBeEqualToStatusWithDifferentCondition") {
     // Under Test.
-    Status other = domain.raise_incident(TestCondition::DOWN);
+    Status other = domain.raise_status(Quark::DOWN);
 
     // Postconditions.
     REQUIRE(other != status);
@@ -307,7 +306,7 @@ TEST_CASE("Status") {
 
   SECTION("ShouldBeEqualToKindWithSameConditionAndDomain") {
     // Under Test.
-    Status other = domain.raise_incident(TestCondition::UP);
+    Status other = domain.raise_status(Quark::UP);
 
     // Postconditions.
     REQUIRE(status == other.kind());
@@ -316,7 +315,7 @@ TEST_CASE("Status") {
 
   SECTION("ShouldNotBeEqualToKindWithDifferentCondition") {
     // Under Test.
-    Status other = domain.raise_incident(TestCondition::DOWN);
+    Status other = domain.raise_status(Quark::DOWN);
 
     // Postconditions.
     REQUIRE(status != other.kind());
@@ -325,7 +324,7 @@ TEST_CASE("Status") {
 
   SECTION("ShouldHaveEqualKindWithSameConditionAndDomain") {
     // Under Test.
-    Status other = domain.raise_incident(TestCondition::UP);
+    Status other = domain.raise_status(Quark::UP);
 
     // Postconditions.
     REQUIRE(status.kind() == other.kind());
@@ -334,7 +333,7 @@ TEST_CASE("Status") {
 
   SECTION("ShouldNotHaveEqualKindWithDifferentCondition") {
     // Under Test.
-    Status other = domain.raise_incident(TestCondition::DOWN);
+    Status other = domain.raise_status(Quark::DOWN);
 
     // Postconditions.
     REQUIRE(status.kind() != other.kind());
@@ -343,7 +342,7 @@ TEST_CASE("Status") {
 
   SECTION("ShouldBeEquivalentToStatusWithSameCondition") {
     // Under Test.
-    Status other = domain.raise_incident(TestCondition::UP);
+    Status other = domain.raise_status(Quark::UP);
 
     // Postconditions.
     REQUIRE(status.has_equivalent_condition_as(other.kind()));
@@ -352,7 +351,7 @@ TEST_CASE("Status") {
 
   SECTION("ShouldNotBeEquivalentToStatusWithDifferentCondition") {
     // Under Test.
-    Status other = domain.raise_incident(TestCondition::DOWN);
+    Status other = domain.raise_status(Quark::DOWN);
 
     // Postconditions.
     REQUIRE(!status.has_equivalent_condition_as(other.kind()));
@@ -373,16 +372,18 @@ TEST_CASE("Status") {
 }
 
 TEST_CASE("StatusKind") {
-  StatusKind down = domain.watch_condition(TestCondition::DOWN);
-  StatusKind up = domain.watch_condition(TestCondition::UP);
-  Status status = domain.raise_incident(TestCondition::UP);
+  StatusKind down = domain.watch_kind(Quark::DOWN);
+  StatusKind up = domain.watch_kind(Quark::UP);
+  Status status = domain.raise_status(Quark::UP);
 
   SECTION("ShouldHaveMessageDescribingCondition") {
     // Under Test.
-    std::string_view message = up.message();
+    std::string_view message0 = up.message();
+    std::string_view message1 = down.message();
 
     // Postconditions.
-    REQUIRE(message == "UP");
+    REQUIRE(message0 == "UP");
+    REQUIRE(message1 == "DOWN");
   }
 
   SECTION("ShouldBeTrueWhenComparedWithIncidentOfSameCondition") {
@@ -420,20 +421,20 @@ TEST_CASE("StatusKind") {
   }
 }
 
-constexpr TestStatusKindDomain kind_domain{42u, "test"};
+constexpr QuarkKindDomain kind_domain{42u, "test"};
 
 constexpr bool StatusKindShouldHaveSameMessage() {
-  StatusKind kind = kind_domain.watch_condition(TestCondition::CHARM);
+  StatusKind kind = kind_domain.watch_kind(Quark::CHARM);
   return kind.message() == "CHARM";
 }
 constexpr bool StatusKindShouldCompareSame() {
-  StatusKind kind_a = kind_domain.watch_condition(TestCondition::CHARM);
-  StatusKind kind_b = kind_domain.watch_condition(TestCondition::CHARM);
+  StatusKind kind_a = kind_domain.watch_kind(Quark::CHARM);
+  StatusKind kind_b = kind_domain.watch_kind(Quark::CHARM);
   return kind_a == kind_b;
 }
 constexpr bool StatusKindShouldCompareDifferent() {
-  StatusKind kind_a = kind_domain.watch_condition(TestCondition::CHARM);
-  StatusKind kind_b = kind_domain.watch_condition(TestCondition::STRANGE);
+  StatusKind kind_a = kind_domain.watch_kind(Quark::CHARM);
+  StatusKind kind_b = kind_domain.watch_kind(Quark::STRANGE);
   return kind_a != kind_b;
 }
 
@@ -462,11 +463,11 @@ TEST_CASE("StatusKindDomain") {
 TEST_CASE("StaticEnumStatusDomain") {
   SECTION("ShouldRaiseStatusFromStaticDomain") {
     // Preconditions.
-    Status other = domain.raise_incident(TestCondition::TOP);
+    Status other = domain.raise_status(Quark::TOP);
 
     // Under Test.
-    Status status0 = raise(TestCondition::TOP);
-    Status status1 = raise(TestCondition::TOP);
+    Status status0 = raise(Quark::TOP);
+    Status status1 = raise(Quark::TOP);
 
     // Postconditions.
     REQUIRE(status0.kind() != other.kind());
@@ -475,8 +476,8 @@ TEST_CASE("StaticEnumStatusDomain") {
 
   SECTION("ShouldRaiseStatusWithMessage") {
     // Under Test.
-    Status status0 = raise(TestCondition::TOP, message0);
-    Status status1 = raise(TestCondition::TOP, message1);
+    Status status0 = raise(Quark::TOP, message0);
+    Status status1 = raise(Quark::TOP, message1);
 
     // Postconditions.
     REQUIRE(status0.message() == message0);
@@ -485,8 +486,8 @@ TEST_CASE("StaticEnumStatusDomain") {
 
   SECTION("ShouldRaiseStatusHereWithLocation") {
     // Under Test.
-    Status status0 = raise_here(TestCondition::TOP, message0, location0);
-    Status status1 = raise_here(TestCondition::TOP, message1, location1);
+    Status status0 = raise_here(Quark::TOP, message0, location0);
+    Status status1 = raise_here(Quark::TOP, message1, location1);
 
     // Postconditions.
     REQUIRE(status0.location().line() == location0.line());
@@ -495,8 +496,8 @@ TEST_CASE("StaticEnumStatusDomain") {
 
   SECTION("ShouldRaiseStatusHereWithLocationByDefault") {
     // Under Test.
-    Status status0 = raise_here(TestCondition::TOP);
-    Status status1 = raise_here(TestCondition::TOP);
+    Status status0 = raise_here(Quark::TOP);
+    Status status1 = raise_here(Quark::TOP);
 
     // Postconditions.
     REQUIRE(status0.location().line() > 0u);
@@ -505,8 +506,8 @@ TEST_CASE("StaticEnumStatusDomain") {
 
   SECTION("ShouldWatchForCondition") {
     // Preconditions.
-    Status status = raise(TestCondition::TOP);
-    StatusKind kind = watch(TestCondition::TOP);
+    Status status = raise(Quark::TOP);
+    StatusKind kind = watch(Quark::TOP);
 
     // Under Test.
     bool found = false;
@@ -516,6 +517,38 @@ TEST_CASE("StaticEnumStatusDomain") {
 
     // Postconditions.
     REQUIRE(found);
+  }
+}
+
+TEST_CASE("PosixStatusDomain") {
+  PosixStatusDomain posix_domain;
+
+  SECTION("ShouldRaisePosixEAGAINWithMessage") {
+    // Preconditions.
+    StatusKind kind = posix_domain.watch_kind(PosixError::AGAIN);
+
+    // Under Test.
+    Status status = posix_domain.raise_status(PosixError::AGAIN);
+
+    // Postconditions.
+    REQUIRE(status == kind);
+    REQUIRE(kind.message() == "Resource unavailable, try again.");
+  }
+}
+
+TEST_CASE("Win32StatusDomain") {
+  Win32StatusDomain win32_domain;
+
+  SECTION("ShouldRaiseWin32ERROR_BUSYWithMessage") {
+    // Preconditions.
+    StatusKind kind = win32_domain.watch_kind(Win32Error::BUSY);
+
+    // Under Test.
+    Status status = win32_domain.raise_status(Win32Error::BUSY);
+
+    // Postconditions.
+    REQUIRE(status == kind);
+    REQUIRE(kind.message() == "ERROR_BUSY");
   }
 }
 

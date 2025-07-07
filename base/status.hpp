@@ -18,7 +18,7 @@ class StatusDetached;
 class Status;
 
 struct StatusConditionEntry final {
-  std::string_view message;
+  std::string message;
 };
 
 struct StatusIncidentEntry final {
@@ -448,7 +448,7 @@ class EnumStatusKindDomain : public StatusKindBuilderInterface,
     return conditions_[condition_code_of(kind)].message;
   }
 
-  constexpr StatusKind watch_condition(ConditionEnumType condition) const {
+  constexpr StatusKind watch_kind(ConditionEnumType condition) const {
     auto condition_code = static_cast<std::size_t>(condition);
     return impl::make_status_kind(make_status_kind_code(condition_code), this);
   }
@@ -505,13 +505,13 @@ class RingStatusDomain : public StatusBuilderInterface,
     return incidents_[incident_code_of(status)].location;
   }
 
-  Status raise_incident(ConditionEnumType condition, std::string message = {}) {
+  Status raise_status(ConditionEnumType condition, std::string message = {}) {
     std::source_location location{};                // Empty.
     return raise_incident_impl(condition,           //
                                std::move(message),  //
                                std::move(location));
   }
-  Status raise_incident_here(
+  Status raise_status_here(
       ConditionEnumType condition, std::string message = {},
       std::source_location location = std::source_location::current()) {
     return raise_incident_impl(condition,           //
@@ -593,7 +593,7 @@ Status raise(ConditionEnumType condition, std::string message = {}) {
   return static_enum_status_domain<ConditionEnumType,
                                    static_cast<std::size_t>(
                                        ConditionEnumType::COUNT)>()
-      .raise_incident(condition, std::move(message));
+      .raise_status(condition, std::move(message));
 }
 
 template <typename ConditionEnumType>
@@ -603,7 +603,7 @@ Status raise_here(
   return static_enum_status_domain<ConditionEnumType,
                                    static_cast<std::size_t>(
                                        ConditionEnumType::COUNT)>()
-      .raise_incident_here(condition, std::move(message), std::move(location));
+      .raise_status_here(condition, std::move(message), std::move(location));
 }
 
 template <typename ConditionEnumType>
@@ -611,10 +611,10 @@ StatusKind watch(ConditionEnumType condition) {
   return static_enum_status_domain<ConditionEnumType,
                                    static_cast<std::size_t>(
                                        ConditionEnumType::COUNT)>()
-      .watch_condition(condition);
+      .watch_kind(condition);
 }
 
-enum class PosixCondition : std::size_t {
+enum class PosixError : std::size_t {
   TOOBIG,          // Argument list too long.
   ACCES,           // Permission denied.
   ADDRINUSE,       // Address in use.
@@ -701,12 +701,12 @@ enum class PosixCondition : std::size_t {
 
 namespace impl {
 constexpr std::size_t POSIX_CONDITION_COUNT =
-    static_cast<std::size_t>(PosixCondition::COUNT);
+    static_cast<std::size_t>(PosixError::COUNT);
 constexpr std::size_t POSIX_DOMAIN_CODE = 0x1;
 }  // namespace impl
 
 class PosixStatusDomain final
-    : public StatusDomain<PosixCondition, impl::POSIX_CONDITION_COUNT> {
+    : public StatusDomain<PosixError, impl::POSIX_CONDITION_COUNT> {
  public:
   DECLARE_COPY_DELETE(PosixStatusDomain);
   DECLARE_MOVE_DELETE(PosixStatusDomain);
@@ -715,7 +715,7 @@ class PosixStatusDomain final
   ~PosixStatusDomain() = default;
 };
 
-enum class Win32Condition : std::size_t {
+enum class Win32Error : std::size_t {
   INVALID_FUNCTION,     // Incorrect function.
   FILE_NOT_FOUND,       // The system cannot find the file specified.
   PATH_NOT_FOUND,       // The system cannot find the path specified.
@@ -920,12 +920,12 @@ enum class Win32Condition : std::size_t {
 
 namespace impl {
 constexpr std::size_t WIN32_CONDITION_COUNT =
-    static_cast<std::size_t>(Win32Condition::COUNT);
+    static_cast<std::size_t>(Win32Error::COUNT);
 constexpr std::size_t WIN32_DOMAIN_CODE = 0x2;
 }  // namespace impl
 
 class Win32StatusDomain final
-    : public StatusDomain<Win32Condition, impl::WIN32_CONDITION_COUNT> {
+    : public StatusDomain<Win32Error, impl::WIN32_CONDITION_COUNT> {
  public:
   DECLARE_COPY_DELETE(Win32StatusDomain);
   DECLARE_MOVE_DELETE(Win32StatusDomain);
