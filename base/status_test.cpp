@@ -421,20 +421,20 @@ TEST_CASE("StatusKind") {
   }
 }
 
-constexpr QuarkKindDomain kind_domain{42u, "test"};
+constexpr QuarkKindDomain quarks{42u, "quark"};
 
 constexpr bool StatusKindShouldHaveSameMessage() {
-  StatusKind kind = kind_domain.watch_kind(Quark::CHARM);
+  StatusKind kind = quarks.watch_kind(Quark::CHARM);
   return kind.message() == "CHARM";
 }
 constexpr bool StatusKindShouldCompareSame() {
-  StatusKind kind_a = kind_domain.watch_kind(Quark::CHARM);
-  StatusKind kind_b = kind_domain.watch_kind(Quark::CHARM);
+  StatusKind kind_a = quarks.watch_kind(Quark::CHARM);
+  StatusKind kind_b = quarks.watch_kind(Quark::CHARM);
   return kind_a == kind_b;
 }
 constexpr bool StatusKindShouldCompareDifferent() {
-  StatusKind kind_a = kind_domain.watch_kind(Quark::CHARM);
-  StatusKind kind_b = kind_domain.watch_kind(Quark::STRANGE);
+  StatusKind kind_a = quarks.watch_kind(Quark::CHARM);
+  StatusKind kind_b = quarks.watch_kind(Quark::STRANGE);
   return kind_a != kind_b;
 }
 
@@ -443,7 +443,7 @@ TEST_CASE("StatusKindDomain") {
 
   SECTION("ShouldHaveConstexprName") {
     // Under Test.
-    constexpr std::string_view name = kind_domain.name();
+    constexpr std::string_view name = quarks.name();
 
     // Postconditions.
     REQUIRE(name == "test");
