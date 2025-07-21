@@ -19,15 +19,16 @@ class Status;
 
 struct StatusConditionEntry final {
   std::string message;
-  int platform_code = 0;
 };
 
 struct StatusIncidentEntry final {
   std::string message;
   std::source_location location;
-  int platform_code = 0;
+  int platform_error = 0;
 };
 
+//==============================================================================
+//
 class StatusCode final {
  public:
   constexpr explicit StatusCode(std::size_t domain,     //
@@ -125,23 +126,46 @@ class StatusCode final {
     return ((reinterpret_cast<std::uint64_t>(bits) << SHIFT) >> SHIFT);
   }
 
-  friend constexpr bool operator<(StatusCode lhs, StatusCode rhs) {
+  friend constexpr bool operator<(StatusCode lhs, StatusCode rhs) noexcept {
     return lhs.bits_ < rhs.bits_;
   }
 
-  friend std::ostream &operator<<(std::ostream &out, StatusCode self) {
+  friend std::ostream &operator<<(std::ostream &out, StatusCode self) noexcept {
     out << std::hex << self.bits_;
     return out;
   }
 };
 
-class StatusKindDomainInterface {
+//==============================================================================
+//
+class StatusKindInspectInterface {
  public:
   constexpr virtual std::string_view status_kind_message_of(
       StatusKind const *) const noexcept = 0;
+};
 
-  constexpr virtual int status_kind_platform_code_of(
-      StatusKind const *) const noexcept = 0;
+class StatusKindBuilderInterface {
+ public:
+  constexpr virtual StatusCode make_status_kind_code(
+      std::size_t condition_code) const noexcept = 0;
+};
+
+class StatusBaseInspectInterface {
+ public:
+  virtual std::string_view status_base_message_of(
+      StatusBase const *) const noexcept = 0;
+
+  virtual std::source_location status_base_location_of(
+      StatusBase const *) const noexcept = 0;
+
+  virtual int status_base_platform_error_of(
+      StatusBase const *) const noexcept = 0;
+};
+
+class StatusBaseBuilderInterface {
+ public:
+  virtual StatusCode make_status_base_code(
+      std::size_t condition_code, std::size_t incident_code) const noexcept = 0;
 };
 
 class StatusConditionEquivalenceInterface {
@@ -156,41 +180,26 @@ class StatusConditionEquivalenceInterface {
   }
 };
 
-class StatusDomainInterface : public StatusKindDomainInterface,
-                              public StatusConditionEquivalenceInterface {
+class StatusDomainInterface : public StatusBaseInspectInterface,
+                              public StatusKindInspectInterface,
+                              public StatusConditionEquivalenceInterface {};
+
+class StatusKindBuilderBase : public StatusKindBuilderInterface {
  public:
-  virtual std::string_view status_base_message_of(
-      StatusBase const *) const noexcept = 0;
+  DECLARE_COPY_DEFAULT_CONSTEXPR(StatusKindBuilderBase);
+  DECLARE_MOVE_DEFAULT_CONSTEXPR(StatusKindBuilderBase);
 
-  virtual std::source_location status_base_location_of(
-      StatusBase const *) const noexcept = 0;
+  constexpr StatusKindBuilderBase() = default;
+  constexpr ~StatusKindBuilderBase() = default;
 
-  virtual int status_base_platform_code_of(
-      StatusBase const *) const noexcept = 0;
-};
-
-class StatusKindBuilderInterface {
- public:
-  constexpr virtual StatusCode make_status_kind_code(
-      std::size_t condition_code) const noexcept = 0;
-};
-
-class StatusKindDomainBase : public StatusKindBuilderInterface {
- public:
-  DECLARE_COPY_DEFAULT_CONSTEXPR(StatusKindDomainBase);
-  DECLARE_MOVE_DEFAULT_CONSTEXPR(StatusKindDomainBase);
-
-  constexpr StatusKindDomainBase() = default;
-  constexpr ~StatusKindDomainBase() = default;
-
-  constexpr explicit StatusKindDomainBase(std::size_t domain_code,
-                                          std::string_view domain_name)
+  constexpr explicit StatusKindBuilderBase(std::size_t domain_code,
+                                           std::string_view domain_name)
       : domain_code_{domain_code, 0U, 0U}, name_{domain_name} {}
 
   constexpr std::string_view name() const noexcept { return name_; }
 
   constexpr StatusCode make_status_kind_code(
-      std::size_t condition_code) const noexcept override {
+      std::size_t condition_code) const noexcept final {
     return StatusCode{domain_code_.domain_bits(), condition_code, 0U};
   }
 
@@ -199,29 +208,23 @@ class StatusKindDomainBase : public StatusKindBuilderInterface {
   std::string_view name_;
 };
 
-class StatusBuilderInterface {
+class StatusDomainBuilderBase : public StatusKindBuilderInterface,
+                                public StatusBaseBuilderInterface {
  public:
-  virtual StatusCode make_status_base_code(
-      std::size_t condition_code, std::size_t incident_code) const noexcept = 0;
-};
+  DECLARE_COPY_DEFAULT(StatusDomainBuilderBase);
+  DECLARE_MOVE_DEFAULT(StatusDomainBuilderBase);
 
-class StatusDomainBase : public StatusKindBuilderInterface,
-                         public StatusBuilderInterface {
- public:
-  DECLARE_COPY_DEFAULT(StatusDomainBase);
-  DECLARE_MOVE_DEFAULT(StatusDomainBase);
+  StatusDomainBuilderBase() = default;
+  ~StatusDomainBuilderBase() = default;
 
-  StatusDomainBase() = default;
-  ~StatusDomainBase() = default;
-
-  explicit StatusDomainBase(std::size_t domain_code,
-                            std::string_view domain_name)
+  explicit StatusDomainBuilderBase(std::size_t domain_code,
+                                   std::string_view domain_name)
       : domain_code_{domain_code, 0U, 0U}, name_{domain_name} {}
 
   std::string_view name() const noexcept { return name_; }
 
   StatusCode make_status_kind_code(
-      std::size_t condition_code) const noexcept override {
+      std::size_t condition_code) const noexcept final {
     return StatusCode{domain_code_.domain_bits(),  //
                       condition_code,              //
                       0U};
@@ -229,7 +232,7 @@ class StatusDomainBase : public StatusKindBuilderInterface,
 
   StatusCode make_status_base_code(
       std::size_t condition_code,
-      std::size_t incident_code) const noexcept override {
+      std::size_t incident_code) const noexcept final {
     return StatusCode{domain_code_.domain_bits(),  //
                       condition_code,              //
                       incident_code};
@@ -241,19 +244,22 @@ class StatusDomainBase : public StatusKindBuilderInterface,
 };
 
 namespace impl {
-
-Status make_status(StatusCode, StatusDomainInterface const *);
-StatusDetached make_status_detached(StatusCode, StatusDomainInterface const *);
-constexpr StatusKind make_status_kind(StatusCode,
-                                      StatusKindDomainInterface const *);
+Status make_status(  //
+    StatusCode, StatusDomainInterface const *) noexcept;
+StatusDetached make_status_detached(  //
+    StatusCode, StatusDomainInterface const *) noexcept;
+constexpr StatusKind make_status_kind(  //
+    StatusCode, StatusKindInspectInterface const *) noexcept;
 }  // namespace impl
 
-constexpr std::size_t domain_code_of(StatusKind const *);
-constexpr std::size_t domain_code_of(StatusBase const *);
-constexpr std::size_t condition_code_of(StatusKind const *);
-constexpr std::size_t condition_code_of(StatusBase const *);
-constexpr std::size_t incident_code_of(StatusBase const *);
+constexpr std::size_t domain_code_of(StatusKind const *) noexcept;
+constexpr std::size_t domain_code_of(StatusBase const *) noexcept;
+constexpr std::size_t condition_code_of(StatusKind const *) noexcept;
+constexpr std::size_t condition_code_of(StatusBase const *) noexcept;
+constexpr std::size_t incident_code_of(StatusBase const *) noexcept;
 
+//==============================================================================
+//
 class StatusKind final {
  public:
   DECLARE_COPY_DEFAULT_CONSTEXPR(StatusKind);
@@ -266,44 +272,42 @@ class StatusKind final {
     return domain_->status_kind_message_of(this);
   }
 
-  constexpr int platform_code() const noexcept {
-    return domain_->status_kind_platform_code_of(this);
-  }
-
   constexpr bool operator==(StatusKind that) const noexcept {
     return kind_code_.is_same_kind(that.kind_code_);
   }
 
  private:
   constexpr explicit StatusKind(StatusCode code,
-                                StatusKindDomainInterface const *domain)
+                                StatusKindInspectInterface const *domain)
       : kind_code_{code}, domain_{domain} {}
 
   StatusCode kind_code_;
-  StatusKindDomainInterface const *domain_ = nullptr;
+  StatusKindInspectInterface const *domain_ = nullptr;
 
   friend class StatusBase;
 
   friend constexpr StatusKind impl::make_status_kind(
-      StatusCode, StatusKindDomainInterface const *);
+      StatusCode, StatusKindInspectInterface const *) noexcept;
 
-  friend constexpr std::size_t domain_code_of(StatusKind const *);
-  friend constexpr std::size_t condition_code_of(StatusKind const *);
+  friend constexpr std::size_t domain_code_of(StatusKind const *) noexcept;
+  friend constexpr std::size_t condition_code_of(StatusKind const *) noexcept;
 
   friend constexpr bool operator!=(StatusKind a, StatusKind b) noexcept {
     return !a.operator==(b);
   }
 
-  friend constexpr bool operator<(StatusKind lhs, StatusKind rhs) {
+  friend constexpr bool operator<(StatusKind lhs, StatusKind rhs) noexcept {
     return lhs.kind_code_ < rhs.kind_code_;
   }
 
-  friend std::ostream &operator<<(std::ostream &out, StatusKind self) {
+  friend std::ostream &operator<<(std::ostream &out, StatusKind self) noexcept {
     out << self.message();
     return out;
   }
 };
 
+//==============================================================================
+//
 class StatusBase {
  public:
   DECLARE_COPY_DEFAULT(StatusBase);
@@ -325,9 +329,9 @@ class StatusBase {
 
   StatusCode status_code_;
 
-  friend constexpr std::size_t domain_code_of(StatusBase const *);
-  friend constexpr std::size_t condition_code_of(StatusBase const *);
-  friend constexpr std::size_t incident_code_of(StatusBase const *);
+  friend constexpr std::size_t domain_code_of(StatusBase const *) noexcept;
+  friend constexpr std::size_t condition_code_of(StatusBase const *) noexcept;
+  friend constexpr std::size_t incident_code_of(StatusBase const *) noexcept;
 
   friend bool operator==(StatusKind lhs, StatusBase rhs) noexcept {
     return rhs.operator==(lhs);
@@ -341,11 +345,13 @@ class StatusBase {
     return !rhs.operator==(lhs);
   }
 
-  friend bool operator<(StatusBase lhs, StatusBase rhs) {
+  friend bool operator<(StatusBase lhs, StatusBase rhs) noexcept {
     return lhs.status_code_ < rhs.status_code_;
   }
 };
 
+//==============================================================================
+//
 class StatusDetached final : public StatusBase {
  public:
   DECLARE_COPY_DEFAULT(StatusDetached);
@@ -356,27 +362,30 @@ class StatusDetached final : public StatusBase {
 
   std::string_view message() const noexcept { return entry_.message; }
   std::source_location location() const noexcept { return entry_.location; }
-  int platform_code() const noexcept { return entry_.platform_code; }
+  int platform_error() const noexcept { return entry_.platform_error; }
 
  private:
   explicit StatusDetached(StatusCode code, StatusDomainInterface const *domain)
       : StatusBase{code} {
     entry_.message = domain->status_base_message_of(this);
     entry_.location = domain->status_base_location_of(this);
-    entry_.platform_code = domain->status_base_platform_code_of(this);
+    entry_.platform_error = domain->status_base_platform_error_of(this);
   }
 
   StatusIncidentEntry entry_;
 
   friend StatusDetached impl::make_status_detached(  //
-      StatusCode, StatusDomainInterface const *);
+      StatusCode, StatusDomainInterface const *) noexcept;
 
-  friend std::ostream &operator<<(std::ostream &out, StatusDetached self) {
+  friend std::ostream &operator<<(std::ostream &out,
+                                  StatusDetached self) noexcept {
     out << self.message();
     return out;
   }
 };
 
+//==============================================================================
+//
 class Status final : public StatusBase {
  public:
   DECLARE_COPY_DEFAULT(Status);
@@ -392,15 +401,15 @@ class Status final : public StatusBase {
     return domain_->status_base_location_of(this);
   }
 
-  int platform_code() const noexcept {
-    return domain_->status_base_platform_code_of(this);
+  int platform_error() const noexcept {
+    return domain_->status_base_platform_error_of(this);
   }
 
   StatusKind kind() const noexcept {
     return impl::make_status_kind(status_code_, domain_);
   }
 
-  StatusDetached copy() const noexcept {
+  StatusDetached detach_copy() const noexcept {
     return impl::make_status_detached(status_code_, domain_);
   }
 
@@ -418,256 +427,291 @@ class Status final : public StatusBase {
 
   StatusDomainInterface const *domain_ = nullptr;
 
-  friend Status impl::make_status(StatusCode, const StatusDomainInterface *);
+  friend Status impl::make_status(  //
+      StatusCode, const StatusDomainInterface *) noexcept;
 
-  friend std::ostream &operator<<(std::ostream &out, Status self) {
+  friend std::ostream &operator<<(std::ostream &out, Status self) noexcept {
     out << self.message();
     return out;
   }
 };
 
+//------------------------------------------------------------------------------
+//
 namespace impl {
 inline Status make_status(  //
-    StatusCode code, const StatusDomainInterface *domain) {
+    StatusCode code, const StatusDomainInterface *domain) noexcept {
   return Status{code, domain};
 }
 
 inline StatusDetached make_status_detached(  //
-    StatusCode code, const StatusDomainInterface *domain) {
+    StatusCode code, const StatusDomainInterface *domain) noexcept {
   return StatusDetached{code, domain};
 }
 
 inline constexpr StatusKind make_status_kind(  //
-    StatusCode code, StatusKindDomainInterface const *domain) {
+    StatusCode code, StatusKindInspectInterface const *domain) noexcept {
   return StatusKind{code, domain};
 }
 }  // namespace impl
 
-inline constexpr std::size_t domain_code_of(StatusKind const *self) {
+inline constexpr std::size_t domain_code_of(StatusKind const *self) noexcept {
   return self->kind_code_.domain_bits();
 }
 
-inline constexpr std::size_t domain_code_of(StatusBase const *self) {
+inline constexpr std::size_t domain_code_of(StatusBase const *self) noexcept {
   return self->status_code_.domain_bits();
 }
 
-inline constexpr std::size_t condition_code_of(StatusKind const *self) {
+inline constexpr std::size_t condition_code_of(
+    StatusKind const *self) noexcept {
   return self->kind_code_.condition_bits();
 }
 
-inline constexpr std::size_t condition_code_of(StatusBase const *self) {
+inline constexpr std::size_t condition_code_of(
+    StatusBase const *self) noexcept {
   return self->status_code_.condition_bits();
 }
 
-inline constexpr std::size_t incident_code_of(StatusBase const *self) {
+inline constexpr std::size_t incident_code_of(StatusBase const *self) noexcept {
   return self->status_code_.incident_bits();
 }
 
+//==============================================================================
+//
 template <typename ConditionEnumType, std::size_t ConditionCount>
-class EnumStatusKindDomain : public StatusKindBuilderInterface,
-                             public StatusKindDomainInterface {
+class EnumStatusKindConditionMixin {
  public:
-  DECLARE_COPY_DEFAULT_CONSTEXPR(EnumStatusKindDomain);
-  DECLARE_MOVE_DEFAULT_CONSTEXPR(EnumStatusKindDomain);
-
-  constexpr EnumStatusKindDomain() = default;
-  constexpr ~EnumStatusKindDomain() = default;
-
-  constexpr std::string_view status_kind_message_of(
-      StatusKind const *kind) const noexcept override {
-    return conditions_[condition_code_of(kind)].message;
-  }
-
-  constexpr int status_kind_platform_code_of(
-      StatusKind const *kind) const noexcept override {
-    return conditions_[condition_code_of(kind)].platform_code;
-  }
-
-  constexpr StatusKind watch_kind(ConditionEnumType condition) const {
-    auto condition_code = static_cast<std::size_t>(condition);
-    return impl::make_status_kind(make_status_kind_code(condition_code), this);
+  constexpr StatusKind watch_kind(ConditionEnumType condition) const noexcept {
+    return handle_watch_kind(condition);
   }
 
  protected:
+  virtual StatusKind handle_watch_kind(
+      ConditionEnumType condition) const noexcept = 0;
+
+  StatusKind do_watch_kind(                       //
+      ConditionEnumType condition,                //
+      StatusKindBuilderInterface const *builder,  //
+      StatusKindInspectInterface const *domain) const noexcept {
+    auto condition_code = static_cast<std::size_t>(condition);
+    return impl::make_status_kind(
+        builder->make_status_kind_code(condition_code), domain);
+  }
+
+  constexpr std::string_view status_kind_message_of(
+      StatusKind const *kind) const noexcept {
+    return conditions_[condition_code_of(kind)].message;
+  }
+
   static const std::array<StatusConditionEntry, ConditionCount> conditions_;
 };
 
-template <typename ConditionEnumType,  //
-          std::size_t ConditionCount>
-class StatusKindDomain
-    : public StatusKindDomainBase,  //
-      public EnumStatusKindDomain<ConditionEnumType, ConditionCount> {
- public:
-  using StatusKindDomainBase::StatusKindDomainBase;
-
-  constexpr std::string_view status_kind_message_of(
-      StatusKind const *kind) const noexcept override {
-    return EnumStatusKindDomain<ConditionEnumType,
-                                ConditionCount>::status_kind_message_of(kind);
-  }
-
-  constexpr int status_kind_platform_code_of(
-      StatusKind const *kind) const noexcept override {
-    return EnumStatusKindDomain<
-        ConditionEnumType, ConditionCount>::status_kind_platform_code_of(kind);
-  }
-
-  constexpr StatusCode make_status_kind_code(
-      std::size_t condition_code) const noexcept override {
-    return StatusKindDomainBase::make_status_kind_code(condition_code);
-  }
-};
-
+//==============================================================================
 // NOTE: To avoid the cost of reference counting each return code's incident
 // location and message, the domain is limited to tracking `IncidentCountMax`
 // number of concurrent incidents, which are stored in a simple array-backed
-// ring buffer. If `Status` incident information must be accurately stored
-// for longer than the buffer might be expected to overlap, then
-// `StatusDetached` should be used instead, which keeps its own local copy.
+// ring buffer. If `Status` incident information must be accurately stored for
+// longer than the buffer might be expected to overlap, then `StatusDetached`
+// should be used instead, which keeps its own local copy.
 //
 template <typename ConditionEnumType,  //
           std::size_t IncidentCountMax>
-class RingStatusDomain : public StatusBuilderInterface,
-                         public StatusDomainInterface {
+class EnumStatusIncidentMixin {
  public:
-  DECLARE_COPY_DEFAULT(RingStatusDomain);
-  DECLARE_MOVE_DEFAULT(RingStatusDomain);
-
-  RingStatusDomain() = default;
-  ~RingStatusDomain() = default;
-
-  std::string_view status_base_message_of(
-      StatusBase const *status) const noexcept override {
-    return incidents_[incident_code_of(status)].message;
-  }
-
-  std::source_location status_base_location_of(
-      StatusBase const *status) const noexcept override {
-    return incidents_[incident_code_of(status)].location;
-  }
-
-  int status_base_platform_code_of(
-      StatusBase const *status) const noexcept override {
-    return incidents_[incident_code_of(status)].platform_code;
-  }
-
-  Status raise_status(ConditionEnumType condition, std::string message = {}) {
+  Status raise_status(              //
+      ConditionEnumType condition,  //
+      std::string message = {}) noexcept {
     std::source_location location{};  // Empty.
-    return raise_incident_impl(condition, StatusIncidentEntry{
-                                              .message = std::move(message),
-                                              .location = std::move(location),
-                                              .platform_code = 0,
-                                          });
+    return handle_raise_incident(condition, StatusIncidentEntry{
+                                                .message = std::move(message),
+                                                .location = std::move(location),
+                                                .platform_error = 0,
+                                            });
   }
 
   Status raise_status_here(         //
       ConditionEnumType condition,  //
-      std::string message = {},
-      std::source_location location = std::source_location::current()) {
-    return raise_incident_impl(condition, StatusIncidentEntry{
-                                              .message = std::move(message),
-                                              .location = std::move(location),
-                                              .platform_code = 0,
-                                          });
+      std::string message = {},     //
+      std::source_location location =
+          std::source_location::current()) noexcept {
+    return handle_raise_incident(condition, StatusIncidentEntry{
+                                                .message = std::move(message),
+                                                .location = std::move(location),
+                                                .platform_error = 0,
+                                            });
   }
 
   Status raise_error(               //
       ConditionEnumType condition,  //
-      int platform_code, std::string message = {}) {
+      int platform_error,           //
+      std::string message = {}) noexcept {
     std::source_location location{};  // Empty.
-    return raise_incident_impl(condition, StatusIncidentEntry{
-                                              .message = std::move(message),
-                                              .location = std::move(location),
-                                              .platform_code = platform_code,
-                                          });
+    return handle_raise_incident(condition,
+                                 StatusIncidentEntry{
+                                     .message = std::move(message),
+                                     .location = std::move(location),
+                                     .platform_error = platform_error,
+                                 });
   }
 
   Status raise_error_here(          //
       ConditionEnumType condition,  //
-      int platform_code, std::string message = {},
-      std::source_location location = std::source_location::current()) {
-    return raise_incident_impl(condition, StatusIncidentEntry{
-                                              .message = std::move(message),
-                                              .location = std::move(location),
-                                              .platform_code = platform_code,
-                                          });
-  }
-
- private:
-  Status raise_incident_impl(ConditionEnumType condition,
-                             StatusIncidentEntry entry) {
-    std::size_t current = next_incident_++;
-    next_incident_ %= incidents_.size();
-
-    incidents_[current] = std::move(entry);
-
-    auto condition_code = static_cast<std::size_t>(condition);
-    return impl::make_status(  //
-        make_status_base_code(condition_code, current), this);
+      int platform_error,           //
+      std::string message = {},
+      std::source_location location =
+          std::source_location::current()) noexcept {
+    return handle_raise_incident(condition,
+                                 StatusIncidentEntry{
+                                     .message = std::move(message),
+                                     .location = std::move(location),
+                                     .platform_error = platform_error,
+                                 });
   }
 
  protected:
+  virtual Status handle_raise_incident(ConditionEnumType condition,
+                                       StatusIncidentEntry entry) noexcept = 0;
+
+  Status do_raise_incident(                       //
+      ConditionEnumType condition,                //
+      StatusIncidentEntry entry,                  //
+      StatusBaseBuilderInterface const *builder,  //
+      StatusDomainInterface const *domain) noexcept {
+    std::size_t current = next_incident_++;
+    next_incident_ %= incidents_.size();
+    incidents_[current] = std::move(entry);
+
+    auto condition_code = static_cast<std::size_t>(condition);
+    return impl::make_status(
+        builder->make_status_base_code(condition_code, current), domain);
+  }
+
+  std::string_view status_base_message_of(
+      StatusBase const *status) const noexcept {
+    return incidents_[incident_code_of(status)].message;
+  }
+
+  std::source_location status_base_location_of(
+      StatusBase const *status) const noexcept {
+    return incidents_[incident_code_of(status)].location;
+  }
+
+  int status_base_platform_error_of(StatusBase const *status) const noexcept {
+    return incidents_[incident_code_of(status)].platform_error;
+  }
+
+ private:
   std::size_t next_incident_ = 0;
   std::array<StatusIncidentEntry, IncidentCountMax> incidents_;
 };
 
+//==============================================================================
+// Kind-only enum-based domain type.
+//
 template <typename ConditionEnumType,  //
-          std::size_t ConditionCount,  //
-          std::size_t IncidentCountMax = 16>
-class StatusDomain
-    : public StatusDomainBase,                                         //
-      public EnumStatusKindDomain<ConditionEnumType, ConditionCount>,  //
-      public RingStatusDomain<ConditionEnumType, IncidentCountMax> {
+          std::size_t ConditionCount>
+class EnumStatusKindDomain
+    : public EnumStatusKindConditionMixin<ConditionEnumType, ConditionCount>,
+      public StatusKindInspectInterface,
+      public StatusKindBuilderBase {
  public:
-  using StatusDomainBase::StatusDomainBase;
+  using StatusKindBuilderBase::StatusKindBuilderBase;
 
   constexpr std::string_view status_kind_message_of(
       StatusKind const *kind) const noexcept override {
-    return EnumStatusKindDomain<ConditionEnumType,
-                                ConditionCount>::status_kind_message_of(kind);
+    return EnumStatusKindConditionMixin<
+        ConditionEnumType, ConditionCount>::status_kind_message_of(kind);
   }
 
-  constexpr int status_kind_platform_code_of(
+ private:
+  StatusKind handle_watch_kind(
+      ConditionEnumType condition) const noexcept final {
+    return EnumStatusKindConditionMixin<ConditionEnumType,
+                                        ConditionCount>::do_watch_kind(  //
+        condition, this, this);
+  }
+};
+
+constexpr std::size_t DEFAULT_INCIDENT_COUNT = 16;
+
+//==============================================================================
+// Main enum-based domain type.
+//
+template <typename ConditionEnumType,  //
+          std::size_t ConditionCount,  //
+          std::size_t IncidentCountMax = DEFAULT_INCIDENT_COUNT>
+class EnumStatusDomain
+    : public StatusDomainBuilderBase,
+      public StatusDomainInterface,
+      public EnumStatusKindConditionMixin<ConditionEnumType, ConditionCount>,
+      public EnumStatusIncidentMixin<ConditionEnumType, IncidentCountMax> {
+ public:
+  using StatusDomainBuilderBase::StatusDomainBuilderBase;
+
+  constexpr std::string_view status_kind_message_of(
       StatusKind const *kind) const noexcept override {
-    return EnumStatusKindDomain<
-        ConditionEnumType, ConditionCount>::status_kind_platform_code_of(kind);
-  }
-
-  constexpr StatusCode make_status_kind_code(
-      std::size_t condition_code) const noexcept override {
-    return StatusDomainBase::make_status_kind_code(condition_code);
+    return EnumStatusKindConditionMixin<
+        ConditionEnumType, ConditionCount>::status_kind_message_of(kind);
   }
 
   std::string_view status_base_message_of(
       StatusBase const *status) const noexcept override {
-    return RingStatusDomain<ConditionEnumType,
-                            IncidentCountMax>::status_base_message_of(status);
+    return EnumStatusIncidentMixin<
+        ConditionEnumType, IncidentCountMax>::status_base_message_of(status);
   }
 
   std::source_location status_base_location_of(
       StatusBase const *status) const noexcept override {
-    return RingStatusDomain<ConditionEnumType,
-                            IncidentCountMax>::status_base_location_of(status);
+    return EnumStatusIncidentMixin<
+        ConditionEnumType, IncidentCountMax>::status_base_location_of(status);
   }
 
-  StatusCode make_status_base_code(
-      std::size_t condition_code,
-      std::size_t incident_code) const noexcept override {
-    return StatusDomainBase::make_status_base_code(condition_code,
-                                                   incident_code);
+  int status_base_platform_error_of(
+      StatusBase const *status) const noexcept override {
+    return EnumStatusIncidentMixin<ConditionEnumType, IncidentCountMax>::
+        status_base_platform_error_of(status);
+  }
+
+ private:
+  StatusKind handle_watch_kind(
+      ConditionEnumType condition) const noexcept final {
+    return EnumStatusKindConditionMixin<ConditionEnumType,
+                                        ConditionCount>::do_watch_kind(  //
+        condition, this, this);
+  }
+
+  Status handle_raise_incident(ConditionEnumType condition,
+                               StatusIncidentEntry entry) noexcept final {
+    return EnumStatusIncidentMixin<ConditionEnumType, IncidentCountMax>::
+        do_raise_incident(condition, std::move(entry), this, this);
   }
 };
 
-template <typename ConditionEnumType, std::size_t ConditionCount>
-StatusDomain<ConditionEnumType, ConditionCount> &static_enum_status_domain() {
+template <typename ConditionEnumType,  //
+          std::size_t ConditionCount,  //
+          std::size_t IncidentCountMax = DEFAULT_INCIDENT_COUNT>
+EnumStatusDomain<ConditionEnumType, ConditionCount, IncidentCountMax> &
+static_enum_status_domain() noexcept {
   static std::size_t domain_code = allocate_static_increment();
-  static StatusDomain<ConditionEnumType, ConditionCount> _{
+  static EnumStatusDomain<ConditionEnumType, ConditionCount> domain{
       domain_code, std::format("static_enum_status_domain_{}", domain_code)};
-  return _;
+  return domain;
+}
+
+template <typename ConditionEnumType,  //
+          std::size_t ConditionCount>
+EnumStatusDomain<ConditionEnumType, ConditionCount, 1u> &
+thread_local_enum_status_domain() noexcept {
+  thread_local std::size_t domain_code = allocate_static_increment();
+  thread_local EnumStatusDomain<ConditionEnumType, ConditionCount, 1u> domain{
+      domain_code,
+      std::format("thread_local_enum_status_domain_{}", domain_code)};
+  return domain;
 }
 
 template <typename ConditionEnumType>
-Status raise(ConditionEnumType condition, std::string message = {}) {
+Status raise(ConditionEnumType condition, std::string message = {}) noexcept {
   return static_enum_status_domain<ConditionEnumType,
                                    static_cast<std::size_t>(
                                        ConditionEnumType::COUNT)>()
@@ -677,7 +721,7 @@ Status raise(ConditionEnumType condition, std::string message = {}) {
 template <typename ConditionEnumType>
 Status raise_here(
     ConditionEnumType condition, std::string message = {},
-    std::source_location location = std::source_location::current()) {
+    std::source_location location = std::source_location::current()) noexcept {
   return static_enum_status_domain<ConditionEnumType,
                                    static_cast<std::size_t>(
                                        ConditionEnumType::COUNT)>()
@@ -685,10 +729,37 @@ Status raise_here(
 }
 
 template <typename ConditionEnumType>
-StatusKind watch(ConditionEnumType condition) {
+StatusKind watch(ConditionEnumType condition) noexcept {
   return static_enum_status_domain<ConditionEnumType,
                                    static_cast<std::size_t>(
                                        ConditionEnumType::COUNT)>()
+      .watch_kind(condition);
+}
+
+template <typename ConditionEnumType>
+Status raise_thread_local(ConditionEnumType condition,
+                          std::string message = {}) noexcept {
+  return thread_local_enum_status_domain<ConditionEnumType,
+                                         static_cast<std::size_t>(
+                                             ConditionEnumType::COUNT)>()
+      .raise_status(condition, std::move(message));
+}
+
+template <typename ConditionEnumType>
+Status raise_here_thread_local(
+    ConditionEnumType condition, std::string message = {},
+    std::source_location location = std::source_location::current()) noexcept {
+  return thread_local_enum_status_domain<ConditionEnumType,
+                                         static_cast<std::size_t>(
+                                             ConditionEnumType::COUNT)>()
+      .raise_status_here(condition, std::move(message), std::move(location));
+}
+
+template <typename ConditionEnumType>
+StatusKind watch_thread_local(ConditionEnumType condition) noexcept {
+  return thread_local_enum_status_domain<ConditionEnumType,
+                                         static_cast<std::size_t>(
+                                             ConditionEnumType::COUNT)>()
       .watch_kind(condition);
 }
 
@@ -784,12 +855,12 @@ constexpr std::size_t POSIX_DOMAIN_CODE = 0x1;
 }  // namespace impl
 
 class PosixStatusDomain final
-    : public StatusDomain<PosixError, impl::POSIX_CONDITION_COUNT> {
+    : public EnumStatusDomain<PosixError, impl::POSIX_CONDITION_COUNT> {
  public:
   DECLARE_COPY_DELETE(PosixStatusDomain);
   DECLARE_MOVE_DELETE(PosixStatusDomain);
 
-  PosixStatusDomain() : StatusDomain{impl::POSIX_DOMAIN_CODE, "posix"} {}
+  PosixStatusDomain() : EnumStatusDomain{impl::POSIX_DOMAIN_CODE, "posix"} {}
   ~PosixStatusDomain() = default;
 
   bool has_equivalent_condition_of(
@@ -1016,12 +1087,12 @@ constexpr std::size_t WIN32_DOMAIN_CODE = 0x2;
 }  // namespace impl
 
 class Win32StatusDomain final
-    : public StatusDomain<Win32Error, impl::WIN32_CONDITION_COUNT> {
+    : public EnumStatusDomain<Win32Error, impl::WIN32_CONDITION_COUNT> {
  public:
   DECLARE_COPY_DELETE(Win32StatusDomain);
   DECLARE_MOVE_DELETE(Win32StatusDomain);
 
-  Win32StatusDomain() : StatusDomain{impl::WIN32_DOMAIN_CODE, "win32"} {}
+  Win32StatusDomain() : EnumStatusDomain{impl::WIN32_DOMAIN_CODE, "win32"} {}
   ~Win32StatusDomain() = default;
 };
 

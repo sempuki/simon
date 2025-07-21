@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -85,7 +86,7 @@
 namespace simon {
 
 inline std::size_t allocate_static_increment() {
-  static std::size_t increment = 0;
+  static std::atomic<std::size_t> increment = 0;
   return increment++;
 }
 
