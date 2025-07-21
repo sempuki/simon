@@ -151,8 +151,8 @@ constexpr std::size_t QUARK_CONDITION_COUNT =
     static_cast<std::size_t>(Quark::COUNT);
 
 class QuarkStatusDomain final
-    : public StatusDomain<Quark, QUARK_CONDITION_COUNT> {
-  using BaseType = StatusDomain<Quark, QUARK_CONDITION_COUNT>;
+    : public EnumStatusDomain<Quark, QUARK_CONDITION_COUNT> {
+  using BaseType = EnumStatusDomain<Quark, QUARK_CONDITION_COUNT>;
 
  public:
   using BaseType::BaseType;
@@ -181,8 +181,8 @@ class QuarkStatusDomain final
 };
 
 class QuarkKindDomain final
-    : public StatusKindDomain<Quark, QUARK_CONDITION_COUNT> {
-  using BaseType = StatusKindDomain<Quark, QUARK_CONDITION_COUNT>;
+    : public EnumStatusKindDomain<Quark, QUARK_CONDITION_COUNT> {
+  using BaseType = EnumStatusKindDomain<Quark, QUARK_CONDITION_COUNT>;
 
  public:
   using BaseType::BaseType;
@@ -190,7 +190,7 @@ class QuarkKindDomain final
 
 template <>
 const std::array<StatusConditionEntry, QUARK_CONDITION_COUNT>
-    EnumStatusKindDomain<Quark, QUARK_CONDITION_COUNT>::conditions_ = {
+    EnumStatusKindConditionMixin<Quark, QUARK_CONDITION_COUNT>::conditions_ = {
         StatusConditionEntry{"UP"},       //
         StatusConditionEntry{"DOWN"},     //
         StatusConditionEntry{"TOP"},      //
@@ -204,9 +204,11 @@ std::source_location location0 = std::source_location::current();
 std::source_location location1 = std::source_location::current();
 std::string message0 = "mark";
 std::string message1 = "bark";
+constexpr int platform_error0 = -50;
+constexpr int platform_error1 = -42;
 
-TEST_CASE("StatusDomain") {
-  SECTION("ShouldNotFetchStatusLocationByDefault") {
+TEST_CASE("EnumStatusDomain") {
+  SECTION("ShouldNotFetchStatusLocationByDefaultWhenRaiseStatus") {
     // Under Test.
     Status status = domain.raise_status(Quark::UP);
 
@@ -214,7 +216,7 @@ TEST_CASE("StatusDomain") {
     REQUIRE(domain.location_of_incident == 0u);
   }
 
-  SECTION("ShouldNotFetchStatusMessageByDefault") {
+  SECTION("ShouldNotFetchStatusMessageByDefaultWhenRaiseStatus") {
     // Under Test.
     Status status = domain.raise_status(Quark::UP);
 
@@ -222,7 +224,7 @@ TEST_CASE("StatusDomain") {
     REQUIRE(domain.message_of_incident == 0u);
   }
 
-  SECTION("ShouldFetchStatusMessageOnDemand") {
+  SECTION("ShouldFetchStatusMessageOnDemandWhenRaiseStatus") {
     // Preconditions.
     Status status = domain.raise_status(Quark::UP, message0);
 
@@ -234,7 +236,7 @@ TEST_CASE("StatusDomain") {
     REQUIRE(message.size() > 0u);
   }
 
-  SECTION("ShouldFetchStatusLocationOnDemand") {
+  SECTION("ShouldFetchStatusLocationOnDemandWhenRaiseStatusHere") {
     // Preconditions.
     Status status = domain.raise_status_here(Quark::UP);
 
@@ -246,8 +248,9 @@ TEST_CASE("StatusDomain") {
     REQUIRE(location.line() > 0u);
   }
 }
+
 TEST_CASE("Status") {
-  SECTION("ShouldHaveCurrentLocationWhenRaisedHere") {
+  SECTION("ShouldHaveCurrentLocationAsRaiseStatusHere") {
     // Preconditions.
     auto raised_location = std::source_location::current();
     Status status = domain.raise_status_here(Quark::UP);
@@ -259,22 +262,74 @@ TEST_CASE("Status") {
     REQUIRE(location.line() - 1 == raised_location.line());
   }
 
+  // Precondition.
   Status status = domain.raise_status_here(Quark::UP, message0, location0);
 
-  SECTION("ShouldHaveSameMessageWhenRaisedHere") {
+  SECTION("ShouldHaveSameMessageAsWhenRaiseStatusHere") {
     // Under Test.
     std::string_view status_message = status.message();
 
     // Postconditions.
     REQUIRE(status_message == message0);
+    REQUIRE(status_message != message1);
   }
 
-  SECTION("ShouldHaveSameLocationWhenRaisedHere") {
+  SECTION("ShouldHaveSameLocationAsWhenRaiseStatusHere") {
     // Under Test.
     std::source_location location = status.location();
 
     // Postconditions.
     REQUIRE(location.line() == location0.line());
+    REQUIRE(location.line() != location1.line());
+  }
+
+  // Precondition.
+  Status error_status = domain.raise_error_here(  //
+      Quark::UP, platform_error0, message0, location0);
+
+  SECTION("ShouldHaveSameMessageAsWhenRaiseErrorHere") {
+    // Under Test.
+    std::string_view status_message = error_status.message();
+
+    // Postconditions.
+    REQUIRE(status_message == message0);
+    REQUIRE(status_message != message1);
+  }
+
+  SECTION("ShouldHaveSameLocationAsWhenRaiseErrorHere") {
+    // Under Test.
+    std::source_location location = error_status.location();
+
+    // Postconditions.
+    REQUIRE(location.line() == location0.line());
+    REQUIRE(location.line() != location1.line());
+  }
+
+  SECTION("ShouldHaveSamePlatformCodeAsWhenRaiseErrorHere") {
+    // Under Test.
+    int platform_error = error_status.platform_error();
+
+    // Postconditions.
+    REQUIRE(platform_error == platform_error0);
+    REQUIRE(platform_error != platform_error1);
+  }
+
+  // Under Test.
+  StatusDetached detached = status.detach_copy();
+
+  SECTION("ShouldHaveSameMessageAsDetachedCopy") {
+    // Postconditions.
+    REQUIRE(detached.message() == status.message());
+  }
+
+  SECTION("ShouldHaveSameLocationAsDetachedCopy") {
+    // Postconditions.
+    REQUIRE(detached.location().line() == status.location().line());
+  }
+
+  SECTION("ShouldHaveSameLocationAsDetachedCopy") {
+    // Postconditions.
+    REQUIRE(detached.platform_error() == status.platform_error());
   }
 
   SECTION("ShouldBeEqualToStatusWithSameIncident") {
@@ -438,26 +493,14 @@ constexpr bool StatusKindShouldCompareDifferent() {
   return kind_a != kind_b;
 }
 
-TEST_CASE("StatusKindDomain") {
-  SECTION("ShouldBeConstexpr") {}
-
+TEST_CASE("EnumStatusKindDomain") {
   SECTION("ShouldHaveConstexprName") {
     // Under Test.
     constexpr std::string_view name = quarks.name();
 
     // Postconditions.
-    REQUIRE(name == "test");
+    REQUIRE(name == "quark");
   }
-
-  // SECTION("ShouldHaveConstexprKind") {
-  //   // Under Test.
-  //   constexpr bool pass = StatusKindShouldHaveSameMessage() &&
-  //                         StatusKindShouldCompareSame() &&
-  //                         StatusKindShouldCompareDifferent();
-
-  //   // Postconditions.
-  //   REQUIRE(pass);
-  // }
 }
 
 TEST_CASE("StaticEnumStatusDomain") {
