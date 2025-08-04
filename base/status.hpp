@@ -688,6 +688,8 @@ class EnumStatusDomain
   }
 };
 
+//==============================================================================
+//
 template <typename ConditionEnumType,  //
           std::size_t ConditionCount,  //
           std::size_t IncidentCountMax = DEFAULT_INCIDENT_COUNT>
@@ -710,6 +712,8 @@ thread_local_enum_status_domain() noexcept {
   return domain;
 }
 
+//------------------------------------------------------------------------------
+//
 template <typename ConditionEnumType>
 Status raise(ConditionEnumType condition, std::string message = {}) noexcept {
   return static_enum_status_domain<ConditionEnumType,
@@ -736,6 +740,8 @@ StatusKind watch(ConditionEnumType condition) noexcept {
       .watch_kind(condition);
 }
 
+//------------------------------------------------------------------------------
+//
 template <typename ConditionEnumType>
 Status raise_thread_local(ConditionEnumType condition,
                           std::string message = {}) noexcept {
@@ -763,6 +769,8 @@ StatusKind watch_thread_local(ConditionEnumType condition) noexcept {
       .watch_kind(condition);
 }
 
+//==============================================================================
+//
 enum class PosixError : std::size_t {
   TOOBIG,          // Argument list too long.
   ACCES,           // Permission denied.
@@ -877,6 +885,8 @@ class PosixStatusDomain final
   static std::map<StatusKind, StatusKind> translation_;
 };
 
+//------------------------------------------------------------------------------
+//
 enum class Win32Error : std::size_t {
   INVALID_FUNCTION,     // Incorrect function.
   FILE_NOT_FOUND,       // The system cannot find the file specified.
