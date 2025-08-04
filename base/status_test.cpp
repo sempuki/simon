@@ -504,7 +504,7 @@ TEST_CASE("EnumStatusKindDomain") {
 }
 
 TEST_CASE("StaticEnumStatusDomain") {
-  SECTION("ShouldRaiseStatusFromStaticDomain") {
+  SECTION("ShouldRaiseStatusFromDifferentDomain") {
     // Preconditions.
     Status other = domain.raise_status(Quark::TOP);
 
@@ -517,7 +517,7 @@ TEST_CASE("StaticEnumStatusDomain") {
     REQUIRE(status0.kind() == status1.kind());
   }
 
-  SECTION("ShouldRaiseStatusWithMessage") {
+  SECTION("ShouldRaiseMultipleStatusWithDifferentMessages") {
     // Under Test.
     Status status0 = raise(Quark::TOP, message0);
     Status status1 = raise(Quark::TOP, message1);
@@ -527,7 +527,7 @@ TEST_CASE("StaticEnumStatusDomain") {
     REQUIRE(status1.message() == message1);
   }
 
-  SECTION("ShouldRaiseStatusHereWithLocation") {
+  SECTION("ShouldRaiseMultipleStatusHereWithDifferentLocations") {
     // Under Test.
     Status status0 = raise_here(Quark::TOP, message0, location0);
     Status status1 = raise_here(Quark::TOP, message1, location1);
@@ -539,18 +539,74 @@ TEST_CASE("StaticEnumStatusDomain") {
 
   SECTION("ShouldRaiseStatusHereWithLocationByDefault") {
     // Under Test.
-    Status status0 = raise_here(Quark::TOP);
-    Status status1 = raise_here(Quark::TOP);
+    Status status = raise_here(Quark::TOP);
 
     // Postconditions.
-    REQUIRE(status0.location().line() > 0u);
-    REQUIRE(status1.location().line() > 0u);
+    REQUIRE(status.location().line() > 0u);
   }
 
   SECTION("ShouldWatchForCondition") {
     // Preconditions.
     Status status = raise(Quark::TOP);
     StatusKind kind = watch(Quark::TOP);
+
+    // Under Test.
+    bool found = false;
+    if (status == kind || kind == status) {
+      found = true;
+    }
+
+    // Postconditions.
+    REQUIRE(found);
+  }
+}
+
+TEST_CASE("ThreadLocalEnumStatusDomain") {
+  SECTION("ShouldRaiseStatusFromDifferentDomain") {
+    // Preconditions.
+    Status other = domain.raise_status(Quark::TOP);
+
+    // Under Test.
+    Status status = raise_thread_local(Quark::TOP);
+
+    // Postconditions.
+    REQUIRE(status.kind() != other.kind());
+  }
+
+  SECTION("ShouldRaiseMultipleStatusWithSingleMessagePerThread") {
+    // Under Test.
+    Status status0 = raise_thread_local(Quark::TOP, message0);
+    Status status1 = raise_thread_local(Quark::TOP, message1);
+
+    // Postconditions.
+    REQUIRE(status0.message() != message0);
+    REQUIRE(status0.message() == message1);
+    REQUIRE(status1.message() == message1);
+  }
+
+  SECTION("ShouldRaiseMultipleStatusHereWithSingleLocationPerThread") {
+    // Under Test.
+    Status status0 = raise_here_thread_local(Quark::TOP, message0, location0);
+    Status status1 = raise_here_thread_local(Quark::TOP, message1, location1);
+
+    // Postconditions.
+    REQUIRE(status0.location().line() != location0.line());
+    REQUIRE(status0.location().line() == location1.line());
+    REQUIRE(status1.location().line() == location1.line());
+  }
+
+  SECTION("ShouldRaiseStatusHereWithLocationByDefault") {
+    // Under Test.
+    Status status = raise_here_thread_local(Quark::TOP);
+
+    // Postconditions.
+    REQUIRE(status.location().line() > 0u);
+  }
+
+  SECTION("ShouldWatchForCondition") {
+    // Preconditions.
+    Status status = raise_thread_local(Quark::TOP);
+    StatusKind kind = watch_thread_local(Quark::TOP);
 
     // Under Test.
     bool found = false;
