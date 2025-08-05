@@ -41,7 +41,6 @@ cc_test(
 cc_library(
     name = "status",
     hdrs = ["status.hpp"],
-    srcs = ["status.cpp"],
     deps = [
       ":core",
     ],
@@ -54,6 +53,26 @@ cc_test(
   deps = [
     ":testing",
     ":status",
+  ],
+  copts = COPTS,
+)
+
+cc_library(
+    name = "platform_status",
+    hdrs = ["platform_status.hpp"],
+    srcs = ["platform_status.cpp"],
+    deps = [
+      ":status",
+    ],
+    copts = COPTS,
+)
+
+cc_test(
+  name = "platform_status_test",
+  srcs = ["platform_status_test.cpp"],
+  deps = [
+    ":testing",
+    ":platform_status",
   ],
   copts = COPTS,
 )
