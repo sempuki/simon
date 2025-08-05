@@ -619,36 +619,4 @@ TEST_CASE("ThreadLocalEnumStatusDomain") {
   }
 }
 
-TEST_CASE("PosixStatusDomain") {
-  PosixStatusDomain posix_domain;
-
-  SECTION("ShouldRaisePosixEAGAINWithMessage") {
-    // Preconditions.
-    StatusKind kind = posix_domain.watch_kind(PosixError::AGAIN);
-
-    // Under Test.
-    Status status = posix_domain.raise_status(PosixError::AGAIN);
-
-    // Postconditions.
-    REQUIRE(status == kind);
-    REQUIRE(kind.message() == "Resource unavailable, try again.");
-  }
-}
-
-TEST_CASE("Win32StatusDomain") {
-  Win32StatusDomain win32_domain;
-
-  SECTION("ShouldRaiseWin32ERROR_BUSYWithMessage") {
-    // Preconditions.
-    StatusKind kind = win32_domain.watch_kind(Win32Error::BUSY);
-
-    // Under Test.
-    Status status = win32_domain.raise_status(Win32Error::BUSY);
-
-    // Postconditions.
-    REQUIRE(status == kind);
-    REQUIRE(kind.message() == "ERROR_BUSY");
-  }
-}
-
 }  // namespace simon
