@@ -11,6 +11,12 @@
 #include "base/time.hpp"
 #include "framework/event.hpp"
 
+namespace simon {
+using lib::Duration;
+using lib::SimClock;
+using lib::TimePoint;
+}  // namespace simon
+
 namespace simon::framework {
 
 class EventQueue final {

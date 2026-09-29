@@ -1,1 +1,3 @@
---std=c++23
+-std=c++2c
+-I.
+-Ithird_party/lib

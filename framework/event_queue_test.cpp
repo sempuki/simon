@@ -35,14 +35,14 @@ TEST_CASE("EventQueue") {
 
   SECTION("ShouldCallImmidateTimers") {
     bool called = false;
-    events.start_timer(start, [&called](auto time) { called = true; });
+    events.start_timer(start, [&called](auto /*time*/) { called = true; });
     events.process_until(start);
     CHECK(called);
   }
 
   SECTION("ShouldCallDelayedTimers") {
     bool called = false;
-    events.start_timer(later, [&called](auto time) { called = true; });
+    events.start_timer(later, [&called](auto /*time*/) { called = true; });
     events.process_until(start);
     CHECK(!called);
     events.process_until(later);

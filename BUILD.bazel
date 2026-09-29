@@ -1,0 +1,27 @@
+# Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+
+load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_binary(
+    name = "hello",
+    srcs = ["hello.cpp"],
+    copts = COPTS,
+    deps = [
+        "//component:controls",
+        "//component:environment",
+        "//component:movement",
+        "//component:physical",
+        "//framework:component_system",
+        "//framework:entity",
+        "//framework:event_queue",
+        "@imgui",
+        "@imgui//backends:platform-sdl2",
+        "@imgui//backends:renderer-sdl2",
+        "@lib//base:contract",
+        "@lib//base:time",
+        "@sdl2",
+    ],
+)

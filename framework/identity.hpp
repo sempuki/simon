@@ -6,7 +6,7 @@
 #include <memory>
 #include <ostream>
 
-#include "base/type_macros.hpp"
+#include "base/core.hpp"
 
 namespace simon::framework {
 
@@ -14,7 +14,7 @@ class Identity;
 
 class Name {
  public:
-  DECLARE_NON_DEFAULTABLE(Name);
+  Name() = delete;
 
   bool operator==(const Name& that) const { return name_ == that.name_; }
   bool operator!=(const Name& that) const { return name_ != that.name_; }
@@ -33,7 +33,8 @@ class Name {
 
 class Identity {
  public:
-  DECLARE_MOVE_ONLY(Identity);
+  DECLARE_COPY_DELETE(Identity);
+  DECLARE_MOVE_DEFAULT(Identity);
 
   Identity();
   Name name() const { return Name{id_}; }

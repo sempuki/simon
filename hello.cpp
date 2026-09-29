@@ -2,8 +2,6 @@
 
 #include <iostream>
 
-#include "backends/imgui_impl_sdl.h"
-#include "backends/imgui_impl_sdlrenderer.h"
 #include "base/contract.hpp"
 #include "base/time.hpp"
 #include "component/controls.hpp"
@@ -13,7 +11,9 @@
 #include "framework/component_system.hpp"
 #include "framework/entity.hpp"
 #include "framework/event_queue.hpp"
-#include "imgui.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_sdl2.h"
+#include "imgui/imgui_impl_sdlrenderer2.h"
 
 using namespace simon;
 using framework::Entity;
@@ -33,7 +33,7 @@ struct DetectSphericalCollision : public framework::ComputeBase<component::Physi
   void prepare(component::Physical* current) { others.push_back(current); }
   void operator()(component::Physical* current,
                   TimePoint time,
-                  Duration step,
+                  Duration /*step*/,
                   framework::EventQueue* events) {
     for (auto* other : others) {
       if (current != other && has_collision(current, other)) {
@@ -41,7 +41,7 @@ struct DetectSphericalCollision : public framework::ComputeBase<component::Physi
       }
     }
   }
-  void resolve(component::Physical* current) { others.clear(); }
+  void resolve(component::Physical* /*current*/) { others.clear(); }
   std::vector<component::Physical*> others;
 };
 
@@ -52,9 +52,9 @@ auto compute_acceleration(component::Movement* m) {
 
 struct ForwardEulerMovement : public framework::ComputeBase<component::Movement> {
   void operator()(component::Movement* movement,
-                  TimePoint time,
+                  TimePoint /*time*/,
                   Duration step,
-                  framework::EventQueue* events) {
+                  framework::EventQueue* /*events*/) {
     auto prev = *movement;
     auto& next = *movement;
     auto acceleration = compute_acceleration(movement);
@@ -66,9 +66,9 @@ struct ForwardEulerMovement : public framework::ComputeBase<component::Movement>
 
 struct TrapezoidMovement : public framework::ComputeBase<component::Movement> {
   void operator()(component::Movement* movement,
-                  TimePoint time,
+                  TimePoint /*time*/,
                   Duration step,
-                  framework::EventQueue* events) {
+                  framework::EventQueue* /*events*/) {
     auto prev = *movement;
     auto& next = *movement;
     auto acceleration = compute_acceleration(movement);
@@ -80,9 +80,9 @@ struct TrapezoidMovement : public framework::ComputeBase<component::Movement> {
 
 struct RungeKutta2Movement : public framework::ComputeBase<component::Movement> {
   void operator()(component::Movement* movement,
-                  TimePoint time,
+                  TimePoint /*time*/,
                   Duration step,
-                  framework::EventQueue* events) {
+                  framework::EventQueue* /*events*/) {
     auto prev = *movement;
     auto& next = *movement;
     auto acceleration = compute_acceleration(movement);
@@ -170,8 +170,12 @@ int main(int, char**) {
   SDL_Renderer* renderer =
     SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
   if (renderer == nullptr) {
-    SDL_Log("Error creating SDL_Renderer!");
-    return 0;
+    SDL_Log("No accelerated renderer (%s); falling back to software.", SDL_GetError());
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+  }
+  if (renderer == nullptr) {
+    SDL_Log("Error creating SDL_Renderer: %s", SDL_GetError());
+    return 1;
   }
 
   // Setup Dear ImGui context
@@ -185,7 +189,7 @@ int main(int, char**) {
 
   // Setup Platform/Renderer backends
   ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
-  ImGui_ImplSDLRenderer_Init(renderer);
+  ImGui_ImplSDLRenderer2_Init(renderer);
   ImVec4 clear_color = ImVec4(0.35f, 0.45f, 0.50f, 1.00f);
 
   // Simulator
@@ -211,7 +215,7 @@ int main(int, char**) {
   auto* ball_b_physical = ball_b->component<component::Physical>();
 
   bool done = false;
-  simulation.events.subscribe<Collision>([&](TimePoint time, const Collision& event) {
+  simulation.events.subscribe<Collision>([&](TimePoint /*time*/, const Collision& event) {
     ASSERT((event.a == ball_a_physical || event.a == ball_b_physical) &&
            (event.b == ball_a_physical || event.b == ball_b_physical));
     done = true;
@@ -235,7 +239,7 @@ int main(int, char**) {
     }
 
     // Start the Dear ImGui frame
-    ImGui_ImplSDLRenderer_NewFrame();
+    ImGui_ImplSDLRenderer2_NewFrame();
     ImGui_ImplSDL2_NewFrame();
     ImGui::NewFrame();
 
@@ -269,12 +273,12 @@ int main(int, char**) {
                            (Uint8)(clear_color.z * 255),
                            (Uint8)(clear_color.w * 255));
     SDL_RenderClear(renderer);
-    ImGui_ImplSDLRenderer_RenderDrawData(ImGui::GetDrawData());
+    ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
     SDL_RenderPresent(renderer);
   }
 
   // Cleanup
-  ImGui_ImplSDLRenderer_Shutdown();
+  ImGui_ImplSDLRenderer2_Shutdown();
   ImGui_ImplSDL2_Shutdown();
   ImGui::DestroyContext();
 

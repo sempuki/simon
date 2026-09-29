@@ -7,6 +7,12 @@
 #include "base/time.hpp"
 #include "framework/identity.hpp"
 
+namespace simon {
+using lib::Duration;
+using lib::SimClock;
+using lib::TimePoint;
+}  // namespace simon
+
 namespace simon::framework {
 
 struct EventName final : public Name {
@@ -15,6 +21,8 @@ struct EventName final : public Name {
 
 class EventBase {
  public:
+  virtual ~EventBase() = default;
+
   virtual EventName event_name() const = 0;
   virtual TimePoint time() const = 0;
 };

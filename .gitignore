@@ -33,3 +33,6 @@
 
 # Bazel
 bazel-*
+
+# Local Bazel overrides
+user.bazelrc

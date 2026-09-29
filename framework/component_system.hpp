@@ -10,6 +10,12 @@
 #include "framework/component.hpp"
 #include "framework/entity.hpp"
 
+namespace simon {
+using lib::Duration;
+using lib::SimClock;
+using lib::TimePoint;
+}  // namespace simon
+
 namespace simon::framework {
 
 class ComponentSystemBase {
@@ -61,14 +67,15 @@ struct ComponentSystem final : public TypedComponentSystemBase<ComponentType> {
 
 template <typename ComponentType>
 struct ComputeBase {
-  void prepare(ComponentType* component) {}
-  void resolve(ComponentType* component) {}
+  void prepare(ComponentType* /*component*/) {}
+  void resolve(ComponentType* /*component*/) {}
 };
 
 struct ComputeNone final {
-  void prepare(auto* component) {}
-  void operator()(auto* component, TimePoint time, Duration step, auto* events) {}
-  void resolve(auto* component) {}
+  void prepare(auto* /*component*/) {}
+  void operator()(auto* /*component*/, TimePoint /*time*/, Duration /*step*/,
+                  auto* /*events*/) {}
+  void resolve(auto* /*component*/) {}
 };
 }  // namespace simon::framework
 
