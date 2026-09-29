@@ -15,5 +15,5 @@ bazel_dep(name = "sdl2", version = "2.32.0.bcr.beta.6")
 bazel_dep(name = "lib")
 local_path_override(
     module_name = "lib",
-    path = "third_party/lib",
+    path = "2nd_party/lib",
 )
