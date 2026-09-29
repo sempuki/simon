@@ -151,7 +151,9 @@ class Simulation final {
 };
 
 int main(int, char**) {
-  // Setup SDL
+  // Setup SDL. Prefer Wayland: SDL2 defaults to X11, where this SDL build has
+  // no GPU renderer (it ships GLES2 over EGL, not GLX).
+  SDL_SetHint(SDL_HINT_VIDEODRIVER, "wayland,x11,windows,cocoa");
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
     std::cerr << "Error: " << SDL_GetError() << "\n";
     return -1;
@@ -176,6 +178,10 @@ int main(int, char**) {
   if (renderer == nullptr) {
     SDL_Log("Error creating SDL_Renderer: %s", SDL_GetError());
     return 1;
+  }
+  SDL_RendererInfo renderer_info;
+  if (SDL_GetRendererInfo(renderer, &renderer_info) == 0) {
+    SDL_Log("Renderer: %s (%s)", renderer_info.name, SDL_GetCurrentVideoDriver());
   }
 
   // Setup Dear ImGui context
