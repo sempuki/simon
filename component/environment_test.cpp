@@ -4,10 +4,13 @@
 
 #include "base/testing.hpp"
 
-namespace simon::components {
+namespace simon {
 
 TEST_CASE("Environment") {
-  //
+  SECTION("ShouldBeZeroGivenDefaultConstruction") {
+    component::Environment environment;
+    CHECK(environment.wind.isZero());
+  }
 }
 
-}  // namespace simon::components
+}  // namespace simon

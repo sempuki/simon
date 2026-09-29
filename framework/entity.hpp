@@ -16,7 +16,12 @@ struct EntityName final : public Name {
 class Entity : public PerObjectIdentity {
  public:
   EntityName entity_name() const { return id_.name(); }
-  void attach(ComponentBase* component) { components_[component->component_name()] = component; }
+  // An entity holds at most one component of each type.
+  void attach(ComponentBase* component) {
+    CHECK_PRECONDITION(component);
+    auto [iter, inserted] = components_.try_emplace(component->component_name(), component);
+    CHECK_PRECONDITION(inserted);
+  }
 
   template <typename ComponentType>
   ComponentType* component() {

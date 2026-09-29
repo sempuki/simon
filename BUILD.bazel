@@ -2,12 +2,14 @@
 
 load("@lib//bazel:copts.bzl", "COPTS")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
 package(default_visibility = ["//visibility:public"])
 
-cc_binary(
-    name = "hello",
-    srcs = ["hello.cpp"],
+cc_library(
+    name = "simulation",
+    hdrs = ["simulation.hpp"],
     copts = COPTS,
     deps = [
         "//component:controls",
@@ -17,6 +19,27 @@ cc_binary(
         "//framework:component_system",
         "//framework:entity",
         "//framework:event_queue",
+        "@lib//base:time",
+    ],
+)
+
+cc_test(
+    name = "simulation_test",
+    size = "small",
+    srcs = ["simulation_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":simulation",
+        "@lib//base:testing",
+    ],
+)
+
+cc_binary(
+    name = "hello",
+    srcs = ["hello.cpp"],
+    copts = COPTS,
+    deps = [
+        ":simulation",
         "@imgui",
         "@imgui//backends:platform-sdl2",
         "@imgui//backends:renderer-sdl2",

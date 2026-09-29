@@ -4,10 +4,13 @@
 
 #include "base/testing.hpp"
 
-namespace simon::components {
+namespace simon {
 
 TEST_CASE("Controls") {
-  //
+  SECTION("ShouldBeZeroGivenDefaultConstruction") {
+    component::Controls controls;
+    CHECK(controls.acceleration.isZero());
+  }
 }
 
-}  // namespace simon::components
+}  // namespace simon

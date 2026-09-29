@@ -2,11 +2,16 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <deque>
 #include <functional>
 #include <iostream>
 #include <map>
-#include <queue>
+#include <memory>
 #include <type_traits>
+#include <vector>
 
 #include "base/time.hpp"
 #include "framework/event.hpp"
@@ -51,16 +56,30 @@ class EventQueue final {
     static_assert(std::is_same_v<MessageType, std::remove_cvref_t<MessageType>>,
                   "Unsupported: cv-ref qualified messages");
 
-    events_.emplace(
-      std::make_unique<Event<MessageType>>(time, std::forward<DeducedMessageArgs>(args)...));
+    events_.push_back(Entry{
+      .sequence = next_sequence_++,
+      .event =
+        std::make_unique<Event<MessageType>>(time, std::forward<DeducedMessageArgs>(args)...),
+    });
+    std::push_heap(events_.begin(), events_.end(), Later{});
   }
 
+  // Delivers every event at or before `time`, earliest first, and events with
+  // equal times in the order they were published. Each handler receives the
+  // event's own time. Handlers may publish or subscribe while being called.
   void process_until(TimePoint time) {
-    while (events_.size() && events_.top()->time() <= time) {
-      for (auto& handler : handlers_[events_.top()->event_name()]) {
-        handler(time, events_.top().get());
+    while (!events_.empty() && events_.front().event->time() <= time) {
+      // Take ownership before calling handlers, since they may publish.
+      std::pop_heap(events_.begin(), events_.end(), Later{});
+      std::unique_ptr<EventBase> event = std::move(events_.back().event);
+      events_.pop_back();
+
+      // A deque keeps existing handlers in place when a handler subscribes.
+      // Handlers subscribed during delivery first see the next event.
+      auto& handlers = handlers_[event->event_name()];
+      for (std::size_t i = 0, count = handlers.size(); i < count; ++i) {
+        handlers[i](event->time(), event.get());
       }
-      events_.pop();
     }
   }
 
@@ -69,15 +88,24 @@ class EventQueue final {
     std::function<void(TimePoint)> action;
   };
 
-  struct Compare final {
-    bool operator()(const std::unique_ptr<EventBase>& a, const std::unique_ptr<EventBase>& b) {
-      return a->time() < b->time();
+  struct Entry final {
+    std::uint64_t sequence = 0;
+    std::unique_ptr<EventBase> event;
+  };
+
+  // Heap order that puts the earliest event, then the first published, on top.
+  struct Later final {
+    bool operator()(const Entry& a, const Entry& b) const {
+      if (a.event->time() != b.event->time()) {
+        return a.event->time() > b.event->time();
+      }
+      return a.sequence > b.sequence;
     }
   };
 
-  std::priority_queue<std::unique_ptr<EventBase>, std::vector<std::unique_ptr<EventBase>>, Compare>
-    events_;
-  std::map<EventName, std::vector<std::function<void(TimePoint, const EventBase*)>>> handlers_;
+  std::vector<Entry> events_;
+  std::uint64_t next_sequence_ = 0;
+  std::map<EventName, std::deque<std::function<void(TimePoint, const EventBase*)>>> handlers_;
 };
 
 }  // namespace simon::framework

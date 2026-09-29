@@ -13,7 +13,7 @@ using lib::Vec3;
 namespace simon::component {
 
 struct Environment final : public framework::Component<Environment> {
-  Vec3 wind;
+  Vec3 wind = Vec3::Zero();
 };
 
 }  // namespace simon::component

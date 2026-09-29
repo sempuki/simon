@@ -13,7 +13,7 @@ using lib::Vec3;
 namespace simon::component {
 
 struct Controls final : public framework::Component<Controls> {
-  Vec3 acceleration;
+  Vec3 acceleration = Vec3::Zero();
 };
 
 }  // namespace simon::component

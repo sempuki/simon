@@ -17,8 +17,8 @@ struct Physical;
 struct Controls;
 
 struct Movement final : public framework::Component<Movement> {
-  Vec3 position;
-  Vec3 velocity;
+  Vec3 position = Vec3::Zero();
+  Vec3 velocity = Vec3::Zero();
 
   Environment* environment = nullptr;
   Physical* physical = nullptr;

@@ -4,10 +4,14 @@
 
 #include "base/testing.hpp"
 
-namespace simon::components {
+namespace simon {
 
 TEST_CASE("Movement") {
-  //
+  SECTION("ShouldBeZeroGivenDefaultConstruction") {
+    component::Movement movement;
+    CHECK(movement.position.isZero());
+    CHECK(movement.velocity.isZero());
+  }
 }
 
-}  // namespace simon::components
+}  // namespace simon

@@ -4,10 +4,13 @@
 
 #include "base/testing.hpp"
 
-namespace simon::components {
+namespace simon {
 
 TEST_CASE("Physical") {
-  //
+  SECTION("ShouldBeZeroGivenDefaultConstruction") {
+    component::Physical physical;
+    CHECK(physical.radius == 0.0);
+  }
 }
 
-}  // namespace simon::components
+}  // namespace simon
