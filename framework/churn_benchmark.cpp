@@ -45,8 +45,11 @@
 // point, and iterating. Warm-up steps run first, so the stores reach the
 // disorder of a long run.
 //
-//   bazel run -c opt //framework:churn_benchmark [-- --contend] [--competing]
+//   bazel run -c opt //framework:churn_benchmark [-- --contend[=N]]
+//       [--competing]
 //
+// --contend runs one thread per spare core streaming over a large buffer, to
+// compete for shared cache and memory bandwidth; --contend=N runs N.
 // --competing runs only the competing case.
 
 #include <algorithm>
@@ -1253,17 +1256,21 @@ void compare_competing(Workload workload) {
 
 int main(int argc, char** argv) {
   using namespace simon::framework;
-  bool contend = false;
+  unsigned threads = 0;
   bool competing_only = false;
   for (int i = 1; i < argc; ++i) {
-    contend = contend || std::string_view{argv[i]} == "--contend";
-    competing_only =
-        competing_only || std::string_view{argv[i]} == "--competing";
+    std::string_view argument{argv[i]};
+    if (auto asked = benchmark::Contention::threads_from(argument)) {
+      threads = *asked;
+    } else if (argument == "--competing") {
+      competing_only = true;
+    } else {
+      std::println(stderr, "unknown argument: {}", argument);
+      return 1;
+    }
   }
-  unsigned spare = benchmark::Contention::spare_cores();
-  benchmark::Contention contention{contend ? spare : 0u};
-  std::println("{}", contend ? std::format("contended by {} threads", spare)
-                             : std::string{"uncontended"});
+  benchmark::Contention contention{threads};
+  std::println("{}", benchmark::Contention::describe(threads));
 
   for (std::size_t population : {100'000uz, 1'000'000uz}) {
     Workload workload{.population = population};

@@ -23,9 +23,10 @@
 // run aligned.
 //
 // --contend runs one thread per spare core streaming over a large buffer, to
-// compete for shared cache and memory bandwidth as a busy cloud host would.
+// compete for shared cache and memory bandwidth as a busy cloud host would;
+// --contend=N runs N.
 //
-//   bazel run -c opt //framework:system_benchmark [-- --contend]
+//   bazel run -c opt //framework:system_benchmark [-- --contend[=N]]
 
 #include <algorithm>
 #include <chrono>
@@ -201,11 +202,18 @@ Result measure(std::size_t count, bool shuffled,
 
 int main(int argc, char** argv) {
   using namespace simon::framework;
-  bool contend = argc > 1 && std::string_view{argv[1]} == "--contend";
-  unsigned spare = benchmark::Contention::spare_cores();
-  benchmark::Contention contention{contend ? spare : 0u};
-  std::println("{}", contend ? std::format("contended by {} threads", spare)
-                             : std::string{"uncontended"});
+  unsigned threads = 0;
+  for (int i = 1; i < argc; ++i) {
+    std::string_view argument{argv[i]};
+    if (auto asked = benchmark::Contention::threads_from(argument)) {
+      threads = *asked;
+    } else {
+      std::println(stderr, "unknown argument: {}", argument);
+      return 1;
+    }
+  }
+  benchmark::Contention contention{threads};
+  std::println("{}", benchmark::Contention::describe(threads));
 
   std::mt19937 random{42};
   std::println("{:>8} {:>9} | {:>10} {:>10} {:>10} {:>10} {:>10}", "entities",

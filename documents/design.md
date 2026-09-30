@@ -1619,8 +1619,9 @@ interop.
 - **Hierarchical locality names** (`/blue/radars`) for ordering segments,
   once a system walks several archetypes together.
 - **A realistic contention load.** `--contend` runs a streaming thread on every
-  spare core, close to the worst case on the development machine. A cloud
-  neighbor is likely milder, so the load should become a parameter.
+  spare core, close to the worst case on the development machine, and
+  `--contend=N` runs N. Which N resembles a busy cloud neighbor is still to be
+  decided.
 
 ## Lessons from the older simulator
 
