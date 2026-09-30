@@ -15,7 +15,7 @@ namespace simon::framework {
 // An entity's local alias: an index into the world's entity table, plus the
 // generation that was current when the entity was created. Destroying an
 // entity bumps its generation, so every copy of the old value goes stale.
-struct Entity {
+struct Entity final {
   static constexpr std::uint32_t INVALID_INDEX =
       std::numeric_limits<std::uint32_t>::max();
 

@@ -14,7 +14,7 @@ TEST_CASE("EventQueue") {
   TimePoint start{std::chrono::seconds{0}};
   TimePoint later{std::chrono::seconds{1}};
 
-  struct M {
+  struct M final {
     int value = 0;
   } mesg{5};
 
@@ -110,7 +110,7 @@ TEST_CASE("EventQueue") {
   }
 
   SECTION("ShouldNotCrossDispatchGivenDifferentMessageTypes") {
-    struct N {};
+    struct N final {};
     int m_calls = 0;
     int n_calls = 0;
     events.subscribe<M>([&m_calls](auto /*time*/, M /*mesg*/) { m_calls++; });

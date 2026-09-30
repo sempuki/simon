@@ -23,10 +23,12 @@ TEST_CASE("Hello") {
   Balls balls = build_balls(lib::InOut(world));
 
   SECTION("ShouldFindBallsByAliasGivenScenario") {
-    CHECK(world.find_alias("red") == std::vector{world.name_of(balls.red)});
-    CHECK(world.find_alias("blue") == std::vector{world.name_of(balls.blue)});
+    CHECK(world.find_name_of(framework::Alias{"red"}) ==
+          std::vector{world.name_of(balls.red)});
+    CHECK(world.find_name_of(framework::Alias{"blue"}) ==
+          std::vector{world.name_of(balls.blue)});
     CHECK(world.aliases_of(world.archetype_of(balls.red)) ==
-          std::vector<std::string>{"ball"});
+          std::vector<framework::Alias>{"ball"});
   }
 
   SECTION("ShouldAccelerateByThrustGivenNoDragAndNoWind") {
@@ -35,9 +37,10 @@ TEST_CASE("Hello") {
 
     scheduler.step(lib::InOut(world), framework::Step{.time = {}, .dt = DT});
 
-    const Kinematics& red = world.store<Kinematics>().get(balls.red);
+    const Kinematics& red =
+        world.store_of<Kinematics>().component_of(balls.red);
     CHECK(
-        red.velocity.numerical_value_in(model::metre_per_second)
+        red.velocity.numerical_value_in(model::meter_per_second)
             .is_approximately(model::Vector3d{10.0, -10.0 + 9.8 * 0.01, 0.0}));
   }
 
@@ -57,8 +60,9 @@ TEST_CASE("Hello") {
     }
 
     REQUIRE(any_collision(world));
-    const Collision& red = world.store<Collision>().get(balls.red);
-    const Collision& blue = world.store<Collision>().get(balls.blue);
+    const Collision& red = world.store_of<Collision>().component_of(balls.red);
+    const Collision& blue =
+        world.store_of<Collision>().component_of(balls.blue);
     CHECK(red.hit);
     CHECK(red.other == balls.blue);
     CHECK(blue.hit);
@@ -100,9 +104,9 @@ TEST_CASE("HelloSimulation") {
     REQUIRE(second_end);
     CHECK(*first_end == *second_end);
     const auto& first_red =
-        first.world().store<Kinematics>().get(first.balls().red);
+        first.world().store_of<Kinematics>().component_of(first.balls().red);
     const auto& second_red =
-        second.world().store<Kinematics>().get(second.balls().red);
+        second.world().store_of<Kinematics>().component_of(second.balls().red);
     CHECK(first_red.position == second_red.position);  // Bit for bit.
   }
 }

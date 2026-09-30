@@ -11,7 +11,7 @@
 // components.
 namespace simon::framework::testing {
 
-struct Position {
+struct Position final {
   double x = 0.0;
 };
 inline double distance(const Position& a, const Position& b) {
@@ -19,22 +19,23 @@ inline double distance(const Position& a, const Position& b) {
 }
 inline Position pose(const Position& a) { return a; }
 
-struct Velocity {
+struct Velocity final {
   double x = 0.0;
 };
 
-struct Health {
+struct Health final {
   double points = 0.0;
 };
 
 using TestWorld = World<Position, Velocity, Health>;
 
 // A body may have any of the test components.
-struct Body
+struct Body final
     : Archetype<"body", Requires<>, Allows<Position, Velocity, Health>> {};
 
-struct Launcher : Archetype<"launcher", Requires<Position>> {};
-struct Interceptor : Archetype<"interceptor", Requires<Position, Velocity>> {};
+struct Launcher final : Archetype<"launcher", Requires<Position>> {};
+struct Interceptor final
+    : Archetype<"interceptor", Requires<Position, Velocity>> {};
 
 inline WorldConfiguration small_world() {
   return WorldConfiguration{.number = 1, .entities = 16, .components = 16};

@@ -43,16 +43,17 @@ template <Spatial Type>
 using distance_of_t = decltype(distance(std::declval<const Type&>(),
                                         std::declval<const Type&>()));
 
-struct WorldConfiguration {
+struct WorldConfiguration final {
   std::uint32_t number = 0;    // The world's instance in its Name and Identity.
   std::size_t entities = 0;    // Entity capacity.
   std::size_t components = 0;  // Capacity of each component store.
 };
 
-// Grants mutable store access. Only the code that runs systems constructs it.
-class SystemAccess final {
+// Unlocks mutable store access. Only the scheduler, which runs systems, can
+// construct one.
+class SchedulerKey final {
  private:
-  SystemAccess() = default;
+  SchedulerKey() = default;
   friend struct SystemRunner;
 };
 
@@ -61,12 +62,12 @@ class SystemAccess final {
 //
 // Everything in it has a Name ({kind, instance}), an Identity computed from the
 // Name ("/world/1/entity/2"), and any number of Aliases ("ego"). See name.hpp.
-template <Spatial SpatialType, typename... Components>
+template <Spatial SpatialType, typename... ComponentTypes>
 class World final {
  public:
   using SpatialComponent = SpatialType;
   using ComponentList =
-      TypeList<SpatialType, EntityArchetype, Parent, Components...>;
+      TypeList<SpatialType, EntityArchetype, Parent, ComponentTypes...>;
   using Command = command_for_t<ComponentList>;
 
   static_assert(is_unique_v<ComponentList>,
@@ -83,22 +84,22 @@ class World final {
                 Store<EntityArchetype>{configuration.entities,
                                        configuration.entities},
                 Store<Parent>{configuration.entities, configuration.entities},
-                Store<Components>{configuration.components,
-                                  configuration.entities}...},
+                Store<ComponentTypes>{configuration.components,
+                                      configuration.entities}...},
         plans_{Plan<SpatialType>{configuration.entities},
                Plan<EntityArchetype>{configuration.entities},
                Plan<Parent>{configuration.entities},
-               Plan<Components>{configuration.entities}...},
+               Plan<ComponentTypes>{configuration.entities}...},
         destroying_(configuration.entities, false),
         instance_of_index_(configuration.entities, 0) {
-    // Component types are aliased by their type names, qualified and short.
-    for_each_type(ComponentList{}, [&]<typename Component>() {
-      std::string type_name = lib::to_type_string<Component>();
-      Name name = name_of<Component>();
-      give_alias(name, type_name);
+    // Components are aliased by their type names, qualified and short.
+    for_each_type(ComponentList{}, [&]<typename ComponentType>() {
+      std::string type_name = lib::to_type_string<ComponentType>();
+      Name name = name_of<ComponentType>();
+      give_alias(name, Alias{type_name});
       if (std::size_t colons = type_name.rfind("::");
           colons != std::string::npos) {
-        give_alias(name, type_name.substr(colons + 2));
+        give_alias(name, Alias{type_name.substr(colons + 2)});
       }
     });
   }
@@ -106,11 +107,11 @@ class World final {
 
   //-- Write -------------------------------------------------------------------
 
-  // Creates an entity of `Archetype`, with an optional alias.
-  template <ArchetypeType Archetype>
-  auto create(std::string_view alias = {}) {
-    return CreateBuilder<World, Archetype, true>{
-        lib::Depend<World>{*this}, std::string{alias}, std::nullopt, {}};
+  // Creates an entity of `ArchetypeType`, with an optional alias.
+  template <Archetypal ArchetypeType>
+  auto create(Alias alias = {}) {
+    return CreateBuilder<World, ArchetypeType, true>{
+        lib::Depend<World>{*this}, std::move(alias), std::nullopt, {}};
   }
   auto change(Entity entity) {
     return ChangeBuilder<World>{lib::Depend<World>{*this}, entity, {}, {}};
@@ -142,29 +143,29 @@ class World final {
   bool alive(Entity entity) const { return entities_.alive(entity); }
   std::size_t size() const { return entities_.size(); }
 
-  template <typename Component>
-  const Store<Component>& store() const {
-    static_assert(contains_v<ComponentList, Component>,
+  template <typename ComponentType>
+  const Store<ComponentType>& store_of() const {
+    static_assert(contains_v<ComponentList, ComponentType>,
                   "This component is not in the world's component list.");
-    return std::get<Store<Component>>(stores_);
+    return std::get<Store<ComponentType>>(stores_);
   }
 
   Name archetype_of(Entity entity) const {
-    return store<EntityArchetype>().get(entity).archetype;
+    return store_of<EntityArchetype>().component_of(entity).archetype;
   }
 
   // The entity `entity` was created under, if any. It may no longer be alive.
   std::optional<Entity> parent_of(Entity entity) const {
-    const Parent* parent = store<Parent>().try_get(entity);
+    const Parent* parent = store_of<Parent>().try_component_of(entity);
     return parent ? std::optional{parent->entity} : std::nullopt;
   }
 
   // Visits every entity whose spatial entity-component is within `radius` of
   // `center`, as `visit(Entity, const SpatialType&)`.
-  template <typename Visitor>
+  template <typename VisitorType>
   void within(const SpatialType& center, distance_of_t<SpatialType> radius,
-              Visitor&& visit) const {
-    const Store<SpatialType>& spatial = store<SpatialType>();
+              VisitorType&& visit) const {
+    const Store<SpatialType>& spatial = store_of<SpatialType>();
     for (std::size_t i = 0; i < spatial.size(); ++i) {
       if (distance(center, spatial.data(i)) <= radius) {
         visit(spatial.owner(i), spatial.data(i));
@@ -183,15 +184,15 @@ class World final {
     return Name{Kind::ENTITY, instance_of_index_[entity.index]};
   }
 
-  template <typename Component>
+  template <typename ComponentType>
   static constexpr Name name_of() {
-    return Name{Kind::COMPONENT, component_number<Component>()};
+    return Name{Kind::COMPONENT, component_number<ComponentType>()};
   }
 
-  // The name of `entity`'s `Component`, which it need not have yet.
-  template <typename Component>
+  // The name of `entity`'s `ComponentType`, which it need not have yet.
+  template <typename ComponentType>
   Name name_of(Entity entity) const {
-    return entity_component_name(component_number<Component>(),
+    return entity_component_name(component_number<ComponentType>(),
                                  name_of(entity).instance);
   }
 
@@ -206,12 +207,12 @@ class World final {
                                              : std::nullopt;
   }
 
-  std::string identity_of(Name name) const {
+  Identity identity_of(Name name) const {
     return framework::identity_of(number_, name);
   }
 
   // The name an identity refers to, if it names something in this world.
-  std::optional<Name> find(std::string_view identity) const {
+  std::optional<Name> find_name_of(const Identity& identity) const {
     std::optional<ParsedIdentity> parsed = parse_identity(identity);
     if (!parsed || parsed->world != number_ || !exists(parsed->name)) {
       return std::nullopt;
@@ -220,9 +221,9 @@ class World final {
   }
 
   // Every name with `alias`, in the order the aliases were given.
-  std::vector<Name> find_alias(std::string_view alias) const {
+  std::vector<Name> find_name_of(const Alias& alias) const {
     std::vector<Name> names;
-    auto [begin, end] = aliases_.equal_range(std::string{alias});
+    auto [begin, end] = aliases_.equal_range(alias);
     for (auto iter = begin; iter != end; ++iter) {
       names.push_back(iter->second);
     }
@@ -230,30 +231,30 @@ class World final {
   }
 
   // Every alias `name` has, in the order they were given.
-  std::vector<std::string> aliases_of(Name name) const {
+  std::vector<Alias> aliases_of(Name name) const {
     auto iter = aliases_of_name_.find(name);
-    return iter != aliases_of_name_.end() ? iter->second
-                                          : std::vector<std::string>{};
+    return iter != aliases_of_name_.end() ? iter->second : std::vector<Alias>{};
   }
 
   // A one-line description for a console, e.g.
   // "/world/1/entity/2 (red) archetype ball: Kinematics, Collider".
   std::string describe(Name name) const {
-    std::string text = identity_of(name);
-    std::vector<std::string> aliases = aliases_of(name);
+    std::string text = identity_of(name).string();
+    std::vector<Alias> aliases = aliases_of(name);
     for (std::size_t i = 0; i < aliases.size(); ++i) {
       text += std::format("{}{}", i == 0 ? " (" : ", ", aliases[i]);
     }
     text += aliases.empty() ? "" : ")";
     if (std::optional<Entity> entity = entity_of(name);
         entity && name.kind == static_cast<std::uint32_t>(Kind::ENTITY)) {
-      std::vector<std::string> archetype = aliases_of(archetype_of(*entity));
+      std::vector<Alias> archetype = aliases_of(archetype_of(*entity));
       text += std::format(" archetype {}:",
-                          archetype.empty() ? "?" : archetype.front());
+                          archetype.empty() ? Alias{"?"} : archetype.front());
       bool first = true;
-      for_each_type(ComponentList{}, [&]<typename Component>() {
-        if (!is_built_in_v<Component> && store<Component>().contains(*entity)) {
-          std::vector<std::string> component = aliases_of(name_of<Component>());
+      for_each_type(ComponentList{}, [&]<typename ComponentType>() {
+        if (!is_built_in_v<ComponentType> &&
+            store_of<ComponentType>().contains(*entity)) {
+          std::vector<Alias> component = aliases_of(name_of<ComponentType>());
           text += std::format("{} {}", first ? "" : ",", component.back());
           first = false;
         }
@@ -262,28 +263,28 @@ class World final {
     return text;
   }
 
-  //-- Systems -----------------------------------------------------------------
+  //-- Systems ----------------------------------------------------------------
 
-  template <typename Component>
-  Store<Component>& mutable_store(SystemAccess) {
-    static_assert(contains_v<ComponentList, Component>,
+  template <typename ComponentType>
+  Store<ComponentType>& mutable_store_of(SchedulerKey) {
+    static_assert(contains_v<ComponentList, ComponentType>,
                   "This component is not in the world's component list.");
-    return std::get<Store<Component>>(stores_);
+    return std::get<Store<ComponentType>>(stores_);
   }
 
  private:
-  template <typename, ArchetypeType, bool, typename...>
+  template <typename, Archetypal, bool, typename...>
   friend class CreateBuilder;
   template <typename, typename, typename, bool>
   friend class ChangeBuilder;
   template <typename>
   friend class DestroyBuilder;
 
-  template <typename Component>
+  template <typename ComponentType>
   static constexpr std::uint32_t component_number() {
-    static_assert(contains_v<ComponentList, Component>,
+    static_assert(contains_v<ComponentList, ComponentType>,
                   "This component is not in the world's component list.");
-    return static_cast<std::uint32_t>(index_of_v<ComponentList, Component>);
+    return static_cast<std::uint32_t>(index_of_v<ComponentList, ComponentType>);
   }
 
   bool exists(Name name) const {
@@ -312,45 +313,45 @@ class World final {
 
   bool has_component_number(Entity entity, std::uint32_t number) const {
     bool found = false;
-    for_each_type(ComponentList{}, [&]<typename Component>() {
-      found = found || (component_number<Component>() == number &&
-                        store<Component>().contains(entity));
+    for_each_type(ComponentList{}, [&]<typename ComponentType>() {
+      found = found || (component_number<ComponentType>() == number &&
+                        store_of<ComponentType>().contains(entity));
     });
     return found;
   }
 
-  template <ArchetypeType Archetype>
+  template <Archetypal ArchetypeType>
   Name archetype_name() {
     auto [iter, inserted] =
-        archetypes_.try_emplace(std::string{Archetype::name});
+        archetypes_.try_emplace(std::string{ArchetypeType::name});
     if (inserted) {
       iter->second = Name{Kind::ARCHETYPE, next_archetype_instance_++};
-      give_alias(iter->second, Archetype::name);
+      give_alias(iter->second, ArchetypeType::name);
     }
     return iter->second;
   }
 
-  void give_alias(Name name, std::string_view alias) {
-    aliases_.emplace(std::string{alias}, name);
-    aliases_of_name_[name].emplace_back(alias);
+  void give_alias(Name name, const Alias& alias) {
+    aliases_.emplace(alias, name);
+    aliases_of_name_[name].push_back(alias);
   }
 
-  void take_alias(Name name, std::string_view alias) {
-    auto [begin, end] = aliases_.equal_range(std::string{alias});
+  void take_alias(Name name, const Alias& alias) {
+    auto [begin, end] = aliases_.equal_range(alias);
     for (auto iter = begin; iter != end; ++iter) {
       if (iter->second == name) {
         aliases_.erase(iter);
         break;
       }
     }
-    std::vector<std::string>& given = aliases_of_name_[name];
-    std::erase(given, std::string{alias});
+    std::vector<Alias>& given = aliases_of_name_[name];
+    std::erase(given, alias);
     if (given.empty()) {
       aliases_of_name_.erase(name);
     }
   }
 
-  bool has_alias(Name name, std::string_view alias) const {
+  bool has_alias(Name name, const Alias& alias) const {
     auto iter = aliases_of_name_.find(name);
     return iter != aliases_of_name_.end() &&
            std::ranges::contains(iter->second, alias);
@@ -384,48 +385,50 @@ class World final {
     }
   };
 
-  template <typename Component>
-  struct Plan : PlanState {
+  template <typename ComponentType>
+  struct Plan final : PlanState {
     using PlanState::PlanState;
   };
 
-  template <typename Component>
-  Plan<Component>& plan() {
-    return std::get<Plan<Component>>(plans_);
+  template <typename ComponentType>
+  Plan<ComponentType>& plan() {
+    return std::get<Plan<ComponentType>>(plans_);
   }
 
   bool will_be_alive(Entity entity) const {
     return alive(entity) && !destroying_[entity.index];
   }
 
-  template <typename Component>
+  template <typename ComponentType>
   bool will_have(Entity entity) const {
-    std::int8_t change = std::get<Plan<Component>>(plans_).change[entity.index];
-    return change != 0 ? change > 0 : store<Component>().contains(entity);
+    std::int8_t change =
+        std::get<Plan<ComponentType>>(plans_).change[entity.index];
+    return change != 0 ? change > 0
+                       : store_of<ComponentType>().contains(entity);
   }
 
-  template <typename Component>
+  template <typename ComponentType>
   bool has_room() const {
-    const Store<Component>& components = store<Component>();
-    return components.size() + std::get<Plan<Component>>(plans_).attaching <
+    const Store<ComponentType>& components = store_of<ComponentType>();
+    return components.size() + std::get<Plan<ComponentType>>(plans_).attaching <
            components.capacity();
   }
 
-  template <typename... Checked>
+  template <typename... CheckedTypes>
   std::optional<Status> check_room() const {
     std::optional<Status> failure;
-    auto check = [&]<typename Component>() {
-      if (!failure && !has_room<Component>()) {
+    [[maybe_unused]] auto check = [&]<typename ComponentType>() {
+      if (!failure && !has_room<ComponentType>()) {
         failure = lib::raise(BuildError::COMPONENT_CAPACITY_EXHAUSTED,
                              std::format("The {} store is full.",
-                                         lib::to_type_string<Component>()));
+                                         lib::to_type_string<ComponentType>()));
       }
     };
-    (check.template operator()<Checked>(), ...);
+    (check.template operator()<CheckedTypes>(), ...);
     return failure;
   }
 
-  static std::optional<Status> check_alias(std::string_view alias) {
+  static std::optional<Status> check_alias(const Alias& alias) {
     if (alias.empty()) {
       return lib::raise(BuildError::ALIAS_INVALID, "An alias cannot be empty.");
     }
@@ -434,10 +437,10 @@ class World final {
 
   //-- Builders ----------------------------------------------------------------
 
-  template <ArchetypeType Archetype, typename... Initial>
+  template <Archetypal ArchetypeType, typename... InitialTypes>
   std::expected<Entity, Status> build_create(
-      const std::string& alias, std::optional<Entity> parent,
-      std::tuple<Initial...> components) {
+      const Alias& alias, std::optional<Entity> parent,
+      std::tuple<InitialTypes...> components) {
     if (entities_.size() == entities_.capacity()) {
       return std::unexpected(
           lib::raise(BuildError::ENTITY_CAPACITY_EXHAUSTED,
@@ -447,7 +450,7 @@ class World final {
       return std::unexpected(lib::raise(BuildError::ENTITY_NOT_ALIVE,
                                         "The parent entity is not alive."));
     }
-    if (std::optional<Status> failure = check_room<Initial...>()) {
+    if (std::optional<Status> failure = check_room<InitialTypes...>()) {
       return std::unexpected(*failure);
     }
     CHECK_PRECONDITION(next_entity_instance_ <
@@ -461,8 +464,8 @@ class World final {
       give_alias(Name{Kind::ENTITY, instance}, alias);
     }
 
-    record_attach(entity,
-                  EntityArchetype{.archetype = archetype_name<Archetype>()});
+    record_attach(
+        entity, EntityArchetype{.archetype = archetype_name<ArchetypeType>()});
     if (parent) {
       record_attach(entity, Parent{.entity = *parent});
     }
@@ -474,38 +477,38 @@ class World final {
     return entity;
   }
 
-  template <typename... Attached, typename... Detached>
-  std::expected<void, Status> build_change(Entity entity,
-                                           std::tuple<Attached...> components,
-                                           TypeList<Detached...>,
-                                           const AliasChanges& aliases) {
+  template <typename... AttachedTypes, typename... DetachedTypes>
+  std::expected<void, Status> build_change(
+      Entity entity, std::tuple<AttachedTypes...> components,
+      TypeList<DetachedTypes...>, const AliasChanges& aliases) {
     if (!will_be_alive(entity)) {
       return std::unexpected(
           lib::raise(BuildError::ENTITY_NOT_ALIVE, "The entity is not alive."));
     }
     std::optional<Status> failure;
-    auto require = [&]<typename Component>(bool present, BuildError condition,
-                                           const char* message) {
-      if (!failure && will_have<Component>(entity) != present) {
-        std::string type_name = lib::to_type_string<Component>();
+    [[maybe_unused]] auto require = [&]<typename ComponentType>(
+                                        bool present, BuildError condition,
+                                        const char* message) {
+      if (!failure && will_have<ComponentType>(entity) != present) {
+        std::string type_name = lib::to_type_string<ComponentType>();
         failure = lib::raise(
             condition, std::vformat(message, std::make_format_args(type_name)));
       }
     };
-    (require.template operator()<Attached>(
+    (require.template operator()<AttachedTypes>(
          false, BuildError::COMPONENT_ALREADY_ATTACHED,
          "The entity already has a {}."),
      ...);
-    (require.template operator()<Detached>(
+    (require.template operator()<DetachedTypes>(
          true, BuildError::COMPONENT_NOT_ATTACHED, "The entity has no {}."),
      ...);
     if (!failure) {
-      failure = check_room<Attached...>();
+      failure = check_room<AttachedTypes...>();
     }
 
     Name name = name_of(entity);
     for (std::size_t i = 0; !failure && i < aliases.given.size(); ++i) {
-      const std::string& alias = aliases.given[i];
+      const Alias& alias = aliases.given[i];
       failure = check_alias(alias);
       if (!failure && (has_alias(name, alias) ||
                        std::count(aliases.given.begin(),
@@ -516,7 +519,7 @@ class World final {
       }
     }
     for (std::size_t i = 0; !failure && i < aliases.taken.size(); ++i) {
-      const std::string& alias = aliases.taken[i];
+      const Alias& alias = aliases.taken[i];
       if (!has_alias(name, alias) ||
           std::count(aliases.taken.begin(), aliases.taken.begin() + i, alias)) {
         failure = lib::raise(
@@ -533,13 +536,13 @@ class World final {
           (record_attach(entity, std::move(component)), ...);
         },
         components);
-    (record_detach<Detached>(entity), ...);
+    (record_detach<DetachedTypes>(entity), ...);
     // Aliases are an index beside the stores, not store shape, so they change
     // immediately.
-    for (const std::string& alias : aliases.taken) {
+    for (const Alias& alias : aliases.taken) {
       take_alias(name, alias);
     }
-    for (const std::string& alias : aliases.given) {
+    for (const Alias& alias : aliases.given) {
       give_alias(name, alias);
     }
     return {};
@@ -556,39 +559,40 @@ class World final {
     return {};
   }
 
-  template <typename Component>
-  void record_attach(Entity entity, Component component) {
-    plan<Component>().mark(entity.index, +1);
-    ++plan<Component>().attaching;
-    commands_.push_back(AttachCommand<Component>{entity, std::move(component)});
+  template <typename ComponentType>
+  void record_attach(Entity entity, ComponentType component) {
+    plan<ComponentType>().mark(entity.index, +1);
+    ++plan<ComponentType>().attaching;
+    commands_.push_back(
+        AttachCommand<ComponentType>{entity, std::move(component)});
   }
 
-  template <typename Component>
+  template <typename ComponentType>
   void record_detach(Entity entity) {
-    plan<Component>().mark(entity.index, -1);
-    commands_.push_back(DetachCommand<Component>{entity});
+    plan<ComponentType>().mark(entity.index, -1);
+    commands_.push_back(DetachCommand<ComponentType>{entity});
   }
 
   //-- Applying commands -------------------------------------------------------
 
-  template <typename Component>
-  void apply(lib::InOut<AttachCommand<Component>> command) {
+  template <typename ComponentType>
+  void apply(lib::InOut<AttachCommand<ComponentType>> command) {
     CHECK_INVARIANT(alive(command->entity));
-    std::get<Store<Component>>(stores_).append(command->entity,
-                                               std::move(command->component));
+    std::get<Store<ComponentType>>(stores_).append(
+        command->entity, std::move(command->component));
   }
 
-  template <typename Component>
-  void apply(lib::InOut<DetachCommand<Component>> command) {
+  template <typename ComponentType>
+  void apply(lib::InOut<DetachCommand<ComponentType>> command) {
     CHECK_INVARIANT(alive(command->entity));
-    std::get<Store<Component>>(stores_).erase(command->entity);
+    std::get<Store<ComponentType>>(stores_).erase(command->entity);
   }
 
   void apply(lib::InOut<DestroyCommand> command) {
     Entity entity = command->entity;
     CHECK_INVARIANT(alive(entity));
     Name name = name_of(entity);
-    for (const std::string& alias : aliases_of(name)) {
+    for (const Alias& alias : aliases_of(name)) {
       take_alias(name, alias);
     }
     entity_of_instance_.erase(name.instance);
@@ -603,11 +607,11 @@ class World final {
   std::uint32_t number_;
   EntityTable entities_;
   std::tuple<Store<SpatialType>, Store<EntityArchetype>, Store<Parent>,
-             Store<Components>...>
+             Store<ComponentTypes>...>
       stores_;
   std::vector<Command> commands_;
   std::tuple<Plan<SpatialType>, Plan<EntityArchetype>, Plan<Parent>,
-             Plan<Components>...>
+             Plan<ComponentTypes>...>
       plans_;
   std::vector<bool> destroying_;
   std::vector<std::uint32_t> destroying_list_;
@@ -620,8 +624,8 @@ class World final {
   std::map<std::string, Name, std::less<>> archetypes_;
 
   // Aliases, many-to-many. A multimap keeps equal aliases in the order given.
-  std::multimap<std::string, Name> aliases_;
-  std::unordered_map<Name, std::vector<std::string>> aliases_of_name_;
+  std::multimap<Alias, Name> aliases_;
+  std::unordered_map<Name, std::vector<Alias>> aliases_of_name_;
 };
 
 }  // namespace simon::framework

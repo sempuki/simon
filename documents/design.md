@@ -36,13 +36,29 @@ and handle rules are the point of the project.
 |---|---|---|
 | `Out<T>` | writes the argument, and may ignore it | `parse(text, Out(result))` |
 | `InOut<T>` | reads and writes the argument | `scheduler.step(InOut(world), step)` |
-| `Depend<T>` | keeps a reference that can dangle | `Context{Depend<World>{world}, step}` |
+| `Depend<T>` | keeps a reference that can dangle | `WorldAccess{Depend<World>{world}}` |
 
 A plain `T&` parameter is only for what the language or the framework decides:
 operators, and a system's call operator, whose entity-components arrive by
 reference with constness declared in `System<...>`. Computing wrappers from
 that constness would be awkward, and an `In<T>` for const parameters would stray
 too far from common C++. `const T&` needs no wrapper.
+
+**Template type parameters end with `Type`** (or `Types` for a pack):
+`ComponentType`, `ComponentTypes...`, `WorldType`. Concepts are named for the
+property they check, as adjectives where they read well: `Spatial`,
+`Archetypal`.
+
+**Types that are lists of types end with `List`:** `TypeList<...>`,
+`SystemList<...>` (a schedule), `ComponentList`, `AllowComponentList`,
+`SequenceAfterSystemList`. Metafunctions that produce one say so:
+`write_list_of_t<SystemType>`.
+
+**Accessors are named for what they return, never `get`:** `component_of` and
+`try_component_of` (the `try_` form returns a pointer that may be null),
+`store_of`, `name_of`. Where arguments of different strong types ask different
+questions, one name is overloaded: `find_name_of(Identity)` and
+`find_name_of(Alias)`.
 
 A class that takes `Depend<T>` stores a plain pointer, so its hot path does not
 pay for `CheckedPointer`'s null check on every access.
@@ -213,7 +229,7 @@ Times are nanoseconds per live entity (iterate) or per random lookup.
   slower at 75% churn from 100,000 entities up.
 - **Lookup** is 10 to 35% faster in the stable-slot store, which saves one load.
 
-Systems iterate far more than they look up, and a defense run is mostly agents
+Systems iterate far more than they look up, and a missile run is mostly agents
 dying, so the dense store wins. Run the benchmark with
 `bazel run -c opt //framework:store_benchmark`.
 
@@ -229,15 +245,17 @@ A handle has three duties, carried over from the older simulator:
 store:
 
 ```cpp
-const Kinematics* target = kinematics.try_get(interceptor.target);  // null if gone
-const Kinematics& target = kinematics.get(interceptor.target);      // contract check if gone
+const Kinematics* target = world.try_component_of<Kinematics>(interceptor.target);  // null if gone
+const Kinematics& target = world.component_of<Kinematics>(interceptor.target);      // contract check if gone
 ```
 
-`try_get` is the explicit path for "this may have disappeared". `get` fails a
-contract check on a stale entity, so misuse stops loudly. Neither can read
+`try_component_of` is the explicit path for "this may have disappeared".
+`component_of` fails a contract check on a stale entity, so misuse stops
+loudly. `Store` has the same pair. Neither can read
 freed memory, because store memory lives as long as the world.
 
-Raw pointers or references returned by a lookup are only valid until the next
+Raw pointers or references returned by `try_component_of` or
+`component_of` are only valid until the next
 sync point. Systems must not keep them across steps.
 
 Nothing registers handles or patches them. The older simulator's self-patching
@@ -290,8 +308,8 @@ which one:
 identity for logs, events and anything leaving the process.
 
 **An Identity** is a REST-like path computed from a Name, so the world stores
-no strings for it. `world.identity_of(name)` formats one and `world.find(path)`
-parses one back, returning nothing for anything that does not exist in this
+no strings for it. `world.identity_of(name)` formats one and
+`world.find_name_of(Identity{path})` parses one back, returning nothing for anything that does not exist in this
 world. `world.describe(name)` gives a one-line summary for a console:
 
 ```
@@ -300,8 +318,15 @@ world. `world.describe(name)` gives a one-line summary for a console:
 
 **An Alias** is a string with meaning only people bring, such as "ego" or "Luke
 Skywalker". Aliases are many-to-many: several entities can share "red drone",
-and one entity can be both "ego" and "Luke Skywalker". `world.find_alias(alias)`
-returns every Name with it, in the order the aliases were given.
+and one entity can be both "ego" and "Luke Skywalker".
+`world.find_name_of(Alias{"ego"})` returns every Name with it, in the order the
+aliases were given.
+
+`Identity` and `Alias` are distinct strong types (`TaggedString<Tag>`). Each
+converts implicitly from anything that converts to `std::string_view`, but
+neither converts to the other, so `find_name_of` is one overloaded name and the
+argument's type picks the query. A bare string literal is ambiguous there, so
+callers say which they mean.
 
 - `create<Ball>("Luke Skywalker")` gives the new entity its first alias.
 - `change(e).alias("ego")` and `change(e).unalias("ego")` add and remove more.
@@ -361,7 +386,7 @@ The grammar:
 
 ```
 utterance  := world . verb . complement* . build()
-verb       := create<Archetype>(alias?) | change(entity) | destroy(entity)
+verb       := create<ArchetypeType>(alias?) | change(entity) | destroy(entity)
 complement := under(entity)                create: at most once, before any with
             | with(component)              create: what the new entity starts with
             | attach(component)            change
@@ -370,7 +395,7 @@ complement := under(entity)                create: at most once, before any with
             | unalias("...")               change: at least one of the four
 ```
 
-- **`create<Archetype>(alias)` carries both archetype and entity information.**
+- **`create<ArchetypeType>(alias)` carries both archetype and entity information.**
   The archetype (see below) supplies its name and the components the entity
   requires and permits. The optional argument is the entity's first alias. The
   world issues the entity's Name.
@@ -448,7 +473,7 @@ Domain builders extend the same grammar with verbs of their own, for example
 of destroy, `world.destroy().each<Team>(Team::Red).within(500 * m, of(asset))
 .build()`. Builders and commands are not isomorphic: one utterance can emit
 many commands, and a query emits a number that depends on the world at the
-time. Domain verbs arrive when defense needs them.
+time. Domain verbs arrive when an application needs them.
 
 #### IO is not a builder verb
 
@@ -467,32 +492,34 @@ they were recorded. The stores never change shape while a system iterates them.
 Sync points sit between systems. A system's commands are applied before the
 next system runs, so later systems in the same step see the change.
 
-Systems use builders too, through their context. Inside a system whose context
-parameter is `auto&`, the free-function form reads best:
-`create<Interceptor>(lib::InOut(context)).under(self).with(...).build()`.
+Systems use builders too, through their `WorldAccess`:
+`world.create<Interceptor>().under(self).with(...).build()`. Inside a system
+whose access parameter is `auto&`, the free-function form avoids the
+`template` keyword: `create<Interceptor>(lib::InOut(world))`.
 
 ### Systems
 
-A system declares its structure as a type. `System<Drive, Optional...>` is a
+A system declares its structure as a type. `System<DrivingComponentType, OtherComponentTypes...>` is a
 variadic template: the first component drives the loop, and every following
 component is optional and belongs to the same entity.
 
 ```cpp
-template <typename Drive, typename... Optional>
+template <typename DrivingComponentType, typename... OtherComponentTypes>
 struct System {
-  using DriveType = Drive;
-  using OptionalTypes = TypeList<Optional...>;
+  using DrivingComponent = DrivingComponentType;
+  using OtherComponentList = TypeList<OtherComponentTypes...>;
 };
 
 struct GuideInterceptors : System<const Interceptor, const Kinematics, Control> {
-  using After = Systems<UpdateTracks>;
-  using Lookups = Stores<Kinematics>;   // other entities, always read-only
+  using SequenceAfterSystemList = SystemList<UpdateTracks>;
+  using AllowComponentList = TypeList<Kinematics>;   // other entities, always read-only
+  using LocalWorld = WorldAccess<GuideInterceptors>;
 
-  void operator()(Entity self, const Interceptor& interceptor,
-                  const Kinematics* kinematics, Control* control,
-                  Context<GuideInterceptors>& context) const {
+  void operator()(LocalWorld& world, Entity self,
+                  const Interceptor& interceptor, const Kinematics* kinematics,
+                  Control* control, Step step) const {
     if (!kinematics || !control) return;
-    const Kinematics* target = lookup<Kinematics>(context, interceptor.target);
+    const Kinematics* target = world.try_component_of<Kinematics>(interceptor.target);
     if (!target) { ... }
     control->acceleration = model::proportional_navigation(*kinematics, *target, interceptor);
   }
@@ -503,10 +530,10 @@ The framework reads only the `System<...>` arguments. It walks the driving
 store and passes each entity's optional entity-components:
 
 ```cpp
-auto& drive = world.store<typename S::DriveType>();   // const Store<Interceptor>& when Drive is const
+auto& drive = world.store_of<typename S::DrivingComponent>();   // const Store<Interceptor>& when const
 for (std::size_t i = 0; i < drive.size(); ++i) {
   Entity e = drive.owner(i);
-  system(e, drive.data(i), world.store<Optional>().try_get(e)..., context);
+  system(access, e, drive.data(i), world.store_of<OtherComponentTypes>().try_component_of(e)..., step);
 }
 ```
 
@@ -532,15 +559,21 @@ Rules:
   framework then takes a `const Store<T>*` for it, and a const store only hands
   out `const T&` and `const T*`. The call operator must accept what the
   declaration implies; a mismatch is a compile error.
-- **Other entities are reached through declared lookups.** `using Lookups =
-  Stores<...>;` lists the stores a system may read by entity, and
-  `lookup<T>(context, e)` returns `const T*`. Lookups are always read-only,
-  and asking for an undeclared store does not compile. (This form is proposed;
-  see [Open decisions](#open-decisions).)
-- **`Context<S>`** also carries the `Step` (see [Time](#time-and-drivers)) and
-  the builders the system may use.
-- **Optional stages** (`prepare` before the main loop, `resolve` after it)
-  are detected at compile time and cost nothing when absent. The older
+- **Other entities are reached through an allow list.** `using AllowComponentList =
+  TypeList<...>;` opts the system in to reading those stores by entity.
+  `world.try_component_of<T>(e)` returns `const T*`, `world.component_of<T>(e)`
+  returns `const T&` with a contract check, and `world.store_of<T>()` returns
+  the whole read-only store. Reads through the allow list are always
+  read-only, and asking for a component not on it does not compile.
+- **The call order is `(WorldAccess& world, Entity self, driving component,
+  other components..., Step step)`.** `WorldAccess<S, W>` is the system's
+  opt-in access to the world: its allow list, spatial and name queries, and
+  builders. The `Step` (see [Time](#time-and-drivers)) is passed by value, on
+  the stack, and is optional: the scheduler passes it only if the call
+  operator takes it. Time is not world data, so it is not in `WorldAccess`.
+- **Optional stages** (`prepare(world[, step])` before the main loop,
+  `resolve(world[, step])` after it) are detected at compile time and cost
+  nothing when absent. The older
   simulator did the same with stage tags.
 
 **Any callable can be a system.** Systems often keep state between steps, so
@@ -550,12 +583,12 @@ captures:
 
 ```cpp
 auto integrate = framework::system<Kinematics, const Control>(
-    [](Entity, Kinematics& kinematics, const Control* control, auto& context) { ... });
+    [](auto&, Entity, Kinematics& kinematics, const Control* control, Step step) { ... });
 auto count = framework::system<const Health>(
-    [seen = 0](Entity, const Health&, auto&) mutable { ++seen; });
+    [seen = 0](auto&, Entity, const Health&) mutable { ++seen; });
 auto guide = framework::system<const Interceptor, const Kinematics, Control>(
-    framework::Stores<Kinematics>{},  // Lookups.
-    [](Entity, const Interceptor&, const Kinematics*, Control*, auto& context) { ... });
+    framework::TypeList<Kinematics>{},  // AllowComponentList.
+    [](auto& world, Entity, const Interceptor&, const Kinematics*, Control*) { ... });
 ```
 
 A struct system keeps its state in members, which the scheduler owns. Either
@@ -591,7 +624,7 @@ before victims look them up, which needs a sync point, and the victims are
 driven by `Health` while the warheads are driven by `Warhead`.
 
 The framework derives each system's reads and writes from its `System` type
-and its `Lookups`. The compiler enforces them: a system declared with
+and its `AllowComponentList`. The compiler enforces them: a system declared with
 `const Radar` cannot write radar state.
 
 The physics inside a system should be a free function in `model/`
@@ -618,12 +651,12 @@ written the batch, and look up the side being read.
 
 ```
 TriggerWarheads   driven by Warhead, reads Kinematics*   writes its own warhead state
-   │  on trigger:  create<Blast>(InOut(context)).under(self).with(Kinematics{...}).with(Blast{...}).build()
-   │               context.destroy(self).build()
+   │  on trigger:  world.create<Blast>().under(self).with(Kinematics{...}).with(Blast{...}).build()
+   │               world.destroy(self).build()
    ▼  sync point: this step's Blast entities exist
 ApplyBlasts       driven by Health, reads Kinematics*    victims are the batch; each writes only itself
    │  asks the world for blasts within range, read-only
-   │  if destroyed: context.destroy(self).build()
+   │  if destroyed: world.destroy(self).build()
    ▼
 ExpireBlasts      driven by Blast                        destroys blasts older than one step
 ```
@@ -654,17 +687,17 @@ ExpireBlasts      driven by Blast                        destroys blasts older t
 
 #### Guarding against misuse
 
-- **Lookups are always read-only.** There is no way to declare a writable
-  lookup, so "loop over blasts and write each victim" cannot be written. The
+- **Reads through the allow list are always read-only.** There is no way to
+  declare a writable one, so "loop over blasts and write each victim" cannot be written. The
   error message points at the inversion pattern.
 - **A system cannot both write `T` and look it up.** Declaring a non-const `T`
-  in the `System` type and `T` in `Lookups` fails to compile. Reading an array
+  in the `System` type and `T` in its `AllowComponentList` fails to compile. Reading an array
   partway through writing it gives results that depend on iteration order.
   This is why guidance writes `Control` and reads `Kinematics`.
 - **Structural changes to other entities go through builders.** Their commands
   apply at the next sync point, so nothing is destroyed partway through an
   iteration.
-- **Pointers from lookups are valid only until the next sync point.** Debug
+- **Pointers from `try_component_of` are valid only until the next sync point.** Debug
   builds can wrap them to catch one kept longer.
 - **The event queue is for rare events.** Per-step traffic belongs in entities
   and components.
@@ -686,7 +719,7 @@ erasure and no virtual call:
 
 ```cpp
 template <typename... Ss>
-void run(Systems<Ss...>, World& world, Step step) {
+void run(SystemList<Ss...>, World& world, Step step) {
   (run_system<Ss>(world, step), ...);   // each call is a direct, inlinable instantiation
 }
 ```
@@ -698,9 +731,9 @@ lambdas with captures cannot be default-constructed. Schedules of
 default-constructible systems need no value:
 
 ```cpp
-framework::Scheduler<World, Systems<ApplyForces, model::Motion>> scheduler;   // Structs only.
+framework::Scheduler<World, SystemList<ApplyForces, model::Motion>> scheduler;   // Structs only.
 
-auto schedule = Systems{count, Systems<ApplyForces, model::Motion>{}, guide};
+auto schedule = SystemList{count, SystemList<ApplyForces, model::Motion>{}, guide};
 framework::Scheduler<World, decltype(schedule)> scheduler{schedule};         // With lambdas.
 ```
 
@@ -708,21 +741,22 @@ Schedules compose:
 
 ```cpp
 // Toolkit pieces.
-using Motion  = Systems<Integrate, UpdateSpatialIndex>;
-using Sensing = Systems<ScanRadars, UpdateTracks, DropStaleTracks>;
-using Blasts  = Systems<TriggerWarheads, ApplyBlasts, ExpireBlasts>;
+using Motion  = SystemList<Integrate, UpdateSpatialIndex>;
+using Sensing = SystemList<ScanRadars, UpdateTracks, DropStaleTracks>;
+using Blasts  = SystemList<TriggerWarheads, ApplyBlasts, ExpireBlasts>;
 
 // Application schedules.
-using HelloSystems   = Systems<ApplyWind, Motion, DetectCollisions>;
-using DefenseSystems = Systems<Sensing, ProposeEngagements, ResolveEngagements,
+using HelloSystems   = SystemList<ApplyWind, Motion, DetectCollisions>;
+using MissileSystems = SystemList<Sensing, ProposeEngagements, ResolveEngagements,
                                LaunchInterceptors, GuideInterceptors, SteerRedDrones,
                                Motion, Blasts, CheckOutcome>;
 ```
 
 - **Nested schedules flatten** at compile time into one list.
 - **Ordering constraints are checked** on the flattened list. A system that
-  declares `using After = Systems<X>;` fails the build if it is scheduled
-  before `X`.
+  declares `using SequenceAfterSystemList = SystemList<X>;` fails the build if it is scheduled
+  before `X`. `SequenceAfterSystemList` is about order only: if `X` is not in the schedule, it
+  imposes nothing, so a sub-schedule can run alone.
 - **Rate adapters are schedules too.** For example, `EveryN<10, Sensing>` runs
   a group every tenth step and is still a type the compiler can inline.
 - **The schedule can be printed.** A test or startup flag prints the flattened
@@ -749,7 +783,7 @@ A world is the entity database. It has two halves:
 
 ```
           write                                           read
-world.create<C>()...build() ─▶ commands ─▶ World ─▶ by name       world.find(name)
+world.create<C>()...build() ─▶ commands ─▶ World ─▶ by name       world.find_name_of(identity)
 world.change(e)...build()   (applied at            by component  System<A, B...>, world.query<...>()
 world.destroy(e).build()     sync points)          by space      world.within(center, radius), world.nearest(p)
                                                    by relation   world.parent(e), world.children(e)
@@ -785,7 +819,7 @@ concept Spatial = requires(const S& a, const S& b) {
 template <Spatial S, typename... Components>
 class World;
 
-using DefenseWorld = World<Kinematics,
+using MissileWorld = World<Kinematics,
                            Team, Control, Health, Warhead, Blast,
                            RedDrone, Asset, Radar, Track, Launcher, Interceptor>;
 ```
@@ -795,7 +829,7 @@ using DefenseWorld = World<Kinematics,
   the default, so interop layers share one notion of position unless an
   application opts out. Other models (geodetic for DIS, 2D, a grid, a network
   where distance is hop count) fit without changing the framework.
-- **The component list is closed per build.** `world.store<T>()` resolves at
+- **The component list is closed per build.** `world.store_of<T>()` resolves at
   compile time, nothing is type-erased, and the inliner sees every hot-path
   call. An application cannot declare a component type at runtime, which none of
   our use cases need.
@@ -822,7 +856,7 @@ consistent snapshot:
 
 Step 1 answers `within()` with a linear scan of the spatial store, which is
 always current, so `UpdateSpatialIndex` does not exist yet. The real index and
-its system arrive with defense, where the population makes a scan too slow.
+its system arrive with the missile application, where the population makes a scan too slow.
 
 Entities replicated from another process enter the same indexes, so a spatial
 query finds a red drone whether red is simulated locally or remotely.
@@ -830,7 +864,7 @@ query finds a red drone whether red is simulated locally or remotely.
 #### Several worlds
 
 A world is an object, so a process can hold several. One use stands out for
-defense: the blue side's track picture as its own world, holding tracks built
+the missile application: the blue side's track picture as its own world, holding tracks built
 from sensor reports and queried the same way as ground truth. It is a natural
 home for perception error later.
 
@@ -865,7 +899,7 @@ input from an edge, validate it, and emit typed commands.
 
 | Edge | Crossed | Polymorphism | Why |
 |---|---|---|---|
-| Systems and schedules | Per entity-component | Static: `System<...>`, `Systems<...>` | Hot path; must inline |
+| Systems and schedules | Per entity-component | Static: `System<...>`, `SystemList<...>` | Hot path; must inline |
 | World configuration (`Spatial`, component list) | Compile time | Static: `World<S, ...>` | Hot path; closed per build |
 | Input formats (scenario files, other schemas) | At load | Runtime: a reader interface feeding builders | New formats without recompiling the framework |
 | Builders | At load or at sync points | Static interface; may type-erase internally | User-facing grammar that emits typed commands |
@@ -936,7 +970,7 @@ std::chrono::nanoseconds as_chrono = to_chrono_duration(travel);
 - **mp-units is heading into the standard.** It is the reference
   implementation of the ISO proposal for quantities and units, targeting
   C++29.
-- **Quantity kinds.** Beyond metres against feet, it can tell a displacement
+- **Quantity kinds.** Beyond meters against feet, it can tell a displacement
   from an altitude from a range where we want that strictness.
 - **Affine positions.** `quantity_point` is to positions what `time_point` is
   to time. Two positions subtract to a displacement, and adding two positions
@@ -988,17 +1022,17 @@ linear algebra do not mix easily:
 an alias:
 
 ```cpp
-using Length = quantity<metre, double>;
+using Length = quantity<meter, double>;
 using Time = quantity<second, double>;
 using Rate = quantity<one / second, double>;
-using Displacement = quantity<metre, Vector3d>;
-using Velocity = quantity<metre / second, Vector3d>;
-using Acceleration = quantity<metre / square(second), Vector3d>;
+using Displacement = quantity<meter, Vector3d>;
+using Velocity = quantity<meter / second, Vector3d>;
+using Acceleration = quantity<meter / square(second), Vector3d>;
 using Position = Displacement;   // From the world origin.
 ```
 
 - Plain units compile on both GCC 16 and Clang 22, and catch the common bug:
-  adding metres to metres per second does not compile.
+  adding meters to meters per second does not compile.
 - They do not tell a position from a displacement, or an altitude from a
   range. Positions are displacements from the world origin, not affine
   `quantity_point`s.
@@ -1135,7 +1169,7 @@ simon/
   model/         Reusable physics: kinematics, sensing, guidance (free functions)
   application/
     hello/       Two bouncing balls, the first application
-    defense/     Red drones against blue radars and launchers
+    missile/     Red drones against blue radars, launchers and interceptors
   documents/     This document
   2nd_party/lib  Shared core libraries (submodule)
 ```
@@ -1151,56 +1185,85 @@ Two balls under gravity and wind that stop when they collide. It is the
 smallest complete use of the architecture: a handful of components, a motion
 schedule, a collision system and a real-time driver.
 
-### defense
+### missile
 
-Red drones fly toward a protected asset. Blue radars detect them, blue
-launchers fire interceptors, and the run ends when red is defeated or the asset
-is destroyed.
+Red drones fly toward a protected asset. Blue radars track them, blue launchers
+fire interceptors, and the run ends when red is defeated or the asset is
+destroyed. `bazel run //application/missile -- <seed>` runs one scenario as
+fast as possible and prints the outcome.
 
-Components:
+Components (`application/missile/components.hpp`):
 
 | Component | Holds |
 |---|---|
-| `Name`, `Team` | Identity and side |
-| `Kinematics` | Position, velocity, acceleration |
-| `Control` | Commanded acceleration, written by guidance and steering |
-| `Health` | Hit points; damage taken this step |
-| `Warhead` | Fuse radius, blast radius, yield |
-| `Blast` | Radius, yield, source name; lives for one step |
-| `RedDrone` | Goal position, cruise speed |
+| `Kinematics`, `Control` | From `model/` |
+| `Health` | Hit points |
+| `Warhead` | Fuse distance, blast radius, damage |
+| `Blast` | Radius, damage, the warhead's Name; lives for one step |
+| `RedDrone` | Target entity (the asset), cruise speed, agility |
+| `Tracked` | Marks a red drone that has a track, and names the track |
 | `Asset` | Marks the protected asset |
-| `Radar` | Range, field of view, `RateGate` for the scan |
-| `Track` | Target entity, estimated position and velocity, last seen time, engaging launcher |
-| `Launcher` | Inventory, reload `RateGate`, engagement range, current proposal |
-| `Interceptor` | Target entity, navigation gain, acceleration limit |
+| `Radar` | Range, a `RateGate` for the scan, whether it scanned this step |
+| `Track` | Target entity, estimated position and velocity, last seen, engaging launcher and until when |
+| `Launcher` | Range, inventory, reload time, ready time, this step's proposal |
+| `Interceptor` | Target entity, navigation gain, speed, agility, seeker range, flight time |
 
-Tracks are entities. Radars create them, tracks update themselves from what the
-radars can see, launchers engage them, and later they are what an interop layer
-would publish.
+Each component has an archetype in `missile::archetype` (asset, radar,
+launcher, red drone, interceptor, track, blast).
+
+Tracks are entities. Radars create them, tracks update themselves from the
+radars that scanned their target, launchers engage them, and later they are
+what an interop layer would publish.
 
 Interceptors and red drones both carry a `Warhead`. An interceptor reaching its
 target and a drone reaching the asset are the same event: a blast, applied to
 every `Health` within its radius.
 
-Schedule:
+Schedule (`application/missile/systems.hpp`):
 
 | System | Does |
 |---|---|
-| `ScanRadars` | Creates a track for each red drone in coverage that has none |
-| `UpdateTracks` | Each track updates its own estimate from the radars that can see its target |
-| `DropStaleTracks` | Destroys tracks not seen recently or whose target is gone |
-| `ProposeEngagements` | Each ready launcher proposes the best unengaged track in range |
-| `ResolveEngagements` | Each track accepts one proposal |
-| `LaunchInterceptors` | Launchers whose proposal was accepted build an interceptor |
-| `GuideInterceptors` | Proportional navigation into `Control`; retargets or self-destructs when the target is gone |
-| `SteerRedDrones` | Steers drones toward the asset into `Control` |
-| `Motion` | Integrates `Control` into `Kinematics` and updates the world's spatial index |
-| `Blasts` | Triggers warheads, applies blast damage, expires blasts |
-| `CheckOutcome` | Returns `Stop` when red is defeated or the asset is destroyed |
+| `ScanRadars` | Each radar whose scan fires marks every untracked red drone in range `Tracked` and creates its track. If another radar marked the drone earlier in the step, the builder refuses the mark and the new track is destroyed. |
+| `UpdateTracks` | Each track updates its own estimate from a radar that scanned its target. Radars are perfect for now. |
+| `DropStaleTracks` | Destroys tracks whose target is gone or unseen for 5 s, and unmarks a surviving target |
+| `ProposeEngagements` | Each ready launcher with inventory proposes the nearest unengaged track in range |
+| `ResolveEngagements` | Each unengaged track accepts the nearest launcher that proposed it, for 30 s |
+| `LaunchInterceptors` | Launchers whose proposal was accepted build an interceptor under themselves, aimed at the track |
+| `GuideInterceptors` | Proportional navigation plus speed hold into `Control`. Retargets the nearest red drone within seeker range when the target is gone; self-destructs when there is none or its flight time is up. |
+| `SteerRedDrones` | Steers drones at their target at cruise speed into `Control` |
+| `Motion` | Integrates `Control` into `Kinematics` |
+| `TriggerWarheads` | A warhead within fuse distance of its target creates a Blast and destroys itself |
+| `ApplyBlasts` | Every `Health` inside a blast takes its damage, and is destroyed at zero |
+| `ExpireBlasts` | Destroys every blast; they live for one step |
 
-This application exercises the parts of the toolkit that matter most:
-references to entities that disappear, relations between entities, creation
-and destruction in the middle of a run, rate gates, and thousands of agents.
+Decisions made while building it:
+
+- **The outcome is decided by the simulation, not a system.** Systems cannot
+  stop a run, so `Simulation::step` checks the world after each step: red wins
+  when the asset is gone, blue when no red drones remain.
+- **No `Team` component yet.** Red is already expressed by `RedDrone`, and
+  nothing needs a team separately.
+- **Engagements expire.** A track stays engaged for about an interceptor's
+  flight time, so a missed intercept frees it to be engaged again.
+- **Retargeting policy:** an interceptor whose target is gone takes the nearest
+  red drone within its seeker range, and otherwise self-destructs.
+- **Reload is a ready time, not a `RateGate`,** because it means "not before
+  time T", not periodic work.
+- **Randomness is `model::Random`,** which converts `std::mt19937_64`'s raw
+  bits itself: the engine's output is fixed by the standard, but the standard
+  distributions are not, so this is the same on every platform.
+- **Entity lookups use a linear scan for now.** A few hundred entities do not
+  need the spatial index; step 5 measures when they do.
+- **Systems name their concrete access type** with a member alias,
+  `using LocalWorld = WorldAccess<ThisSystem>;`, so builder
+  calls with explicit template arguments, such as `detach<Tracked>()`, need no
+  `template` keyword.
+
+The test runs whole scenarios under `BatchDriver` (blue wins by default, red
+wins without launchers or with too few interceptors, and the same seed repeats
+exactly) and each rule on a small world (one track per drone however many radars
+see it, one launch per contested track, reload, retargeting, self-destruct,
+blast damage).
 
 ## Libraries
 
@@ -1230,9 +1293,9 @@ Each step ends with a working application and passing tests.
 2. **Drivers (done).** Replace `lib::SimClock` with the `SimTime` tag and `int64`
    nanoseconds. Add `Step`, the lifecycle, `advance_to`, `BatchDriver`,
    `RealTimeDriver` and `RateGate`. Run `hello` under the real-time driver.
-3. **Defense, headless.** The components and schedule above, with a
+3. **Missile, headless (done).** The components and schedule above, with a
    `BatchDriver` test that checks a deterministic outcome for a fixed seed.
-4. **Defense demo.** An ImGui and ImPlot view under `RealTimeDriver`.
+4. **Missile demo.** An ImGui and ImPlot view under `RealTimeDriver`.
 5. **Performance.** Profile at thousands to hundreds of thousands of agents.
    Consider struct-of-arrays layout inside hot components only if measurements
    call for it.
@@ -1245,12 +1308,8 @@ interop.
 
 - **ISQ quantity kinds** (and affine positions) once a Clang release compiles
   them.
-- **Retargeting policy** for interceptors whose target disappears. To be
-  settled while building defense.
 - **Spatial index structure.** A uniform grid is the likely start; to be
-  measured with defense at scale.
-- **Cross-entity lookups.** Proposed: `using Lookups = Stores<...>;` on the
-  system, reached through `lookup<T>(context, e)`, always read-only.
+  measured with the missile application at scale.
 
 ## Lessons from the older simulator
 

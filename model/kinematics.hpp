@@ -10,17 +10,17 @@ namespace simon::model {
 
 using Quaternion = Eigen::Quaterniond;
 
-struct Pose {
-  Position position = metres(0.0, 0.0, 0.0);
+struct Pose final {
+  Position position = meters(0.0, 0.0, 0.0);
   Quaternion orientation = Quaternion::Identity();
 };
 
 // The toolkit's default spatial model: local Cartesian 3D, SI units.
-struct Kinematics {
-  Position position = metres(0.0, 0.0, 0.0);
+struct Kinematics final {
+  Position position = meters(0.0, 0.0, 0.0);
   Quaternion orientation = Quaternion::Identity();
-  Velocity velocity = metres_per_second(0.0, 0.0, 0.0);
-  Acceleration acceleration = metres_per_second_squared(0.0, 0.0, 0.0);
+  Velocity velocity = meters_per_second(0.0, 0.0, 0.0);
+  Acceleration acceleration = meters_per_second_squared(0.0, 0.0, 0.0);
 };
 
 inline Length distance(const Kinematics& a, const Kinematics& b) {
@@ -34,8 +34,8 @@ inline Pose pose(const Kinematics& kinematics) {
 
 // The commanded acceleration. Guidance and steering write it; Integrate reads
 // it.
-struct Control {
-  Acceleration acceleration = metres_per_second_squared(0.0, 0.0, 0.0);
+struct Control final {
+  Acceleration acceleration = meters_per_second_squared(0.0, 0.0, 0.0);
 };
 
 // Advances `kinematics` by `dt` under constant `acceleration`, using the

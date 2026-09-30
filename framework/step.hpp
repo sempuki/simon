@@ -10,7 +10,7 @@ using lib::Duration;
 using lib::TimePoint;
 
 // The time a system runs at. Drivers produce steps; there is no global clock.
-struct Step {
+struct Step final {
   TimePoint time;  // Start of this step.
   Duration dt;     // Length of this step.
 };

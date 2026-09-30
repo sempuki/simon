@@ -1,0 +1,52 @@
+# Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+
+load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "missile_library",
+    hdrs = [
+        "components.hpp",
+        "simulation.hpp",
+        "systems.hpp",
+    ],
+    copts = COPTS,
+    deps = [
+        "//engine:lifecycle",
+        "//engine:rate_gate",
+        "//framework",
+        "//model:guidance",
+        "//model:kinematics",
+        "//model:motion",
+        "//model:random",
+        "//model:units",
+        "@lib//base:core",
+    ],
+)
+
+cc_test(
+    name = "missile_test",
+    size = "small",
+    srcs = ["missile_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":missile_library",
+        "//engine:driver",
+        "@lib//base:testing",
+    ],
+)
+
+# Runs one scenario as fast as possible and prints the outcome.
+cc_binary(
+    name = "missile",
+    srcs = ["main.cpp"],
+    copts = COPTS,
+    deps = [
+        ":missile_library",
+        "//engine:driver",
+    ],
+)

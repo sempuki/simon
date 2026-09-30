@@ -24,7 +24,7 @@ using framework::Duration;
 using framework::Step;
 using framework::TimePoint;
 
-struct Timing {
+struct Timing final {
   TimePoint start{};
   Duration max_step{};
 };
@@ -141,7 +141,7 @@ class BatchDriver final {
 // real-time run takes exactly the steps a batch run would: the wall clock
 // decides when steps happen, never how long they are.
 template <Simulation SimulationType,
-          typename WallClock = std::chrono::steady_clock>
+          typename WallClockType = std::chrono::steady_clock>
 class RealTimeDriver final {
  public:
   RealTimeDriver(lib::Depend<SimulationType> simulation, Timing timing,
@@ -154,7 +154,7 @@ class RealTimeDriver final {
   // application's frame loop. The first call starts the simulation.
   PhaseResult tick() {
     if (driver_.phase() == Phase::NEW) {
-      wall_start_ = WallClock::now();
+      wall_start_ = WallClockType::now();
       PhaseResult started = driver_.start();
       if (!started || *started == Flow::STOP) {
         return started;
@@ -163,16 +163,18 @@ class RealTimeDriver final {
     if (driver_.phase() != Phase::RUNNING) {
       return Flow::STOP;
     }
-    return driver_.advance_to(target_at(WallClock::now()));
+    return driver_.advance_to(target_at(WallClockType::now()));
   }
 
   // Ticks until the simulation stops, sleeping until each step is due. For
-  // headless runs; it needs a WallClock that sleep_until understands.
+  // headless runs; it needs a WallClockType that sleep_until understands.
   FinishResult run() {
     for (;;) {
       PhaseResult result = tick();
       if (!result) {
-        (void)driver_.finish();
+        // The step's error is the one to report; finishing is best effort.
+        FinishResult finished = driver_.finish();
+        DECLARE_UNUSED(finished);
         return std::unexpected(result.error());
       }
       if (*result == Flow::STOP) {
@@ -189,24 +191,24 @@ class RealTimeDriver final {
 
  private:
   // The last whole step at or before the simulated time `wall` corresponds to.
-  TimePoint target_at(typename WallClock::time_point wall) const {
+  TimePoint target_at(typename WallClockType::time_point wall) const {
     auto simulated = std::chrono::duration_cast<Duration>(
         std::chrono::duration<double>(wall - wall_start_) * speed_);
     Duration step = driver_.max_step();
     return start_ + (simulated / step) * step;
   }
 
-  typename WallClock::time_point wall_time_of(TimePoint time) const {
+  typename WallClockType::time_point wall_time_of(TimePoint time) const {
     auto simulated = std::chrono::duration<double>(time - start_);
     return wall_start_ +
-           std::chrono::duration_cast<typename WallClock::duration>(simulated /
-                                                                    speed_);
+           std::chrono::duration_cast<typename WallClockType::duration>(
+               simulated / speed_);
   }
 
   Driver<SimulationType> driver_;
   TimePoint start_;
   double speed_;
-  typename WallClock::time_point wall_start_{};
+  typename WallClockType::time_point wall_start_{};
 };
 
 }  // namespace simon::engine

@@ -11,16 +11,16 @@ namespace simon::model {
 
 // Integrates each entity's Control into its Kinematics. Entities without a
 // Control coast.
-struct Integrate : framework::System<Kinematics, const Control> {
-  void operator()(framework::Entity, Kinematics& kinematics,
-                  const Control* control, auto& context) const {
+struct Integrate final : framework::System<Kinematics, const Control> {
+  void operator()(auto&, framework::Entity, Kinematics& kinematics,
+                  const Control* control, framework::Step step) const {
     integrate_midpoint(
         lib::InOut(kinematics),
-        control ? control->acceleration : metres_per_second_squared(0, 0, 0),
-        seconds(context.step().dt));
+        control ? control->acceleration : meters_per_second_squared(0, 0, 0),
+        seconds(step.dt));
   }
 };
 
-using Motion = framework::Systems<Integrate>;
+using Motion = framework::SystemList<Integrate>;
 
 }  // namespace simon::model

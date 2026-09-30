@@ -42,9 +42,9 @@ class EventBase {
 template <typename MessageType>
 class Event final : public EventBase {
  public:
-  template <typename... Arguments>
-  explicit Event(TimePoint time, Arguments&&... arguments)
-      : time_{time}, message_{std::forward<Arguments>(arguments)...} {}
+  template <typename... ArgumentTypes>
+  explicit Event(TimePoint time, ArgumentTypes&&... arguments)
+      : time_{time}, message_{std::forward<ArgumentTypes>(arguments)...} {}
 
   EventType event_type() const override { return event_type_of<MessageType>(); }
   TimePoint time() const override { return time_; }
@@ -86,15 +86,15 @@ class EventQueue final {
         });
   }
 
-  template <typename MessageType, typename... DeducedMessageArgs>
-  void publish(TimePoint time, DeducedMessageArgs&&... args) {
+  template <typename MessageType, typename... DeducedMessageArgumentTypes>
+  void publish(TimePoint time, DeducedMessageArgumentTypes&&... args) {
     static_assert(std::is_same_v<MessageType, std::remove_cvref_t<MessageType>>,
                   "Unsupported: cv-ref qualified messages");
 
     events_.push_back(Entry{
         .sequence = next_sequence_++,
         .event = std::make_unique<Event<MessageType>>(
-            time, std::forward<DeducedMessageArgs>(args)...),
+            time, std::forward<DeducedMessageArgumentTypes>(args)...),
     });
     std::push_heap(events_.begin(), events_.end(), Later{});
   }

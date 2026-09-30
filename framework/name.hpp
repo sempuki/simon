@@ -4,6 +4,7 @@
 
 #include <charconv>
 #include <compare>
+#include <concepts>
 #include <cstdint>
 #include <format>
 #include <functional>
@@ -36,7 +37,39 @@ enum class Kind : std::uint32_t {
   ENTITY_COMPONENT,
 };
 
-struct Name {
+// A string that is one kind of thing and cannot be mistaken for another kind:
+// an Identity is never an Alias. Converts implicitly from anything that
+// converts to std::string_view, including string literals.
+template <typename TagType>
+class TaggedString final {
+ public:
+  TaggedString() = default;
+  template <typename SourceType>
+    requires std::convertible_to<const SourceType&, std::string_view>
+  TaggedString(const SourceType& text)  // NOLINT(google-explicit-constructor)
+      : value_{std::string_view{text}} {}
+
+  std::string_view view() const { return value_; }
+  const std::string& string() const { return value_; }
+  bool empty() const { return value_.empty(); }
+
+  friend auto operator<=>(const TaggedString&, const TaggedString&) = default;
+  friend bool operator==(const TaggedString&, const TaggedString&) = default;
+
+ private:
+  std::string value_;
+};
+
+struct IdentityTag;
+struct AliasTag;
+
+// The canonical REST-like string for a Name, e.g. "/world/1/entity/2".
+using Identity = TaggedString<IdentityTag>;
+
+// A string with meaning only people bring, e.g. "ego" or "Luke Skywalker".
+using Alias = TaggedString<AliasTag>;
+
+struct Name final {
   std::uint32_t kind = static_cast<std::uint32_t>(Kind::NONE);
   std::uint32_t instance = 0;
 
@@ -64,7 +97,7 @@ constexpr std::uint32_t component_of(Name name) {
 }
 
 // The canonical identity of `name` in world number `world`.
-inline std::string identity_of(std::uint32_t world, Name name) {
+inline Identity identity_of(std::uint32_t world, Name name) {
   if (is_entity_component(name)) {
     return std::format("/world/{}/entity/{}/component/{}", world, name.instance,
                        component_of(name));
@@ -87,13 +120,14 @@ inline std::string identity_of(std::uint32_t world, Name name) {
   return {};
 }
 
-struct ParsedIdentity {
+struct ParsedIdentity final {
   std::uint32_t world = 0;
   Name name;
 };
 
 // Parses an identity made by identity_of. Returns nothing for anything else.
-inline std::optional<ParsedIdentity> parse_identity(std::string_view identity) {
+inline std::optional<ParsedIdentity> parse_identity(const Identity& given) {
+  std::string_view identity = given.view();
   if (!identity.starts_with('/')) {
     return std::nullopt;
   }
@@ -154,8 +188,17 @@ inline std::optional<ParsedIdentity> parse_identity(std::string_view identity) {
 }  // namespace simon::framework
 
 template <>
-struct std::hash<simon::framework::Name> {
+struct std::hash<simon::framework::Name> final {
   std::size_t operator()(simon::framework::Name name) const noexcept {
     return (static_cast<std::size_t>(name.kind) << 32) ^ name.instance;
+  }
+};
+
+template <typename TagType>
+struct std::formatter<simon::framework::TaggedString<TagType>>
+    : std::formatter<std::string_view> {
+  auto format(const simon::framework::TaggedString<TagType>& text,
+              std::format_context& context) const {
+    return std::formatter<std::string_view>::format(text.view(), context);
   }
 };

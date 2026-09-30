@@ -12,31 +12,31 @@ namespace simon::framework {
 // Commands are the low-level vocabulary of structural change. Builders emit
 // them; the world applies them at sync points, in the order they were recorded.
 
-template <typename Component>
-struct AttachCommand {
+template <typename ComponentType>
+struct AttachCommand final {
   Entity entity;
-  Component component;
+  ComponentType component;
 };
 
-template <typename Component>
-struct DetachCommand {
-  Entity entity;
-};
-
-struct DestroyCommand {
+template <typename ComponentType>
+struct DetachCommand final {
   Entity entity;
 };
 
-template <typename ComponentList>
+struct DestroyCommand final {
+  Entity entity;
+};
+
+template <typename ComponentListType>
 struct CommandFor;
 
-template <typename... Components>
-struct CommandFor<TypeList<Components...>> {
-  using type = std::variant<DestroyCommand, AttachCommand<Components>...,
-                            DetachCommand<Components>...>;
+template <typename... ComponentTypes>
+struct CommandFor<TypeList<ComponentTypes...>> final {
+  using type = std::variant<DestroyCommand, AttachCommand<ComponentTypes>...,
+                            DetachCommand<ComponentTypes>...>;
 };
 
-template <typename ComponentList>
-using command_for_t = typename CommandFor<ComponentList>::type;
+template <typename ComponentListType>
+using command_for_t = typename CommandFor<ComponentListType>::type;
 
 }  // namespace simon::framework

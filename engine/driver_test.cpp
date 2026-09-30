@@ -28,7 +28,7 @@ namespace {
 using namespace std::chrono_literals;
 
 // Records every phase and step, and stops or fails when told to.
-struct Recorder {
+struct Recorder final {
   PhaseResult configure() {
     phases.push_back("configure");
     return configure_result;
@@ -57,7 +57,7 @@ struct Recorder {
 };
 
 // A wall clock the test moves by hand.
-struct FakeClock {
+struct FakeClock final {
   using duration = std::chrono::nanoseconds;
   using rep = duration::rep;
   using period = duration::period;

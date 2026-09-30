@@ -58,3 +58,33 @@ cc_test(
         "@lib//base:testing",
     ],
 )
+
+cc_library(
+    name = "guidance",
+    hdrs = ["guidance.hpp"],
+    copts = COPTS,
+    deps = [
+        ":kinematics",
+        ":units",
+    ],
+)
+
+cc_library(
+    name = "random",
+    hdrs = ["random.hpp"],
+    copts = COPTS,
+)
+
+[cc_test(
+    name = test + "_test",
+    size = "small",
+    srcs = [test + "_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":" + test,
+        "@lib//base:testing",
+    ],
+) for test in [
+    "guidance",
+    "random",
+]]

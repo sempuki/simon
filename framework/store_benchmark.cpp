@@ -25,18 +25,18 @@ namespace {
 // The stable-slot alternative to Store, for comparison only. Each entity index
 // has a fixed slot, so a lookup is one load and nothing ever moves, but
 // destroyed entities leave holes that iteration must skip.
-template <typename Component>
+template <typename ComponentType>
 class StableSlotStore final {
  public:
   explicit StableSlotStore(std::size_t entity_capacity)
       : slots_(entity_capacity) {}
 
-  Component* try_get(Entity entity) {
+  ComponentType* try_component_of(Entity entity) {
     Slot& slot = slots_[entity.index];
     return slot.generation == entity.generation ? &slot.value : nullptr;
   }
 
-  void append(Entity entity, Component component) {
+  void append(Entity entity, ComponentType component) {
     Slot& slot = slots_[entity.index];
     CHECK_PRECONDITION(slot.generation == 0);
     slot = Slot{.value = std::move(component), .generation = entity.generation};
@@ -48,8 +48,8 @@ class StableSlotStore final {
     slot.generation = 0;
   }
 
-  template <typename Visitor>
-  void for_each(Visitor&& visit) {
+  template <typename VisitorType>
+  void for_each(VisitorType&& visit) {
     for (Slot& slot : slots_) {
       if (slot.generation != 0) {
         visit(slot.value);
@@ -58,8 +58,8 @@ class StableSlotStore final {
   }
 
  private:
-  struct Slot {
-    Component value{};
+  struct Slot final {
+    ComponentType value{};
     std::uint32_t generation = 0;
   };
 
@@ -67,7 +67,7 @@ class StableSlotStore final {
 };
 
 // About the size of Kinematics: nine doubles, 72 bytes.
-struct Body {
+struct Body final {
   double position[3] = {};
   double velocity[3] = {1.0, 2.0, 3.0};
   double acceleration[3] = {};
@@ -78,8 +78,8 @@ void keep(const Type& value) {
   asm volatile("" : : "g"(&value) : "memory");
 }
 
-template <typename Function>
-double median_nanoseconds(Function&& function, int repetitions) {
+template <typename FunctionType>
+double median_nanoseconds(FunctionType&& function, int repetitions) {
   std::vector<double> samples;
   for (int i = 0; i < repetitions; ++i) {
     auto start = std::chrono::steady_clock::now();
@@ -92,12 +92,12 @@ double median_nanoseconds(Function&& function, int repetitions) {
   return samples[samples.size() / 2];
 }
 
-struct Result {
+struct Result final {
   double iterate = 0.0;  // Nanoseconds per live entity.
   double lookup = 0.0;   // Nanoseconds per random lookup.
 };
 
-struct Population {
+struct Population final {
   std::vector<Entity> live;
   std::vector<Entity> destroyed;
 };
@@ -116,9 +116,9 @@ Population make_population(lib::InOut<EntityTable> table, std::size_t count,
   return population;
 }
 
-template <typename StoreType, typename Iterate>
+template <typename StoreType, typename IterateType>
 Result measure(lib::InOut<StoreType> store, const Population& population,
-               Iterate&& iterate, lib::InOut<std::mt19937> random) {
+               IterateType&& iterate, lib::InOut<std::mt19937> random) {
   constexpr double DT = 0.01;
   int repetitions = population.live.size() < 50'000 ? 200 : 40;
 
@@ -140,7 +140,7 @@ Result measure(lib::InOut<StoreType> store, const Population& population,
                       [&] {
                         double sum = 0.0;
                         for (Entity entity : order) {
-                          sum += store->try_get(entity)->position[0];
+                          sum += store->try_component_of(entity)->position[0];
                         }
                         keep(sum);
                       },

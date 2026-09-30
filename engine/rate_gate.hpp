@@ -22,7 +22,7 @@ enum class CatchUp {
 
 // When a gate fires: the time since it last fired, and how many periods to
 // run (always 1 for CatchUp::SKIP).
-struct Firing {
+struct Firing final {
   Duration elapsed{};
   std::uint32_t periods = 1;
 };

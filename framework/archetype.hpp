@@ -14,7 +14,7 @@ namespace simon::framework {
 
 // A string usable as a template argument: Archetype<"ball", ...>.
 template <std::size_t Size>
-struct FixedString {
+struct FixedString final {
   char value[Size] = {};
 
   constexpr FixedString(const char (&text)[Size]) {
@@ -23,11 +23,11 @@ struct FixedString {
   constexpr std::string_view view() const { return {value, Size - 1}; }
 };
 
-template <typename... Components>
-struct Requires {};
+template <typename... ComponentTypes>
+struct Requires final {};
 
-template <typename... Components>
-struct Allows {};
+template <typename... ComponentTypes>
+struct Allows final {};
 
 // An archetype: what sort of object an entity is, and which components it must
 // and may have. Every entity is created from one, and the archetype is recorded
@@ -40,31 +40,33 @@ template <FixedString ArchetypeName, typename RequiresType = Requires<>,
           typename AllowsType = Allows<>>
 struct Archetype;
 
-template <FixedString ArchetypeName, typename... Required, typename... Allowed>
-struct Archetype<ArchetypeName, Requires<Required...>, Allows<Allowed...>> {
+template <FixedString ArchetypeName, typename... RequiredTypes,
+          typename... AllowedTypes>
+struct Archetype<ArchetypeName, Requires<RequiredTypes...>,
+                 Allows<AllowedTypes...>> {
   static constexpr std::string_view name = ArchetypeName.view();
-  using RequiredComponents = TypeList<Required...>;
-  using PermittedComponents = TypeList<Required..., Allowed...>;
+  using RequiredComponentList = TypeList<RequiredTypes...>;
+  using PermittedComponentList = TypeList<RequiredTypes..., AllowedTypes...>;
 };
 
 template <typename Type>
-concept ArchetypeType = requires {
+concept Archetypal = requires {
   { Type::name } -> std::convertible_to<std::string_view>;
-  typename Type::RequiredComponents;
-  typename Type::PermittedComponents;
+  typename Type::RequiredComponentList;
+  typename Type::PermittedComponentList;
 };
 
 // Built-in components every world has.
 
 // The archetype an entity was created from. Every entity has one.
-struct EntityArchetype {
+struct EntityArchetype final {
   Name archetype;
 };
 
 // The entity an entity was created under (`create<...>().under(parent)`). The
 // relation goes stale, and lookups through it fail, when the parent is
 // destroyed.
-struct Parent {
+struct Parent final {
   Entity entity;
 };
 

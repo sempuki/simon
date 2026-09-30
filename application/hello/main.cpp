@@ -51,7 +51,7 @@ int main(int, char**) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO();
-  (void)io;
+  DECLARE_UNUSED(io);
 
   // Setup Dear ImGui style
   ImGui::StyleColorsDark();
@@ -112,15 +112,15 @@ int main(int, char**) {
     for (auto [entity, color] :
          {std::pair{balls.red, red}, std::pair{balls.blue, blue}}) {
       const model::Kinematics& kinematics =
-          world.store<model::Kinematics>().get(entity);
+          world.store_of<model::Kinematics>().component_of(entity);
       const hello::Collider& collider =
-          world.store<hello::Collider>().get(entity);
+          world.store_of<hello::Collider>().component_of(entity);
       model::Vector3d pixels =
-          kinematics.position.numerical_value_in(model::metre);
+          kinematics.position.numerical_value_in(model::meter);
       draw_list->AddCircleFilled(
           ImVec2(static_cast<float>(pixels.x()),
                  static_cast<float>(pixels.y())),
-          static_cast<float>(collider.radius.numerical_value_in(model::metre)),
+          static_cast<float>(collider.radius.numerical_value_in(model::meter)),
           color, sides);
     }
     ImGui::End();

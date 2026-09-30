@@ -11,7 +11,7 @@
 // Physical quantities carry their units in their types. Time uses std::chrono
 // (framework::Duration); everything else uses mp-units, in plain SI units.
 //
-// Plain units check that metres are not added to metres per second. mp-units'
+// Plain units check that meters are not added to meters per second. mp-units'
 // ISQ quantity kinds would also tell a position from a displacement or an
 // altitude from a range, but Clang 22 cannot compile them (a Clang regression,
 // llvm/llvm-project#175831). Every quantity type is an alias here, so moving to
@@ -29,8 +29,9 @@ class Vector3d final {
 
   Vector3d() : value_{Eigen::Vector3d::Zero()} {}
   Vector3d(double x, double y, double z) : value_{x, y, z} {}
-  template <typename Derived>
-  explicit Vector3d(const Eigen::MatrixBase<Derived>& value) : value_{value} {}
+  template <typename DerivedType>
+  explicit Vector3d(const Eigen::MatrixBase<DerivedType>& value)
+      : value_{value} {}
 
   const Eigen::Vector3d& eigen() const { return value_; }
 
@@ -94,40 +95,41 @@ class Vector3d final {
   Eigen::Vector3d value_;
 };
 
-inline constexpr auto metre = units::si::metre;
+inline constexpr auto meter = units::si::metre;
 inline constexpr auto second = units::si::second;
-inline constexpr auto metre_per_second = metre / second;
-inline constexpr auto metre_per_second_squared = metre / units::square(second);
+inline constexpr auto meter_per_second = meter / second;
+inline constexpr auto meter_per_second_squared = meter / units::square(second);
 inline constexpr auto per_second = units::one / second;
 
 // Scalars.
-using Length = units::quantity<metre, double>;
+using Length = units::quantity<meter, double>;
 using Time = units::quantity<second, double>;
-using Speed = units::quantity<metre_per_second, double>;
+using Speed = units::quantity<meter_per_second, double>;
+using AccelerationMagnitude = units::quantity<meter_per_second_squared, double>;
 using Rate = units::quantity<per_second, double>;
 
 // Vectors.
-using Displacement = units::quantity<metre, Vector3d>;
-using Velocity = units::quantity<metre_per_second, Vector3d>;
-using Acceleration = units::quantity<metre_per_second_squared, Vector3d>;
+using Displacement = units::quantity<meter, Vector3d>;
+using Velocity = units::quantity<meter_per_second, Vector3d>;
+using Acceleration = units::quantity<meter_per_second_squared, Vector3d>;
 
 // Positions are displacements from the world origin, the origin of the local
 // Cartesian frame.
 using Position = Displacement;
 
-inline Displacement metres(double x, double y, double z) {
-  return Vector3d{x, y, z} * metre;
+inline Displacement meters(double x, double y, double z) {
+  return Vector3d{x, y, z} * meter;
 }
-inline Velocity metres_per_second(double x, double y, double z) {
-  return Vector3d{x, y, z} * metre_per_second;
+inline Velocity meters_per_second(double x, double y, double z) {
+  return Vector3d{x, y, z} * meter_per_second;
 }
-inline Acceleration metres_per_second_squared(double x, double y, double z) {
-  return Vector3d{x, y, z} * metre_per_second_squared;
+inline Acceleration meters_per_second_squared(double x, double y, double z) {
+  return Vector3d{x, y, z} * meter_per_second_squared;
 }
 
 // A std::chrono duration as seconds.
-template <typename Representation, typename Period>
-Time seconds(std::chrono::duration<Representation, Period> duration) {
+template <typename RepresentationType, typename PeriodType>
+Time seconds(std::chrono::duration<RepresentationType, PeriodType> duration) {
   return std::chrono::duration<double>(duration).count() * second;
 }
 

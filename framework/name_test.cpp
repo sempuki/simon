@@ -2,6 +2,11 @@
 
 #include "framework/name.hpp"
 
+#include <format>
+#include <string>
+#include <string_view>
+#include <type_traits>
+
 #include "base/testing.hpp"
 
 namespace simon::framework {
@@ -56,6 +61,28 @@ TEST_CASE("Identity") {
           "/world/1/entity/2x"}) {
       CHECK_FALSE(parse_identity(text));
     }
+  }
+}
+
+TEST_CASE("TaggedString") {
+  SECTION("ShouldConvertImplicitlyGivenStringLikeValues") {
+    Alias from_literal = "ego";
+    Alias from_view = std::string_view{"ego"};
+    Alias from_string = std::string{"ego"};
+    CHECK(from_literal == from_view);
+    CHECK(from_view == from_string);
+    CHECK(from_literal == "ego");
+    CHECK(from_literal.view() == "ego");
+  }
+
+  SECTION("ShouldNotConvertGivenOtherTag") {
+    static_assert(!std::is_convertible_v<Identity, Alias>);
+    static_assert(!std::is_convertible_v<Alias, Identity>);
+    static_assert(!std::is_convertible_v<Alias, std::string_view>);
+  }
+
+  SECTION("ShouldFormatAsTextGivenStdFormat") {
+    CHECK(std::format("[{}]", Alias{"Luke Skywalker"}) == "[Luke Skywalker]");
   }
 }
 

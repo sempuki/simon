@@ -8,17 +8,17 @@
 
 namespace simon::model {
 
-template <typename A, typename B>
-concept Addable = requires(A a, B b) { a + b; };
+template <typename FirstType, typename SecondType>
+concept Addable = requires(FirstType a, SecondType b) { a + b; };
 
 TEST_CASE("Units") {
   SECTION("ShouldCarryUnitsThroughArithmeticGivenVectors") {
-    Velocity velocity = metres_per_second(1.0, 2.0, 3.0);
+    Velocity velocity = meters_per_second(1.0, 2.0, 3.0);
     Time dt = 2.0 * second;
 
     Displacement moved = velocity * dt;
 
-    CHECK(moved.numerical_value_in(metre).is_approximately(
+    CHECK(moved.numerical_value_in(meter).is_approximately(
         Vector3d{2.0, 4.0, 6.0}));
   }
 
@@ -27,13 +27,13 @@ TEST_CASE("Units") {
   }
 
   SECTION("ShouldComputeNormDotAndCrossGivenQuantities") {
-    Displacement a = metres(3.0, 4.0, 0.0);
-    Displacement b = metres(0.0, 0.0, 2.0);
+    Displacement a = meters(3.0, 4.0, 0.0);
+    Displacement b = meters(0.0, 0.0, 2.0);
 
-    CHECK(norm(a) == 5.0 * metre);
-    CHECK(dot(a, b) == 0.0 * units::square(metre));
+    CHECK(norm(a) == 5.0 * meter);
+    CHECK(dot(a, b) == 0.0 * units::square(meter));
     CHECK(cross(a, b)
-              .numerical_value_in(units::square(metre))
+              .numerical_value_in(units::square(meter))
               .is_approximately(Vector3d{8.0, -6.0, 0.0}));
   }
 

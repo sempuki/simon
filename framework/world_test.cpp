@@ -16,9 +16,9 @@ using testing::Position;
 using testing::TestWorld;
 using testing::Velocity;
 
-template <typename Builder>
+template <typename BuilderType>
 concept CanParent =
-    requires(Builder builder) { std::move(builder).under(Entity{}); };
+    requires(BuilderType builder) { std::move(builder).under(Entity{}); };
 
 TEST_CASE("World") {
   TestWorld world{testing::small_world()};
@@ -28,12 +28,12 @@ TEST_CASE("World") {
         world.create<Body>().with(Position{1.0}).with(Velocity{2.0}).build();
     REQUIRE(entity);
     CHECK(world.alive(*entity));
-    CHECK_FALSE(world.store<Position>().contains(*entity));
+    CHECK_FALSE(world.store_of<Position>().contains(*entity));
 
     world.sync();
 
-    CHECK(world.store<Position>().get(*entity).x == 1.0);
-    CHECK(world.store<Velocity>().get(*entity).x == 2.0);
+    CHECK(world.store_of<Position>().component_of(*entity).x == 1.0);
+    CHECK(world.store_of<Velocity>().component_of(*entity).x == 2.0);
     CHECK(world.pending() == 0u);
   }
 
@@ -69,8 +69,10 @@ TEST_CASE("World") {
     CHECK(world.identity_of(world.name()) == "/world/1");
     CHECK(world.identity_of(world.name_of(entity)) == "/world/1/entity/0");
     CHECK(world.identity_of(position) == "/world/1/entity/0/component/0");
-    CHECK(world.find("/world/1/entity/0") == world.name_of(entity));
-    CHECK(world.find("/world/1/entity/0/component/0") == position);
+    CHECK(world.find_name_of(Identity{"/world/1/entity/0"}) ==
+          world.name_of(entity));
+    CHECK(world.find_name_of(Identity{"/world/1/entity/0/component/0"}) ==
+          position);
     CHECK(world.entity_of(position) == entity);
   }
 
@@ -78,36 +80,41 @@ TEST_CASE("World") {
     Entity entity = *world.create<Body>().build();
     world.sync();
 
-    CHECK_FALSE(world.find("/world/2/entity/0"));  // Another world.
-    CHECK_FALSE(world.find("/world/1/entity/9"));  // No such entity.
-    CHECK_FALSE(world.find("/world/1/entity/0/component/0"));  // No Position.
-    CHECK_FALSE(world.find("/world/1/component/99"));  // No such component.
-    CHECK_FALSE(world.find("world/1"));                // Not an identity.
-    CHECK(world.find("/world/1/component/0") == TestWorld::name_of<Position>());
-    (void)entity;
+    CHECK_FALSE(
+        world.find_name_of(Identity{"/world/2/entity/0"}));  // Another world.
+    CHECK_FALSE(
+        world.find_name_of(Identity{"/world/1/entity/9"}));  // No such entity.
+    CHECK_FALSE(world.find_name_of(
+        Identity{"/world/1/entity/0/component/0"}));  // No Position.
+    CHECK_FALSE(world.find_name_of(
+        Identity{"/world/1/component/99"}));               // No such component.
+    CHECK_FALSE(world.find_name_of(Identity{"world/1"}));  // Not an identity.
+    CHECK(world.find_name_of(Identity{"/world/1/component/0"}) ==
+          TestWorld::name_of<Position>());
+    DECLARE_UNUSED(entity);
   }
 
   SECTION("ShouldFindComponentByTypeNameGivenBuiltInAliases") {
-    CHECK(world.find_alias("Position") ==
+    CHECK(world.find_name_of(Alias{"Position"}) ==
           std::vector{TestWorld::name_of<Position>()});
-    CHECK(world.find_alias("simon::framework::testing::Position") ==
+    CHECK(world.find_name_of(Alias{"simon::framework::testing::Position"}) ==
           std::vector{TestWorld::name_of<Position>()});
   }
 
   SECTION("ShouldAliasEntityGivenCreateAlias") {
     Entity luke = *world.create<Body>("Luke Skywalker").build();
 
-    CHECK(world.find_alias("Luke Skywalker") ==
+    CHECK(world.find_name_of(Alias{"Luke Skywalker"}) ==
           std::vector{world.name_of(luke)});
     CHECK(world.aliases_of(world.name_of(luke)) ==
-          std::vector<std::string>{"Luke Skywalker"});
+          std::vector<Alias>{"Luke Skywalker"});
   }
 
   SECTION("ShouldShareAliasGivenManyEntities") {
     Entity first = *world.create<Body>("red drone").build();
     Entity second = *world.create<Body>("red drone").build();
 
-    CHECK(world.find_alias("red drone") ==
+    CHECK(world.find_name_of(Alias{"red drone"}) ==
           std::vector{world.name_of(first), world.name_of(second)});
   }
 
@@ -115,12 +122,13 @@ TEST_CASE("World") {
     Entity entity = *world.create<Body>().build();
 
     REQUIRE(world.change(entity).alias("ego").alias("hero").build());
-    CHECK(world.find_alias("ego") == std::vector{world.name_of(entity)});
+    CHECK(world.find_name_of(Alias{"ego"}) ==
+          std::vector{world.name_of(entity)});
 
     REQUIRE(world.change(entity).unalias("ego").build());
-    CHECK(world.find_alias("ego").empty());
+    CHECK(world.find_name_of(Alias{"ego"}).empty());
     CHECK(world.aliases_of(world.name_of(entity)) ==
-          std::vector<std::string>{"hero"});
+          std::vector<Alias>{"hero"});
   }
 
   SECTION("ShouldRefuseAliasChangeGivenInvalidDuplicateOrMissingAlias") {
@@ -135,8 +143,7 @@ TEST_CASE("World") {
     CHECK(duplicate.error() == lib::watch(BuildError::ALIAS_ALREADY_GIVEN));
     CHECK(twice.error() == lib::watch(BuildError::ALIAS_ALREADY_GIVEN));
     CHECK(missing.error() == lib::watch(BuildError::ALIAS_NOT_GIVEN));
-    CHECK(world.aliases_of(world.name_of(entity)) ==
-          std::vector<std::string>{"ego"});
+    CHECK(world.aliases_of(world.name_of(entity)) == std::vector<Alias>{"ego"});
   }
 
   SECTION("ShouldRecordArchetypeGivenCreate") {
@@ -147,7 +154,7 @@ TEST_CASE("World") {
 
     Name archetype = world.archetype_of(launcher);
     CHECK(archetype.kind == static_cast<std::uint32_t>(Kind::ARCHETYPE));
-    CHECK(world.aliases_of(archetype) == std::vector<std::string>{"launcher"});
+    CHECK(world.aliases_of(archetype) == std::vector<Alias>{"launcher"});
     CHECK(world.archetype_of(body) != archetype);
     CHECK(world.identity_of(archetype) == "/world/1/archetype/0");
   }
@@ -192,11 +199,11 @@ TEST_CASE("World") {
     world.sync();
 
     CHECK_FALSE(world.alive(entity));
-    CHECK(world.store<Position>().size() == 0u);
-    CHECK(world.store<Health>().size() == 0u);
-    CHECK(world.store<EntityArchetype>().size() == 0u);
+    CHECK(world.store_of<Position>().size() == 0u);
+    CHECK(world.store_of<Health>().size() == 0u);
+    CHECK(world.store_of<EntityArchetype>().size() == 0u);
     CHECK_FALSE(world.entity_of(name));
-    CHECK(world.find_alias("ball").empty());
+    CHECK(world.find_name_of(Alias{"ball"}).empty());
   }
 
   SECTION("ShouldAttachAndDetachGivenChange") {
@@ -207,8 +214,8 @@ TEST_CASE("World") {
         world.change(entity).attach(Health{5.0}).detach<Position>().build());
     world.sync();
 
-    CHECK(world.store<Health>().get(entity).points == 5.0);
-    CHECK_FALSE(world.store<Position>().contains(entity));
+    CHECK(world.store_of<Health>().component_of(entity).points == 5.0);
+    CHECK_FALSE(world.store_of<Position>().contains(entity));
   }
 
   SECTION("ShouldReturnErrorWithoutCommandsGivenInvalidChange") {
@@ -267,7 +274,7 @@ TEST_CASE("World") {
     REQUIRE_FALSE(second);
     CHECK(second.error() == lib::watch(BuildError::COMPONENT_ALREADY_ATTACHED));
     REQUIRE_NOTHROW(world.sync());
-    CHECK(world.store<Health>().get(entity).points == 1.0);
+    CHECK(world.store_of<Health>().component_of(entity).points == 1.0);
   }
 
   SECTION("ShouldAllowReattachGivenDetachPendingInSameBatch") {
@@ -278,7 +285,7 @@ TEST_CASE("World") {
     REQUIRE(world.change(entity).attach(Health{2.0}).build());
     world.sync();
 
-    CHECK(world.store<Health>().get(entity).points == 2.0);
+    CHECK(world.store_of<Health>().component_of(entity).points == 2.0);
   }
 
   SECTION("ShouldRefuseAttachGivenStoreFullAfterPendingAttaches") {
@@ -300,7 +307,7 @@ TEST_CASE("World") {
     CHECK(attach.error() ==
           lib::watch(BuildError::COMPONENT_CAPACITY_EXHAUSTED));
     REQUIRE_NOTHROW(small.sync());
-    CHECK(small.store<Health>().size() == 2u);
+    CHECK(small.store_of<Health>().size() == 2u);
   }
 
   SECTION("ShouldRefuseCreateGivenDeadParent") {
