@@ -1,0 +1,59 @@
+# Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+
+load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "units",
+    hdrs = ["units.hpp"],
+    copts = COPTS,
+    deps = [
+        "@eigen",
+        "@mp-units",
+    ],
+)
+
+cc_test(
+    name = "units_test",
+    size = "small",
+    srcs = ["units_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":units",
+        "@lib//base:testing",
+    ],
+)
+
+cc_library(
+    name = "kinematics",
+    hdrs = ["kinematics.hpp"],
+    copts = COPTS,
+    deps = [
+        ":units",
+        "@eigen",
+    ],
+)
+
+cc_library(
+    name = "motion",
+    hdrs = ["motion.hpp"],
+    copts = COPTS,
+    deps = [
+        ":kinematics",
+        "//core",
+    ],
+)
+
+cc_test(
+    name = "kinematics_test",
+    size = "small",
+    srcs = ["kinematics_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":kinematics",
+        "@lib//base:testing",
+    ],
+)

@@ -16,7 +16,10 @@ git clone --recurse-submodules git@github.com:sempuki/simon.git
 git submodule update --init
 
 bazel test //...
-bazel run //:hello
+bazel run //app/hello
 ```
 
 Code targets C++26; flags come from `@lib//bazel:copts.bzl`.
+
+The architecture, its decisions and the roadmap are in
+[docs/design.md](docs/design.md).

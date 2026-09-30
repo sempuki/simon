@@ -1,0 +1,62 @@
+# Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+
+load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "core",
+    srcs = ["status.cpp"],
+    hdrs = [
+        "archetype.hpp",
+        "builder.hpp",
+        "command.hpp",
+        "entity.hpp",
+        "name.hpp",
+        "status.hpp",
+        "step.hpp",
+        "store.hpp",
+        "system.hpp",
+        "type_list.hpp",
+        "world.hpp",
+    ],
+    copts = COPTS,
+    deps = [
+        "@lib//base:core",
+        "@lib//base:status",
+        "@lib//base:time",
+    ],
+)
+
+[cc_test(
+    name = test + "_test",
+    size = "small",
+    srcs = [
+        test + "_test.cpp",
+        "test_world.hpp",
+    ],
+    copts = COPTS,
+    deps = [
+        ":core",
+        "@lib//base:testing",
+    ],
+) for test in [
+    "entity",
+    "name",
+    "store",
+    "system",
+    "world",
+]]
+
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+
+# Dense store against a stable-slot store; backs the store layout decision in
+# docs/design.md. Run with: bazel run -c opt //core:store_benchmark
+cc_binary(
+    name = "store_benchmark",
+    srcs = ["store_benchmark.cpp"],
+    copts = COPTS,
+    deps = [":core"],
+)

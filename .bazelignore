@@ -1,1 +1,3 @@
 2nd_party/lib
+# Claude Code worktrees live here and contain their own copy of the repo.
+.claude

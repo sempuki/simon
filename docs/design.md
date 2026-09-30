@@ -35,6 +35,7 @@ and handle rules are the point of the project.
 | Entity | An object with a name/identity suitable for quick comparison, canonical lookup and local aliasing. An `Entity` value is the local alias; its `Name` is the canonical identity. |
 | Component | A type with a name/identity suitable for debugging. |
 | Entity-component | A single object of a component type, associated with a single entity. |
+| Archetype | What sort of object an entity is: a name, and the components an entity of it must and may have. Every entity is created from one. |
 
 ## Architecture
 
@@ -47,7 +48,7 @@ The architecture is idiomatic ECS with no exceptions:
 | Store | Exactly one per component. It is the array of that component's entity-components. |
 | System | Every non-trivial function is a system. A system iterates component arrays through stores. |
 | Builder | The user-facing language for asking the simulator to do something specific. A builder turns a request into commands. |
-| Command | A typed, low-level structural change: create, add, remove, destroy. Commands are applied to stores. |
+| Command | A typed, low-level structural change: create, attach, detach, destroy. Commands are applied to stores. |
 | Schedule | A type listing systems in execution order. Schedules compose. |
 | World | The entity database. A factory of builders (the only way to write) and a query interface (the only way to read). Configured by a `Spatial` model. |
 | Driver | Owns time and steps the world's schedule. |
@@ -157,24 +158,45 @@ Store<Kinematics>
 
 - **Iterate.** Walk `data` (and `owner` when the entity is needed) from start
   to end. The index is never touched.
-- **Add.** Append to `data` and `owner`, and write the index entry.
-- **Remove.** Move the last element into the gap, fix the moved element's
-  index entry, and clear the removed one. The array stays dense after every
-  removal.
+- **Append.** Push onto `data` and `owner`, and write the index entry.
+- **Erase.** Move the last element into the gap, fix the moved element's
+  index entry, and clear the erased one. The array stays dense after every
+  erasure.
 - **Look up.** `index[e.index]` checks the generation, then reads `data`. The
   index for 5,000 entities is 40 KiB and stays hot.
 - **Capacity.** Every array is allocated once, at a capacity chosen when the
   world is created. Stores never reallocate, so references into them stay
-  valid until the element is removed or moved by a removal.
+  valid until the element is erased or moved by an erasure.
 
 A hole now costs 8 bytes in the index, instead of a whole component in the
 array.
 
-This design is still to be confirmed by measurement. The alternative is a
-stable-slot store, where components never move, destroyed slots are reused by
-new components, and a handle dereference is one load. Step 1 of the roadmap
-benchmarks both. Systems use the same store interface either way (add, remove,
-look up, iterate), so the choice stays inside `Store`.
+**Decided by measurement: dense.** The alternative was a stable-slot store,
+where each entity index has a fixed slot, nothing moves, and a lookup is one
+load, but destroyed entities leave holes. `core/store_benchmark.cpp`
+compares the two with a 72-byte component, destroying a random fraction of the
+population (as when drones are shot down). On the development machine, with
+`-c opt`:
+
+| Entities | Churn | Dense iterate | Stable iterate | Dense lookup | Stable lookup |
+|---:|---:|---:|---:|---:|---:|
+| 10,000 | 0% | 0.88 | 1.17 | 1.25 | 1.19 |
+| 10,000 | 75% | 0.72 | 2.73 | 0.95 | 0.94 |
+| 100,000 | 0% | 0.85 | 1.13 | 1.67 | 1.13 |
+| 100,000 | 50% | 0.93 | 4.86 | 1.52 | 1.14 |
+| 100,000 | 75% | 0.84 | 6.16 | 1.50 | 1.16 |
+| 1,000,000 | 75% | 1.06 | 14.78 | 7.34 | 5.99 |
+
+Times are nanoseconds per live entity (iterate) or per random lookup.
+
+- **Iteration** stays near 1 ns per entity in the dense store at every churn
+  level. The stable-slot store slows in proportion to its holes: 3 to 7 times
+  slower at 75% churn from 100,000 entities up.
+- **Lookup** is 10 to 35% faster in the stable-slot store, which saves one load.
+
+Systems iterate far more than they look up, and a defense run is mostly agents
+dying, so the dense store wins. Run the benchmark with
+`bazel run -c opt //core:store_benchmark`.
 
 ### Handles and references
 
@@ -204,44 +226,74 @@ handle met the same three duties, but every copy made a virtual call and a hash
 insert to follow objects that reallocation had moved. Fixed capacity removes
 the reallocation, and the generation check replaces the patching.
 
-### Names, identities and queries
+### Names, identities and aliases
 
 Many entities and components come and go during a run, and every one of them
-must be debuggable. Names and identities exist for that.
+must be debuggable from a console, comparable in a hot loop, and findable by
+what people call it. Everything in a world (the world itself, its archetypes,
+components, systems, entities and entity-components) is known three ways:
 
-**A name** is a magic number compared in a vaguely type-safe way. `Name<Tag>`
-wraps an integer, so an entity name cannot be compared with, say, an event
-name. Comparing names is an integer compare.
+| | For | Example | Cost |
+|---|---|---|---|
+| **Name** `{kind, instance}` | Hot loops, logs, crossing processes | `{Entity, 2}` | Two `uint32_t`, one compare |
+| **Identity** | Debugging from a console | `/world/1/entity/2/component/3` | Computed from the Name |
+| **Alias** | Meaning only people bring | `"ego"`, `"Luke Skywalker"` | A multimap, off the hot path |
 
-**An identity** is what issues names. The older simulator drew identities from
-static counters, so a name said nothing about where its entity came from, and
-the numbers depended on construction order. In simon an identity belongs to
-the builder that created the entity. Each builder has an identity scope, and
-scopes nest:
+**A Name** is a pair of integers. `kind` says what is named; `instance` says
+which one:
+
+| Named | Name | Identity |
+|---|---|---|
+| World | `{World, 1}` | `/world/1` |
+| Archetype | `{Archetype, 0}` | `/world/1/archetype/0` |
+| Component | `{Component, 3}` | `/world/1/component/3` |
+| System | `{System, 4}` | `/world/1/system/4` |
+| Entity | `{Entity, 2}` | `/world/1/entity/2` |
+| Entity-component | `{EntityComponent + 3, 2}` | `/world/1/entity/2/component/3` |
+
+- **Each component type is its own kind for its entity-components,** so an
+  entity-component's Name fits in the same two integers and its Identity
+  follows from it.
+- **A component's instance** is its position in the world's component list. A
+  system's is its position in the flattened schedule. An archetype's is the
+  order in which the world first saw it.
+- **An entity's instance is a serial number in creation order, never reused.**
+  `Entity` indices are recycled; entity Names are not. A Name stays meaningful
+  after its entity is destroyed, the same scenario gives the same Names on every
+  run and machine, and Names can cross processes.
+- **The world's number is given when it is constructed**
+  (`WorldConfiguration::number`). There is no global counter; the older
+  simulator's static identity source had to be set before anything could be
+  constructed.
+
+`Entity` and Name are both eight bytes and compare in one instruction. An
+`Entity` is the local alias systems use to reach stores. A Name is the stable
+identity for logs, events and anything leaving the process.
+
+**An Identity** is a REST-like path computed from a Name, so the world stores
+no strings for it. `world.identity_of(name)` formats one and `world.find(path)`
+parses one back, returning nothing for anything that does not exist in this
+world. `world.describe(name)` gives a one-line summary for a console:
 
 ```
-scenario
-└── blue/launcher/2                 created by the scenario's launcher builder
-    └── blue/launcher/2/interceptor/7   created by launcher 2's interceptor builder
+/world/1/entity/0 (red) archetype ball: Kinematics, Control, Thrust, Wind, Drag, Collider, Collision
 ```
 
-- **Deterministic.** The same scenario and seed produce the same names, in any
-  run and on any machine. Replays and logs line up.
-- **Traceable.** A name leads back to the builder that made the entity, and
-  that builder's own name leads to its creator.
-- **Cheap on the hot path.** The name is an integer derived from the scope
-  path. The readable path is kept in a cold-path table in the world, for logs
-  and debuggers.
-- **Portable.** Two processes that load the same scenario derive the same
-  names. That makes names usable as the identity across processes (see
-  [Distribution](#distribution)).
+**An Alias** is a string with meaning only people bring, such as "ego" or "Luke
+Skywalker". Aliases are many-to-many: several entities can share "red drone",
+and one entity can be both "ego" and "Luke Skywalker". `world.find_alias(alias)`
+returns every Name with it, in the order the aliases were given.
 
-A `Name` component holds an entity's name, so a name is ordinary component
-data. The world keeps an index from name to entity:
+- `create<Ball>("Luke Skywalker")` gives the new entity its first alias.
+- `change(e).alias("ego")` and `change(e).unalias("ego")` add and remove more.
+- Component types are aliased by their type names, qualified and short, so
+  `/world/1/component/3` is also findable as `Kinematics`.
+- Archetypes are aliased by their names, so the ball archetype is findable as
+  "ball".
+- Destroying an entity drops its aliases.
 
-```cpp
-std::optional<Entity> missile = world.find(names.path("blue/launcher/2/interceptor/7"));
-```
+Aliases are an index beside the stores, not store shape, so alias changes take
+effect immediately at `build()` instead of at the next sync point.
 
 **A component query** finds every entity with a set of components, optionally
 filtered:
@@ -267,63 +319,138 @@ with two simpler rules:
 
 ### Builders and commands
 
-Builders are the user-facing language of the toolkit. A builder is a type-safe,
-friendly way to ask the simulator for something specific:
+Builders are the user-facing language of the toolkit: a type-safe, friendly way
+to ask the simulator for something specific. They form a fluent grammar, so
+their names are chosen as a grammar, from the sentences users should be able to
+say:
+
+```
+In the world, create a ball known as Luke Skywalker, under squadron 1, with kinematics and a collider.
+In the world, create an interceptor under launcher 2, with kinematics.
+In the world, change ball 0: attach health, detach drag, and call it "ego".
+In the world, destroy ball 0.
+```
 
 ```cpp
-build.ego().with_missiles(4).at(site).build();
-build.destroy().team(Team::Red).within(radius, of(asset)).build();
-build.connect().cosimulator("red-side").lockstep().lookahead(10ms).build();
+world.create<Ball>("Luke Skywalker").under(squadron).with(Kinematics{...}).with(Collider{...}).build();
+world.create<Interceptor>().under(launcher).with(Kinematics{...}).build();
+world.change(ball).attach(Health{}).detach<Drag>().alias("ego").build();
+world.destroy(ball).build();
 ```
+
+The grammar:
+
+```
+utterance  := world . verb . complement* . build()
+verb       := create<Archetype>(alias?) | change(entity) | destroy(entity)
+complement := under(entity)                create: at most once, before any with
+            | with(component)              create: what the new entity starts with
+            | attach(component)            change
+            | detach<Component>()          change
+            | alias("...")                 change
+            | unalias("...")               change: at least one of the four
+```
+
+- **`create<Archetype>(alias)` carries both archetype and entity information.**
+  The archetype (see below) supplies its name and the components the entity
+  requires and permits. The optional argument is the entity's first alias. The
+  world issues the entity's Name.
+- **`under(parent)` records the entity it was created under** (an interceptor
+  under its launcher) as a built-in `Parent` entity-component. That is a
+  relation, not part of the entity's identity, and it is what the world's
+  transform hierarchy will build on.
+- **`with` declares a new entity's starting components. `attach` and `detach`
+  change a live one.**
+- **`build()` ends every utterance.** It returns `std::expected<Entity,
+  Status>` for `create` and `std::expected<void, Status>` for the others.
+
+#### Archetypes
+
+Every entity is created from an archetype, which states what sort of object the
+entity is and which components it must and may have. (In this document "class"
+only ever means a C++ class.)
+
+```cpp
+struct Ball : Archetype<"ball", Requires<Kinematics, Collider, Collision>,
+                        Allows<Control, Thrust, Wind, Drag>> {};
+```
+
+The archetype is recorded on the entity as a built-in `EntityArchetype`
+entity-component. `world.archetype_of(e)` returns the archetype's Name, and
+`world.aliases_of(archetype)` its name. That is the information an IO layer needs to
+map entities to foreign object types, such as HLA object classes or DIS entity
+types, and it helps debugging.
+
+#### Validation
+
+A builder is a grammar, and an utterance can only be validated once it is
+complete. A builder accumulates the utterance, validates it at `build()`, and
+only then emits commands.
+
+- **Word order and composition are checked at compile time.** Each step returns
+  a builder of a different type, so only well-formed sentences compile:
+  - `under` after `with` does not compile.
+  - `with` of a component the archetype neither requires nor allows fails with
+    "The entity's archetype neither requires nor allows this component."
+  - `build()` before every required component is declared fails with "The
+    entity lacks a component its archetype requires."
+  - A `change` that attaches, detaches, aliases and unaliases nothing does not
+    compile.
+- **Data-dependent rules are checked by `build()` at runtime, against the state
+  the world will be in once pending commands apply:** the entity (and any
+  parent) is alive and not about to be destroyed, a component to attach is
+  absent and its store has room, a component to detach is present, an alias is
+  non-empty and not already given, an alias to take was given. A refused
+  utterance returns a `lib::Status` whose condition is a `BuildCondition`
+  (compare with `status == lib::watch(BuildCondition::ALIAS_NOT_GIVEN)`), and
+  emits nothing. Because every command was validated this way, applying
+  commands at a sync point cannot fail halfway through a batch.
+- **The terminal call is explicit and `[[nodiscard]]`.** A builder never does
+  work in its destructor, and a failure is never only logged.
+- **One builder type per verb.** A builder does not switch between modes.
+- **Creating reserves the entity and its Name immediately,** so the returned
+  `Entity` can be stored, and children can be created under it, before the
+  commands are applied.
+
+`lib::Status` keeps each incident's message in a ring buffer of 16 per
+condition domain, and that buffer is not thread-safe. Inspect a returned
+`Status` where it is returned, or keep a `detach_copy()`. The simulation is
+single-threaded today; this needs revisiting before it is not.
+
+#### Domain builders
 
 A builder hides important type details without losing them. It may convert or
-erase types internally (a query, a set of archetypes, a transport), and the
-caller never sees those details. What leaves the builder is always a list of
-typed commands, so nothing is lost.
+erase types internally (a query, a set of archetypes), and the caller never
+sees those details. What leaves the builder is always a list of typed commands,
+so nothing is lost.
 
-A builder is a grammar. An utterance can only be validated once it is
-complete, so a builder accumulates the utterance, validates it at its terminal
-call, and only then emits commands:
+Domain builders extend the same grammar with verbs of their own, for example
+`world.create<Ego>("ego").with_missiles(4).at(site).build()`, or a query form
+of destroy, `world.destroy().each<Team>(Team::Red).within(500 * m, of(asset))
+.build()`. Builders and commands are not isomorphic: one utterance can emit
+many commands, and a query emits a number that depends on the world at the
+time. Domain verbs arrive when defense needs them.
 
-```
-build.ego().with_missiles(4).at(site).build()
-└──────────── utterance ─────────────┘   │
-                                         ├─ validate the complete utterance
-                                         └─ emit commands:
-                                              create(e) add(Kinematics) add(Launcher)
-                                              name(e, "blue/ego/1") ...
-```
+#### IO is not a builder verb
 
-Builders and commands are not isomorphic. One utterance can emit many
-commands, and "destroy all red within a radius" emits a number of commands
-that depends on the world at the time.
+The world has no verb for connecting to a foreign simulator. The IO layer is
+distinct: the simulation has no idea where entities and components came from,
+only that they are there. The programmer who adapts a foreign simulator at the
+IO layer uses the same builders as anyone else, and connection setup belongs
+to the IO layer and the driver.
 
-Rules for builders:
+#### Commands
 
-- **Validate the whole utterance before emitting anything.** Structure is
-  checked at compile time where the grammar allows it: each step can return a
-  builder of a different type, so an incomplete or contradictory utterance
-  fails when `.build()` compiles. Data-dependent rules (a name must exist, a
-  radius must be positive) are checked at runtime.
-- **The terminal call is explicit, `[[nodiscard]]`, and returns a status.** A
-  builder never does work in its destructor, and a failure is never only
-  logged.
-- **One builder type per request.** A builder does not switch between modes.
-- **Builders issue identities.** Entities a builder creates are named inside
-  its identity scope (see above).
-- **Creating reserves the entity immediately,** so the returned `Entity` can be
-  stored before the commands are applied.
-
-Commands are the low-level vocabulary: create, add, remove, destroy, name.
-They are typed, go into the world's command buffer, and are applied at sync
-points in the order they were recorded. The stores never change shape while a
-system iterates them.
+Commands are the low-level vocabulary: attach, detach, destroy. They are typed,
+go into the world's command buffer, and are applied at sync points in the order
+they were recorded. The stores never change shape while a system iterates them.
 
 Sync points sit between systems. A system's commands are applied before the
 next system runs, so later systems in the same step see the change.
 
-Systems use builders too. `AssignLaunchers` asks its launcher's interceptor
-builder for a new interceptor, and the builder emits the commands.
+Systems use builders too, through their context. Inside a system whose context
+parameter is `auto&`, the free-function form reads best:
+`create<Interceptor>(context).under(self).with(...).build()`.
 
 ### Systems
 
@@ -346,7 +473,7 @@ struct GuideInterceptors : System<const Interceptor, const Kinematics, Control> 
                   const Kinematics* kinematics, Control* control,
                   Context<GuideInterceptors>& context) const {
     if (!kinematics || !control) return;
-    const Kinematics* target = context.lookup<Kinematics>(interceptor.target);
+    const Kinematics* target = lookup<Kinematics>(context, interceptor.target);
     if (!target) { ... }
     control->acceleration = model::proportional_navigation(*kinematics, *target, interceptor);
   }
@@ -388,7 +515,7 @@ Rules:
   declaration implies; a mismatch is a compile error.
 - **Other entities are reached through declared lookups.** `using Lookups =
   Stores<...>;` lists the stores a system may read by entity, and
-  `Context<S>::lookup<T>(e)` returns `const T*`. Lookups are always read-only,
+  `lookup<T>(context, e)` returns `const T*`. Lookups are always read-only,
   and asking for an undeclared store does not compile. (This form is proposed;
   see [Open decisions](#open-decisions).)
 - **`Context<S>`** also carries the `Step` (see [Time](#time-and-drivers)) and
@@ -396,6 +523,24 @@ Rules:
 - **Optional stages** (`prepare` before the main loop, `resolve` after it)
   are detected at compile time and cost nothing when absent. The older
   simulator did the same with stage tags.
+
+**Any callable can be a system.** Systems often keep state between steps, so
+besides structs, a system can be made from a lambda or any other callable. The
+structure still lives in a type; the callable keeps its own state in its
+captures:
+
+```cpp
+auto integrate = core::system<Kinematics, const Control>(
+    [](Entity, Kinematics& kinematics, const Control* control, auto& context) { ... });
+auto count = core::system<const Health>(
+    [seen = 0](Entity, const Health&, auto&) mutable { ++seen; });
+auto guide = core::system<const Interceptor, const Kinematics, Control>(
+    core::Stores<Kinematics>{},  // Lookups.
+    [](Entity, const Interceptor&, const Kinematics*, Control*, auto& context) { ... });
+```
+
+A struct system keeps its state in members, which the scheduler owns. Either
+way, each scheduled system is one object that lives as long as its scheduler.
 
 Because the structure is a type, it composes. A system can be generic
 (`template <typename Body> struct Integrate : System<Kinematics, const Control,
@@ -454,18 +599,18 @@ written the batch, and look up the side being read.
 
 ```
 TriggerWarheads   driven by Warhead, reads Kinematics*   writes its own warhead state
-   │  on trigger:  build.blast().at(position).radius(r).yield(y).source(self).build()
-   │               build.destroy(self).build()
+   │  on trigger:  create<Blast>(context).under(self).with(Kinematics{...}).with(Blast{...}).build()
+   │               context.destroy(self).build()
    ▼  sync point: this step's Blast entities exist
 ApplyBlasts       driven by Health, reads Kinematics*    victims are the batch; each writes only itself
    │  asks the world for blasts within range, read-only
-   │  if destroyed: build.destroy(self).build()
+   │  if destroyed: context.destroy(self).build()
    ▼
 ExpireBlasts      driven by Blast                        destroys blasts older than one step
 ```
 
 - **The blast is an entity** with `Blast` and `Kinematics` entity-components,
-  named inside the warhead's builder scope. It can be debugged and drawn, and
+  created under the warhead, so its `Parent` records where it came from. It can be debugged and drawn, and
   it has the same shape as a DIS Detonation PDU or an HLA interaction. If a
   victim lives in another process, the blast is the only thing that could reach
   it.
@@ -529,6 +674,17 @@ void run(Systems<Ss...>, World& world, Step step) {
 
 Each system is listed once, in the schedule type.
 
+A schedule is also a value that holds its systems, because systems made from
+lambdas with captures cannot be default-constructed. Schedules of
+default-constructible systems need no value:
+
+```cpp
+core::Scheduler<World, Systems<ApplyForces, model::Motion>> scheduler;   // Structs only.
+
+auto schedule = Systems{count, Systems<ApplyForces, model::Motion>{}, guide};
+core::Scheduler<World, decltype(schedule)> scheduler{schedule};         // With lambdas.
+```
+
 Schedules compose:
 
 ```cpp
@@ -573,11 +729,11 @@ A world is the entity database. It has two halves:
    array walks.
 
 ```
-          write                                       read
-build.ego()...build() ─▶ commands ─▶ World ─▶ by name       world.find(name)
-build.destroy()...     (applied at            by component  System<A, B...>, world.query<...>()
-build.connect()...      sync points)          by space      world.within(center, radius), world.nearest(p)
-                                              by relation   world.parent(e), world.children(e)
+          write                                           read
+world.create<C>()...build() ─▶ commands ─▶ World ─▶ by name       world.find(name)
+world.change(e)...build()   (applied at            by component  System<A, B...>, world.query<...>()
+world.destroy(e).build()     sync points)          by space      world.within(center, radius), world.nearest(p)
+                                                   by relation   world.parent(e), world.children(e)
 ```
 
 | Database | World |
@@ -589,7 +745,9 @@ build.connect()...      sync points)          by space      world.within(center,
 | Business logic | Systems |
 
 A world holds every entity-component its builders created, the mappings from
-names to entities, and any relationships between entities. Relationships are
+Names to entities, the aliases, and any relationships between entities. The
+built-in components `EntityArchetype` and `Parent` are always in a world's
+component list; applications do not list them. Relationships are
 ordinary data: `Entity` fields in components, or relation entities (see
 [Relations between entities](#relations-between-entities)).
 
@@ -609,7 +767,7 @@ template <Spatial S, typename... Components>
 class World;
 
 using DefenseWorld = World<Kinematics,
-                           Name, Team, Control, Health, Warhead, Blast,
+                           Team, Control, Health, Warhead, Blast,
                            RedDrone, Asset, Radar, Track, Launcher, Interceptor>;
 ```
 
@@ -620,7 +778,7 @@ using DefenseWorld = World<Kinematics,
   where distance is hop count) fit without changing the core.
 - **The component list is closed per build.** `world.store<T>()` resolves at
   compile time, nothing is type-erased, and the inliner sees every hot-path
-  call. An application cannot add a component type at runtime, which none of
+  call. An application cannot declare a component type at runtime, which none of
   our use cases need.
 
 #### Indexes
@@ -642,6 +800,10 @@ consistent snapshot:
 - Moved entities are re-indexed by a world-provided system,
   `UpdateSpatialIndex`, which the schedule places after `Motion`. The world
   maintains its indexes, and the schedule says when.
+
+Step 1 answers `within()` with a linear scan of the spatial store, which is
+always current, so `UpdateSpatialIndex` does not exist yet. The real index and
+its system arrive with defense, where the population makes a scan too slow.
 
 Entities replicated from another process enter the same indexes, so a spatial
 query finds a red drone whether red is simulated locally or remotely.
@@ -665,7 +827,7 @@ A run is reproducible from its scenario and seed. That requires:
 
 - A fixed schedule order (the schedule type).
 - A stable iteration order within a system. Dense stores change order only on
-  removal, and removal happens only at sync points, so the order depends only
+  erasure, and erasure happens only at sync points, so the order depends only
   on the history of commands.
 - Commands applied in recorded order.
 - Integer time (see below).
@@ -779,10 +941,52 @@ linear algebra do not mix easily:
 | An Eigen vector of quantities (`Matrix<quantity<m>, 3, 1>`) | Eigen assumes one scalar type, and products change units (m × m = m²) |
 | Units at the boundaries: components and APIs carry quantities; `model/` kernels unwrap to Eigen doubles | Always possible; costs some typing at each call site |
 
-A spike in step 1 settles it: `Kinematics` with mp-units quantities over Eigen
-`Vec3`, one proportional-navigation step, and a check of the generated code and
-compile time. If the Eigen representation works cleanly, it is used
-throughout. If not, units live at the boundaries.
+**Spike results (step 1).** The spike is on branch `spike/units-eigen`
+(`spike/units/`).
+
+- **A thin `Vec3` wrapper over Eigen works as a representation.** Every
+  operator evaluates back to `Vec3`, so mp-units never sees an Eigen expression
+  type. Plain `Eigen::Vector3d` fails to compile for that reason.
+- **Generated code matches raw Eigen** at `-O2`: integration is identical
+  instruction for instruction, and proportional navigation differs only in
+  register allocation.
+- **Compile time** rises from 1.5 s to 3.8 s for one translation unit, almost
+  all of it the mp-units headers. Including only the headers needed brings the
+  headers' share down to about 1.85 s.
+- **Units at the boundaries saves nothing.** Components still need `Vec3` to
+  hold vector quantities, and every boundary needs an unwrap call.
+- **Gaps to fill ourselves:** mp-units 2.5 has no dot or cross product for
+  vector quantities (about 15 lines), and `r / |r|` is a dimensionless scalar
+  to mp-units, so unit vectors are written as a division by range at the end.
+- **Clang 22 cannot compile ISQ quantity types** (`quantity<isq::velocity[m/s],
+  ...>`), even over `double`. It is a Clang regression (llvm/llvm-project
+  #175831, mp-units #798). Quantities in plain SI units (`quantity<m/s, Vec3>`)
+  compile on both compilers.
+
+**Decision: plain SI units, over a `Vector3` wrapper, everywhere.**
+`model/units.hpp` holds the wrapper, the vector algebra (`dot`, `cross`,
+`norm`), a `seconds()` conversion from `std::chrono`, and every quantity type as
+an alias:
+
+```cpp
+using Length = quantity<metre, double>;
+using Time = quantity<second, double>;
+using Rate = quantity<one / second, double>;
+using Displacement = quantity<metre, Vector3>;
+using Velocity = quantity<metre / second, Vector3>;
+using Acceleration = quantity<metre / square(second), Vector3>;
+using Position = Displacement;   // From the world origin.
+```
+
+- Plain units compile on both GCC 16 and Clang 22, and catch the common bug:
+  adding metres to metres per second does not compile.
+- They do not tell a position from a displacement, or an altitude from a
+  range. Positions are displacements from the world origin, not affine
+  `quantity_point`s.
+- Moving to ISQ quantity kinds once Clang is fixed changes the aliases in
+  `units.hpp`, not the code that uses them.
+- `core` stays free of units: the `Spatial` concept only needs distances to be
+  ordered, so `World::within` takes whatever `distance()` returns.
 
 ### Lifecycle
 
@@ -876,8 +1080,8 @@ Portico for HLA.
 
 ```
 simon/
-  core/          Entity, Store, World, Spatial, builders, command buffer, System, schedules
-  drive/         Step, lifecycle, drivers, RateGate, EventQueue
+  core/          Entity, Store, World, Spatial, names, builders, commands, Step, System, schedules
+  drive/         Lifecycle, drivers, RateGate, EventQueue
   model/         Reusable physics: kinematics, sensing, guidance (free functions)
   app/
     hello/       Two bouncing balls, the first application
@@ -886,8 +1090,8 @@ simon/
   2nd_party/lib  Shared core libraries (submodule)
 ```
 
-`framework/`, `component/` and the top-level `simulation.hpp` are the current
-prototype. They are retired once `app/hello` runs on the new core.
+The prototype (`framework/`, `component/` and the top-level `simulation.hpp`)
+was retired in step 1. Its event queue moved to `drive/`.
 
 ## Applications
 
@@ -953,20 +1157,21 @@ and destruction in the middle of a run, rate gates, and thousands of agents.
 | Need | Library |
 |---|---|
 | Linear algebra | Eigen (have) |
-| Units | `std::chrono` for time; mp-units for everything else (Au as fallback) |
-| Tests and benchmarks | Catch2, including its benchmarks (have) |
+| Units | `std::chrono` for time; mp-units in plain SI units for everything else |
+| Tests | Catch2 (have) |
+| Benchmarks | A small `std::chrono` harness per benchmark, printing one table per question. Benchmarks sit beside what they measure, like tests; only ones that measure several things go in a common directory. |
 | UI | Dear ImGui (have), ImPlot for the top-down view |
 | Window and input | SDL2 now; SDL3 when it is in the Bazel Central Registry |
 | Profiling, later | Tracy |
 
-C++26 reflection would remove some boilerplate, but GCC 16 supports it and
+C++26 reflection would eliminate some boilerplate, but GCC 16 supports it and
 Clang 22 does not. We will revisit it when both compilers do.
 
 ## Roadmap
 
 Each step ends with a working application and passing tests.
 
-1. **Core ECS.** `Entity`, `Store`, `World`, systems, schedules, builders and
+1. **Core ECS (done).** `Entity`, `Store`, `World`, systems, schedules, builders and
    commands, with tests. Benchmark the dense store against the stable-slot
    store at 1k, 10k and 100k entities with 0–75% churn, for iteration and
    random lookup, and record the choice here. Run the units spike (mp-units
@@ -988,16 +1193,14 @@ interop.
 
 ## Open decisions
 
-- **Units with Eigen vectors.** A quantity with an Eigen representation, or
-  units at the boundaries only. Decided by a spike in step 1.
-- **Store layout.** Dense with an entity index, or stable slots. Decided by the
-  step 1 benchmark.
+- **ISQ quantity kinds** (and affine positions) once a Clang release compiles
+  them.
 - **Retargeting policy** for interceptors whose target disappears. To be
   settled while building defense.
 - **Spatial index structure.** A uniform grid is the likely start; to be
   measured with defense at scale.
 - **Cross-entity lookups.** Proposed: `using Lookups = Stores<...>;` on the
-  system, reached through `Context<S>::lookup<T>(e)`, always read-only.
+  system, reached through `lookup<T>(context, e)`, always read-only.
 
 ## Lessons from the older simulator
 
