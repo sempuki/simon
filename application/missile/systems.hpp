@@ -434,22 +434,42 @@ struct ApplyBlasts final : System<Health, const Kinematics> {
   using SequenceAfterSystemList = SystemList<TriggerWarheads>;
   using AllowComponentList = TypeList<Blast, Kinematics>;
 
+  // Collects this step's blasts, once, so each victim reads a short array
+  // instead of walking the Blast store. Most steps have none.
+  void prepare(LocalWorld& world) {
+    blasts_.clear();
+    world.store_of<Blast>().for_each([&](Entity owner, const Blast& blast) {
+      if (const Kinematics* center =
+              world.try_component_of<Kinematics>(owner)) {
+        blasts_.push_back(Burst{
+            .center = center, .radius = blast.radius, .damage = blast.damage});
+      }
+    });
+  }
+
   void operator()(LocalWorld& world, Entity self, Health& health,
                   const Kinematics* kinematics) {
     if (!kinematics) {
       return;
     }
-    world.store_of<Blast>().for_each([&](Entity owner, const Blast& blast) {
-      const Kinematics* center = world.try_component_of<Kinematics>(owner);
-      if (center && distance(*kinematics, *center) <= blast.radius) {
-        health.points -= blast.damage;
+    for (const Burst& burst : blasts_) {
+      if (distance(*kinematics, *burst.center) <= burst.radius) {
+        health.points -= burst.damage;
       }
-    });
+    }
     if (health.points <= 0.0) {
       auto destroyed = world.destroy(self).build();
       DECLARE_UNUSED(destroyed);
     }
   }
+
+ private:
+  struct Burst final {
+    const Kinematics* center = nullptr;  // Valid until the next sync point.
+    Length radius = 0.0 * model::meter;
+    double damage = 0.0;
+  };
+  std::vector<Burst> blasts_;
 };
 
 // Blasts live for one step.

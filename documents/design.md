@@ -405,9 +405,10 @@ the archetype's segment):
 A required sibling now costs what a handle or a structural walk costs. Over
 3,000 steps at 10,000 drones, the missile step went from 0.738 to 0.691 ms:
 `Integrate` from 0.060 to 0.041, `TriggerWarheads` from 0.105 to 0.070 and
-`SteerRedDrones` from 0.078 to 0.067. `ApplyBlasts` went from 0.040 to 0.056;
-it walks the few blasts once per victim, and a segmented walk has more fixed
-cost than an array.
+`SteerRedDrones` from 0.078 to 0.067. `ApplyBlasts` first went from 0.040 to
+0.056, because it walked the few blasts once per victim and a segmented walk
+has more fixed cost than an array. It now collects the step's blasts once in
+`prepare`, and takes 0.026, bringing the step to 0.66 ms.
 
 ### Handles and references
 
