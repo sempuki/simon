@@ -81,16 +81,29 @@ struct UpdateTracks final : System<Track> {
   using SequenceAfterSystemList = SystemList<ScanRadars>;
   using AllowComponentList = TypeList<Kinematics, Radar>;
 
-  // Collects the radars that scanned this step, once, so each track checks
-  // only those. Radars scan a few times a second, so most steps there are none.
+  // Collects the radars that scanned this step, once, and indexes them, so
+  // each track checks only the radars near it. Radars scan a few times a
+  // second, so most steps there are none.
   void prepare(LocalWorld& world) {
     scanning_.clear();
-    world.store_of<Radar>().for_each([&](Entity owner, const Radar& radar) {
+    longest_ = 0.0 * model::meter;
+    const auto& radars = world.store_of<Radar>();
+    radars.for_each([&](Entity owner, const Radar& radar) {
       const Kinematics* kinematics = world.try_component_of<Kinematics>(owner);
       if (radar.scanned && kinematics) {
         scanning_.push_back(
             Scanning{.radar = kinematics, .range = radar.range});
+        longest_ = std::max(longest_, radar.range);
       }
+    });
+    if (scanning_.empty()) {
+      return;
+    }
+    if (!index_) {
+      index_.emplace(radars.capacity(), CELL_SIZE);
+    }
+    index_->rebuild(scanning_.size(), [&](std::size_t slot) {
+      return model::coordinates(*scanning_[slot].radar);
     });
   }
 
@@ -102,22 +115,31 @@ struct UpdateTracks final : System<Track> {
     if (!target) {
       return;
     }
-    for (const Scanning& scanning : scanning_) {
-      if (distance(*scanning.radar, *target) <= scanning.range) {
-        track.position = target->position;
-        track.velocity = target->velocity;
-        track.last_seen = step.time;
-        return;
-      }
+    // Any scanning radar whose range covers the target will do; the nearest
+    // such radar is found by looking only as far as the longest range.
+    std::optional<std::uint32_t> seen_by = index_->nearest(
+        model::coordinates(*target), longest_.numerical_value_in(model::meter),
+        [&](std::uint32_t slot) {
+          const Scanning& scanning = scanning_[slot];
+          return distance(*scanning.radar, *target) <= scanning.range;
+        });
+    if (seen_by) {
+      track.position = target->position;
+      track.velocity = target->velocity;
+      track.last_seen = step.time;
     }
   }
 
  private:
+  static constexpr double CELL_SIZE = 4000.0;  // Meters, about a radar's range.
+
   struct Scanning final {
     const Kinematics* radar = nullptr;  // Valid until the next sync point.
     Length range = 0.0 * model::meter;
   };
   std::vector<Scanning> scanning_;
+  Length longest_ = 0.0 * model::meter;
+  std::optional<framework::SpatialIndex> index_;  // Sized on first use.
 };
 
 // Destroys tracks whose target is gone or has not been seen for `timeout`, and

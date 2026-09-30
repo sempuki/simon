@@ -1116,10 +1116,17 @@ steps, after archetype segments:
 | 100,000 | 100 | 6.885 | 34.3 |
 
 From 10,000 to 100,000 drones the cost per entity is nearly flat; the step
-from 1,000 is the working set leaving the core's caches. `UpdateTracks` does
-not scale: every radar scans on the same steps, and each track then checks
-every scanning radar in the world, so it goes from 0.011 to 0.824 ms per step
-for ten times the population.
+from 1,000 is the working set leaving the core's caches.
+
+`UpdateTracks` did not scale at first: every radar scans on the same steps,
+and each track checked every scanning radar in the world, so it went from
+0.011 to 0.824 ms per step for ten times the population. Its `prepare` now
+indexes the step's scanning radars in a `SpatialIndex` with 4 km cells (about
+a radar's range), and each track asks for the nearest one whose range covers
+its target. That takes 0.018 and 0.218 ms per step, growing with the
+population. At 10,000 drones the old loop over 100 radars was cheaper; a query
+has fixed cost. With 1 km cells the query visited dozens of empty cells and
+took 0.499 ms at 100,000 drones, so cell size matters as much as the index.
 
 Entities replicated from another process enter the same indexes, so a spatial
 query finds a red drone whether red is simulated locally or remotely.
@@ -1532,6 +1539,8 @@ Decisions made while building it:
   its target's, which the rule against writing and reading one component
   forbids. `ProposeEngagements` owns a `SpatialIndex` over the estimates
   instead, rebuilt on the first query of each step.
+- **`UpdateTracks` indexes the radars that scanned,** in `prepare`, so a track
+  checks only the radars near its target.
 - **Systems name their concrete access type** with a member alias,
   `using LocalWorld = WorldAccess<ThisSystem>;`, so builder
   calls with explicit template arguments, such as `detach<Tracked>()`, need no
@@ -1612,9 +1621,6 @@ interop.
 - **A realistic contention load.** `--contend` runs a streaming thread on every
   spare core, close to the worst case on the development machine. A cloud
   neighbor is likely milder, so the load should become a parameter.
-- **`UpdateTracks` checks every scanning radar per track,** which grows with
-  the square of the population when sites are tiled. An index over the step's
-  scanning radars would make it local.
 
 ## Lessons from the older simulator
 
