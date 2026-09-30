@@ -16,10 +16,19 @@ git clone --recurse-submodules git@github.com:sempuki/simon.git
 git submodule update --init
 
 bazel test //...
-bazel run //app/hello
+bazel run //application/hello
 ```
 
 Code targets C++26; flags come from `@lib//bazel:copts.bzl`.
 
 The architecture, its decisions and the roadmap are in
-[docs/design.md](docs/design.md).
+[documents/design.md](documents/design.md).
+
+## Editor setup
+
+clangd needs a `compile_commands.json`. Generate it from the workspace root,
+and again after adding files, targets or dependencies:
+
+```sh
+python3 2nd_party/lib/bazel/compile_commands.py
+```
