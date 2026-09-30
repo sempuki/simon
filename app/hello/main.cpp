@@ -63,7 +63,7 @@ int main(int, char**) {
   // Simulator
   hello::World world{core::WorldConfiguration{.number = 1, .entities = 16, .components = 16}};
   hello::Scheduler scheduler;
-  hello::Balls balls = hello::build_balls(world);
+  hello::Balls balls = hello::build_balls(lib::InOut(world));
   const core::Duration dt{0.01};
   const int steps_per_frame = 10;
   core::TimePoint time{};
@@ -83,7 +83,7 @@ int main(int, char**) {
 
     // Advance the simulation.
     for (int i = 0; i < steps_per_frame && !hello::any_collision(world); ++i) {
-      scheduler.step(world, core::Step{.time = time, .dt = dt});
+      scheduler.step(lib::InOut(world), core::Step{.time = time, .dt = dt});
       time += dt;
     }
     done = done || hello::any_collision(world);

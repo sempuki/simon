@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "base/core.hpp"
 #include "core/archetype.hpp"
 #include "core/entity.hpp"
 #include "core/status.hpp"
@@ -41,9 +42,10 @@ inline constexpr bool is_built_in_v =
 template <typename World, ArchetypeType Archetype, bool CanParent, typename... Initial>
 class [[nodiscard]] CreateBuilder final {
  public:
-  CreateBuilder(World* world, std::string alias, std::optional<Entity> parent,
+  // Keeps a reference to `world` until the utterance is built.
+  CreateBuilder(lib::Depend<World> world, std::string alias, std::optional<Entity> parent,
                 std::tuple<Initial...> components)
-      : world_{world},
+      : world_{world.get()},
         alias_{std::move(alias)},
         parent_{parent},
         components_{std::move(components)} {}
@@ -53,7 +55,8 @@ class [[nodiscard]] CreateBuilder final {
   auto under(Entity parent) &&
     requires CanParent
   {
-    return CreateBuilder<World, Archetype, false>{world_, std::move(alias_), parent, {}};
+    return CreateBuilder<World, Archetype, false>{lib::Depend<World>{*world_},
+                                                  std::move(alias_), parent, {}};
   }
 
   // Declares a component the entity starts with.
@@ -69,7 +72,7 @@ class [[nodiscard]] CreateBuilder final {
     static_assert(!contains_v<TypeList<Initial...>, Component>,
                   "The entity already starts with this component.");
     return CreateBuilder<World, Archetype, false, Initial..., Component>{
-        world_, std::move(alias_), parent_,
+        lib::Depend<World>{*world_}, std::move(alias_), parent_,
         std::tuple_cat(std::move(components_),
                        std::tuple<Component>{std::forward<Argument>(component)})};
   }
@@ -83,7 +86,7 @@ class [[nodiscard]] CreateBuilder final {
   }
 
  private:
-  World* world_;
+  World* world_;  // Never null; checked once by Depend at construction.
   std::string alias_;
   std::optional<Entity> parent_;
   std::tuple<Initial...> components_;
@@ -103,9 +106,10 @@ class [[nodiscard]] ChangeBuilder<World, TypeList<Attached...>, TypeList<Detache
                                   Aliasing>
     final {
  public:
-  ChangeBuilder(World* world, Entity entity, std::tuple<Attached...> components,
+  // Keeps a reference to `world` until the utterance is built.
+  ChangeBuilder(lib::Depend<World> world, Entity entity, std::tuple<Attached...> components,
                 AliasChanges aliases)
-      : world_{world},
+      : world_{world.get()},
         entity_{entity},
         components_{std::move(components)},
         aliases_{std::move(aliases)} {}
@@ -117,7 +121,7 @@ class [[nodiscard]] ChangeBuilder<World, TypeList<Attached...>, TypeList<Detache
     check_component<Component>();
     return ChangeBuilder<World, TypeList<Attached..., Component>, TypeList<Detached...>,
                          Aliasing>{
-        world_, entity_,
+        lib::Depend<World>{*world_}, entity_,
         std::tuple_cat(std::move(components_),
                        std::tuple<Component>{std::forward<Argument>(component)}),
         std::move(aliases_)};
@@ -128,22 +132,22 @@ class [[nodiscard]] ChangeBuilder<World, TypeList<Attached...>, TypeList<Detache
   auto detach() && {
     check_component<Component>();
     return ChangeBuilder<World, TypeList<Attached...>, TypeList<Detached..., Component>,
-                         Aliasing>{world_, entity_, std::move(components_),
-                                   std::move(aliases_)};
+                         Aliasing>{lib::Depend<World>{*world_}, entity_,
+                                   std::move(components_), std::move(aliases_)};
   }
 
   // Gives the entity an alias, such as "ego".
   auto alias(std::string_view alias) && {
     aliases_.given.emplace_back(alias);
     return ChangeBuilder<World, TypeList<Attached...>, TypeList<Detached...>, true>{
-        world_, entity_, std::move(components_), std::move(aliases_)};
+        lib::Depend<World>{*world_}, entity_, std::move(components_), std::move(aliases_)};
   }
 
   // Takes an alias away from the entity.
   auto unalias(std::string_view alias) && {
     aliases_.taken.emplace_back(alias);
     return ChangeBuilder<World, TypeList<Attached...>, TypeList<Detached...>, true>{
-        world_, entity_, std::move(components_), std::move(aliases_)};
+        lib::Depend<World>{*world_}, entity_, std::move(components_), std::move(aliases_)};
   }
 
   std::expected<void, Status> build() && {
@@ -164,7 +168,7 @@ class [[nodiscard]] ChangeBuilder<World, TypeList<Attached...>, TypeList<Detache
                   "Each component may be attached or detached once per change.");
   }
 
-  World* world_;
+  World* world_;  // Never null; checked once by Depend at construction.
   Entity entity_;
   std::tuple<Attached...> components_;
   AliasChanges aliases_;
@@ -173,12 +177,14 @@ class [[nodiscard]] ChangeBuilder<World, TypeList<Attached...>, TypeList<Detache
 template <typename World>
 class [[nodiscard]] DestroyBuilder final {
  public:
-  DestroyBuilder(World* world, Entity entity) : world_{world}, entity_{entity} {}
+  // Keeps a reference to `world` until the utterance is built.
+  DestroyBuilder(lib::Depend<World> world, Entity entity)
+      : world_{world.get()}, entity_{entity} {}
 
   std::expected<void, Status> build() && { return world_->build_destroy(entity_); }
 
  private:
-  World* world_;
+  World* world_;  // Never null; checked once by Depend at construction.
   Entity entity_;
 };
 

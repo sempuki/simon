@@ -18,7 +18,7 @@ const core::Duration DT{0.01};
 TEST_CASE("Hello") {
   World world{CONFIGURATION};
   Scheduler scheduler;
-  Balls balls = build_balls(world);
+  Balls balls = build_balls(lib::InOut(world));
 
   SECTION("ShouldFindBallsByAliasGivenScenario") {
     CHECK(world.find_alias("red") == std::vector{world.name_of(balls.red)});
@@ -30,7 +30,7 @@ TEST_CASE("Hello") {
     REQUIRE(world.change(balls.red).detach<Drag>().build());
     world.sync();
 
-    scheduler.step(world, core::Step{.time = {}, .dt = DT});
+    scheduler.step(lib::InOut(world), core::Step{.time = {}, .dt = DT});
 
     const Kinematics& red = world.store<Kinematics>().get(balls.red);
     CHECK(red.velocity.numerical_value_in(model::metre_per_second)
@@ -38,7 +38,7 @@ TEST_CASE("Hello") {
   }
 
   SECTION("ShouldNotCollideGivenBallsFarApart") {
-    scheduler.step(world, core::Step{.time = {}, .dt = DT});
+    scheduler.step(lib::InOut(world), core::Step{.time = {}, .dt = DT});
     CHECK_FALSE(any_collision(world));
   }
 
@@ -46,7 +46,7 @@ TEST_CASE("Hello") {
     core::TimePoint time{};
     int steps = 0;
     while (!any_collision(world) && steps < 100'000) {
-      scheduler.step(world, core::Step{.time = time, .dt = DT});
+      scheduler.step(lib::InOut(world), core::Step{.time = time, .dt = DT});
       time += DT;
       ++steps;
     }

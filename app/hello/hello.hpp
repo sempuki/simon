@@ -4,6 +4,7 @@
 
 #include <algorithm>
 
+#include "base/core.hpp"
 #include "core/archetype.hpp"
 #include "core/system.hpp"
 #include "core/world.hpp"
@@ -117,9 +118,9 @@ struct Balls {
 };
 
 // Builds the two balls. One metre is drawn as one screen pixel.
-inline Balls build_balls(World& world) {
+inline Balls build_balls(lib::InOut<World> world) {
   Balls balls{
-      .red = *world.create<Ball>("red")
+      .red = *world->create<Ball>("red")
                   .with(Kinematics{.position = metres(360.0, 100.0, 0.0),
                                   .velocity = metres_per_second(10.0, -10.0, 0.0)})
                   .with(Control{})
@@ -129,13 +130,13 @@ inline Balls build_balls(World& world) {
                   .with(Collider{.radius = 10.0 * metre})
                   .with(Collision{})
                   .build(),
-      .blue = *world.create<Ball>("blue")
+      .blue = *world->create<Ball>("blue")
                    .with(Kinematics{.position = metres(360.0, 600.0, 0.0)})
                    .with(Collider{.radius = 10.0 * metre})
                    .with(Collision{})
                    .build(),
   };
-  world.sync();
+  world->sync();
   return balls;
 }
 

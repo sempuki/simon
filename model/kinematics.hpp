@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Eigen/Geometry"
+#include "base/core.hpp"
 #include "model/units.hpp"
 
 namespace simon::model {
@@ -37,12 +38,12 @@ struct Control {
 
 // Advances `kinematics` by `dt` under constant `acceleration`, using the
 // midpoint method (exact for constant acceleration).
-inline void integrate_midpoint(Kinematics& kinematics, const Acceleration& acceleration,
-                               Time dt) {
-  Velocity mid_velocity = kinematics.velocity + acceleration * (dt * 0.5);
-  kinematics.position += mid_velocity * dt;
-  kinematics.velocity += acceleration * dt;
-  kinematics.acceleration = acceleration;
+inline void integrate_midpoint(lib::InOut<Kinematics> kinematics,
+                               const Acceleration& acceleration, Time dt) {
+  Velocity mid_velocity = kinematics->velocity + acceleration * (dt * 0.5);
+  kinematics->position += mid_velocity * dt;
+  kinematics->velocity += acceleration * dt;
+  kinematics->acceleration = acceleration;
 }
 
 }  // namespace simon::model

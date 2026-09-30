@@ -55,6 +55,17 @@ struct Cull : System<const Health> {
   }
 };
 
+// Spawns a child under every launcher, from inside a system.
+struct Spawn : System<const Position> {
+  void operator()(Entity self, const Position& position, auto& context) {
+    REQUIRE(create<testing::Interceptor>(lib::InOut(context))
+                .under(self)
+                .with(Position{position.x})
+                .with(Velocity{})
+                .build());
+  }
+};
+
 // Counts entities with health; runs after Cull, so it sees Cull's commands.
 struct Count : System<const Health> {
   using After = Systems<Cull>;
@@ -78,7 +89,7 @@ TEST_CASE("System") {
     world.sync();
 
     Scheduler<TestWorld, Systems<Record>> scheduler;
-    scheduler.step(world, STEP);
+    scheduler.step(lib::InOut(world), STEP);
 
     auto& seen = scheduler.system<Record>().seen;
     REQUIRE(seen.size() == 2u);
@@ -92,7 +103,7 @@ TEST_CASE("System") {
     world.sync();
 
     Scheduler<TestWorld, Systems<Integrate>> scheduler;
-    scheduler.step(world, STEP);
+    scheduler.step(lib::InOut(world), STEP);
 
     CHECK(world.store<Position>().get(entity).x == 2.0);
   }
@@ -104,7 +115,7 @@ TEST_CASE("System") {
 
     Scheduler<TestWorld, Systems<Chase>> scheduler;
     scheduler.system<Chase>().target = target;
-    scheduler.step(world, STEP);
+    scheduler.step(lib::InOut(world), STEP);
 
     CHECK(world.store<Velocity>().get(chaser).x == 6.0);
   }
@@ -115,7 +126,7 @@ TEST_CASE("System") {
     world.sync();
 
     Scheduler<TestWorld, Systems<Cull, Count>> scheduler;
-    scheduler.step(world, STEP);
+    scheduler.step(lib::InOut(world), STEP);
 
     CHECK(scheduler.system<Count>().count == 1);
     CHECK(scheduler.system<Count>().resolved);
@@ -130,8 +141,8 @@ TEST_CASE("System") {
     auto count = system<const Health>(
         [seen = 0](Entity, const Health&, auto&) mutable { return ++seen; });
     Scheduler<TestWorld, Systems<decltype(count)>> scheduler{Systems{count}};
-    scheduler.step(world, STEP);
-    scheduler.step(world, STEP);
+    scheduler.step(lib::InOut(world), STEP);
+    scheduler.step(lib::InOut(world), STEP);
 
     // The capture persists across steps: two entities, two steps.
     auto& lambda = scheduler.system<decltype(count)>().callable();
@@ -151,7 +162,7 @@ TEST_CASE("System") {
           velocity.x = (mine && other) ? other->x - mine->x : 0.0;
         });
     Scheduler<TestWorld, Systems<decltype(chase)>> scheduler{Systems{chase}};
-    scheduler.step(world, STEP);
+    scheduler.step(lib::InOut(world), STEP);
 
     CHECK(world.store<Velocity>().get(chaser).x == 6.0);
   }
@@ -164,10 +175,23 @@ TEST_CASE("System") {
         [](Entity, Velocity& velocity, auto&) { velocity.x *= 2.0; });
     using Schedule = Systems<decltype(double_velocity), Systems<Integrate>>;
     Scheduler<TestWorld, Schedule> scheduler{Schedule{double_velocity, Systems<Integrate>{}}};
-    scheduler.step(world, STEP);
+    scheduler.step(lib::InOut(world), STEP);
 
     CHECK(world.store<Velocity>().get(entity).x == 2.0);
     CHECK(world.store<Position>().get(entity).x == 1.0);  // 2.0 * 0.5
+  }
+
+  SECTION("ShouldCreateChildrenGivenSystemThatSpawns") {
+    Entity launcher = *world.create<testing::Launcher>().with(Position{3.0}).build();
+    world.sync();
+
+    Scheduler<TestWorld, Systems<Spawn>> scheduler;
+    scheduler.step(lib::InOut(world), STEP);
+
+    REQUIRE(world.store<Position>().size() == 2u);
+    Entity child = world.store<Position>().owner(1);
+    CHECK(world.parent_of(child) == launcher);
+    CHECK(world.store<Position>().get(child).x == 3.0);
   }
 
   SECTION("ShouldFlattenInOrderGivenNestedSchedules") {

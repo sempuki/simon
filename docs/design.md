@@ -28,6 +28,25 @@ We prefer existing, modern libraries for anything outside the core. The core
 (entities, stores, systems, schedules and drivers) is ours, because its layout
 and handle rules are the point of the project.
 
+## Conventions
+
+**Reference arguments are marked at the call site** with `lib`'s wrappers:
+
+| Wrapper | The callee | Call site |
+|---|---|---|
+| `Out<T>` | writes the argument, and may ignore it | `parse(text, Out(result))` |
+| `InOut<T>` | reads and writes the argument | `scheduler.step(InOut(world), step)` |
+| `Depend<T>` | keeps a reference that can dangle | `Context{Depend<World>{world}, step}` |
+
+A plain `T&` parameter is only for what the language or the framework decides:
+operators, and a system's call operator, whose entity-components arrive by
+reference with constness declared in `System<...>`. Computing wrappers from
+that constness would be awkward, and an `In<T>` for const parameters would stray
+too far from common C++. `const T&` needs no wrapper.
+
+A class that takes `Depend<T>` stores a plain pointer, so its hot path does not
+pay for `CheckedPointer`'s null check on every access.
+
 ## Terminology
 
 | Term | Meaning |
@@ -450,7 +469,7 @@ next system runs, so later systems in the same step see the change.
 
 Systems use builders too, through their context. Inside a system whose context
 parameter is `auto&`, the free-function form reads best:
-`create<Interceptor>(context).under(self).with(...).build()`.
+`create<Interceptor>(lib::InOut(context)).under(self).with(...).build()`.
 
 ### Systems
 
@@ -599,7 +618,7 @@ written the batch, and look up the side being read.
 
 ```
 TriggerWarheads   driven by Warhead, reads Kinematics*   writes its own warhead state
-   │  on trigger:  create<Blast>(context).under(self).with(Kinematics{...}).with(Blast{...}).build()
+   │  on trigger:  create<Blast>(InOut(context)).under(self).with(Kinematics{...}).with(Blast{...}).build()
    │               context.destroy(self).build()
    ▼  sync point: this step's Blast entities exist
 ApplyBlasts       driven by Health, reads Kinematics*    victims are the batch; each writes only itself

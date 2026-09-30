@@ -199,7 +199,8 @@ class Context final {
   using World = WorldType;
   using SpatialComponent = typename World::SpatialComponent;
 
-  Context(World& world, const Step& step) : world_{world}, step_{step} {}
+  // Keeps a reference to `world` for as long as the context lives.
+  Context(lib::Depend<World> world, Step step) : world_{world.get()}, step_{step} {}
 
   const Step& step() const { return step_; }
 
@@ -207,7 +208,7 @@ class Context final {
   const Component* lookup(Entity entity) const {
     static_assert(contains_v<lookups_of_t<SystemType>, Component>,
                   "Declare this component in the system's Lookups to look it up.");
-    return world_.template store<Component>().try_get(entity);
+    return world_->template store<Component>().try_get(entity);
   }
 
   // A declared lookup store, for whole-store reads such as in `prepare`.
@@ -215,7 +216,7 @@ class Context final {
   const Store<Component>& store() const {
     static_assert(contains_v<lookups_of_t<SystemType>, Component>,
                   "Declare this component in the system's Lookups to read its store.");
-    return world_.template store<Component>();
+    return world_->template store<Component>();
   }
 
   template <typename Visitor>
@@ -224,28 +225,28 @@ class Context final {
     static_assert(contains_v<lookups_of_t<SystemType>, SpatialComponent>,
                   "Declare the spatial component in the system's Lookups to "
                   "query space.");
-    world_.within(center, radius, std::forward<Visitor>(visit));
+    world_->within(center, radius, std::forward<Visitor>(visit));
   }
 
-  bool alive(Entity entity) const { return world_.alive(entity); }
-  Name name_of(Entity entity) const { return world_.name_of(entity); }
-  Name archetype_of(Entity entity) const { return world_.archetype_of(entity); }
-  std::optional<Entity> entity_of(Name name) const { return world_.entity_of(name); }
-  std::optional<Name> find(std::string_view identity) const { return world_.find(identity); }
+  bool alive(Entity entity) const { return world_->alive(entity); }
+  Name name_of(Entity entity) const { return world_->name_of(entity); }
+  Name archetype_of(Entity entity) const { return world_->archetype_of(entity); }
+  std::optional<Entity> entity_of(Name name) const { return world_->entity_of(name); }
+  std::optional<Name> find(std::string_view identity) const { return world_->find(identity); }
   std::vector<Name> find_alias(std::string_view alias) const {
-    return world_.find_alias(alias);
+    return world_->find_alias(alias);
   }
 
   template <ArchetypeType Archetype>
   auto create(std::string_view alias = {}) {
-    return world_.template create<Archetype>(alias);
+    return world_->template create<Archetype>(alias);
   }
-  auto change(Entity entity) { return world_.change(entity); }
-  auto destroy(Entity entity) { return world_.destroy(entity); }
+  auto change(Entity entity) { return world_->change(entity); }
+  auto destroy(Entity entity) { return world_->destroy(entity); }
 
  private:
-  World& world_;
-  const Step& step_;
+  World* world_;  // Never null; checked once by Depend at construction.
+  Step step_;
 };
 
 // Free-function forms of the Context member templates, so a system whose
@@ -263,15 +264,15 @@ const Store<Component>& store(const Context<SystemType, World>& context) {
 }
 
 template <ArchetypeType Archetype, typename SystemType, typename World>
-auto create(Context<SystemType, World>& context, std::string_view alias = {}) {
-  return context.template create<Archetype>(alias);
+auto create(lib::InOut<Context<SystemType, World>> context, std::string_view alias = {}) {
+  return context->template create<Archetype>(alias);
 }
 
 //-- Running systems ------------------------------------------------------------
 
 struct SystemRunner final {
   template <typename SystemType, typename World>
-  static void run(SystemType& system, World& world, const Step& step) {
+  static void run(lib::InOut<SystemType> system, lib::InOut<World> world, const Step& step) {
     using Components = components_of_t<SystemType>;
     using Lookups = lookups_of_t<SystemType>;
     using Writes = writes_of_t<SystemType>;
@@ -286,30 +287,30 @@ struct SystemRunner final {
                   "reading an array partway through writing it depends on "
                   "iteration order.");
 
-    Context<SystemType, World> context{world, step};
-    if constexpr (requires { system.prepare(context); }) {
-      system.prepare(context);
+    Context<SystemType, World> context{lib::Depend<World>{*world}, step};
+    if constexpr (requires { system->prepare(context); }) {
+      system->prepare(context);
     }
-    loop(system, world, context, typename SystemType::OptionalTypes{});
-    if constexpr (requires { system.resolve(context); }) {
-      system.resolve(context);
+    loop(system, world, lib::InOut(context), typename SystemType::OptionalTypes{});
+    if constexpr (requires { system->resolve(context); }) {
+      system->resolve(context);
     }
   }
 
  private:
   template <typename Component, typename World>
-  static decltype(auto) store_for(World& world) {
+  static decltype(auto) store_for(lib::InOut<World> world) {
     if constexpr (std::is_const_v<Component>) {
-      return world.template store<std::remove_const_t<Component>>();
+      return std::as_const(*world).template store<std::remove_const_t<Component>>();
     } else {
-      return world.template mutable_store<Component>(SystemAccess{});
+      return world->template mutable_store<Component>(SystemAccess{});
     }
   }
 
   template <typename SystemType, typename World, typename ContextType,
             typename... Optional>
-  static void loop(SystemType& system, World& world, ContextType& context,
-                   TypeList<Optional...>) {
+  static void loop(lib::InOut<SystemType> system, lib::InOut<World> world,
+                   lib::InOut<ContextType> context, TypeList<Optional...>) {
     using Drive = typename SystemType::DriveType;
     static_assert(
         std::is_invocable_v<SystemType&, Entity, Drive&, Optional*..., ContextType&>,
@@ -318,11 +319,14 @@ struct SystemRunner final {
 
     auto&& drive = store_for<Drive>(world);
     auto optional = std::forward_as_tuple(store_for<Optional>(world)...);
+    // Unwrapped once, outside the loop, so the hot path has no pointer checks.
+    SystemType& call = *system;
+    ContextType& shared = *context;
     std::apply(
         [&](auto&... optional_store) {
           for (std::size_t i = 0; i < drive.size(); ++i) {
             Entity entity = drive.owner(i);
-            system(entity, drive.data(i), optional_store.try_get(entity)..., context);
+            call(entity, drive.data(i), optional_store.try_get(entity)..., shared);
           }
         },
         optional);
@@ -377,10 +381,10 @@ class Scheduler final {
   = default;
   explicit Scheduler(Schedule schedule) : systems_{flatten_systems(std::move(schedule))} {}
 
-  void step(World& world, const Step& step) {
+  void step(lib::InOut<World> world, const Step& step) {
     std::apply(
         [&](auto&... system) {
-          ((SystemRunner::run(system, world, step), world.sync()), ...);
+          ((SystemRunner::run(lib::InOut(system), world, step), world->sync()), ...);
         },
         systems_);
   }

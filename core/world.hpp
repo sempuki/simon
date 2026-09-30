@@ -104,10 +104,13 @@ class World final {
   // Creates an entity of `Archetype`, with an optional alias.
   template <ArchetypeType Archetype>
   auto create(std::string_view alias = {}) {
-    return CreateBuilder<World, Archetype, true>{this, std::string{alias}, std::nullopt, {}};
+    return CreateBuilder<World, Archetype, true>{lib::Depend<World>{*this}, std::string{alias},
+                                                 std::nullopt, {}};
   }
-  auto change(Entity entity) { return ChangeBuilder<World>{this, entity, {}, {}}; }
-  auto destroy(Entity entity) { return DestroyBuilder<World>{this, entity}; }
+  auto change(Entity entity) {
+    return ChangeBuilder<World>{lib::Depend<World>{*this}, entity, {}, {}};
+  }
+  auto destroy(Entity entity) { return DestroyBuilder<World>{lib::Depend<World>{*this}, entity}; }
 
   // Applies every pending command, in the order it was recorded. Builders
   // validated each command against the state the world would be in, so this
@@ -115,7 +118,7 @@ class World final {
   void sync() {
     std::vector<Command> commands = std::exchange(commands_, {});
     for (Command& command : commands) {
-      std::visit([&](auto& operation) { this->apply(operation); }, command);
+      std::visit([&](auto& operation) { this->apply(lib::InOut(operation)); }, command);
     }
     std::apply([](auto&... plan) { (plan.clear(), ...); }, plans_);
     for (std::uint32_t index : destroying_list_) {
@@ -534,19 +537,20 @@ class World final {
   //-- Applying commands --------------------------------------------------------
 
   template <typename Component>
-  void apply(AttachCommand<Component>& command) {
-    CHECK_INVARIANT(alive(command.entity));
-    std::get<Store<Component>>(stores_).append(command.entity, std::move(command.component));
+  void apply(lib::InOut<AttachCommand<Component>> command) {
+    CHECK_INVARIANT(alive(command->entity));
+    std::get<Store<Component>>(stores_).append(command->entity,
+                                               std::move(command->component));
   }
 
   template <typename Component>
-  void apply(DetachCommand<Component>& command) {
-    CHECK_INVARIANT(alive(command.entity));
-    std::get<Store<Component>>(stores_).erase(command.entity);
+  void apply(lib::InOut<DetachCommand<Component>> command) {
+    CHECK_INVARIANT(alive(command->entity));
+    std::get<Store<Component>>(stores_).erase(command->entity);
   }
 
-  void apply(DestroyCommand& command) {
-    Entity entity = command.entity;
+  void apply(lib::InOut<DestroyCommand> command) {
+    Entity entity = command->entity;
     CHECK_INVARIANT(alive(entity));
     Name name = name_of(entity);
     for (const std::string& alias : aliases_of(name)) {

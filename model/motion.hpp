@@ -14,7 +14,7 @@ namespace simon::model {
 struct Integrate : core::System<Kinematics, const Control> {
   void operator()(core::Entity, Kinematics& kinematics, const Control* control,
                   auto& context) const {
-    integrate_midpoint(kinematics,
+    integrate_midpoint(lib::InOut(kinematics),
                        control ? control->acceleration : metres_per_second_squared(0, 0, 0),
                        seconds(context.step().dt));
   }
