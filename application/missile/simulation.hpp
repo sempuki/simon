@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -44,17 +45,100 @@ struct Scenario final {
 
 enum class Outcome { UNDECIDED, BLUE_WINS, RED_WINS };
 
+// A world big enough for everything a scenario can create at once: the asset,
+// radars, launchers, every drone with its track and blast, and every
+// interceptor with its blast.
+inline framework::WorldConfiguration world_configuration_of(
+    const Scenario& scenario) {
+  auto count = [](int value) {
+    return static_cast<std::size_t>(std::max(value, 0));
+  };
+  std::size_t interceptors = count(scenario.launchers) * scenario.inventory;
+  std::size_t entities = 1 + count(scenario.radars) +
+                         count(scenario.launchers) +
+                         3 * count(scenario.drones) + 2 * interceptors;
+  return framework::WorldConfiguration{
+      .number = 1, .entities = entities, .components = entities};
+}
+
+// A point `radius` from the origin at `bearing` radians from east.
+inline Position on_ring(Length radius, double bearing) {
+  double length = radius.numerical_value_in(model::meter);
+  return model::meters(length * std::cos(bearing), length * std::sin(bearing),
+                       0.0);
+}
+
+// Places the asset at the origin, radars and launchers on rings around it, and
+// red drones at random bearings, flying at it. Returns the asset.
+inline Entity build_scenario(lib::InOut<World> world,
+                             const Scenario& scenario) {
+  constexpr double TURN = 2.0 * std::numbers::pi;
+  auto asset = world->create<archetype::Asset>("asset")
+                   .with(Kinematics{})
+                   .with(Health{.points = scenario.asset_health})
+                   .with(Asset{})
+                   .build();
+  CHECK_POSTCONDITION(asset.has_value());
+  Entity asset_entity = *asset;
+
+  for (int i = 0; i < scenario.radars; ++i) {
+    double bearing = TURN * i / scenario.radars;
+    auto radar =
+        world->create<archetype::Radar>()
+            .with(Kinematics{.position = on_ring(scenario.radar_ring, bearing)})
+            .with(Radar{.range = scenario.radar_range,
+                        .scan = engine::RateGate{scenario.scan_period}})
+            .build();
+    CHECK_POSTCONDITION(radar.has_value());
+  }
+
+  for (int i = 0; i < scenario.launchers; ++i) {
+    double bearing = TURN * (i + 0.5) / scenario.launchers;
+    auto launcher = world->create<archetype::Launcher>()
+                        .with(Kinematics{.position = on_ring(
+                                             scenario.launcher_ring, bearing)})
+                        .with(Launcher{.range = scenario.launcher_range,
+                                       .inventory = scenario.inventory,
+                                       .reload = scenario.reload})
+                        .build();
+    CHECK_POSTCONDITION(launcher.has_value());
+  }
+
+  model::Random random{scenario.seed};
+  Kinematics asset_kinematics;
+  for (int i = 0; i < scenario.drones; ++i) {
+    double bearing = random.uniform(0.0, TURN);
+    Length radius = scenario.spawn_distance +
+                    scenario.spawn_spread * random.uniform(-0.5, 0.5);
+    Kinematics kinematics{.position = on_ring(radius, bearing)};
+    kinematics.velocity =
+        (asset_kinematics.position - kinematics.position) *
+        (scenario.drone_cruise /
+         norm(asset_kinematics.position - kinematics.position));
+    auto drone = world->create<archetype::RedDrone>()
+                     .with(kinematics)
+                     .with(Control{})
+                     .with(Health{.points = 1.0})
+                     .with(scenario.drone_warhead)
+                     .with(RedDrone{.target = asset_entity,
+                                    .cruise = scenario.drone_cruise,
+                                    .agility = scenario.drone_agility})
+                     .build();
+    CHECK_POSTCONDITION(drone.has_value());
+  }
+  world->sync();
+  return asset_entity;
+}
+
 // The missile simulation: builds the scenario when configured, and stops when
 // red is defeated or the asset is destroyed. Any driver can run it.
 class Simulation final {
  public:
   explicit Simulation(Scenario scenario = {})
-      : scenario_{scenario},
-        world_{framework::WorldConfiguration{
-            .number = 1, .entities = 1024, .components = 1024}} {}
+      : scenario_{scenario}, world_{world_configuration_of(scenario)} {}
 
   engine::PhaseResult configure() {
-    build(lib::InOut(world_));
+    asset_ = build_scenario(lib::InOut(world_), scenario_);
     return engine::Flow::CONTINUE;
   }
 
@@ -85,72 +169,6 @@ class Simulation final {
   }
 
  private:
-  static Position on_ring(Length radius, double bearing) {
-    double length = radius.numerical_value_in(model::meter);
-    return model::meters(length * std::cos(bearing), length * std::sin(bearing),
-                         0.0);
-  }
-
-  void build(lib::InOut<World> world) {
-    constexpr double TURN = 2.0 * std::numbers::pi;
-    auto asset = world->create<archetype::Asset>("asset")
-                     .with(Kinematics{})
-                     .with(Health{.points = scenario_.asset_health})
-                     .with(Asset{})
-                     .build();
-    CHECK_POSTCONDITION(asset.has_value());
-    asset_ = *asset;
-
-    for (int i = 0; i < scenario_.radars; ++i) {
-      double bearing = TURN * i / scenario_.radars;
-      auto radar =
-          world->create<archetype::Radar>()
-              .with(Kinematics{.position =
-                                   on_ring(scenario_.radar_ring, bearing)})
-              .with(Radar{.range = scenario_.radar_range,
-                          .scan = engine::RateGate{scenario_.scan_period}})
-              .build();
-      CHECK_POSTCONDITION(radar.has_value());
-    }
-
-    for (int i = 0; i < scenario_.launchers; ++i) {
-      double bearing = TURN * (i + 0.5) / scenario_.launchers;
-      auto launcher =
-          world->create<archetype::Launcher>()
-              .with(Kinematics{.position =
-                                   on_ring(scenario_.launcher_ring, bearing)})
-              .with(Launcher{.range = scenario_.launcher_range,
-                             .inventory = scenario_.inventory,
-                             .reload = scenario_.reload})
-              .build();
-      CHECK_POSTCONDITION(launcher.has_value());
-    }
-
-    model::Random random{scenario_.seed};
-    Kinematics asset_kinematics;
-    for (int i = 0; i < scenario_.drones; ++i) {
-      double bearing = random.uniform(0.0, TURN);
-      Length radius = scenario_.spawn_distance +
-                      scenario_.spawn_spread * random.uniform(-0.5, 0.5);
-      Kinematics kinematics{.position = on_ring(radius, bearing)};
-      kinematics.velocity =
-          (asset_kinematics.position - kinematics.position) *
-          (scenario_.drone_cruise /
-           norm(asset_kinematics.position - kinematics.position));
-      auto drone = world->create<archetype::RedDrone>()
-                       .with(kinematics)
-                       .with(Control{})
-                       .with(Health{.points = 1.0})
-                       .with(scenario_.drone_warhead)
-                       .with(RedDrone{.target = asset_,
-                                      .cruise = scenario_.drone_cruise,
-                                      .agility = scenario_.drone_agility})
-                       .build();
-      CHECK_POSTCONDITION(drone.has_value());
-    }
-    world->sync();
-  }
-
   Scenario scenario_;
   World world_;
   Scheduler scheduler_;

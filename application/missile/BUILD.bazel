@@ -67,3 +67,16 @@ cc_binary(
         "@sdl2",
     ],
 )
+
+# Times the simulation at growing populations, system by system. Run with
+# bazel run -c opt //application/missile:missile_benchmark
+cc_binary(
+    name = "missile_benchmark",
+    srcs = ["missile_benchmark.cpp"],
+    copts = COPTS,
+    deps = [
+        ":missile_library",
+        "//framework",
+        "@lib//base:core",
+    ],
+)

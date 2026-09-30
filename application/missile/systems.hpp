@@ -2,10 +2,13 @@
 
 #pragma once
 
+#include <algorithm>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <utility>
+#include <vector>
 
 #include "application/missile/components.hpp"
 #include "base/core.hpp"
@@ -80,17 +83,31 @@ struct UpdateTracks final : System<Track> {
   using SequenceAfterSystemList = SystemList<ScanRadars>;
   using AllowComponentList = TypeList<Kinematics, Radar>;
 
-  void operator()(LocalWorld& world, Entity, Track& track, Step step) {
-    const Kinematics* target = world.try_component_of<Kinematics>(track.target);
-    if (!target) {
-      return;
-    }
+  // Collects the radars that scanned this step, once, so each track checks
+  // only those. Radars scan a few times a second, so most steps there are none.
+  void prepare(LocalWorld& world) {
+    scanning_.clear();
     const auto& radars = world.store_of<Radar>();
     for (std::size_t i = 0; i < radars.size(); ++i) {
       const Kinematics* radar =
           world.try_component_of<Kinematics>(radars.owner(i));
-      if (radars.data(i).scanned && radar &&
-          distance(*radar, *target) <= radars.data(i).range) {
+      if (radars.data(i).scanned && radar) {
+        scanning_.push_back(
+            Scanning{.radar = radar, .range = radars.data(i).range});
+      }
+    }
+  }
+
+  void operator()(LocalWorld& world, Entity, Track& track, Step step) {
+    if (scanning_.empty()) {
+      return;
+    }
+    const Kinematics* target = world.try_component_of<Kinematics>(track.target);
+    if (!target) {
+      return;
+    }
+    for (const Scanning& scanning : scanning_) {
+      if (distance(*scanning.radar, *target) <= scanning.range) {
         track.position = target->position;
         track.velocity = target->velocity;
         track.last_seen = step.time;
@@ -98,6 +115,13 @@ struct UpdateTracks final : System<Track> {
       }
     }
   }
+
+ private:
+  struct Scanning final {
+    const Kinematics* radar = nullptr;  // Valid until the next sync point.
+    Length range = 0.0 * model::meter;
+  };
+  std::vector<Scanning> scanning_;
 };
 
 // Destroys tracks whose target is gone or has not been seen for `timeout`, and
@@ -163,29 +187,55 @@ struct ResolveEngagements final : System<Track> {
   using SequenceAfterSystemList = SystemList<ProposeEngagements>;
   using AllowComponentList = TypeList<Launcher, Kinematics>;
 
+  // Indexes this step's proposals by track, once, so each track finds its
+  // proposers without scanning every launcher. Launchers are indexed in store
+  // order, so ties still go to the launcher that comes first.
+  void prepare(LocalWorld& world) {
+    proposals_.clear();
+    const auto& launchers = world.store_of<Launcher>();
+    for (std::size_t i = 0; i < launchers.size(); ++i) {
+      Entity track = launchers.data(i).proposal;
+      if (track != Entity{}) {
+        proposals_.push_back(
+            Proposal{.track = track.index, .launcher = launchers.owner(i)});
+      }
+    }
+    std::ranges::stable_sort(proposals_, {}, &Proposal::track);
+  }
+
   void operator()(LocalWorld& world, Entity self, Track& track, Step step) {
     TimePoint now = step.time;
     if (track.engaged_by != Entity{} && now < track.engaged_until) {
       return;
     }
-    const auto& launchers = world.store_of<Launcher>();
+    auto [begin, end] =
+        std::ranges::equal_range(proposals_, self.index, {}, &Proposal::track);
     std::optional<Length> nearest;
-    for (std::size_t i = 0; i < launchers.size(); ++i) {
+    for (auto proposal = begin; proposal != end; ++proposal) {
       const Kinematics* launcher =
-          world.try_component_of<Kinematics>(launchers.owner(i));
-      if (launchers.data(i).proposal != self || !launcher) {
-        continue;
+          world.try_component_of<Kinematics>(proposal->launcher);
+      if (!launcher || world.store_of<Launcher>()
+                               .component_of(proposal->launcher)
+                               .proposal != self) {
+        continue;  // A stale index entry for a reused entity index.
       }
       Length range = distance_between(track.position, launcher->position);
       if (!nearest || range < *nearest) {
         nearest = range;
-        track.engaged_by = launchers.owner(i);
+        track.engaged_by = proposal->launcher;
         track.engaged_until = now + engagement;
       }
     }
   }
 
   Duration engagement = 30s;  // About an interceptor's flight time.
+
+ private:
+  struct Proposal final {
+    std::uint32_t track = 0;  // The proposed track's entity index.
+    Entity launcher;
+  };
+  std::vector<Proposal> proposals_;
 };
 
 // What every interceptor is built with.
