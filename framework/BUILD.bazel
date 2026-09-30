@@ -92,7 +92,11 @@ cc_library(
     name = "benchmark_support",
     hdrs = ["benchmark_support.hpp"],
     copts = COPTS,
-    visibility = ["//visibility:private"],
+    # For benchmarks only.
+    visibility = [
+        "//application:__subpackages__",
+        "//framework:__pkg__",
+    ],
     deps = ["@lib//base:core"],
 )
 

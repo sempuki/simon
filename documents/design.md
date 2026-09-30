@@ -1128,6 +1128,31 @@ population. At 10,000 drones the old loop over 100 radars was cheaper; a query
 has fixed cost. With 1 km cells the query visited dozens of empty cells and
 took 0.499 ms at 100,000 drones, so cell size matters as much as the index.
 
+Under contention (`missile_benchmark --contend=N`, N threads each streaming
+over 256 MB), over 200 steps including the first radar scan, ms per step and
+the slowdown against an idle machine:
+
+| Contending threads | 10,000 drones | 100,000 drones |
+|---:|---:|---:|
+| 0 | 1.20 | 9.4 |
+| 4 | 1.82 (1.5×) | 40.8 (4.3×) |
+| 16 | 14.7 (12×) | 141 (15×) |
+| 31 | 30.6 (26×) | 466 (49×) |
+
+- **Light contention separates the sizes.** With 4 threads, 10,000 drones slow
+  1.5 times and 100,000 slow 4.3 times. The smaller working set is probably
+  still mostly in the 32 MiB L3; the larger one is several times bigger and
+  depends on memory bandwidth, which the neighbors take. This is the bar in
+  step 5: at scale the simulation is bandwidth-bound, so the bytes each entity
+  touches per step are what to reduce.
+- **At 16 and 31 threads the benchmark also competes for cores.** The machine
+  has 32 hardware threads, so those runs measure CPU contention as well as
+  memory contention, and overstate a realistic neighbor. 4 to 8 threads is
+  probably closer.
+- **This window runs slower than the 500-step table above,** because it
+  includes the step where every drone gets a track: 9.4 ms idle at 100,000
+  drones here, against 6.3 ms over 500 steps.
+
 Entities replicated from another process enter the same indexes, so a spatial
 query finds a red drone whether red is simulated locally or remotely.
 
@@ -1602,7 +1627,10 @@ Each step ends with a working application and passing tests.
      spatial index, `system_benchmark` (the cost of reaching a sibling) and
      `churn_benchmark` (layouts under churn).
    - Done: archetype segments (see [Stores](#stores)).
-   - Next: remeasure the missile simulation idle and contended.
+   - Done: the missile simulation measured idle and contended (see
+     [Indexes](#indexes)). At 100,000 drones, 4 contending threads slow it
+     4.3 times.
+   - Next: reduce the bytes each entity touches per step.
    Consider struct-of-arrays layout inside hot components only if measurements
    call for it.
 
@@ -1621,7 +1649,7 @@ interop.
 - **A realistic contention load.** `--contend` runs a streaming thread on every
   spare core, close to the worst case on the development machine, and
   `--contend=N` runs N. Which N resembles a busy cloud neighbor is still to be
-  decided.
+  decided; 4 to 8 on the development machine avoids also taking its cores.
 
 ## Lessons from the older simulator
 

@@ -2,26 +2,35 @@
 
 // Times the missile simulation at growing populations, system by system.
 //
-//   bazel run -c opt //application/missile:missile_benchmark
+//   bazel run -c opt //application/missile:missile_benchmark [-- --steps N]
+//       [--contend[=N]] [drones...]
 //
 // Each scenario spawns its drones inside radar and launcher range, so
 // sensing, engagement, guidance and blasts all run from the first steps.
-// Radars and launchers scale with the drones. Each system runs in its own
-// single-system scheduler, in schedule order, against one world; that is the
-// same as the full schedule, which also syncs after every system.
+// Sites (each with its asset, radars, launchers and 1,000 drones) scale with
+// the drones, so density stays the same. --contend runs one thread per spare
+// core streaming over a large buffer, to compete for shared cache and memory
+// bandwidth as a busy cloud host would; --contend=N runs N. Each system runs in
+// its own single-system scheduler, in schedule order, against one world; that
+// is the same as the full schedule, which also syncs after every system.
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <chrono>
 #include <cstddef>
+#include <cstdio>
+#include <optional>
 #include <print>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <tuple>
 #include <vector>
 
 #include "application/missile/simulation.hpp"
 #include "base/core.hpp"
+#include "framework/benchmark_support.hpp"
 #include "framework/type_list.hpp"
 
 namespace simon::missile {
@@ -123,26 +132,54 @@ void measure(int drones, int maximum_steps, bool budgeted) {
 }  // namespace
 }  // namespace simon::missile
 
-// missile_benchmark [--steps N] [drones...]
+namespace {
+
+// A whole positive number, or nothing.
+std::optional<int> count_of(std::string_view text) {
+  int count = 0;
+  auto [end, error] =
+      std::from_chars(text.data(), text.data() + text.size(), count);
+  if (error != std::errc{} || end != text.data() + text.size() || count <= 0) {
+    return std::nullopt;
+  }
+  return count;
+}
+
+}  // namespace
+
+// missile_benchmark [--steps N] [--contend[=N]] [drones...]
 //
 // Without --steps, each population runs up to 500 steps or 30 s of wall time,
 // whichever comes first. Radars scan once a second, so compare runs only over
 // the same number of steps.
 int main(int argc, char** argv) {
+  using simon::framework::benchmark::Contention;
   int steps = simon::missile::DEFAULT_STEPS;
   bool budgeted = true;
+  unsigned threads = 0;
   std::vector<int> populations;
   for (int i = 1; i < argc; ++i) {
-    if (std::string_view{argv[i]} == "--steps" && i + 1 < argc) {
-      steps = std::stoi(argv[++i]);
+    std::string_view argument{argv[i]};
+    std::optional<int> count;
+    if (argument == "--steps" && i + 1 < argc &&
+        (count = count_of(argv[i + 1]))) {
+      steps = *count;
       budgeted = false;
+      ++i;
+    } else if (auto asked = Contention::threads_from(argument)) {
+      threads = *asked;
+    } else if ((count = count_of(argument))) {
+      populations.push_back(*count);
     } else {
-      populations.push_back(std::stoi(argv[i]));
+      std::println(stderr, "unknown argument: {}", argument);
+      return 1;
     }
   }
   if (populations.empty()) {
     populations = {1'000, 10'000, 100'000};
   }
+  Contention contention{threads};
+  std::println("{}", Contention::describe(threads));
   for (int drones : populations) {
     simon::missile::measure(drones, steps, budgeted);
   }

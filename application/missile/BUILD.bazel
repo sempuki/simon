@@ -77,6 +77,7 @@ cc_binary(
     deps = [
         ":missile_library",
         "//framework",
+        "//framework:benchmark_support",
         "@lib//base:core",
     ],
 )
