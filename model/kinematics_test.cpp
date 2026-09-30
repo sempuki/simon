@@ -8,7 +8,8 @@ namespace simon::model {
 
 namespace {
 bool near(const Displacement& a, const Displacement& b) {
-  return a.numerical_value_in(metre).is_approximately(b.numerical_value_in(metre));
+  return a.numerical_value_in(metre).is_approximately(
+      b.numerical_value_in(metre));
 }
 bool near(const Velocity& a, const Velocity& b) {
   return a.numerical_value_in(metre_per_second)
@@ -23,7 +24,8 @@ TEST_CASE("IntegrateMidpoint") {
     kinematics.position = metres(1.0, 2.0, 3.0);
     kinematics.velocity = metres_per_second(4.0, -2.0, 0.0);
 
-    integrate_midpoint(lib::InOut(kinematics), metres_per_second_squared(0.0, 0.0, 0.0), 0.5 * second);
+    integrate_midpoint(lib::InOut(kinematics),
+                       metres_per_second_squared(0.0, 0.0, 0.0), 0.5 * second);
 
     CHECK(near(kinematics.position, metres(3.0, 1.0, 3.0)));
     CHECK(near(kinematics.velocity, metres_per_second(4.0, -2.0, 0.0)));
@@ -32,7 +34,8 @@ TEST_CASE("IntegrateMidpoint") {
   SECTION("ShouldMatchKinematicEquationsGivenConstantAcceleration") {
     kinematics.velocity = metres_per_second(1.0, 0.0, 0.0);
 
-    integrate_midpoint(lib::InOut(kinematics), metres_per_second_squared(0.0, 2.0, 0.0), 0.5 * second);
+    integrate_midpoint(lib::InOut(kinematics),
+                       metres_per_second_squared(0.0, 2.0, 0.0), 0.5 * second);
 
     // p = v*t + a*t^2/2, v' = v + a*t
     CHECK(near(kinematics.position, metres(0.5, 0.25, 0.0)));

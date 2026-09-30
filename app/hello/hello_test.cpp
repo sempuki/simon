@@ -11,7 +11,8 @@
 namespace simon::hello {
 
 namespace {
-const core::WorldConfiguration CONFIGURATION{.number = 1, .entities = 8, .components = 8};
+const core::WorldConfiguration CONFIGURATION{
+    .number = 1, .entities = 8, .components = 8};
 const core::Duration DT{0.01};
 }  // namespace
 
@@ -23,7 +24,8 @@ TEST_CASE("Hello") {
   SECTION("ShouldFindBallsByAliasGivenScenario") {
     CHECK(world.find_alias("red") == std::vector{world.name_of(balls.red)});
     CHECK(world.find_alias("blue") == std::vector{world.name_of(balls.blue)});
-    CHECK(world.aliases_of(world.archetype_of(balls.red)) == std::vector<std::string>{"ball"});
+    CHECK(world.aliases_of(world.archetype_of(balls.red)) ==
+          std::vector<std::string>{"ball"});
   }
 
   SECTION("ShouldAccelerateByThrustGivenNoDragAndNoWind") {

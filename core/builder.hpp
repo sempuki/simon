@@ -23,7 +23,8 @@ namespace simon::core {
 // grammar. Each utterance starts with a verb on the world and ends with
 // `build()`:
 //
-//   world.create<Ball>("Luke Skywalker").under(squadron).with(Kinematics{}).build();
+//   world.create<Ball>("Luke Skywalker").under(squadron)
+//        .with(Kinematics{}).build();
 //   world.change(ball).attach(Health{}).detach<Drag>().alias("ego").build();
 //   world.destroy(ball).build();
 //
@@ -37,14 +38,16 @@ namespace simon::core {
 
 template <typename Component>
 inline constexpr bool is_built_in_v =
-    std::is_same_v<Component, EntityArchetype> || std::is_same_v<Component, Parent>;
+    std::is_same_v<Component, EntityArchetype> ||
+    std::is_same_v<Component, Parent>;
 
-template <typename World, ArchetypeType Archetype, bool CanParent, typename... Initial>
+template <typename World, ArchetypeType Archetype, bool CanParent,
+          typename... Initial>
 class [[nodiscard]] CreateBuilder final {
  public:
   // Keeps a reference to `world` until the utterance is built.
-  CreateBuilder(lib::Depend<World> world, std::string alias, std::optional<Entity> parent,
-                std::tuple<Initial...> components)
+  CreateBuilder(lib::Depend<World> world, std::string alias,
+                std::optional<Entity> parent, std::tuple<Initial...> components)
       : world_{world.get()},
         alias_{std::move(alias)},
         parent_{parent},
@@ -55,8 +58,8 @@ class [[nodiscard]] CreateBuilder final {
   auto under(Entity parent) &&
     requires CanParent
   {
-    return CreateBuilder<World, Archetype, false>{lib::Depend<World>{*world_},
-                                                  std::move(alias_), parent, {}};
+    return CreateBuilder<World, Archetype, false>{
+        lib::Depend<World>{*world_}, std::move(alias_), parent, {}};
   }
 
   // Declares a component the entity starts with.
@@ -65,22 +68,25 @@ class [[nodiscard]] CreateBuilder final {
     using Component = std::remove_cvref_t<Argument>;
     static_assert(contains_v<typename World::ComponentList, Component>,
                   "This component is not in the world's component list.");
-    static_assert(!is_built_in_v<Component>,
-                  "Built-in components come from create<Archetype> and under().");
-    static_assert(contains_v<typename Archetype::PermittedComponents, Component>,
-                  "The entity's archetype neither requires nor allows this component.");
+    static_assert(
+        !is_built_in_v<Component>,
+        "Built-in components come from create<Archetype> and under().");
+    static_assert(
+        contains_v<typename Archetype::PermittedComponents, Component>,
+        "The entity's archetype neither requires nor allows this component.");
     static_assert(!contains_v<TypeList<Initial...>, Component>,
                   "The entity already starts with this component.");
     return CreateBuilder<World, Archetype, false, Initial..., Component>{
         lib::Depend<World>{*world_}, std::move(alias_), parent_,
-        std::tuple_cat(std::move(components_),
-                       std::tuple<Component>{std::forward<Argument>(component)})};
+        std::tuple_cat(
+            std::move(components_),
+            std::tuple<Component>{std::forward<Argument>(component)})};
   }
 
   std::expected<Entity, Status> build() && {
-    static_assert(
-        is_subset_v<typename Archetype::RequiredComponents, TypeList<Initial...>>,
-        "The entity lacks a component its archetype requires.");
+    static_assert(is_subset_v<typename Archetype::RequiredComponents,
+                              TypeList<Initial...>>,
+                  "The entity lacks a component its archetype requires.");
     return world_->template build_create<Archetype>(alias_, parent_,
                                                     std::move(components_));
   }
@@ -101,14 +107,15 @@ template <typename World, typename AttachedList = TypeList<>,
           typename DetachedList = TypeList<>, bool Aliasing = false>
 class ChangeBuilder;
 
-template <typename World, typename... Attached, typename... Detached, bool Aliasing>
-class [[nodiscard]] ChangeBuilder<World, TypeList<Attached...>, TypeList<Detached...>,
-                                  Aliasing>
+template <typename World, typename... Attached, typename... Detached,
+          bool Aliasing>
+class [[nodiscard]]
+ChangeBuilder<World, TypeList<Attached...>, TypeList<Detached...>, Aliasing>
     final {
  public:
   // Keeps a reference to `world` until the utterance is built.
-  ChangeBuilder(lib::Depend<World> world, Entity entity, std::tuple<Attached...> components,
-                AliasChanges aliases)
+  ChangeBuilder(lib::Depend<World> world, Entity entity,
+                std::tuple<Attached...> components, AliasChanges aliases)
       : world_{world.get()},
         entity_{entity},
         components_{std::move(components)},
@@ -119,11 +126,12 @@ class [[nodiscard]] ChangeBuilder<World, TypeList<Attached...>, TypeList<Detache
   auto attach(Argument&& component) && {
     using Component = std::remove_cvref_t<Argument>;
     check_component<Component>();
-    return ChangeBuilder<World, TypeList<Attached..., Component>, TypeList<Detached...>,
-                         Aliasing>{
+    return ChangeBuilder<World, TypeList<Attached..., Component>,
+                         TypeList<Detached...>, Aliasing>{
         lib::Depend<World>{*world_}, entity_,
-        std::tuple_cat(std::move(components_),
-                       std::tuple<Component>{std::forward<Argument>(component)}),
+        std::tuple_cat(
+            std::move(components_),
+            std::tuple<Component>{std::forward<Argument>(component)}),
         std::move(aliases_)};
   }
 
@@ -131,30 +139,33 @@ class [[nodiscard]] ChangeBuilder<World, TypeList<Attached...>, TypeList<Detache
   template <typename Component>
   auto detach() && {
     check_component<Component>();
-    return ChangeBuilder<World, TypeList<Attached...>, TypeList<Detached..., Component>,
-                         Aliasing>{lib::Depend<World>{*world_}, entity_,
-                                   std::move(components_), std::move(aliases_)};
+    return ChangeBuilder<World, TypeList<Attached...>,
+                         TypeList<Detached..., Component>, Aliasing>{
+        lib::Depend<World>{*world_}, entity_, std::move(components_),
+        std::move(aliases_)};
   }
 
   // Gives the entity an alias, such as "ego".
   auto alias(std::string_view alias) && {
     aliases_.given.emplace_back(alias);
-    return ChangeBuilder<World, TypeList<Attached...>, TypeList<Detached...>, true>{
-        lib::Depend<World>{*world_}, entity_, std::move(components_), std::move(aliases_)};
+    return ChangeBuilder<World, TypeList<Attached...>, TypeList<Detached...>,
+                         true>{lib::Depend<World>{*world_}, entity_,
+                               std::move(components_), std::move(aliases_)};
   }
 
   // Takes an alias away from the entity.
   auto unalias(std::string_view alias) && {
     aliases_.taken.emplace_back(alias);
-    return ChangeBuilder<World, TypeList<Attached...>, TypeList<Detached...>, true>{
-        lib::Depend<World>{*world_}, entity_, std::move(components_), std::move(aliases_)};
+    return ChangeBuilder<World, TypeList<Attached...>, TypeList<Detached...>,
+                         true>{lib::Depend<World>{*world_}, entity_,
+                               std::move(components_), std::move(aliases_)};
   }
 
   std::expected<void, Status> build() && {
     static_assert(sizeof...(Attached) + sizeof...(Detached) > 0 || Aliasing,
                   "A change must attach, detach, alias or unalias something.");
-    return world_->build_change(entity_, std::move(components_), TypeList<Detached...>{},
-                                aliases_);
+    return world_->build_change(entity_, std::move(components_),
+                                TypeList<Detached...>{}, aliases_);
   }
 
  private:
@@ -164,8 +175,9 @@ class [[nodiscard]] ChangeBuilder<World, TypeList<Attached...>, TypeList<Detache
                   "This component is not in the world's component list.");
     static_assert(!is_built_in_v<Component>,
                   "An entity's archetype and parent cannot change.");
-    static_assert(!contains_v<TypeList<Attached..., Detached...>, Component>,
-                  "Each component may be attached or detached once per change.");
+    static_assert(
+        !contains_v<TypeList<Attached..., Detached...>, Component>,
+        "Each component may be attached or detached once per change.");
   }
 
   World* world_;  // Never null; checked once by Depend at construction.
@@ -181,7 +193,9 @@ class [[nodiscard]] DestroyBuilder final {
   DestroyBuilder(lib::Depend<World> world, Entity entity)
       : world_{world.get()}, entity_{entity} {}
 
-  std::expected<void, Status> build() && { return world_->build_destroy(entity_); }
+  std::expected<void, Status> build() && {
+    return world_->build_destroy(entity_);
+  }
 
  private:
   World* world_;  // Never null; checked once by Depend at construction.

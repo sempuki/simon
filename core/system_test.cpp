@@ -11,11 +11,11 @@
 
 namespace simon::core {
 
+using testing::Body;
 using testing::Health;
 using testing::Position;
 using testing::TestWorld;
 using testing::Velocity;
-using testing::Body;
 
 namespace {
 
@@ -23,14 +23,16 @@ const Step STEP{.time = TimePoint{}, .dt = Duration{0.5}};
 
 // Records which entities it ran for, and whether each had a Velocity.
 struct Record : System<const Position, const Velocity> {
-  void operator()(Entity entity, const Position&, const Velocity* velocity, auto&) {
+  void operator()(Entity entity, const Position&, const Velocity* velocity,
+                  auto&) {
     seen.push_back({entity, velocity != nullptr});
   }
   std::vector<std::pair<Entity, bool>> seen;
 };
 
 struct Integrate : System<Position, const Velocity> {
-  void operator()(Entity, Position& position, const Velocity* velocity, auto& context) {
+  void operator()(Entity, Position& position, const Velocity* velocity,
+                  auto& context) {
     if (!velocity) return;
     position.x += velocity->x * context.step().dt.count();
   }
@@ -38,7 +40,8 @@ struct Integrate : System<Position, const Velocity> {
 
 struct Chase : System<Velocity, const Health> {
   using Lookups = Stores<Position>;
-  void operator()(Entity self, Velocity& velocity, const Health*, auto& context) {
+  void operator()(Entity self, Velocity& velocity, const Health*,
+                  auto& context) {
     const Position* mine = lookup<Position>(context, self);
     const Position* other = lookup<Position>(context, target);
     velocity.x = (mine && other) ? other->x - mine->x : 0.0;
@@ -99,7 +102,8 @@ TEST_CASE("System") {
   }
 
   SECTION("ShouldWriteDrivingComponentGivenStep") {
-    Entity entity = *world.create<Body>().with(Position{1.0}).with(Velocity{2.0}).build();
+    Entity entity =
+        *world.create<Body>().with(Position{1.0}).with(Velocity{2.0}).build();
     world.sync();
 
     Scheduler<TestWorld, Systems<Integrate>> scheduler;
@@ -110,7 +114,8 @@ TEST_CASE("System") {
 
   SECTION("ShouldReadOtherEntitiesGivenDeclaredLookup") {
     Entity target = *world.create<Body>().with(Position{10.0}).build();
-    Entity chaser = *world.create<Body>().with(Position{4.0}).with(Velocity{}).build();
+    Entity chaser =
+        *world.create<Body>().with(Position{4.0}).with(Velocity{}).build();
     world.sync();
 
     Scheduler<TestWorld, Systems<Chase>> scheduler;
@@ -152,12 +157,13 @@ TEST_CASE("System") {
 
   SECTION("ShouldReadOtherEntitiesGivenLambdaWithLookups") {
     Entity target = *world.create<Body>().with(Position{10.0}).build();
-    Entity chaser = *world.create<Body>().with(Position{4.0}).with(Velocity{}).build();
+    Entity chaser =
+        *world.create<Body>().with(Position{4.0}).with(Velocity{}).build();
     world.sync();
 
     auto chase = system<Velocity, const Position>(
-        Stores<Position>{},
-        [target](Entity, Velocity& velocity, const Position* mine, auto& context) {
+        Stores<Position>{}, [target](Entity, Velocity& velocity,
+                                     const Position* mine, auto& context) {
           const Position* other = lookup<Position>(context, target);
           velocity.x = (mine && other) ? other->x - mine->x : 0.0;
         });
@@ -168,13 +174,15 @@ TEST_CASE("System") {
   }
 
   SECTION("ShouldRunInOrderGivenMixedStructAndLambdaSystems") {
-    Entity entity = *world.create<Body>().with(Position{0.0}).with(Velocity{1.0}).build();
+    Entity entity =
+        *world.create<Body>().with(Position{0.0}).with(Velocity{1.0}).build();
     world.sync();
 
     auto double_velocity = system<Velocity>(
         [](Entity, Velocity& velocity, auto&) { velocity.x *= 2.0; });
     using Schedule = Systems<decltype(double_velocity), Systems<Integrate>>;
-    Scheduler<TestWorld, Schedule> scheduler{Schedule{double_velocity, Systems<Integrate>{}}};
+    Scheduler<TestWorld, Schedule> scheduler{
+        Schedule{double_velocity, Systems<Integrate>{}}};
     scheduler.step(lib::InOut(world), STEP);
 
     CHECK(world.store<Velocity>().get(entity).x == 2.0);
@@ -182,7 +190,8 @@ TEST_CASE("System") {
   }
 
   SECTION("ShouldCreateChildrenGivenSystemThatSpawns") {
-    Entity launcher = *world.create<testing::Launcher>().with(Position{3.0}).build();
+    Entity launcher =
+        *world.create<testing::Launcher>().with(Position{3.0}).build();
     world.sync();
 
     Scheduler<TestWorld, Systems<Spawn>> scheduler;
@@ -196,7 +205,8 @@ TEST_CASE("System") {
 
   SECTION("ShouldFlattenInOrderGivenNestedSchedules") {
     using Nested = Systems<Integrate, Systems<Cull, Count>>;
-    static_assert(std::is_same_v<flatten_t<Nested>, TypeList<Integrate, Cull, Count>>);
+    static_assert(
+        std::is_same_v<flatten_t<Nested>, TypeList<Integrate, Cull, Count>>);
   }
 
   SECTION("ShouldBeInvalidGivenSystemBeforeItsAfter") {
@@ -207,7 +217,8 @@ TEST_CASE("System") {
   }
 
   SECTION("ShouldNameSystemsBySchedulePositionGivenNestedSchedule") {
-    using Scheduled = Scheduler<TestWorld, Systems<Integrate, Systems<Cull, Count>>>;
+    using Scheduled =
+        Scheduler<TestWorld, Systems<Integrate, Systems<Cull, Count>>>;
     static_assert(Scheduled::name_of<Integrate>() == Name{Kind::SYSTEM, 0});
     static_assert(Scheduled::name_of<Count>() == Name{Kind::SYSTEM, 2});
     CHECK(Scheduled::describe(1).contains("/world/1/system/2 "));

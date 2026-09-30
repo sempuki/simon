@@ -28,7 +28,8 @@ namespace {
 template <typename Component>
 class StableSlotStore final {
  public:
-  explicit StableSlotStore(std::size_t entity_capacity) : slots_(entity_capacity) {}
+  explicit StableSlotStore(std::size_t entity_capacity)
+      : slots_(entity_capacity) {}
 
   Component* try_get(Entity entity) {
     Slot& slot = slots_[entity.index];
@@ -84,7 +85,8 @@ double median_nanoseconds(Function&& function, int repetitions) {
     auto start = std::chrono::steady_clock::now();
     function();
     auto stop = std::chrono::steady_clock::now();
-    samples.push_back(std::chrono::duration<double, std::nano>(stop - start).count());
+    samples.push_back(
+        std::chrono::duration<double, std::nano>(stop - start).count());
   }
   std::ranges::sort(samples);
   return samples[samples.size() / 2];
@@ -100,22 +102,23 @@ struct Population {
   std::vector<Entity> destroyed;
 };
 
-Population make_population(lib::InOut<EntityTable> table, std::size_t count, double churn,
-                           lib::InOut<std::mt19937> random) {
+Population make_population(lib::InOut<EntityTable> table, std::size_t count,
+                           double churn, lib::InOut<std::mt19937> random) {
   Population population;
   for (std::size_t i = 0; i < count; ++i) {
     population.live.push_back(table->create());
   }
   std::ranges::shuffle(population.live, *random);
   auto destroyed = static_cast<std::size_t>(churn * static_cast<double>(count));
-  population.destroyed.assign(population.live.end() - destroyed, population.live.end());
+  population.destroyed.assign(population.live.end() - destroyed,
+                              population.live.end());
   population.live.resize(count - destroyed);
   return population;
 }
 
 template <typename StoreType, typename Iterate>
-Result measure(lib::InOut<StoreType> store, const Population& population, Iterate&& iterate,
-               lib::InOut<std::mt19937> random) {
+Result measure(lib::InOut<StoreType> store, const Population& population,
+               Iterate&& iterate, lib::InOut<std::mt19937> random) {
   constexpr double DT = 0.01;
   int repetitions = population.live.size() < 50'000 ? 200 : 40;
 
@@ -150,7 +153,8 @@ Result measure(lib::InOut<StoreType> store, const Population& population, Iterat
 template <typename StoreType>
 void populate(lib::InOut<StoreType> store, const Population& population) {
   std::vector<Entity> all = population.live;
-  all.insert(all.end(), population.destroyed.begin(), population.destroyed.end());
+  all.insert(all.end(), population.destroyed.begin(),
+             population.destroyed.end());
   std::ranges::sort(all);
   for (Entity entity : all) {
     store->append(entity, Body{});
@@ -160,27 +164,33 @@ void populate(lib::InOut<StoreType> store, const Population& population) {
   }
 }
 
-Result measure_dense(std::size_t count, double churn, lib::InOut<std::mt19937> random) {
+Result measure_dense(std::size_t count, double churn,
+                     lib::InOut<std::mt19937> random) {
   EntityTable table{count};
-  Population population = make_population(lib::InOut(table), count, churn, random);
+  Population population =
+      make_population(lib::InOut(table), count, churn, random);
   Store<Body> store{count, count};
   populate(lib::InOut(store), population);
-  return measure(lib::InOut(store), population,
-                 [](auto& dense, auto&& visit) {
-                   for (Body& body : dense.values()) {
-                     visit(body);
-                   }
-                 },
-                 random);
+  return measure(
+      lib::InOut(store), population,
+      [](auto& dense, auto&& visit) {
+        for (Body& body : dense.values()) {
+          visit(body);
+        }
+      },
+      random);
 }
 
-Result measure_stable(std::size_t count, double churn, lib::InOut<std::mt19937> random) {
+Result measure_stable(std::size_t count, double churn,
+                      lib::InOut<std::mt19937> random) {
   EntityTable table{count};
-  Population population = make_population(lib::InOut(table), count, churn, random);
+  Population population =
+      make_population(lib::InOut(table), count, churn, random);
   StableSlotStore<Body> store{count};
   populate(lib::InOut(store), population);
-  return measure(lib::InOut(store), population,
-                 [](auto& stable, auto&& visit) { stable.for_each(visit); }, random);
+  return measure(
+      lib::InOut(store), population,
+      [](auto& stable, auto&& visit) { stable.for_each(visit); }, random);
 }
 
 }  // namespace
@@ -189,17 +199,19 @@ Result measure_stable(std::size_t count, double churn, lib::InOut<std::mt19937> 
 int main() {
   using namespace simon::core;
   std::mt19937 random{42};
-  std::println("{:>8} {:>6} | {:>14} {:>14} | {:>14} {:>14}", "entities", "churn",
-               "dense iterate", "stable iterate", "dense lookup", "stable lookup");
-  std::println("{:>8} {:>6} | {:>14} {:>14} | {:>14} {:>14}", "", "", "ns/entity",
-               "ns/entity", "ns/lookup", "ns/lookup");
+  std::println("{:>8} {:>6} | {:>14} {:>14} | {:>14} {:>14}", "entities",
+               "churn", "dense iterate", "stable iterate", "dense lookup",
+               "stable lookup");
+  std::println("{:>8} {:>6} | {:>14} {:>14} | {:>14} {:>14}", "", "",
+               "ns/entity", "ns/entity", "ns/lookup", "ns/lookup");
   for (std::size_t count : {1'000uz, 10'000uz, 100'000uz, 1'000'000uz}) {
     for (double churn : {0.0, 0.25, 0.5, 0.75}) {
       Result dense = measure_dense(count, churn, lib::InOut(random));
       Result stable = measure_stable(count, churn, lib::InOut(random));
-      std::println("{:>8} {:>5.0f}% | {:>14.2f} {:>14.2f} | {:>14.2f} {:>14.2f}", count,
-                   churn * 100.0, dense.iterate, stable.iterate, dense.lookup,
-                   stable.lookup);
+      std::println(
+          "{:>8} {:>5.0f}% | {:>14.2f} {:>14.2f} | {:>14.2f} {:>14.2f}", count,
+          churn * 100.0, dense.iterate, stable.iterate, dense.lookup,
+          stable.lookup);
     }
   }
 }

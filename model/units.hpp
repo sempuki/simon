@@ -50,9 +50,15 @@ class Vector3 final {
   friend Vector3 operator-(const Vector3& a, const Vector3& b) {
     return Vector3{a.value_ - b.value_};
   }
-  friend Vector3 operator*(const Vector3& a, double scale) { return Vector3{a.value_ * scale}; }
-  friend Vector3 operator*(double scale, const Vector3& a) { return Vector3{scale * a.value_}; }
-  friend Vector3 operator/(const Vector3& a, double scale) { return Vector3{a.value_ / scale}; }
+  friend Vector3 operator*(const Vector3& a, double scale) {
+    return Vector3{a.value_ * scale};
+  }
+  friend Vector3 operator*(double scale, const Vector3& a) {
+    return Vector3{scale * a.value_};
+  }
+  friend Vector3 operator/(const Vector3& a, double scale) {
+    return Vector3{a.value_ / scale};
+  }
 
   Vector3& operator+=(const Vector3& that) {
     value_ += that.value_;
@@ -71,11 +77,15 @@ class Vector3 final {
     return *this;
   }
 
-  friend bool operator==(const Vector3& a, const Vector3& b) { return a.value_ == b.value_; }
+  friend bool operator==(const Vector3& a, const Vector3& b) {
+    return a.value_ == b.value_;
+  }
 
   // Found by mp_units::magnitude through argument-dependent lookup.
   friend double magnitude(const Vector3& a) { return a.value_.norm(); }
-  friend double dot(const Vector3& a, const Vector3& b) { return a.value_.dot(b.value_); }
+  friend double dot(const Vector3& a, const Vector3& b) {
+    return a.value_.dot(b.value_);
+  }
   friend Vector3 cross(const Vector3& a, const Vector3& b) {
     return Vector3{a.value_.cross(b.value_)};
   }
@@ -105,7 +115,9 @@ using Acceleration = units::quantity<metre_per_second_squared, Vector3>;
 // Cartesian frame.
 using Position = Displacement;
 
-inline Displacement metres(double x, double y, double z) { return Vector3{x, y, z} * metre; }
+inline Displacement metres(double x, double y, double z) {
+  return Vector3{x, y, z} * metre;
+}
 inline Velocity metres_per_second(double x, double y, double z) {
   return Vector3{x, y, z} * metre_per_second;
 }
@@ -122,13 +134,19 @@ Time seconds(std::chrono::duration<Representation, Period> duration) {
 // Vector algebra on quantities. mp-units 2.5 has none for custom
 // representations, so these unwrap, operate, and rewrap with the product unit.
 template <auto A, auto B>
-auto dot(const units::quantity<A, Vector3>& a, const units::quantity<B, Vector3>& b) {
-  return dot(a.numerical_value_ref_in(a.unit), b.numerical_value_ref_in(b.unit)) * (A * B);
+auto dot(const units::quantity<A, Vector3>& a,
+         const units::quantity<B, Vector3>& b) {
+  return dot(a.numerical_value_ref_in(a.unit),
+             b.numerical_value_ref_in(b.unit)) *
+         (A * B);
 }
 
 template <auto A, auto B>
-auto cross(const units::quantity<A, Vector3>& a, const units::quantity<B, Vector3>& b) {
-  return cross(a.numerical_value_ref_in(a.unit), b.numerical_value_ref_in(b.unit)) * (A * B);
+auto cross(const units::quantity<A, Vector3>& a,
+           const units::quantity<B, Vector3>& b) {
+  return cross(a.numerical_value_ref_in(a.unit),
+               b.numerical_value_ref_in(b.unit)) *
+         (A * B);
 }
 
 template <auto A>

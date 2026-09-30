@@ -15,11 +15,12 @@
 
 // Everything in a world is known three ways:
 //
-//   Name      {kind, instance}                 two integers; compared in hot loops,
-//                                              written to logs, sent across processes
-//   Identity  "/world/1/entity/2/component/3"  the canonical string, for debugging
-//                                              from a console; computed from the Name
-//   Alias     "ego", "Luke Skywalker"          meaning only people bring; many-to-many
+//   Name      {kind, instance}: two integers. Compared in hot loops, written
+//             to logs, sent across processes.
+//   Identity  "/world/1/entity/2/component/3": the canonical string, for
+//             debugging from a console. Computed from the Name.
+//   Alias     "ego", "Luke Skywalker": meaning only people bring.
+//             Many-to-many.
 namespace simon::core {
 
 // What a name names. Each component type is its own kind for its
@@ -46,7 +47,8 @@ struct Name {
   friend constexpr auto operator<=>(const Name&, const Name&) = default;
 };
 
-constexpr Name entity_component_name(std::uint32_t component, std::uint32_t entity) {
+constexpr Name entity_component_name(std::uint32_t component,
+                                     std::uint32_t entity) {
   Name name{Kind::ENTITY_COMPONENT, entity};
   name.kind += component;
   return name;
@@ -99,18 +101,22 @@ inline std::optional<ParsedIdentity> parse_identity(std::string_view identity) {
   for (std::string_view rest = identity.substr(1); !rest.empty();) {
     std::size_t slash = rest.find('/');
     segments.push_back(rest.substr(0, slash));
-    rest = slash == std::string_view::npos ? std::string_view{} : rest.substr(slash + 1);
+    rest = slash == std::string_view::npos ? std::string_view{}
+                                           : rest.substr(slash + 1);
   }
 
   auto number = [](std::string_view text) -> std::optional<std::uint32_t> {
     std::uint32_t value = 0;
-    auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
-    if (error != std::errc{} || end != text.data() + text.size() || text.empty()) {
+    auto [end, error] =
+        std::from_chars(text.data(), text.data() + text.size(), value);
+    if (error != std::errc{} || end != text.data() + text.size() ||
+        text.empty()) {
       return std::nullopt;
     }
     return value;
   };
-  auto pair = [&](std::size_t at, std::string_view word) -> std::optional<std::uint32_t> {
+  auto pair = [&](std::size_t at,
+                  std::string_view word) -> std::optional<std::uint32_t> {
     if (segments.size() < at + 2 || segments[at] != word) {
       return std::nullopt;
     }

@@ -61,10 +61,11 @@ class EventQueue final {
  public:
   EventQueue() {
     // Install the bespoke timer handler.
-    handlers_[event_type_of<Timer>()].emplace_back([](TimePoint time, const EventBase* base) {
-      auto* event = static_cast<const Event<Timer>*>(base);
-      event->data().action(time);
-    });
+    handlers_[event_type_of<Timer>()].emplace_back(
+        [](TimePoint time, const EventBase* base) {
+          auto* event = static_cast<const Event<Timer>*>(base);
+          event->data().action(time);
+        });
   }
 
   template <typename HandlerType>
@@ -78,10 +79,11 @@ class EventQueue final {
                   "Unsupported: cv-ref qualified messages");
 
     handlers_[event_type_of<MessageType>()].emplace_back(
-      [msg_handler = std::forward<HandlerType>(handler)](TimePoint time, const EventBase* base) {
-        auto* event = static_cast<const Event<MessageType>*>(base);
-        msg_handler(time, event->data());
-      });
+        [msg_handler = std::forward<HandlerType>(handler)](
+            TimePoint time, const EventBase* base) {
+          auto* event = static_cast<const Event<MessageType>*>(base);
+          msg_handler(time, event->data());
+        });
   }
 
   template <typename MessageType, typename... DeducedMessageArgs>
@@ -90,9 +92,9 @@ class EventQueue final {
                   "Unsupported: cv-ref qualified messages");
 
     events_.push_back(Entry{
-      .sequence = next_sequence_++,
-      .event =
-        std::make_unique<Event<MessageType>>(time, std::forward<DeducedMessageArgs>(args)...),
+        .sequence = next_sequence_++,
+        .event = std::make_unique<Event<MessageType>>(
+            time, std::forward<DeducedMessageArgs>(args)...),
     });
     std::push_heap(events_.begin(), events_.end(), Later{});
   }
@@ -138,7 +140,9 @@ class EventQueue final {
 
   std::vector<Entry> events_;
   std::uint64_t next_sequence_ = 0;
-  std::map<EventType, std::deque<std::function<void(TimePoint, const EventBase*)>>> handlers_;
+  std::map<EventType,
+           std::deque<std::function<void(TimePoint, const EventBase*)>>>
+      handlers_;
 };
 
 }  // namespace simon::drive

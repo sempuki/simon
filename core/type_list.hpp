@@ -32,10 +32,10 @@ struct IndexOf<TypeList<>, Type> : std::integral_constant<std::size_t, 0> {};
 
 template <typename First, typename... Rest, typename Type>
 struct IndexOf<TypeList<First, Rest...>, Type>
-    : std::integral_constant<std::size_t,
-                             std::is_same_v<First, Type>
-                                 ? 0
-                                 : 1 + IndexOf<TypeList<Rest...>, Type>::value> {};
+    : std::integral_constant<
+          std::size_t, std::is_same_v<First, Type>
+                           ? 0
+                           : 1 + IndexOf<TypeList<Rest...>, Type>::value> {};
 
 template <typename List, typename Type>
 inline constexpr std::size_t index_of_v = IndexOf<List, Type>::value;
@@ -71,7 +71,8 @@ struct Concatenate<TypeList<Types...>> {
 
 template <typename... First, typename... Second, typename... Rest>
 struct Concatenate<TypeList<First...>, TypeList<Second...>, Rest...> {
-  using type = typename Concatenate<TypeList<First..., Second...>, Rest...>::type;
+  using type =
+      typename Concatenate<TypeList<First..., Second...>, Rest...>::type;
 };
 
 template <typename... Lists>

@@ -93,7 +93,8 @@ class Store final {
   }
 
  private:
-  static constexpr std::uint32_t ABSENT = std::numeric_limits<std::uint32_t>::max();
+  static constexpr std::uint32_t ABSENT =
+      std::numeric_limits<std::uint32_t>::max();
 
   struct Slot {
     std::uint32_t position = ABSENT;

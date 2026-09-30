@@ -54,7 +54,8 @@ TEST_CASE("EventQueue") {
 
   SECTION("ShouldDeliverEarliestFirstGivenEventsPublishedOutOfOrder") {
     std::vector<int> seen;
-    events.subscribe<M>([&seen](auto /*time*/, M mesg) { seen.push_back(mesg.value); });
+    events.subscribe<M>(
+        [&seen](auto /*time*/, M mesg) { seen.push_back(mesg.value); });
 
     events.publish<M>(TimePoint{Duration{5.0}}, M{5});
     events.publish<M>(TimePoint{Duration{1.0}}, M{1});
@@ -69,7 +70,8 @@ TEST_CASE("EventQueue") {
 
   SECTION("ShouldDeliverInPublishOrderGivenEqualTimes") {
     std::vector<int> seen;
-    events.subscribe<M>([&seen](auto /*time*/, M mesg) { seen.push_back(mesg.value); });
+    events.subscribe<M>(
+        [&seen](auto /*time*/, M mesg) { seen.push_back(mesg.value); });
 
     for (int value = 0; value < 20; ++value) {
       events.publish<M>(later, M{value});
@@ -85,7 +87,8 @@ TEST_CASE("EventQueue") {
 
   SECTION("ShouldPassEventTimeGivenLaterProcessTime") {
     TimePoint received;
-    events.subscribe<M>([&received](auto time, M /*mesg*/) { received = time; });
+    events.subscribe<M>(
+        [&received](auto time, M /*mesg*/) { received = time; });
 
     events.publish<M>(later, mesg);
     events.process_until(TimePoint{Duration{3.0}});
@@ -95,8 +98,10 @@ TEST_CASE("EventQueue") {
 
   SECTION("ShouldCallEverySubscriberInOrderGivenSeveralSubscribers") {
     std::vector<int> seen;
-    events.subscribe<M>([&seen](auto /*time*/, M /*mesg*/) { seen.push_back(1); });
-    events.subscribe<M>([&seen](auto /*time*/, M /*mesg*/) { seen.push_back(2); });
+    events.subscribe<M>(
+        [&seen](auto /*time*/, M /*mesg*/) { seen.push_back(1); });
+    events.subscribe<M>(
+        [&seen](auto /*time*/, M /*mesg*/) { seen.push_back(2); });
 
     events.publish<M>(start, mesg);
     events.process_until(start);
@@ -130,17 +135,20 @@ TEST_CASE("EventQueue") {
 
     events.process_until(TimePoint{Duration{10.0}});
 
-    CHECK(fired == std::vector<TimePoint>{start, later, TimePoint{Duration{2.0}}});
+    CHECK(fired ==
+          std::vector<TimePoint>{start, later, TimePoint{Duration{2.0}}});
   }
 
-  SECTION("ShouldDeliverToNewSubscriberFromNextEventGivenSubscribeInsideHandler") {
+  SECTION(
+      "ShouldDeliverToNewSubscriberFromNextEventGivenSubscribeInsideHandler") {
     int outer_calls = 0;
     int inner_calls = 0;
     events.subscribe<M>([&](auto /*time*/, M /*mesg*/) {
       outer_calls++;
       // Enough subscriptions to force the handler container to grow.
       for (int i = 0; i < 64; ++i) {
-        events.subscribe<M>([&inner_calls](auto /*time*/, M /*mesg*/) { inner_calls++; });
+        events.subscribe<M>(
+            [&inner_calls](auto /*time*/, M /*mesg*/) { inner_calls++; });
       }
     });
 

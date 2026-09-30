@@ -20,15 +20,15 @@ using model::Acceleration;
 using model::Control;
 using model::Kinematics;
 using model::Length;
-using model::Rate;
-using model::Velocity;
 using model::metre;
 using model::metres;
 using model::metres_per_second;
 using model::metres_per_second_squared;
 using model::per_second;
+using model::Rate;
+using model::Velocity;
 
-//-- Components -----------------------------------------------------------------
+//-- Components ----------------------------------------------------------------
 
 struct Thrust {
   Acceleration acceleration = metres_per_second_squared(0.0, 0.0, 0.0);
@@ -52,22 +52,24 @@ struct Collision {
   Entity other;
 };
 
-using World = core::World<Kinematics, Control, Thrust, Wind, Drag, Collider, Collision>;
+using World =
+    core::World<Kinematics, Control, Thrust, Wind, Drag, Collider, Collision>;
 
 // A ball must have a position, a size and a collision record; it may be driven.
-struct Ball : core::Archetype<"ball", core::Requires<Kinematics, Collider, Collision>,
-                              core::Allows<Control, Thrust, Wind, Drag>> {};
+struct Ball
+    : core::Archetype<"ball", core::Requires<Kinematics, Collider, Collision>,
+                      core::Allows<Control, Thrust, Wind, Drag>> {};
 
-//-- Systems --------------------------------------------------------------------
+//-- Systems -------------------------------------------------------------------
 
 // Sums thrust and wind drag into the commanded acceleration.
-struct ApplyForces
-    : core::System<Control, const Kinematics, const Thrust, const Wind, const Drag> {
+struct ApplyForces : core::System<Control, const Kinematics, const Thrust,
+                                  const Wind, const Drag> {
   void operator()(Entity, Control& control, const Kinematics* kinematics,
                   const Thrust* thrust, const Wind* wind, const Drag* drag,
                   auto&) const {
-    control.acceleration =
-        thrust ? thrust->acceleration : metres_per_second_squared(0.0, 0.0, 0.0);
+    control.acceleration = thrust ? thrust->acceleration
+                                  : metres_per_second_squared(0.0, 0.0, 0.0);
     if (kinematics && drag) {
       Velocity air = wind ? wind->velocity : metres_per_second(0.0, 0.0, 0.0);
       control.acceleration += drag->factor * (air - kinematics->velocity);
@@ -110,7 +112,7 @@ struct DetectCollisions
 using Schedule = core::Systems<ApplyForces, model::Motion, DetectCollisions>;
 using Scheduler = core::Scheduler<World, Schedule>;
 
-//-- Scenario -------------------------------------------------------------------
+//-- Scenario ------------------------------------------------------------------
 
 struct Balls {
   Entity red;
@@ -121,10 +123,12 @@ struct Balls {
 inline Balls build_balls(lib::InOut<World> world) {
   Balls balls{
       .red = *world->create<Ball>("red")
-                  .with(Kinematics{.position = metres(360.0, 100.0, 0.0),
-                                  .velocity = metres_per_second(10.0, -10.0, 0.0)})
+                  .with(Kinematics{
+                      .position = metres(360.0, 100.0, 0.0),
+                      .velocity = metres_per_second(10.0, -10.0, 0.0)})
                   .with(Control{})
-                  .with(Thrust{.acceleration = metres_per_second_squared(0.0, 9.8, 0.0)})
+                  .with(Thrust{.acceleration =
+                                   metres_per_second_squared(0.0, 9.8, 0.0)})
                   .with(Wind{.velocity = metres_per_second(-1.0, 0.0, 0.0)})
                   .with(Drag{.factor = 0.4 * per_second})
                   .with(Collider{.radius = 10.0 * metre})

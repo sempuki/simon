@@ -68,7 +68,8 @@ struct System {
 //   auto guide = system<const Interceptor, Control>(
 //       Stores<Kinematics>{},  // Lookups.
 //       [](Entity, const Interceptor&, Control*, auto& context) { ... });
-template <typename Callable, typename LookupStores, typename Drive, typename... Optional>
+template <typename Callable, typename LookupStores, typename Drive,
+          typename... Optional>
 class CallableSystem final : public System<Drive, Optional...> {
  public:
   using Lookups = LookupStores;
@@ -89,17 +90,18 @@ class CallableSystem final : public System<Drive, Optional...> {
 
 template <typename Drive, typename... Optional, typename Callable>
 auto system(Callable callable) {
-  return CallableSystem<Callable, Stores<>, Drive, Optional...>{std::move(callable)};
+  return CallableSystem<Callable, Stores<>, Drive, Optional...>{
+      std::move(callable)};
 }
 
 template <typename Drive, typename... Optional, typename... LookupComponents,
           typename Callable>
 auto system(Stores<LookupComponents...>, Callable callable) {
-  return CallableSystem<Callable, Stores<LookupComponents...>, Drive, Optional...>{
-      std::move(callable)};
+  return CallableSystem<Callable, Stores<LookupComponents...>, Drive,
+                        Optional...>{std::move(callable)};
 }
 
-//-- Schedule metafunctions -----------------------------------------------------
+//-- Schedule metafunctions ----------------------------------------------------
 
 template <typename Type>
 struct Flatten {
@@ -136,8 +138,9 @@ struct WritesOf;
 
 template <typename... Types>
 struct WritesOf<TypeList<Types...>> {
-  using type = concatenate_t<
-      std::conditional_t<std::is_const_v<Types>, TypeList<>, TypeList<Types>>...>;
+  using type =
+      concatenate_t<std::conditional_t<std::is_const_v<Types>, TypeList<>,
+                                       TypeList<Types>>...>;
 };
 
 template <typename List>
@@ -145,8 +148,9 @@ struct ReadsOf;
 
 template <typename... Types>
 struct ReadsOf<TypeList<Types...>> {
-  using type = concatenate_t<std::conditional_t<
-      std::is_const_v<Types>, TypeList<std::remove_const_t<Types>>, TypeList<>>...>;
+  using type = concatenate_t<
+      std::conditional_t<std::is_const_v<Types>,
+                         TypeList<std::remove_const_t<Types>>, TypeList<>>...>;
 };
 
 template <typename SystemType>
@@ -189,7 +193,7 @@ inline constexpr bool is_valid_schedule_v =
     ScheduleCheck<flatten_t<Schedule>>::unique &&
     ScheduleCheck<flatten_t<Schedule>>::ordered;
 
-//-- Context --------------------------------------------------------------------
+//-- Context -------------------------------------------------------------------
 
 // What a system may use besides its own entity's components: the step, the
 // lookups it declared, spatial and name queries, and builders.
@@ -200,28 +204,31 @@ class Context final {
   using SpatialComponent = typename World::SpatialComponent;
 
   // Keeps a reference to `world` for as long as the context lives.
-  Context(lib::Depend<World> world, Step step) : world_{world.get()}, step_{step} {}
+  Context(lib::Depend<World> world, Step step)
+      : world_{world.get()}, step_{step} {}
 
   const Step& step() const { return step_; }
 
   template <typename Component>
   const Component* lookup(Entity entity) const {
-    static_assert(contains_v<lookups_of_t<SystemType>, Component>,
-                  "Declare this component in the system's Lookups to look it up.");
+    static_assert(
+        contains_v<lookups_of_t<SystemType>, Component>,
+        "Declare this component in the system's Lookups to look it up.");
     return world_->template store<Component>().try_get(entity);
   }
 
   // A declared lookup store, for whole-store reads such as in `prepare`.
   template <typename Component>
   const Store<Component>& store() const {
-    static_assert(contains_v<lookups_of_t<SystemType>, Component>,
-                  "Declare this component in the system's Lookups to read its store.");
+    static_assert(
+        contains_v<lookups_of_t<SystemType>, Component>,
+        "Declare this component in the system's Lookups to read its store.");
     return world_->template store<Component>();
   }
 
   template <typename Visitor>
-  void within(const SpatialComponent& center, distance_of_t<SpatialComponent> radius,
-              Visitor&& visit) const {
+  void within(const SpatialComponent& center,
+              distance_of_t<SpatialComponent> radius, Visitor&& visit) const {
     static_assert(contains_v<lookups_of_t<SystemType>, SpatialComponent>,
                   "Declare the spatial component in the system's Lookups to "
                   "query space.");
@@ -230,9 +237,15 @@ class Context final {
 
   bool alive(Entity entity) const { return world_->alive(entity); }
   Name name_of(Entity entity) const { return world_->name_of(entity); }
-  Name archetype_of(Entity entity) const { return world_->archetype_of(entity); }
-  std::optional<Entity> entity_of(Name name) const { return world_->entity_of(name); }
-  std::optional<Name> find(std::string_view identity) const { return world_->find(identity); }
+  Name archetype_of(Entity entity) const {
+    return world_->archetype_of(entity);
+  }
+  std::optional<Entity> entity_of(Name name) const {
+    return world_->entity_of(name);
+  }
+  std::optional<Name> find(std::string_view identity) const {
+    return world_->find(identity);
+  }
   std::vector<Name> find_alias(std::string_view alias) const {
     return world_->find_alias(alias);
   }
@@ -254,7 +267,8 @@ class Context final {
 // instead of `context.template lookup<Collider>(other)`. Found by
 // argument-dependent lookup.
 template <typename Component, typename SystemType, typename World>
-const Component* lookup(const Context<SystemType, World>& context, Entity entity) {
+const Component* lookup(const Context<SystemType, World>& context,
+                        Entity entity) {
   return context.template lookup<Component>(entity);
 }
 
@@ -264,15 +278,17 @@ const Store<Component>& store(const Context<SystemType, World>& context) {
 }
 
 template <ArchetypeType Archetype, typename SystemType, typename World>
-auto create(lib::InOut<Context<SystemType, World>> context, std::string_view alias = {}) {
+auto create(lib::InOut<Context<SystemType, World>> context,
+            std::string_view alias = {}) {
   return context->template create<Archetype>(alias);
 }
 
-//-- Running systems ------------------------------------------------------------
+//-- Running systems -----------------------------------------------------------
 
 struct SystemRunner final {
   template <typename SystemType, typename World>
-  static void run(lib::InOut<SystemType> system, lib::InOut<World> world, const Step& step) {
+  static void run(lib::InOut<SystemType> system, lib::InOut<World> world,
+                  const Step& step) {
     using Components = components_of_t<SystemType>;
     using Lookups = lookups_of_t<SystemType>;
     using Writes = writes_of_t<SystemType>;
@@ -291,7 +307,8 @@ struct SystemRunner final {
     if constexpr (requires { system->prepare(context); }) {
       system->prepare(context);
     }
-    loop(system, world, lib::InOut(context), typename SystemType::OptionalTypes{});
+    loop(system, world, lib::InOut(context),
+         typename SystemType::OptionalTypes{});
     if constexpr (requires { system->resolve(context); }) {
       system->resolve(context);
     }
@@ -301,7 +318,8 @@ struct SystemRunner final {
   template <typename Component, typename World>
   static decltype(auto) store_for(lib::InOut<World> world) {
     if constexpr (std::is_const_v<Component>) {
-      return std::as_const(*world).template store<std::remove_const_t<Component>>();
+      return std::as_const(*world)
+          .template store<std::remove_const_t<Component>>();
     } else {
       return world->template mutable_store<Component>(SystemAccess{});
     }
@@ -313,7 +331,8 @@ struct SystemRunner final {
                    lib::InOut<ContextType> context, TypeList<Optional...>) {
     using Drive = typename SystemType::DriveType;
     static_assert(
-        std::is_invocable_v<SystemType&, Entity, Drive&, Optional*..., ContextType&>,
+        std::is_invocable_v<SystemType&, Entity, Drive&, Optional*...,
+                            ContextType&>,
         "A system's call operator must accept (Entity, Drive&, Optional*..., "
         "Context&), with const exactly where the System declares it.");
 
@@ -326,14 +345,15 @@ struct SystemRunner final {
         [&](auto&... optional_store) {
           for (std::size_t i = 0; i < drive.size(); ++i) {
             Entity entity = drive.owner(i);
-            call(entity, drive.data(i), optional_store.try_get(entity)..., shared);
+            call(entity, drive.data(i), optional_store.try_get(entity)...,
+                 shared);
           }
         },
         optional);
   }
 };
 
-//-- Scheduler ------------------------------------------------------------------
+//-- Scheduler -----------------------------------------------------------------
 
 template <typename List>
 struct TupleOf;
@@ -355,11 +375,13 @@ auto flatten_systems(Schedule&& schedule) {
   if constexpr (is_systems_v<std::remove_cvref_t<Schedule>>) {
     return std::apply(
         [](auto&&... nested) {
-          return std::tuple_cat(flatten_systems(std::forward<decltype(nested)>(nested))...);
+          return std::tuple_cat(
+              flatten_systems(std::forward<decltype(nested)>(nested))...);
         },
         std::forward<Schedule>(schedule).systems);
   } else {
-    return std::tuple<std::remove_cvref_t<Schedule>>{std::forward<Schedule>(schedule)};
+    return std::tuple<std::remove_cvref_t<Schedule>>{
+        std::forward<Schedule>(schedule)};
   }
 }
 
@@ -379,12 +401,14 @@ class Scheduler final {
   Scheduler()
     requires std::is_default_constructible_v<typename TupleOf<SystemList>::type>
   = default;
-  explicit Scheduler(Schedule schedule) : systems_{flatten_systems(std::move(schedule))} {}
+  explicit Scheduler(Schedule schedule)
+      : systems_{flatten_systems(std::move(schedule))} {}
 
   void step(lib::InOut<World> world, const Step& step) {
     std::apply(
         [&](auto&... system) {
-          ((SystemRunner::run(lib::InOut(system), world, step), world->sync()), ...);
+          ((SystemRunner::run(lib::InOut(system), world, step), world->sync()),
+           ...);
         },
         systems_);
   }
@@ -397,8 +421,10 @@ class Scheduler final {
   // A system's name: its position in the flattened schedule.
   template <typename SystemType>
   static constexpr Name name_of() {
-    static_assert(contains_v<SystemList, SystemType>, "This system is not scheduled.");
-    return Name{Kind::SYSTEM, static_cast<std::uint32_t>(index_of_v<SystemList, SystemType>)};
+    static_assert(contains_v<SystemList, SystemType>,
+                  "This system is not scheduled.");
+    return Name{Kind::SYSTEM,
+                static_cast<std::uint32_t>(index_of_v<SystemList, SystemType>)};
   }
 
   // The flattened schedule, one system per entry with its identity in world
@@ -407,12 +433,11 @@ class Scheduler final {
   static std::string describe(std::uint32_t world = 0) {
     std::string text;
     for_each_type(SystemList{}, [&]<typename SystemType>() {
-      text += std::format("{} {}\n  writes: {}\n  reads: {}\n  lookups: {}\n",
-                          identity_of(world, name_of<SystemType>()),
-                          lib::to_type_string<SystemType>(),
-                          names(writes_of_t<SystemType>{}),
-                          names(reads_of_t<SystemType>{}),
-                          names(lookups_of_t<SystemType>{}));
+      text += std::format(
+          "{} {}\n  writes: {}\n  reads: {}\n  lookups: {}\n",
+          identity_of(world, name_of<SystemType>()),
+          lib::to_type_string<SystemType>(), names(writes_of_t<SystemType>{}),
+          names(reads_of_t<SystemType>{}), names(lookups_of_t<SystemType>{}));
     });
     return text;
   }

@@ -41,7 +41,8 @@ concept Spatial = requires(const Type& a, const Type& b) {
 };
 
 template <Spatial Type>
-using distance_of_t = decltype(distance(std::declval<const Type&>(), std::declval<const Type&>()));
+using distance_of_t = decltype(distance(std::declval<const Type&>(),
+                                        std::declval<const Type&>()));
 
 struct WorldConfiguration {
   std::uint32_t number = 0;    // The world's instance in its Name and Identity.
@@ -65,7 +66,8 @@ template <Spatial SpatialType, typename... Components>
 class World final {
  public:
   using SpatialComponent = SpatialType;
-  using ComponentList = TypeList<SpatialType, EntityArchetype, Parent, Components...>;
+  using ComponentList =
+      TypeList<SpatialType, EntityArchetype, Parent, Components...>;
   using Command = command_for_t<ComponentList>;
 
   static_assert(is_unique_v<ComponentList>,
@@ -77,10 +79,13 @@ class World final {
   explicit World(WorldConfiguration configuration)
       : number_{configuration.number},
         entities_{configuration.entities},
-        stores_{Store<SpatialType>{configuration.components, configuration.entities},
-                Store<EntityArchetype>{configuration.entities, configuration.entities},
+        stores_{Store<SpatialType>{configuration.components,
+                                   configuration.entities},
+                Store<EntityArchetype>{configuration.entities,
+                                       configuration.entities},
                 Store<Parent>{configuration.entities, configuration.entities},
-                Store<Components>{configuration.components, configuration.entities}...},
+                Store<Components>{configuration.components,
+                                  configuration.entities}...},
         plans_{Plan<SpatialType>{configuration.entities},
                Plan<EntityArchetype>{configuration.entities},
                Plan<Parent>{configuration.entities},
@@ -92,25 +97,28 @@ class World final {
       std::string type_name = lib::to_type_string<Component>();
       Name name = name_of<Component>();
       give_alias(name, type_name);
-      if (std::size_t colons = type_name.rfind("::"); colons != std::string::npos) {
+      if (std::size_t colons = type_name.rfind("::");
+          colons != std::string::npos) {
         give_alias(name, type_name.substr(colons + 2));
       }
     });
   }
   ~World() = default;
 
-  //-- Write --------------------------------------------------------------------
+  //-- Write -------------------------------------------------------------------
 
   // Creates an entity of `Archetype`, with an optional alias.
   template <ArchetypeType Archetype>
   auto create(std::string_view alias = {}) {
-    return CreateBuilder<World, Archetype, true>{lib::Depend<World>{*this}, std::string{alias},
-                                                 std::nullopt, {}};
+    return CreateBuilder<World, Archetype, true>{
+        lib::Depend<World>{*this}, std::string{alias}, std::nullopt, {}};
   }
   auto change(Entity entity) {
     return ChangeBuilder<World>{lib::Depend<World>{*this}, entity, {}, {}};
   }
-  auto destroy(Entity entity) { return DestroyBuilder<World>{lib::Depend<World>{*this}, entity}; }
+  auto destroy(Entity entity) {
+    return DestroyBuilder<World>{lib::Depend<World>{*this}, entity};
+  }
 
   // Applies every pending command, in the order it was recorded. Builders
   // validated each command against the state the world would be in, so this
@@ -118,7 +126,8 @@ class World final {
   void sync() {
     std::vector<Command> commands = std::exchange(commands_, {});
     for (Command& command : commands) {
-      std::visit([&](auto& operation) { this->apply(lib::InOut(operation)); }, command);
+      std::visit([&](auto& operation) { this->apply(lib::InOut(operation)); },
+                 command);
     }
     std::apply([](auto&... plan) { (plan.clear(), ...); }, plans_);
     for (std::uint32_t index : destroying_list_) {
@@ -183,19 +192,24 @@ class World final {
   // The name of `entity`'s `Component`, which it need not have yet.
   template <typename Component>
   Name name_of(Entity entity) const {
-    return entity_component_name(component_number<Component>(), name_of(entity).instance);
+    return entity_component_name(component_number<Component>(),
+                                 name_of(entity).instance);
   }
 
   // The live entity an entity or entity-component name refers to.
   std::optional<Entity> entity_of(Name name) const {
-    if (name.kind != static_cast<std::uint32_t>(Kind::ENTITY) && !is_entity_component(name)) {
+    if (name.kind != static_cast<std::uint32_t>(Kind::ENTITY) &&
+        !is_entity_component(name)) {
       return std::nullopt;
     }
     auto iter = entity_of_instance_.find(name.instance);
-    return iter != entity_of_instance_.end() ? std::optional{iter->second} : std::nullopt;
+    return iter != entity_of_instance_.end() ? std::optional{iter->second}
+                                             : std::nullopt;
   }
 
-  std::string identity_of(Name name) const { return core::identity_of(number_, name); }
+  std::string identity_of(Name name) const {
+    return core::identity_of(number_, name);
+  }
 
   // The name an identity refers to, if it names something in this world.
   std::optional<Name> find(std::string_view identity) const {
@@ -219,7 +233,8 @@ class World final {
   // Every alias `name` has, in the order they were given.
   std::vector<std::string> aliases_of(Name name) const {
     auto iter = aliases_of_name_.find(name);
-    return iter != aliases_of_name_.end() ? iter->second : std::vector<std::string>{};
+    return iter != aliases_of_name_.end() ? iter->second
+                                          : std::vector<std::string>{};
   }
 
   // A one-line description for a console, e.g.
@@ -234,7 +249,8 @@ class World final {
     if (std::optional<Entity> entity = entity_of(name);
         entity && name.kind == static_cast<std::uint32_t>(Kind::ENTITY)) {
       std::vector<std::string> archetype = aliases_of(archetype_of(*entity));
-      text += std::format(" archetype {}:", archetype.empty() ? "?" : archetype.front());
+      text += std::format(" archetype {}:",
+                          archetype.empty() ? "?" : archetype.front());
       bool first = true;
       for_each_type(ComponentList{}, [&]<typename Component>() {
         if (!is_built_in_v<Component> && store<Component>().contains(*entity)) {
@@ -247,7 +263,7 @@ class World final {
     return text;
   }
 
-  //-- Systems ------------------------------------------------------------------
+  //-- Systems -----------------------------------------------------------------
 
   template <typename Component>
   Store<Component>& mutable_store(SystemAccess) {
@@ -272,8 +288,8 @@ class World final {
   }
 
   bool exists(Name name) const {
-    switch (static_cast<Kind>(std::min(name.kind,
-                                       static_cast<std::uint32_t>(Kind::ENTITY_COMPONENT)))) {
+    switch (static_cast<Kind>(std::min(
+        name.kind, static_cast<std::uint32_t>(Kind::ENTITY_COMPONENT)))) {
       case Kind::WORLD:
         return name.instance == number_;
       case Kind::ARCHETYPE:
@@ -281,11 +297,13 @@ class World final {
       case Kind::COMPONENT:
         return name.instance < ComponentList::size;
       case Kind::SYSTEM:
-        return true;  // Systems belong to schedulers, which the world does not see.
+        // Systems belong to schedulers, which the world does not see.
+        return true;
       case Kind::ENTITY:
         return entity_of(name).has_value();
       case Kind::ENTITY_COMPONENT:
-        return component_of(name) < ComponentList::size && entity_of(name).has_value() &&
+        return component_of(name) < ComponentList::size &&
+               entity_of(name).has_value() &&
                has_component_number(*entity_of(name), component_of(name));
       case Kind::NONE:
         break;
@@ -304,7 +322,8 @@ class World final {
 
   template <ArchetypeType Archetype>
   Name archetype_name() {
-    auto [iter, inserted] = archetypes_.try_emplace(std::string{Archetype::name});
+    auto [iter, inserted] =
+        archetypes_.try_emplace(std::string{Archetype::name});
     if (inserted) {
       iter->second = Name{Kind::ARCHETYPE, next_archetype_instance_++};
       give_alias(iter->second, Archetype::name);
@@ -334,17 +353,20 @@ class World final {
 
   bool has_alias(Name name, std::string_view alias) const {
     auto iter = aliases_of_name_.find(name);
-    return iter != aliases_of_name_.end() && std::ranges::contains(iter->second, alias);
+    return iter != aliases_of_name_.end() &&
+           std::ranges::contains(iter->second, alias);
   }
 
-  //-- Planned state: what the world will be once pending commands apply --------
+  //-- Planned state: what the world will be once pending commands apply -------
 
   // For one component: which entities will gain or lose it, and how many
   // entity-components are waiting to be attached.
   struct PlanState {
-    explicit PlanState(std::size_t entity_capacity) : change(entity_capacity, 0) {}
+    explicit PlanState(std::size_t entity_capacity)
+        : change(entity_capacity, 0) {}
 
-    std::vector<std::int8_t> change;  // +1 will be attached, -1 will be detached.
+    std::vector<std::int8_t>
+        change;  // +1 will be attached, -1 will be detached.
     std::vector<std::uint32_t> touched;
     std::size_t attaching = 0;
 
@@ -395,9 +417,9 @@ class World final {
     std::optional<Status> failure;
     auto check = [&]<typename Component>() {
       if (!failure && !has_room<Component>()) {
-        failure = lib::raise(
-            BuildCondition::COMPONENT_CAPACITY_EXHAUSTED,
-            std::format("The {} store is full.", lib::to_type_string<Component>()));
+        failure = lib::raise(BuildCondition::COMPONENT_CAPACITY_EXHAUSTED,
+                             std::format("The {} store is full.",
+                                         lib::to_type_string<Component>()));
       }
     };
     (check.template operator()<Checked>(), ...);
@@ -406,20 +428,22 @@ class World final {
 
   static std::optional<Status> check_alias(std::string_view alias) {
     if (alias.empty()) {
-      return lib::raise(BuildCondition::ALIAS_INVALID, "An alias cannot be empty.");
+      return lib::raise(BuildCondition::ALIAS_INVALID,
+                        "An alias cannot be empty.");
     }
     return std::nullopt;
   }
 
-  //-- Builders -----------------------------------------------------------------
+  //-- Builders ----------------------------------------------------------------
 
   template <ArchetypeType Archetype, typename... Initial>
-  std::expected<Entity, Status> build_create(const std::string& alias,
-                                             std::optional<Entity> parent,
-                                             std::tuple<Initial...> components) {
+  std::expected<Entity, Status> build_create(
+      const std::string& alias, std::optional<Entity> parent,
+      std::tuple<Initial...> components) {
     if (entities_.size() == entities_.capacity()) {
-      return std::unexpected(lib::raise(BuildCondition::ENTITY_CAPACITY_EXHAUSTED,
-                                        "The world is out of entity capacity."));
+      return std::unexpected(
+          lib::raise(BuildCondition::ENTITY_CAPACITY_EXHAUSTED,
+                     "The world is out of entity capacity."));
     }
     if (parent && !will_be_alive(*parent)) {
       return std::unexpected(lib::raise(BuildCondition::ENTITY_NOT_ALIVE,
@@ -428,7 +452,8 @@ class World final {
     if (std::optional<Status> failure = check_room<Initial...>()) {
       return std::unexpected(*failure);
     }
-    CHECK_PRECONDITION(next_entity_instance_ < std::numeric_limits<std::uint32_t>::max());
+    CHECK_PRECONDITION(next_entity_instance_ <
+                       std::numeric_limits<std::uint32_t>::max());
 
     Entity entity = entities_.create();
     std::uint32_t instance = next_entity_instance_++;
@@ -438,37 +463,44 @@ class World final {
       give_alias(Name{Kind::ENTITY, instance}, alias);
     }
 
-    record_attach(entity, EntityArchetype{.archetype = archetype_name<Archetype>()});
+    record_attach(entity,
+                  EntityArchetype{.archetype = archetype_name<Archetype>()});
     if (parent) {
       record_attach(entity, Parent{.entity = *parent});
     }
-    std::apply([&](auto&... component) { (record_attach(entity, std::move(component)), ...); },
-               components);
+    std::apply(
+        [&](auto&... component) {
+          (record_attach(entity, std::move(component)), ...);
+        },
+        components);
     return entity;
   }
 
   template <typename... Attached, typename... Detached>
-  std::expected<void, Status> build_change(Entity entity, std::tuple<Attached...> components,
+  std::expected<void, Status> build_change(Entity entity,
+                                           std::tuple<Attached...> components,
                                            TypeList<Detached...>,
                                            const AliasChanges& aliases) {
     if (!will_be_alive(entity)) {
-      return std::unexpected(
-          lib::raise(BuildCondition::ENTITY_NOT_ALIVE, "The entity is not alive."));
+      return std::unexpected(lib::raise(BuildCondition::ENTITY_NOT_ALIVE,
+                                        "The entity is not alive."));
     }
     std::optional<Status> failure;
-    auto require = [&]<typename Component>(bool present, BuildCondition condition,
+    auto require = [&]<typename Component>(bool present,
+                                           BuildCondition condition,
                                            const char* message) {
       if (!failure && will_have<Component>(entity) != present) {
         std::string type_name = lib::to_type_string<Component>();
-        failure = lib::raise(condition,
-                             std::vformat(message, std::make_format_args(type_name)));
+        failure = lib::raise(
+            condition, std::vformat(message, std::make_format_args(type_name)));
       }
     };
-    (require.template operator()<Attached>(false, BuildCondition::COMPONENT_ALREADY_ATTACHED,
-                                            "The entity already has a {}."),
+    (require.template operator()<Attached>(
+         false, BuildCondition::COMPONENT_ALREADY_ATTACHED,
+         "The entity already has a {}."),
      ...);
-    (require.template operator()<Detached>(true, BuildCondition::COMPONENT_NOT_ATTACHED,
-                                            "The entity has no {}."),
+    (require.template operator()<Detached>(
+         true, BuildCondition::COMPONENT_NOT_ATTACHED, "The entity has no {}."),
      ...);
     if (!failure) {
       failure = check_room<Attached...>();
@@ -479,25 +511,31 @@ class World final {
       const std::string& alias = aliases.given[i];
       failure = check_alias(alias);
       if (!failure && (has_alias(name, alias) ||
-                       std::count(aliases.given.begin(), aliases.given.begin() + i, alias))) {
-        failure = lib::raise(BuildCondition::ALIAS_ALREADY_GIVEN,
-                             std::format("The entity already has the alias {}.", alias));
+                       std::count(aliases.given.begin(),
+                                  aliases.given.begin() + i, alias))) {
+        failure = lib::raise(
+            BuildCondition::ALIAS_ALREADY_GIVEN,
+            std::format("The entity already has the alias {}.", alias));
       }
     }
     for (std::size_t i = 0; !failure && i < aliases.taken.size(); ++i) {
       const std::string& alias = aliases.taken[i];
       if (!has_alias(name, alias) ||
           std::count(aliases.taken.begin(), aliases.taken.begin() + i, alias)) {
-        failure = lib::raise(BuildCondition::ALIAS_NOT_GIVEN,
-                             std::format("The entity does not have the alias {}.", alias));
+        failure = lib::raise(
+            BuildCondition::ALIAS_NOT_GIVEN,
+            std::format("The entity does not have the alias {}.", alias));
       }
     }
     if (failure) {
       return std::unexpected(*failure);
     }
 
-    std::apply([&](auto&... component) { (record_attach(entity, std::move(component)), ...); },
-               components);
+    std::apply(
+        [&](auto&... component) {
+          (record_attach(entity, std::move(component)), ...);
+        },
+        components);
     (record_detach<Detached>(entity), ...);
     // Aliases are an index beside the stores, not store shape, so they change
     // immediately.
@@ -512,8 +550,8 @@ class World final {
 
   std::expected<void, Status> build_destroy(Entity entity) {
     if (!will_be_alive(entity)) {
-      return std::unexpected(
-          lib::raise(BuildCondition::ENTITY_NOT_ALIVE, "The entity is not alive."));
+      return std::unexpected(lib::raise(BuildCondition::ENTITY_NOT_ALIVE,
+                                        "The entity is not alive."));
     }
     destroying_[entity.index] = true;
     destroying_list_.push_back(entity.index);
@@ -534,7 +572,7 @@ class World final {
     commands_.push_back(DetachCommand<Component>{entity});
   }
 
-  //-- Applying commands --------------------------------------------------------
+  //-- Applying commands -------------------------------------------------------
 
   template <typename Component>
   void apply(lib::InOut<AttachCommand<Component>> command) {
@@ -571,7 +609,8 @@ class World final {
              Store<Components>...>
       stores_;
   std::vector<Command> commands_;
-  std::tuple<Plan<SpatialType>, Plan<EntityArchetype>, Plan<Parent>, Plan<Components>...>
+  std::tuple<Plan<SpatialType>, Plan<EntityArchetype>, Plan<Parent>,
+             Plan<Components>...>
       plans_;
   std::vector<bool> destroying_;
   std::vector<std::uint32_t> destroying_list_;

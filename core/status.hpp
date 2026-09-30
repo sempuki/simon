@@ -33,5 +33,6 @@ inline constexpr std::size_t BUILD_CONDITION_COUNT =
 // Messages for each condition, defined in status.cpp.
 template <>
 const std::array<lib::StatusConditionEntry, simon::core::BUILD_CONDITION_COUNT>
-    lib::EnumStatusKindConditionMixin<simon::core::BuildCondition,
-                                      simon::core::BUILD_CONDITION_COUNT>::conditions_;
+    lib::EnumStatusKindConditionMixin<
+        simon::core::BuildCondition,
+        simon::core::BUILD_CONDITION_COUNT>::conditions_;

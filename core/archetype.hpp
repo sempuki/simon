@@ -17,7 +17,9 @@ template <std::size_t Size>
 struct FixedString {
   char value[Size] = {};
 
-  constexpr FixedString(const char (&text)[Size]) { std::copy_n(text, Size, value); }
+  constexpr FixedString(const char (&text)[Size]) {
+    std::copy_n(text, Size, value);
+  }
   constexpr std::string_view view() const { return {value, Size - 1}; }
 };
 
@@ -60,7 +62,8 @@ struct EntityArchetype {
 };
 
 // The entity an entity was created under (`create<...>().under(parent)`). The
-// relation goes stale, and lookups through it fail, when the parent is destroyed.
+// relation goes stale, and lookups through it fail, when the parent is
+// destroyed.
 struct Parent {
   Entity entity;
 };

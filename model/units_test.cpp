@@ -18,7 +18,8 @@ TEST_CASE("Units") {
 
     Displacement moved = velocity * dt;
 
-    CHECK(moved.numerical_value_in(metre).is_approximately(Vector3{2.0, 4.0, 6.0}));
+    CHECK(moved.numerical_value_in(metre).is_approximately(
+        Vector3{2.0, 4.0, 6.0}));
   }
 
   SECTION("ShouldConvertChronoDurationGivenNanoseconds") {
@@ -31,7 +32,8 @@ TEST_CASE("Units") {
 
     CHECK(norm(a) == 5.0 * metre);
     CHECK(dot(a, b) == 0.0 * units::square(metre));
-    CHECK(cross(a, b).numerical_value_in(units::square(metre))
+    CHECK(cross(a, b)
+              .numerical_value_in(units::square(metre))
               .is_approximately(Vector3{8.0, -6.0, 0.0}));
   }
 

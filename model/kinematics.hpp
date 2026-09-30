@@ -28,10 +28,12 @@ inline Length distance(const Kinematics& a, const Kinematics& b) {
 }
 
 inline Pose pose(const Kinematics& kinematics) {
-  return Pose{.position = kinematics.position, .orientation = kinematics.orientation};
+  return Pose{.position = kinematics.position,
+              .orientation = kinematics.orientation};
 }
 
-// The commanded acceleration. Guidance and steering write it; Integrate reads it.
+// The commanded acceleration. Guidance and steering write it; Integrate reads
+// it.
 struct Control {
   Acceleration acceleration = metres_per_second_squared(0.0, 0.0, 0.0);
 };

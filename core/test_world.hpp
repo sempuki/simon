@@ -29,7 +29,8 @@ struct Health {
 using TestWorld = World<Position, Velocity, Health>;
 
 // A body may have any of the test components.
-struct Body : Archetype<"body", Requires<>, Allows<Position, Velocity, Health>> {};
+struct Body
+    : Archetype<"body", Requires<>, Allows<Position, Velocity, Health>> {};
 
 struct Launcher : Archetype<"launcher", Requires<Position>> {};
 struct Interceptor : Archetype<"interceptor", Requires<Position, Velocity>> {};
