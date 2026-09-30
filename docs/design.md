@@ -706,16 +706,83 @@ struct Step {
 };
 ```
 
-There is no global clock.
+There is no global clock. Current time always arrives through `Step`, from the
+driver.
 
-Time is counted in `int64` nanoseconds. Integer time is exact, which
-determinism needs, and it removes a class of substep drift bugs. simon already
-fixed one caused by accumulating `double` substeps. An `int64` of nanoseconds
-covers about 292 years.
+Time uses `std::chrono`, counted in `int64` nanoseconds:
 
-`lib::SimClock` currently counts `double` seconds and changes to `int64`
-nanoseconds in step 2. Physics code converts a `Duration` to `double` seconds
-at the point of use.
+```cpp
+struct SimTime;   // tag only: no now(), no state
+using Duration  = std::chrono::nanoseconds;
+using TimePoint = std::chrono::time_point<SimTime, Duration>;
+```
+
+- **Integer time is exact,** which determinism needs, and it removes a class of
+  substep drift bugs. simon already fixed one caused by accumulating `double`
+  substeps. An `int64` of nanoseconds covers about 292 years.
+- **`SimTime` is a tag.** It exists so that a simulation time point and a
+  wall-clock time point are different types. `RealTimeDriver` handles both,
+  and subtracting a `steady_clock` time point from a `TimePoint` does not
+  compile. `SimTime` has no `now()`, because a global clock would give systems
+  a hidden second source of time.
+- **Durations convert to `double` seconds** at the point of use in physics,
+  through the units library (see [Units](#units)).
+
+Strictly, the standard asks a `time_point`'s clock parameter to meet the clock
+requirements, which include `now()`. GCC, Clang and MSVC do not enforce it. If
+that ever matters, `TimePoint` becomes a small type of our own wrapping
+`nanoseconds` since the start of the run, with the same arithmetic rules.
+
+`lib::SimClock` currently counts `double` seconds and has a static `now()`. In
+step 2 it becomes the `SimTime` tag above.
+
+### Units
+
+Every physical quantity carries its unit in its type. Time uses `std::chrono`.
+Everything else uses [mp-units](https://mpusz.github.io/mp-units/) (2.5.0,
+in the Bazel Central Registry):
+
+```cpp
+using namespace mp_units;
+using namespace mp_units::si::unit_symbols;
+
+quantity<isq::length[m]> range = 20 * km;
+quantity<isq::speed[m / s]> cruise = 40 * m / s;
+auto travel = range / cruise;                      // a time quantity
+std::chrono::nanoseconds as_chrono = to_chrono_duration(travel);
+```
+
+- **mp-units is heading into the standard.** It is the reference
+  implementation of the ISO proposal for quantities and units, targeting
+  C++29.
+- **Quantity kinds.** Beyond metres against feet, it can tell a displacement
+  from an altitude from a range where we want that strictness.
+- **Affine positions.** `quantity_point` is to positions what `time_point` is
+  to time. Two positions subtract to a displacement, and adding two positions
+  does not compile.
+- **`std::chrono` interop.** Durations and time points convert both ways, so
+  `SimTime` plugs straight in.
+- **Angles** (radians, degrees) help with the geodetic coordinates DIS needs
+  later.
+
+The costs are heavier templates, slower compiles and long error messages.
+[Au](https://aurora-opensource.github.io/au) (0.6.0, in the Bazel Central
+Registry) is the fallback if those costs hurt: C++14, fast to compile, good
+errors, `std::chrono` interop, and less expressive.
+
+**Vectors are the open question.** Our vectors are Eigen types, and units and
+linear algebra do not mix easily:
+
+| Approach | Problem |
+|---|---|
+| A quantity whose representation is an Eigen vector (`quantity<isq::displacement[m], Vec3>`) | Eigen's arithmetic returns expression types, which may need wrapping or `.eval()` |
+| An Eigen vector of quantities (`Matrix<quantity<m>, 3, 1>`) | Eigen assumes one scalar type, and products change units (m × m = m²) |
+| Units at the boundaries: components and APIs carry quantities; `model/` kernels unwrap to Eigen doubles | Always possible; costs some typing at each call site |
+
+A spike in step 1 settles it: `Kinematics` with mp-units quantities over Eigen
+`Vec3`, one proportional-navigation step, and a check of the generated code and
+compile time. If the Eigen representation works cleanly, it is used
+throughout. If not, units live at the boundaries.
 
 ### Lifecycle
 
@@ -886,6 +953,7 @@ and destruction in the middle of a run, rate gates, and thousands of agents.
 | Need | Library |
 |---|---|
 | Linear algebra | Eigen (have) |
+| Units | `std::chrono` for time; mp-units for everything else (Au as fallback) |
 | Tests and benchmarks | Catch2, including its benchmarks (have) |
 | UI | Dear ImGui (have), ImPlot for the top-down view |
 | Window and input | SDL2 now; SDL3 when it is in the Bazel Central Registry |
@@ -901,10 +969,11 @@ Each step ends with a working application and passing tests.
 1. **Core ECS.** `Entity`, `Store`, `World`, systems, schedules, builders and
    commands, with tests. Benchmark the dense store against the stable-slot
    store at 1k, 10k and 100k entities with 0–75% churn, for iteration and
-   random lookup, and record the choice here. Port `hello` onto the core and
-   retire the prototype.
-2. **Drivers.** Switch `lib::SimClock` to `int64` nanoseconds. Add `Step`, the
-   lifecycle, `advance_to`, `BatchDriver`,
+   random lookup, and record the choice here. Run the units spike (mp-units
+   quantities over Eigen vectors) and record that choice too. Port `hello` onto
+   the core and retire the prototype.
+2. **Drivers.** Replace `lib::SimClock` with the `SimTime` tag and `int64`
+   nanoseconds. Add `Step`, the lifecycle, `advance_to`, `BatchDriver`,
    `RealTimeDriver` and `RateGate`. Run `hello` under the real-time driver.
 3. **Defense, headless.** The components and schedule above, with a
    `BatchDriver` test that checks a deterministic outcome for a fixed seed.
@@ -919,6 +988,8 @@ interop.
 
 ## Open decisions
 
+- **Units with Eigen vectors.** A quantity with an Eigen representation, or
+  units at the boundaries only. Decided by a spike in step 1.
 - **Store layout.** Dense with an entity index, or stable slots. Decided by the
   step 1 benchmark.
 - **Retargeting policy** for interceptors whose target disappears. To be
