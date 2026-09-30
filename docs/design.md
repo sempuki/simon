@@ -49,7 +49,7 @@ The architecture is idiomatic ECS with no exceptions:
 | Builder | The user-facing language for asking the simulator to do something specific. A builder turns a request into commands. |
 | Command | A typed, low-level structural change: create, add, remove, destroy. Commands are applied to stores. |
 | Schedule | A type listing systems in execution order. Schedules compose. |
-| World | Owns the entity table, the stores, the name index and the command buffer. |
+| World | The entity database. A factory of builders (the only way to write) and a query interface (the only way to read). Configured by a `Spatial` model. |
 | Driver | Owns time and steps the world's schedule. |
 
 Two pairs factor the details out of the parts people write:
@@ -103,10 +103,14 @@ A component is a plain struct:
 ```cpp
 struct Kinematics {
   Vec3 position = Vec3::Zero();
+  Quat orientation = Quat::Identity();
   Vec3 velocity = Vec3::Zero();
   Vec3 acceleration = Vec3::Zero();
 };
 ```
+
+`Kinematics` is the toolkit's default `Spatial` model (see
+[The world](#the-world)).
 
 Every field has a default initializer. Eigen types in particular do not
 initialize themselves.
@@ -323,73 +327,108 @@ builder for a new interceptor, and the builder emits the commands.
 
 ### Systems
 
-A system is a struct with a call operator. It iterates a declared set of one or
-more entity-components of the same entity. A set of one is the classic
-`System<Component, Compute>`: the system receives the entity and its
-entity-component, and looks up anything else through the entity.
-
-The call operator's parameters say what the system reads and writes. `const T&`
-reads an entity-component and `T&` writes it.
+A system declares its structure as a type. `System<Drive, Optional...>` is a
+variadic template: the first component drives the loop, and every following
+component is optional and belongs to the same entity.
 
 ```cpp
-struct GuideInterceptors {
-  using After = Systems<UpdateTracks>;
+template <typename Drive, typename... Optional>
+struct System {
+  using DriveType = Drive;
+  using OptionalTypes = TypeList<Optional...>;
+};
 
-  void operator()(Entity self, const Interceptor& interceptor, const Kinematics& kinematics,
-                  Control& control, const Store<Kinematics>& all_kinematics, Step step) const {
-    const Kinematics* target = all_kinematics.try_get(interceptor.target);
+struct GuideInterceptors : System<const Interceptor, const Kinematics, Control> {
+  using After = Systems<UpdateTracks>;
+  using Lookups = Stores<Kinematics>;   // other entities, always read-only
+
+  void operator()(Entity self, const Interceptor& interceptor,
+                  const Kinematics* kinematics, Control* control,
+                  Context<GuideInterceptors>& context) const {
+    if (!kinematics || !control) return;
+    const Kinematics* target = context.lookup<Kinematics>(interceptor.target);
     if (!target) { ... }
-    control.acceleration = model::proportional_navigation(kinematics, *target, interceptor);
+    control->acceleration = model::proportional_navigation(*kinematics, *target, interceptor);
   }
 };
 ```
 
-- **Entity-component parameters** (`const Interceptor&`, `Control&`) are what
-  the system iterates. The system runs once for every entity that has all of
-  them, and may write the ones it takes by mutable reference.
-- **Store parameters** (`const Store<Kinematics>&`) give read-only random
-  access, for following references to other entities. They are always `const`
-  (see [Relations between entities](#relations-between-entities)).
-- **A builder parameter** lets a system create, edit or destroy entities.
-- **`Step`** carries the time and step size (see [Time](#time-and-drivers)).
+The framework reads only the `System<...>` arguments. It walks the driving
+store and passes each entity's optional entity-components:
+
+```cpp
+auto& drive = world.store<typename S::DriveType>();   // const Store<Interceptor>& when Drive is const
+for (std::size_t i = 0; i < drive.size(); ++i) {
+  Entity e = drive.owner(i);
+  system(e, drive.data(i), world.store<Optional>().try_get(e)..., context);
+}
+```
+
+Given a system driven by `A` with an optional `B`, and entities `x`, `y` and
+`z` holding `(a)`, `(b)` and `(a, b)`:
+
+| Entity | Holds | The system |
+|---|---|---|
+| `x` | `(a)` | runs with `b == nullptr` |
+| `y` | `(b)` | does not run |
+| `z` | `(a, b)` | runs with its `b` |
+
+Rules:
+
+- **The driving component comes in by reference** and runs the loop, in the
+  driving store's dense order.
+- **Every following component comes in by pointer** and is null when the entity
+  lacks it. A system that needs it checks explicitly (`if (!b) return;`), so a
+  missing component is visible in the code, never silently skipped.
+- **Constness is declared in the `System` type, nowhere else.** Components are
+  written plainly (`System<Interceptor, Control>`). To read a component without
+  writing it, declare it `const` (`System<const Interceptor, Control>`). The
+  framework then takes a `const Store<T>*` for it, and a const store only hands
+  out `const T&` and `const T*`. The call operator must accept what the
+  declaration implies; a mismatch is a compile error.
+- **Other entities are reached through declared lookups.** `using Lookups =
+  Stores<...>;` lists the stores a system may read by entity, and
+  `Context<S>::lookup<T>(e)` returns `const T*`. Lookups are always read-only,
+  and asking for an undeclared store does not compile. (This form is proposed;
+  see [Open decisions](#open-decisions).)
+- **`Context<S>`** also carries the `Step` (see [Time](#time-and-drivers)) and
+  the builders the system may use.
 - **Optional stages** (`prepare` before the main loop, `resolve` after it)
   are detected at compile time and cost nothing when absent. The older
   simulator did the same with stage tags.
 
-The call operator must not be a template (no `auto` parameters), because the
-framework reads its parameter types to decide which stores to iterate and which
-to pass for lookup.
+Because the structure is a type, it composes. A system can be generic
+(`template <typename Body> struct Integrate : System<Kinematics, const Control,
+const Body>`), wrapped (`EveryN<10, S>`), or generated (an interop layer could
+declare `Replicate<T> : System<T, const Replica<T>>` for every component it
+publishes). A later builder built on expression templates could assemble
+`System<...>` types the same way.
 
-**Same-entity correlation** has two forms, and both appear in the signature:
-
-- Put the other entity-component in the iterated set when every row needs it.
-- Look it up through the entity with a `const Store<T>&` when only some rows
-  need it.
-
-Either way costs about the same at runtime. Iterating a set walks the smallest
-store and looks up the others through their indexes, which is the same
-two-array-read lookup a system does by hand. What the signature buys is
-visibility. Because every access is a typed parameter, the compiler can enforce
-the write rule, check ordering, and print what each system reads and writes. A
-system that could query any entity-component through the entity would hide all
-of that.
+**Cost.** Each optional component costs one probe of its store's index per row
+(an array read and a generation compare). That is the same lookup the older
+simulator made by hand through the entity, minus its hash map and
+`dynamic_cast`. The declared type adds no cost and buys visibility: the
+compiler can enforce the write rule, check ordering, and print what each system
+reads and writes. If a hot pair measures too slow, the world can keep an owned
+group for it (entities holding both packed at the front of both stores, in the
+same order), which removes the probes without changing system code.
 
 **Stages or separate systems.** Every non-trivial function is a system, but a
 system may do several passes:
 
 - Use stages (or a state variable with a switch) when the passes are one
-  concern over the same set of entity-components.
+  concern over the same driving component.
 - Use separate systems when a sync point is needed between the passes, when
-  the set of entity-components differs, or when a pass is worth testing or
-  reusing alone.
+  the driving component differs, or when a pass is worth testing or reusing
+  alone.
 
 Detonation needs three systems for those reasons. Blast entities must exist
-before victims look them up, which needs a sync point, and the victims iterate
-`Health` while the warheads iterate `Warhead`.
+before victims look them up, which needs a sync point, and the victims are
+driven by `Health` while the warheads are driven by `Warhead`.
 
-The framework derives each system's reads and writes from its signature. The
-compiler enforces them: a system that takes `const Radar&` cannot write radar
-state.
+The framework derives each system's reads and writes from its `System` type
+and its `Lookups`. The compiler enforces them: a system declared with
+`const Radar` cannot write radar state.
 
 The physics inside a system should be a free function in `model/`
 (`model::proportional_navigation` above), testable without a world.
@@ -403,9 +442,9 @@ target. Two launchers want the same track. ECS lets users choose how to handle
 relations, which is a strength, so simon needs a clear best practice and a
 design that makes misuse hard.
 
-**The rule: write what you iterate, read what you look up.** A system writes
-only the entity-components it iterates. Everything it reaches by lookup is
-read-only. To affect another entity, a system either uses a builder (create,
+**The rule: write only your own entity.** A system writes only the
+entity-components of the entity it is running for: the driving one and the
+optional ones. Everything it reaches through a `Store` lookup is read-only. To affect another entity, a system either uses a builder (create,
 edit, destroy) or leaves data that the other entity's own system reads.
 
 When the natural loop runs the wrong way, invert it. Make the side being
@@ -414,15 +453,15 @@ written the batch, and look up the side being read.
 #### Example: detonation
 
 ```
-TriggerWarheads   iterates Warhead + Kinematics        writes its own warhead state
+TriggerWarheads   driven by Warhead, reads Kinematics*   writes its own warhead state
    │  on trigger:  build.blast().at(position).radius(r).yield(y).source(self).build()
    │               build.destroy(self).build()
    ▼  sync point: this step's Blast entities exist
-ApplyBlasts       iterates Health + Kinematics         victims are the batch; each writes only itself
-   │  looks up nearby blasts through the spatial index, read-only
+ApplyBlasts       driven by Health, reads Kinematics*    victims are the batch; each writes only itself
+   │  asks the world for blasts within range, read-only
    │  if destroyed: build.destroy(self).build()
    ▼
-ExpireBlasts      iterates Blast                       destroys blasts older than one step
+ExpireBlasts      driven by Blast                        destroys blasts older than one step
 ```
 
 - **The blast is an entity** with `Blast` and `Kinematics` entity-components,
@@ -433,9 +472,9 @@ ExpireBlasts      iterates Blast                       destroys blasts older tha
 - **Victims write only themselves.** Two blasts hitting one victim, or a victim
   destroyed partway through, cannot produce order-dependent results. Each
   victim sums its own damage.
-- **"Everything within the radius"** is answered by the toolkit's spatial
-  index, rebuilt once per step after `Motion` and read-only for the rest of the
-  step.
+- **"Everything within the radius"** is a world query. The world's spatial
+  index is updated once per step after `Motion` and read-only for the rest of
+  the step.
 - **Victims that must react** set state on themselves (for example `Damaged`)
   or publish an event if something rare needs to know.
 
@@ -451,12 +490,13 @@ ExpireBlasts      iterates Blast                       destroys blasts older tha
 
 #### Guarding against misuse
 
-- **Random-access store parameters must be `const`.** A mutable `Store<T>&`
-  parameter does not compile, so "loop over blasts and write each victim"
-  cannot be written. The error message points at the inversion pattern.
-- **A system cannot both iterate `T&` and look up `Store<T>`.** Reading an
-  array partway through writing it gives results that depend on iteration
-  order. This is why guidance writes `Control` and reads `Kinematics`.
+- **Lookups are always read-only.** There is no way to declare a writable
+  lookup, so "loop over blasts and write each victim" cannot be written. The
+  error message points at the inversion pattern.
+- **A system cannot both write `T` and look it up.** Declaring a non-const `T`
+  in the `System` type and `T` in `Lookups` fails to compile. Reading an array
+  partway through writing it gives results that depend on iteration order.
+  This is why guidance writes `Control` and reads `Kinematics`.
 - **Structural changes to other entities go through builders.** Their commands
   apply at the next sync point, so nothing is destroyed partway through an
   iteration.
@@ -464,8 +504,8 @@ ExpireBlasts      iterates Blast                       destroys blasts older tha
   builds can wrap them to catch one kept longer.
 - **The event queue is for rare events.** Per-step traffic belongs in entities
   and components.
-- **The toolkit ships a spatial index,** so nobody writes an O(N²) scan for
-  lack of one.
+- **The world answers spatial queries,** so nobody writes an O(N²) scan for
+  lack of an index.
 
 The rule is the same as the authority rule in [Distribution](#distribution):
 only the owner writes. Code written this way is already shaped to run across
@@ -493,7 +533,7 @@ Schedules compose:
 
 ```cpp
 // Toolkit pieces.
-using Motion  = Systems<Integrate, BuildSpatialIndex>;
+using Motion  = Systems<Integrate, UpdateSpatialIndex>;
 using Sensing = Systems<ScanRadars, UpdateTracks, DropStaleTracks>;
 using Blasts  = Systems<TriggerWarheads, ApplyBlasts, ExpireBlasts>;
 
@@ -519,18 +559,105 @@ The older simulator also fixed order by template arguments, but kept the
 dependencies that justified the order in comments. simon keeps the type list
 and makes the dependencies part of the type.
 
-### The world type
+### The world
 
-Each application lists its components once, at compile time:
+A world is the entity database. It has two halves:
+
+1. **A factory of builders.** Builders are the only way to write. A builder
+   validates its utterance and emits commands, and the world applies them at
+   the next sync point, so the database is populated when the commands are
+   evaluated and no store changes shape while a system iterates it.
+2. **A query interface over the result.** Queries are the only way to read:
+   by name, by component, by space and by relation. A system's per-entity loop
+   is the most basic query ("every `A`, with optional `B`"), compiled down to
+   array walks.
+
+```
+          write                                       read
+build.ego()...build() ─▶ commands ─▶ World ─▶ by name       world.find(name)
+build.destroy()...     (applied at            by component  System<A, B...>, world.query<...>()
+build.connect()...      sync points)          by space      world.within(center, radius), world.nearest(p)
+                                              by relation   world.parent(e), world.children(e)
+```
+
+| Database | World |
+|---|---|
+| Primary key | `Entity` (local alias) and `Name` (canonical identity) |
+| Tables | Stores, one per component |
+| Indexes | The name index, the spatial index, the transform hierarchy |
+| Transactions | Command buffers, applied at sync points in recorded order |
+| Business logic | Systems |
+
+A world holds every entity-component its builders created, the mappings from
+names to entities, and any relationships between entities. Relationships are
+ordinary data: `Entity` fields in components, or relation entities (see
+[Relations between entities](#relations-between-entities)).
+
+#### Configuration
+
+A world is configured at compile time by a `Spatial` model and its component
+list:
 
 ```cpp
-using DefenseWorld = World<Name, Team, Kinematics, Control, Health, Warhead, Blast,
+template <typename S>
+concept Spatial = requires(const S& a, const S& b) {
+  { distance(a, b) } -> std::convertible_to<double>;
+  { pose(a) } -> std::convertible_to<Pose>;
+};
+
+template <Spatial S, typename... Components>
+class World;
+
+using DefenseWorld = World<Kinematics,
+                           Name, Team, Control, Health, Warhead, Blast,
                            RedDrone, Asset, Radar, Track, Launcher, Interceptor>;
 ```
 
-`world.store<T>()` resolves at compile time. Nothing is type-erased, so the
-inliner sees every hot-path call. The cost is that an application cannot add a
-component type at runtime, which none of our use cases need.
+- **`Spatial` is the world's only configuration concept.** It needs a distance
+  and a pose. The toolkit ships `Kinematics`, a local Cartesian 3D model, as
+  the default, so interop layers share one notion of position unless an
+  application opts out. Other models (geodetic for DIS, 2D, a grid, a network
+  where distance is hop count) fit without changing the core.
+- **The component list is closed per build.** `world.store<T>()` resolves at
+  compile time, nothing is type-erased, and the inliner sees every hot-path
+  call. An application cannot add a component type at runtime, which none of
+  our use cases need.
+
+#### Indexes
+
+The world owns two trees. Both are implementation details, exposed only as
+queries:
+
+- **The spatial index** answers `within()` and `nearest()` over every entity
+  with the `Spatial` component. Its structure (uniform grid, BVH, k-d tree) is
+  the world's choice, measured and swappable. Users never supply a tree type.
+- **The transform hierarchy** answers `parent()` and `children()`, and composes
+  poses for mounted entities such as a radar on a vehicle. It is built from
+  `pose()` and a parent relation.
+
+Indexes are updated at defined points, so every query within a step sees a
+consistent snapshot:
+
+- Created and destroyed entities enter and leave the indexes at sync points.
+- Moved entities are re-indexed by a world-provided system,
+  `UpdateSpatialIndex`, which the schedule places after `Motion`. The world
+  maintains its indexes, and the schedule says when.
+
+Entities replicated from another process enter the same indexes, so a spatial
+query finds a red drone whether red is simulated locally or remotely.
+
+#### Several worlds
+
+A world is an object, so a process can hold several. One use stands out for
+defense: the blue side's track picture as its own world, holding tracks built
+from sensor reports and queried the same way as ground truth. It is a natural
+home for perception error later.
+
+An entity belongs to exactly one world. References across worlds use names,
+the same rule as references across processes.
+
+Only one world type, the Cartesian spatial world, is built until a second is
+needed.
 
 ### Determinism
 
@@ -544,6 +671,26 @@ A run is reproducible from its scenario and seed. That requires:
 - Integer time (see below).
 - No iteration over unordered containers on the hot path.
 - Random numbers drawn from generators the simulation owns and seeds.
+
+## Extensible edges
+
+Large simulations connect to other input formats and co-simulators, so we
+decide deliberately which edges are extensible and what polymorphism each uses.
+
+The principle is templates inside the step, where code runs once per
+entity-component, and runtime polymorphism at the edges, which are crossed once
+per step or once at load. Builders sit between the two. They take type-erased
+input from an edge, validate it, and emit typed commands.
+
+| Edge | Crossed | Polymorphism | Why |
+|---|---|---|---|
+| Systems and schedules | Per entity-component | Static: `System<...>`, `Systems<...>` | Hot path; must inline |
+| World configuration (`Spatial`, component list) | Compile time | Static: `World<S, ...>` | Hot path; closed per build |
+| Input formats (scenario files, other schemas) | At load | Runtime: a reader interface feeding builders | New formats without recompiling the core |
+| Builders | At load or at sync points | Static interface; may type-erase internally | User-facing grammar that emits typed commands |
+| Co-simulator connections (scatter/gather, DIS, HLA) | Once per step | Runtime: a channel interface | Chosen by configuration; cost amortized over the step |
+| Drivers | Once per step | Runtime: chosen from configuration | Outer loop; batch, real-time or lockstep picked at startup |
+| Component serialization | At the edge | Compile-time traits per component, called through the runtime channel | Typed codecs, reachable through the type-erased edge |
 
 ## Time and drivers
 
@@ -662,7 +809,7 @@ Portico for HLA.
 
 ```
 simon/
-  core/          Entity, Store, World, builders, command buffer, Systems, schedules
+  core/          Entity, Store, World, Spatial, builders, command buffer, System, schedules
   drive/         Step, lifecycle, drivers, RateGate, EventQueue
   model/         Reusable physics: kinematics, sensing, guidance (free functions)
   app/
@@ -726,7 +873,7 @@ Schedule:
 | `LaunchInterceptors` | Launchers whose proposal was accepted build an interceptor |
 | `GuideInterceptors` | Proportional navigation into `Control`; retargets or self-destructs when the target is gone |
 | `SteerRedDrones` | Steers drones toward the asset into `Control` |
-| `Motion` | Integrates `Control` into `Kinematics` and rebuilds the spatial index |
+| `Motion` | Integrates `Control` into `Kinematics` and updates the world's spatial index |
 | `Blasts` | Triggers warheads, applies blast damage, expires blasts |
 | `CheckOutcome` | Returns `Stop` when red is defeated or the asset is destroyed |
 
@@ -778,6 +925,8 @@ interop.
   settled while building defense.
 - **Spatial index structure.** A uniform grid is the likely start; to be
   measured with defense at scale.
+- **Cross-entity lookups.** Proposed: `using Lookups = Stores<...>;` on the
+  system, reached through `Context<S>::lookup<T>(e)`, always read-only.
 
 ## Lessons from the older simulator
 
@@ -807,7 +956,7 @@ What we changed, and why:
 | `DependencyTracker` with deferred callbacks | Two-phase loading, lookup by name at use time, and an `EntityCreated` event | Deferred resolution existed only because of arbitrary construction order. |
 | Identities drawn from static counters | Identities owned by the builder that creates the entity | Names become deterministic and traceable to their creator. |
 | Builders with several modes that built in the destructor and type-erased through `dynamic_cast` | One builder per request with an explicit, checked terminal call that emits typed commands | Keeps the builder as the user-facing language. Invalid utterances were only caught at runtime, and failures were only logged. |
-| Order by template arguments, dependencies in comments | Order by template arguments, dependencies derived from signatures and checked | Keeps the compiler-fixed order and makes the dependencies checkable. |
+| Order by template arguments, dependencies in comments | Order by template arguments, dependencies declared in `System` types and checked | Keeps the compiler-fixed order and makes the dependencies checkable. |
 | One system per component type, with `ComputeNone` fillers | Systems that iterate any set of components; stores exist without a system | A store is data. It does not need a system to exist. |
 | Scenarios assembled from string paths into an external proto schema | Code-first scenarios now; scenario files with two-phase loading later | Removes about 45 near-identical attach functions. |
 | Multi-process state machines and liveness inside the engine | A small lifecycle enum and `advance_to` in the core; transport outside it | Keeps what every simulator needs and leaves deployment concerns at the edge. |
