@@ -7,13 +7,14 @@
 #include <vector>
 
 #include "base/testing.hpp"
+#include "drive/driver.hpp"
 
 namespace simon::hello {
 
 namespace {
 const core::WorldConfiguration CONFIGURATION{
     .number = 1, .entities = 8, .components = 8};
-const core::Duration DT{0.01};
+const core::Duration DT = std::chrono::milliseconds{10};
 }  // namespace
 
 TEST_CASE("Hello") {
@@ -66,6 +67,41 @@ TEST_CASE("Hello") {
     std::string text = Scheduler::describe();
     CHECK(text.find("ApplyForces") < text.find("Integrate"));
     CHECK(text.find("Integrate") < text.find("DetectCollisions"));
+  }
+}
+
+TEST_CASE("HelloSimulation") {
+  using namespace std::chrono_literals;
+  const drive::Timing timing{.max_step = 10ms};
+
+  SECTION("ShouldStopAtFirstCollisionGivenBatchRun") {
+    Simulation simulation;
+    drive::BatchDriver driver{lib::Depend<Simulation>{simulation}, timing};
+
+    auto reached = driver.run(core::TimePoint{60s});
+
+    REQUIRE(reached);
+    CHECK(*reached < core::TimePoint{60s});
+    CHECK(any_collision(simulation.world()));
+  }
+
+  SECTION("ShouldEndAtSameTimeAndPlaceGivenTwoRuns") {
+    Simulation first;
+    Simulation second;
+    drive::BatchDriver first_driver{lib::Depend<Simulation>{first}, timing};
+    drive::BatchDriver second_driver{lib::Depend<Simulation>{second}, timing};
+
+    auto first_end = first_driver.run(core::TimePoint{60s});
+    auto second_end = second_driver.run(core::TimePoint{60s});
+
+    REQUIRE(first_end);
+    REQUIRE(second_end);
+    CHECK(*first_end == *second_end);
+    const auto& first_red =
+        first.world().store<Kinematics>().get(first.balls().red);
+    const auto& second_red =
+        second.world().store<Kinematics>().get(second.balls().red);
+    CHECK(first_red.position == second_red.position);  // Bit for bit.
   }
 }
 

@@ -11,8 +11,8 @@ namespace simon::drive {
 
 TEST_CASE("EventQueue") {
   EventQueue events;
-  TimePoint start{Duration{0.0}};
-  TimePoint later{Duration{1.0}};
+  TimePoint start{std::chrono::seconds{0}};
+  TimePoint later{std::chrono::seconds{1}};
 
   struct M {
     int value = 0;
@@ -57,14 +57,14 @@ TEST_CASE("EventQueue") {
     events.subscribe<M>(
         [&seen](auto /*time*/, M mesg) { seen.push_back(mesg.value); });
 
-    events.publish<M>(TimePoint{Duration{5.0}}, M{5});
-    events.publish<M>(TimePoint{Duration{1.0}}, M{1});
-    events.publish<M>(TimePoint{Duration{3.0}}, M{3});
+    events.publish<M>(TimePoint{std::chrono::seconds{5}}, M{5});
+    events.publish<M>(TimePoint{std::chrono::seconds{1}}, M{1});
+    events.publish<M>(TimePoint{std::chrono::seconds{3}}, M{3});
 
-    events.process_until(TimePoint{Duration{2.0}});
+    events.process_until(TimePoint{std::chrono::seconds{2}});
     CHECK(seen == std::vector<int>{1});
 
-    events.process_until(TimePoint{Duration{10.0}});
+    events.process_until(TimePoint{std::chrono::seconds{10}});
     CHECK(seen == std::vector<int>{1, 3, 5});
   }
 
@@ -91,7 +91,7 @@ TEST_CASE("EventQueue") {
         [&received](auto time, M /*mesg*/) { received = time; });
 
     events.publish<M>(later, mesg);
-    events.process_until(TimePoint{Duration{3.0}});
+    events.process_until(TimePoint{std::chrono::seconds{3}});
 
     CHECK(received == later);
   }
@@ -128,15 +128,15 @@ TEST_CASE("EventQueue") {
     std::function<void(TimePoint)> tick = [&](TimePoint time) {
       fired.push_back(time);
       if (fired.size() < 3) {
-        events.start_timer(time + Duration{1.0}, tick);
+        events.start_timer(time + std::chrono::seconds{1}, tick);
       }
     };
     events.start_timer(start, tick);
 
-    events.process_until(TimePoint{Duration{10.0}});
+    events.process_until(TimePoint{std::chrono::seconds{10}});
 
-    CHECK(fired ==
-          std::vector<TimePoint>{start, later, TimePoint{Duration{2.0}}});
+    CHECK(fired == std::vector<TimePoint>{start, later,
+                                          TimePoint{std::chrono::seconds{2}}});
   }
 
   SECTION(

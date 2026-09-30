@@ -19,7 +19,7 @@ using testing::Velocity;
 
 namespace {
 
-const Step STEP{.time = TimePoint{}, .dt = Duration{0.5}};
+const Step STEP{.time = TimePoint{}, .dt = std::chrono::milliseconds{500}};
 
 // Records which entities it ran for, and whether each had a Velocity.
 struct Record : System<const Position, const Velocity> {
@@ -34,7 +34,8 @@ struct Integrate : System<Position, const Velocity> {
   void operator()(Entity, Position& position, const Velocity* velocity,
                   auto& context) {
     if (!velocity) return;
-    position.x += velocity->x * context.step().dt.count();
+    position.x +=
+        velocity->x * std::chrono::duration<double>(context.step().dt).count();
   }
 };
 

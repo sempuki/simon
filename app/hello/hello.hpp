@@ -8,6 +8,7 @@
 #include "core/archetype.hpp"
 #include "core/system.hpp"
 #include "core/world.hpp"
+#include "drive/lifecycle.hpp"
 #include "model/kinematics.hpp"
 #include "model/motion.hpp"
 
@@ -150,5 +151,32 @@ inline bool any_collision(const World& world) {
   }
   return false;
 }
+
+// The hello simulation: builds the balls when configured, and stops at the
+// first collision. Any driver can run it.
+class Simulation final {
+ public:
+  explicit Simulation(core::WorldConfiguration configuration =
+                          {.number = 1, .entities = 16, .components = 16})
+      : world_{configuration} {}
+
+  drive::PhaseResult configure() {
+    balls_ = build_balls(lib::InOut(world_));
+    return drive::Flow::CONTINUE;
+  }
+
+  drive::PhaseResult step(const core::Step& step) {
+    scheduler_.step(lib::InOut(world_), step);
+    return any_collision(world_) ? drive::Flow::STOP : drive::Flow::CONTINUE;
+  }
+
+  const World& world() const { return world_; }
+  const Balls& balls() const { return balls_; }
+
+ private:
+  World world_;
+  Scheduler scheduler_;
+  Balls balls_{};
+};
 
 }  // namespace simon::hello

@@ -914,8 +914,8 @@ requirements, which include `now()`. GCC, Clang and MSVC do not enforce it. If
 that ever matters, `TimePoint` becomes a small type of our own wrapping
 `nanoseconds` since the start of the run, with the same arithmetic rules.
 
-`lib::SimClock` currently counts `double` seconds and has a static `now()`. In
-step 2 it becomes the `SimTime` tag above.
+These live in `lib/base/time.hpp` as `lib::SimTime`, `lib::Duration` and
+`lib::TimePoint` (step 2 replaced the old `double`-second `SimClock`).
 
 ### Units
 
@@ -1016,10 +1016,16 @@ configure ─▶ initialize ─▶ step ─▶ step ─▶ ... ─▶ finalize
                              └── any step may return Stop
 ```
 
-Each phase returns `Continue` or `Stop`. Errors are statuses and are never
-used as control flow. (The older engine sometimes used `AbortedError` to mean
-"exit the loop".) The lifecycle is a small enum. It needs no state machine
-classes.
+Each phase returns `std::expected<Flow, Status>` (`PhaseResult`), where `Flow`
+is `CONTINUE` or `STOP`; `finalize` returns `std::expected<void, Status>`.
+Errors are statuses and are never used as control flow. (The older engine
+sometimes used `AbortedError` to mean "exit the loop".)
+
+A simulation is anything with `step(const Step&) -> PhaseResult` (the
+`Simulation` concept in `drive/lifecycle.hpp`). `configure`, `initialize` and
+`finalize` are optional; a driver calls them when they exist. Where a driver is
+in the lifecycle is a small enum, `Phase`: `NEW`, `RUNNING`, `STOPPED`,
+`FINISHED`. It needs no state machine classes.
 
 ### Drivers
 
@@ -1037,11 +1043,28 @@ from:
 | `RealTimeDriver` | The wall clock, paced | The demo, DIS-style interop |
 | `LockstepDriver` | An external peer grants the next time | Multiple processes, HLA-style time management |
 
-The contract carries an optional lookahead, the promise that this simulation
-will not produce events earlier than `now + lookahead`. HLA time management
-needs it.
+`drive/driver.hpp` implements the contract once, in `Driver`, which owns the
+simulation's time and phase. The other drivers wrap it:
 
-`BatchDriver` and `RealTimeDriver` come first. `LockstepDriver` waits until a
+- **`BatchDriver::run(end)`** runs the whole lifecycle to `end`, or until the
+  simulation stops, and returns the time reached. `finalize` runs even after an
+  error.
+- **`RealTimeDriver::tick()`** advances to wherever the wall clock has reached;
+  an application calls it once per frame. `run()` ticks and sleeps until the
+  simulation stops, for headless use. The wall clock is a template parameter,
+  so tests drive it by hand.
+- **Real-time runs are deterministic.** `RealTimeDriver` only ever targets whole
+  multiples of the maximum step, so the wall clock decides when steps happen,
+  never how long they are. A test checks that irregular wall-clock ticks take
+  exactly the steps a batch run takes.
+
+`hello` runs under `RealTimeDriver` at five times real time; its test runs the
+same simulation under `BatchDriver` and checks that two runs end at the same
+time with bit-identical state.
+
+The contract will carry an optional lookahead, the promise that this
+simulation will not produce events earlier than `now + lookahead`. HLA time
+management needs it, so it arrives with `LockstepDriver`, which waits until a
 second process exists.
 
 ### Rate gates
@@ -1050,10 +1073,18 @@ A component that works at a lower rate than the step (a radar scanning at
 10 Hz on a 100 Hz step) holds a `RateGate` value. Its system asks the gate
 whether to run this step.
 
-When it runs, the work receives the elapsed time since the gate last fired, not
-the driver's `dt`. The catch-up policy (fire once and skip missed periods, or
-fire once per missed period) is an explicit parameter. The older simulator's
-`PeriodicStep` passed the driver's `dt`, which was wrong for any gated work.
+`RateGate::fire(step)` returns a `Firing` when the gate fires, and nothing
+otherwise:
+
+- The gate fires on the first step it is asked about, then on each step that
+  contains one of its period boundaries. Steps are half-open, `[time,
+  time + dt)`.
+- `Firing::elapsed` is the time since the gate last fired (zero the first
+  time), never the driver's `dt`. The older simulator's `PeriodicStep` passed
+  the driver's `dt`, which was wrong for any gated work.
+- The catch-up policy is explicit. `CatchUp::SKIP` fires once and drops missed
+  periods. `CatchUp::EVERY` fires once and reports, in `Firing::periods`, how
+  many periods fell in the step, so the work can run once per period.
 
 ### Events
 
@@ -1196,7 +1227,7 @@ Each step ends with a working application and passing tests.
    random lookup, and record the choice here. Run the units spike (mp-units
    quantities over Eigen vectors) and record that choice too. Port `hello` onto
    the core and retire the prototype.
-2. **Drivers.** Replace `lib::SimClock` with the `SimTime` tag and `int64`
+2. **Drivers (done).** Replace `lib::SimClock` with the `SimTime` tag and `int64`
    nanoseconds. Add `Step`, the lifecycle, `advance_to`, `BatchDriver`,
    `RealTimeDriver` and `RateGate`. Run `hello` under the real-time driver.
 3. **Defense, headless.** The components and schedule above, with a

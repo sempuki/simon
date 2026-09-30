@@ -7,19 +7,54 @@ load("@rules_cc//cc:cc_test.bzl", "cc_test")
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
+    name = "lifecycle",
+    hdrs = ["lifecycle.hpp"],
+    copts = COPTS,
+    deps = [
+        "//core",
+        "@lib//base:status",
+    ],
+)
+
+cc_library(
+    name = "driver",
+    hdrs = ["driver.hpp"],
+    copts = COPTS,
+    deps = [
+        ":lifecycle",
+        "//core",
+        "@lib//base:core",
+    ],
+)
+
+cc_library(
+    name = "rate_gate",
+    hdrs = ["rate_gate.hpp"],
+    copts = COPTS,
+    deps = [
+        "//core",
+        "@lib//base:core",
+    ],
+)
+
+cc_library(
     name = "event_queue",
     hdrs = ["event_queue.hpp"],
     copts = COPTS,
     deps = ["//core"],
 )
 
-cc_test(
-    name = "event_queue_test",
+[cc_test(
+    name = test + "_test",
     size = "small",
-    srcs = ["event_queue_test.cpp"],
+    srcs = [test + "_test.cpp"],
     copts = COPTS,
     deps = [
-        ":event_queue",
+        ":" + test,
         "@lib//base:testing",
     ],
-)
+) for test in [
+    "driver",
+    "event_queue",
+    "rate_gate",
+]]

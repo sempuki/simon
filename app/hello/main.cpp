@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "app/hello/hello.hpp"
+#include "drive/driver.hpp"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_sdl2.h"
 #include "imgui/imgui_impl_sdlrenderer2.h"
@@ -60,14 +61,11 @@ int main(int, char**) {
   ImGui_ImplSDLRenderer2_Init(renderer);
   ImVec4 clear_color = ImVec4(0.35f, 0.45f, 0.50f, 1.00f);
 
-  // Simulator
-  hello::World world{
-      core::WorldConfiguration{.number = 1, .entities = 16, .components = 16}};
-  hello::Scheduler scheduler;
-  hello::Balls balls = hello::build_balls(lib::InOut(world));
-  const core::Duration dt{0.01};
-  const int steps_per_frame = 10;
-  core::TimePoint time{};
+  // Simulator: 10 ms steps, paced to the wall clock at five times real time.
+  hello::Simulation simulation;
+  drive::RealTimeDriver driver{
+      lib::Depend<hello::Simulation>{simulation},
+      drive::Timing{.max_step = std::chrono::milliseconds{10}}, 5.0};
 
   bool done = false;
 
@@ -83,12 +81,16 @@ int main(int, char**) {
         done = true;
     }
 
-    // Advance the simulation.
-    for (int i = 0; i < steps_per_frame && !hello::any_collision(world); ++i) {
-      scheduler.step(lib::InOut(world), core::Step{.time = time, .dt = dt});
-      time += dt;
+    // Advance the simulation to wherever the wall clock has reached.
+    drive::PhaseResult flow = driver.tick();
+    if (!flow) {
+      std::cerr << "Error: " << flow.error().message() << "\n";
+      done = true;
+    } else if (*flow == drive::Flow::STOP) {
+      done = true;
     }
-    done = done || hello::any_collision(world);
+    const hello::World& world = simulation.world();
+    const hello::Balls& balls = simulation.balls();
 
     // Start the Dear ImGui frame
     ImGui_ImplSDLRenderer2_NewFrame();
@@ -131,6 +133,10 @@ int main(int, char**) {
     SDL_RenderClear(renderer);
     ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
     SDL_RenderPresent(renderer);
+  }
+
+  if (drive::FinishResult finished = driver.finish(); !finished) {
+    std::cerr << "Error: " << finished.error().message() << "\n";
   }
 
   // Cleanup

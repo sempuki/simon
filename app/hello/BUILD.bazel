@@ -13,6 +13,7 @@ cc_library(
     copts = COPTS,
     deps = [
         "//core",
+        "//drive:lifecycle",
         "//model:kinematics",
         "//model:motion",
         "//model:units",
@@ -26,6 +27,7 @@ cc_test(
     copts = COPTS,
     deps = [
         ":hello_library",
+        "//drive:driver",
         "@lib//base:testing",
     ],
 )
@@ -36,6 +38,7 @@ cc_binary(
     copts = COPTS,
     deps = [
         ":hello_library",
+        "//drive:driver",
         "@imgui",
         "@imgui//backends:platform-sdl2",
         "@imgui//backends:renderer-sdl2",
