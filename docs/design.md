@@ -28,6 +28,14 @@ We prefer existing, modern libraries for anything outside the core. The core
 (entities, stores, systems, schedules and drivers) is ours, because its layout
 and handle rules are the point of the project.
 
+## Terminology
+
+| Term | Meaning |
+|---|---|
+| Entity | An object with a name/identity suitable for quick comparison, canonical lookup and local aliasing. An `Entity` value is the local alias; its `Name` is the canonical identity. |
+| Component | A type with a name/identity suitable for debugging. |
+| Entity-component | A single object of a component type, associated with a single entity. |
+
 ## Architecture
 
 The architecture is idiomatic ECS with no exceptions:
@@ -35,8 +43,8 @@ The architecture is idiomatic ECS with no exceptions:
 | Concept | Rule |
 |---|---|
 | Entity | An identity and nothing else: `{index, generation}`. It holds no data and no pointers. |
-| Component | Plain data. No behaviour, no virtual functions, no base class required. |
-| Store | Exactly one per component type. It is the array of that component. |
+| Component | Plain data. No behaviour, no virtual functions, no base class required. Each component type has a debug name. |
+| Store | Exactly one per component. It is the array of that component's entity-components. |
 | System | Every non-trivial function is a system. A system iterates component arrays through stores. |
 | Builder | The user-facing language for asking the simulator to do something specific. A builder turns a request into commands. |
 | Command | A typed, low-level structural change: create, add, remove, destroy. Commands are applied to stores. |
@@ -103,6 +111,18 @@ struct Kinematics {
 Every field has a default initializer. Eigen types in particular do not
 initialize themselves.
 
+A component's debug name comes from its type (`lib::to_type_string<T>()`), so
+logs and debuggers can say which component an entity-component belongs to.
+
+State and the commands that change it are separate components. Guidance writes
+a `Control`, and `Integrate` turns `Control` into motion:
+
+```cpp
+struct Control {
+  Vec3 acceleration = Vec3::Zero();
+};
+```
+
 A component that depends on another entity stores that `Entity`:
 
 ```cpp
@@ -115,8 +135,8 @@ struct Interceptor {
 
 ### Stores
 
-Each component type has one `Store<T>`. Stores keep their component array
-dense so that large simulations fit in cache. On the development machine (Zen
+Each component has one `Store<T>`, which holds all of its entity-components.
+Stores keep that array dense so that large simulations fit in cache. On the development machine (Zen
 3, 512 KiB L2 per core, 32 MiB L3 per chiplet), 5,000 agents with a 72-byte
 `Kinematics` take 360 KiB. That fits in one core's L2. With 50% holes the same
 store takes 720 KiB and spills into L3.
@@ -303,32 +323,69 @@ builder for a new interceptor, and the builder emits the commands.
 
 ### Systems
 
-A system is a struct with a call operator. Its parameters say what it reads and
-writes: `const T&` reads a component, and `T&` writes it.
+A system is a struct with a call operator. It iterates a declared set of one or
+more entity-components of the same entity. A set of one is the classic
+`System<Component, Compute>`: the system receives the entity and its
+entity-component, and looks up anything else through the entity.
+
+The call operator's parameters say what the system reads and writes. `const T&`
+reads an entity-component and `T&` writes it.
 
 ```cpp
 struct GuideInterceptors {
-  using After = Systems<ScanRadars>;
+  using After = Systems<UpdateTracks>;
 
-  void operator()(Entity self, const Interceptor& interceptor, Kinematics& kinematics,
-                  const Store<Kinematics>& all_kinematics, Step step) const {
+  void operator()(Entity self, const Interceptor& interceptor, const Kinematics& kinematics,
+                  Control& control, const Store<Kinematics>& all_kinematics, Step step) const {
     const Kinematics* target = all_kinematics.try_get(interceptor.target);
     if (!target) { ... }
-    kinematics.acceleration = model::proportional_navigation(kinematics, *target, interceptor);
+    control.acceleration = model::proportional_navigation(kinematics, *target, interceptor);
   }
 };
 ```
 
-- **Per-component parameters** (`const Interceptor&`, `Kinematics&`) are what
+- **Entity-component parameters** (`const Interceptor&`, `Control&`) are what
   the system iterates. The system runs once for every entity that has all of
-  them.
-- **Store parameters** (`const Store<Kinematics>&`) give random access, for
-  following references to other entities.
+  them, and may write the ones it takes by mutable reference.
+- **Store parameters** (`const Store<Kinematics>&`) give read-only random
+  access, for following references to other entities. They are always `const`
+  (see [Relations between entities](#relations-between-entities)).
 - **A builder parameter** lets a system create, edit or destroy entities.
 - **`Step`** carries the time and step size (see [Time](#time-and-drivers)).
 - **Optional stages** (`prepare` before the main loop, `resolve` after it)
   are detected at compile time and cost nothing when absent. The older
   simulator did the same with stage tags.
+
+The call operator must not be a template (no `auto` parameters), because the
+framework reads its parameter types to decide which stores to iterate and which
+to pass for lookup.
+
+**Same-entity correlation** has two forms, and both appear in the signature:
+
+- Put the other entity-component in the iterated set when every row needs it.
+- Look it up through the entity with a `const Store<T>&` when only some rows
+  need it.
+
+Either way costs about the same at runtime. Iterating a set walks the smallest
+store and looks up the others through their indexes, which is the same
+two-array-read lookup a system does by hand. What the signature buys is
+visibility. Because every access is a typed parameter, the compiler can enforce
+the write rule, check ordering, and print what each system reads and writes. A
+system that could query any entity-component through the entity would hide all
+of that.
+
+**Stages or separate systems.** Every non-trivial function is a system, but a
+system may do several passes:
+
+- Use stages (or a state variable with a switch) when the passes are one
+  concern over the same set of entity-components.
+- Use separate systems when a sync point is needed between the passes, when
+  the set of entity-components differs, or when a pass is worth testing or
+  reusing alone.
+
+Detonation needs three systems for those reasons. Blast entities must exist
+before victims look them up, which needs a sync point, and the victims iterate
+`Health` while the warheads iterate `Warhead`.
 
 The framework derives each system's reads and writes from its signature. The
 compiler enforces them: a system that takes `const Radar&` cannot write radar
@@ -337,24 +394,114 @@ state.
 The physics inside a system should be a free function in `model/`
 (`model::proportional_navigation` above), testable without a world.
 
+### Relations between entities
+
+ECS favours batch processing: a system walks arrays and treats every row alike.
+Simulations cannot escape relations between entities, though. A warhead
+detonates and must damage everything within its radius. An interceptor chases a
+target. Two launchers want the same track. ECS lets users choose how to handle
+relations, which is a strength, so simon needs a clear best practice and a
+design that makes misuse hard.
+
+**The rule: write what you iterate, read what you look up.** A system writes
+only the entity-components it iterates. Everything it reaches by lookup is
+read-only. To affect another entity, a system either uses a builder (create,
+edit, destroy) or leaves data that the other entity's own system reads.
+
+When the natural loop runs the wrong way, invert it. Make the side being
+written the batch, and look up the side being read.
+
+#### Example: detonation
+
+```
+TriggerWarheads   iterates Warhead + Kinematics        writes its own warhead state
+   │  on trigger:  build.blast().at(position).radius(r).yield(y).source(self).build()
+   │               build.destroy(self).build()
+   ▼  sync point: this step's Blast entities exist
+ApplyBlasts       iterates Health + Kinematics         victims are the batch; each writes only itself
+   │  looks up nearby blasts through the spatial index, read-only
+   │  if destroyed: build.destroy(self).build()
+   ▼
+ExpireBlasts      iterates Blast                       destroys blasts older than one step
+```
+
+- **The blast is an entity** with `Blast` and `Kinematics` entity-components,
+  named inside the warhead's builder scope. It can be debugged and drawn, and
+  it has the same shape as a DIS Detonation PDU or an HLA interaction. If a
+  victim lives in another process, the blast is the only thing that could reach
+  it.
+- **Victims write only themselves.** Two blasts hitting one victim, or a victim
+  destroyed partway through, cannot produce order-dependent results. Each
+  victim sums its own damage.
+- **"Everything within the radius"** is answered by the toolkit's spatial
+  index, rebuilt once per step after `Motion` and read-only for the rest of the
+  step.
+- **Victims that must react** set state on themselves (for example `Damaged`)
+  or publish an event if something rare needs to know.
+
+#### Patterns, simplest first
+
+| Relation | Pattern | Example |
+|---|---|---|
+| One-to-one reference | Store an `Entity`; look it up read-only | An interceptor reads its target's `Kinematics` |
+| One-to-many by space or predicate | A shared per-step index or a query, read-only | Blast radius, radar coverage |
+| Affecting another entity | Emit an entity or command; the target's own system applies it | Blasts, new tracks |
+| Conflicting claims | Propose, then resolve | Each launcher writes a proposal on itself; `ResolveEngagements` iterates tracks and picks one |
+| Many-to-many | A relation entity holding both `Entity` values | A radar observing a track |
+
+#### Guarding against misuse
+
+- **Random-access store parameters must be `const`.** A mutable `Store<T>&`
+  parameter does not compile, so "loop over blasts and write each victim"
+  cannot be written. The error message points at the inversion pattern.
+- **A system cannot both iterate `T&` and look up `Store<T>`.** Reading an
+  array partway through writing it gives results that depend on iteration
+  order. This is why guidance writes `Control` and reads `Kinematics`.
+- **Structural changes to other entities go through builders.** Their commands
+  apply at the next sync point, so nothing is destroyed partway through an
+  iteration.
+- **Pointers from lookups are valid only until the next sync point.** Debug
+  builds can wrap them to catch one kept longer.
+- **The event queue is for rare events.** Per-step traffic belongs in entities
+  and components.
+- **The toolkit ships a spatial index,** so nobody writes an O(N²) scan for
+  lack of one.
+
+The rule is the same as the authority rule in [Distribution](#distribution):
+only the owner writes. Code written this way is already shaped to run across
+processes.
+
 ### Schedules
 
 A schedule is a type. Its template argument order is the execution order, and
 the compiler holds it fixed. This is what makes a step deterministic and
 replayable.
 
+Running a schedule is a fold expression over its systems. There is no type
+erasure and no virtual call:
+
+```cpp
+template <typename... Ss>
+void run(Systems<Ss...>, World& world, Step step) {
+  (run_system<Ss>(world, step), ...);   // each call is a direct, inlinable instantiation
+}
+```
+
+Each system is listed once, in the schedule type.
+
 Schedules compose:
 
 ```cpp
 // Toolkit pieces.
-using Motion  = Systems<ApplyControls, Integrate>;
-using Sensing = Systems<ScanRadars, DropStaleTracks>;
+using Motion  = Systems<Integrate, BuildSpatialIndex>;
+using Sensing = Systems<ScanRadars, UpdateTracks, DropStaleTracks>;
+using Blasts  = Systems<TriggerWarheads, ApplyBlasts, ExpireBlasts>;
 
 // Application schedules.
-using HelloSystems   = Systems<Motion, DetectCollisions, ResolveCollisions>;
-using DefenseSystems = Systems<Sensing, AssignLaunchers, GuideInterceptors,
-                               SteerRedDrones, Motion, ResolveIntercepts,
-                               ResolveAssetHits, CheckOutcome>;
+using HelloSystems   = Systems<ApplyWind, Motion, DetectCollisions>;
+using DefenseSystems = Systems<Sensing, ProposeEngagements, ResolveEngagements,
+                               LaunchInterceptors, GuideInterceptors, SteerRedDrones,
+                               Motion, Blasts, CheckOutcome>;
 ```
 
 - **Nested schedules flatten** at compile time into one list.
@@ -377,8 +524,8 @@ and makes the dependencies part of the type.
 Each application lists its components once, at compile time:
 
 ```cpp
-using DefenseWorld = World<Name, Team, Kinematics, RedDrone, Asset,
-                           Radar, Track, Launcher, Interceptor>;
+using DefenseWorld = World<Name, Team, Kinematics, Control, Health, Warhead, Blast,
+                           RedDrone, Asset, Radar, Track, Launcher, Interceptor>;
 ```
 
 `world.store<T>()` resolves at compile time. Nothing is type-erased, so the
@@ -548,33 +695,44 @@ Components:
 |---|---|
 | `Name`, `Team` | Identity and side |
 | `Kinematics` | Position, velocity, acceleration |
+| `Control` | Commanded acceleration, written by guidance and steering |
+| `Health` | Hit points; damage taken this step |
+| `Warhead` | Fuse radius, blast radius, yield |
+| `Blast` | Radius, yield, source name; lives for one step |
 | `RedDrone` | Goal position, cruise speed |
-| `Asset` | Protected radius, health |
+| `Asset` | Marks the protected asset |
 | `Radar` | Range, field of view, `RateGate` for the scan |
 | `Track` | Target entity, estimated position and velocity, last seen time, engaging launcher |
-| `Launcher` | Inventory, reload `RateGate`, engagement range |
-| `Interceptor` | Target entity, navigation gain, acceleration limit, fuse radius |
+| `Launcher` | Inventory, reload `RateGate`, engagement range, current proposal |
+| `Interceptor` | Target entity, navigation gain, acceleration limit |
 
-Tracks are entities. A radar creates and updates them, launchers engage them,
-and later they are what an interop layer would publish.
+Tracks are entities. Radars create them, tracks update themselves from what the
+radars can see, launchers engage them, and later they are what an interop layer
+would publish.
+
+Interceptors and red drones both carry a `Warhead`. An interceptor reaching its
+target and a drone reaching the asset are the same event: a blast, applied to
+every `Health` within its radius.
 
 Schedule:
 
 | System | Does |
 |---|---|
-| `ScanRadars` | Detects red drones in range and creates or updates tracks |
+| `ScanRadars` | Creates a track for each red drone in coverage that has none |
+| `UpdateTracks` | Each track updates its own estimate from the radars that can see its target |
 | `DropStaleTracks` | Destroys tracks not seen recently or whose target is gone |
-| `AssignLaunchers` | Engages unengaged tracks in range and creates interceptors |
-| `GuideInterceptors` | Proportional navigation toward the target; retargets or self-destructs when the target is gone |
-| `SteerRedDrones` | Steers drones toward the asset |
-| `Motion` | Applies controls and integrates |
-| `ResolveIntercepts` | Destroys an interceptor and its target within the fuse radius |
-| `ResolveAssetHits` | Damages the asset when a drone reaches it |
+| `ProposeEngagements` | Each ready launcher proposes the best unengaged track in range |
+| `ResolveEngagements` | Each track accepts one proposal |
+| `LaunchInterceptors` | Launchers whose proposal was accepted build an interceptor |
+| `GuideInterceptors` | Proportional navigation into `Control`; retargets or self-destructs when the target is gone |
+| `SteerRedDrones` | Steers drones toward the asset into `Control` |
+| `Motion` | Integrates `Control` into `Kinematics` and rebuilds the spatial index |
+| `Blasts` | Triggers warheads, applies blast damage, expires blasts |
 | `CheckOutcome` | Returns `Stop` when red is defeated or the asset is destroyed |
 
 This application exercises the parts of the toolkit that matter most:
-references to entities that disappear, creation and destruction in the middle
-of a run, rate gates, and thousands of agents.
+references to entities that disappear, relations between entities, creation
+and destruction in the middle of a run, rate gates, and thousands of agents.
 
 ## Libraries
 
@@ -618,6 +776,8 @@ interop.
   step 1 benchmark.
 - **Retargeting policy** for interceptors whose target disappears. To be
   settled while building defense.
+- **Spatial index structure.** A uniform grid is the likely start; to be
+  measured with defense at scale.
 
 ## Lessons from the older simulator
 
