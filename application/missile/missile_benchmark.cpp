@@ -16,7 +16,9 @@
 #include <cstddef>
 #include <print>
 #include <string>
+#include <string_view>
 #include <tuple>
+#include <vector>
 
 #include "application/missile/simulation.hpp"
 #include "base/core.hpp"
@@ -29,8 +31,8 @@ using namespace std::chrono_literals;
 using WallClock = std::chrono::steady_clock;
 
 constexpr Duration DT = 10ms;
-constexpr int MAXIMUM_STEPS = 500;  // 5 s simulated.
-constexpr auto WALL_BUDGET = 30s;   // Per population.
+constexpr int DEFAULT_STEPS = 500;  // 5 s simulated.
+constexpr auto WALL_BUDGET = 30s;   // Per population, unless --steps is given.
 
 Scenario scenario_of(int drones) {
   return Scenario{.seed = 1,
@@ -56,7 +58,7 @@ std::array<std::string, sizeof...(SystemTypes)> names_of(
   return {short_name(lib::to_type_string<SystemTypes>())...};
 }
 
-void measure(int drones) {
+void measure(int drones, int maximum_steps, bool budgeted) {
   using List = Scheduler::FlattenedSystemList;
   constexpr std::size_t SYSTEM_COUNT = List::size;
 
@@ -69,7 +71,8 @@ void measure(int drones) {
 
   auto wall_start = WallClock::now();
   int steps = 0;
-  for (; steps < MAXIMUM_STEPS && WallClock::now() - wall_start < WALL_BUDGET &&
+  for (; steps < maximum_steps &&
+         (!budgeted || WallClock::now() - wall_start < WALL_BUDGET) &&
          world.alive(asset) && world.store_of<RedDrone>().size() > 0;
        ++steps) {
     framework::Step step{.time = TimePoint{} + steps * DT, .dt = DT};
@@ -110,8 +113,27 @@ void measure(int drones) {
 }  // namespace
 }  // namespace simon::missile
 
-int main() {
-  for (int drones : {1'000, 10'000, 100'000}) {
-    simon::missile::measure(drones);
+// missile_benchmark [--steps N] [drones...]
+//
+// Without --steps, each population runs up to 500 steps or 30 s of wall time,
+// whichever comes first. Radars scan once a second, so compare runs only over
+// the same number of steps.
+int main(int argc, char** argv) {
+  int steps = simon::missile::DEFAULT_STEPS;
+  bool budgeted = true;
+  std::vector<int> populations;
+  for (int i = 1; i < argc; ++i) {
+    if (std::string_view{argv[i]} == "--steps" && i + 1 < argc) {
+      steps = std::stoi(argv[++i]);
+      budgeted = false;
+    } else {
+      populations.push_back(std::stoi(argv[i]));
+    }
+  }
+  if (populations.empty()) {
+    populations = {1'000, 10'000, 100'000};
+  }
+  for (int drones : populations) {
+    simon::missile::measure(drones, steps, budgeted);
   }
 }

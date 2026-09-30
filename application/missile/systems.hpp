@@ -49,30 +49,28 @@ struct ScanRadars final : System<Radar, const Kinematics> {
       return;
     }
     radar.scanned = true;
-    const auto& drones = world.store_of<RedDrone>();
-    for (std::size_t i = 0; i < drones.size(); ++i) {
-      Entity drone = drones.owner(i);
-      const Kinematics* drone_kinematics =
-          world.try_component_of<Kinematics>(drone);
-      if (world.try_component_of<Tracked>(drone) || !drone_kinematics ||
-          distance(*kinematics, *drone_kinematics) > radar.range) {
-        continue;
-      }
-      auto track = world.create<archetype::Track>()
-                       .with(Track{.target = drone,
-                                   .position = drone_kinematics->position,
-                                   .velocity = drone_kinematics->velocity,
-                                   .last_seen = step.time})
-                       .build();
-      if (!track) {
-        continue;
-      }
-      if (!world.change(drone).attach(Tracked{.track = *track}).build()) {
-        // Another radar got there first.
-        auto dropped = world.destroy(*track).build();
-        DECLARE_UNUSED(dropped);
-      }
-    }
+    world.within(
+        *kinematics, radar.range,
+        [&](Entity drone, const Kinematics& drone_kinematics) {
+          if (!world.try_component_of<RedDrone>(drone) ||
+              world.try_component_of<Tracked>(drone)) {
+            return;
+          }
+          auto track = world.create<archetype::Track>()
+                           .with(Track{.target = drone,
+                                       .position = drone_kinematics.position,
+                                       .velocity = drone_kinematics.velocity,
+                                       .last_seen = step.time})
+                           .build();
+          if (!track) {
+            return;
+          }
+          if (!world.change(drone).attach(Tracked{.track = *track}).build()) {
+            // Another radar got there first.
+            auto dropped = world.destroy(*track).build();
+            DECLARE_UNUSED(dropped);
+          }
+        });
   }
 };
 
@@ -153,10 +151,17 @@ using Sensing = SystemList<ScanRadars, UpdateTracks, DropStaleTracks>;
 //-- Engagement ---------------------------------------------------------------
 
 // Each ready launcher proposes the nearest unengaged track in range.
+//
+// Tracks are not in the world's spatial index: a track's position is blue's
+// estimate, and UpdateTracks could not write a track Kinematics while reading
+// its target's. So this system indexes the estimates itself, on the first
+// query in a step.
 struct ProposeEngagements final : System<Launcher, const Kinematics> {
   using LocalWorld = WorldAccess<ProposeEngagements>;
   using SequenceAfterSystemList = SystemList<DropStaleTracks>;
   using AllowComponentList = TypeList<Track>;
+
+  void prepare(LocalWorld&) { indexed_ = false; }
 
   void operator()(LocalWorld& world, Entity, Launcher& launcher,
                   const Kinematics* kinematics, Step step) {
@@ -166,18 +171,31 @@ struct ProposeEngagements final : System<Launcher, const Kinematics> {
       return;
     }
     const auto& tracks = world.store_of<Track>();
-    std::optional<Length> nearest;
-    for (std::size_t i = 0; i < tracks.size(); ++i) {
-      const Track& track = tracks.data(i);
-      bool engaged = track.engaged_by != Entity{} && now < track.engaged_until;
-      Length range = distance_between(track.position, kinematics->position);
-      if (!engaged && range <= launcher.range &&
-          (!nearest || range < *nearest)) {
-        nearest = range;
-        launcher.proposal = tracks.owner(i);
+    if (!indexed_) {
+      if (!tracks_) {
+        tracks_.emplace(tracks.capacity(), CELL_SIZE);
       }
+      tracks_->rebuild(tracks.size(), [&](std::size_t slot) {
+        return model::coordinates(tracks.data(slot).position);
+      });
+      indexed_ = true;
+    }
+    std::optional<std::uint32_t> nearest = tracks_->nearest(
+        model::coordinates(kinematics->position),
+        launcher.range.numerical_value_in(model::meter),
+        [&](std::uint32_t slot) {
+          const Track& track = tracks.data(slot);
+          return track.engaged_by == Entity{} || now >= track.engaged_until;
+        });
+    if (nearest) {
+      launcher.proposal = tracks.owner(*nearest);
     }
   }
+
+ private:
+  static constexpr double CELL_SIZE = 250.0;       // Meters.
+  std::optional<framework::SpatialIndex> tracks_;  // Sized on first use.
+  bool indexed_ = false;
 };
 
 // Each unengaged track accepts the nearest launcher that proposed it. Ties go
@@ -339,19 +357,16 @@ struct GuideInterceptors final
   static const Kinematics* retarget(Interceptor& interceptor,
                                     const Kinematics& kinematics,
                                     LocalWorld& world) {
-    const auto& drones = world.store_of<RedDrone>();
-    const Kinematics* nearest = nullptr;
-    for (std::size_t i = 0; i < drones.size(); ++i) {
-      const Kinematics* drone =
-          world.try_component_of<Kinematics>(drones.owner(i));
-      if (drone && distance(kinematics, *drone) <= interceptor.seeker_range &&
-          (!nearest ||
-           distance(kinematics, *drone) < distance(kinematics, *nearest))) {
-        nearest = drone;
-        interceptor.target = drones.owner(i);
-      }
+    std::optional<Entity> nearest = world.nearest(
+        kinematics, interceptor.seeker_range,
+        [&](Entity candidate, const Kinematics&) {
+          return world.try_component_of<RedDrone>(candidate) != nullptr;
+        });
+    if (!nearest) {
+      return nullptr;
     }
-    return nearest;
+    interceptor.target = *nearest;
+    return &world.component_of<Kinematics>(*nearest);
   }
 };
 

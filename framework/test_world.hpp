@@ -18,6 +18,10 @@ inline double distance(const Position& a, const Position& b) {
   return std::abs(a.x - b.x);
 }
 inline Position pose(const Position& a) { return a; }
+inline Coordinates coordinates(const Position& a) { return {a.x, 0.0, 0.0}; }
+inline double coordinate_length(const Position&, double length) {
+  return length;
+}
 
 struct Velocity final {
   double x = 0.0;

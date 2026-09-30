@@ -250,6 +250,17 @@ class WorldAccess final {
     world_->within(center, radius, std::forward<VisitorType>(visit));
   }
 
+  template <typename AcceptType>
+  std::optional<Entity> nearest(const SpatialComponent& center,
+                                distance_of_t<SpatialComponent> radius,
+                                AcceptType&& accept) const {
+    static_assert(
+        contains_v<allow_component_list_of_t<SystemType>, SpatialComponent>,
+        "Declare the spatial component in the system's AllowComponentList to "
+        "query space.");
+    return world_->nearest(center, radius, std::forward<AcceptType>(accept));
+  }
+
   bool alive(Entity entity) const { return world_->alive(entity); }
   Name name_of(Entity entity) const { return world_->name_of(entity); }
   Name archetype_of(Entity entity) const {

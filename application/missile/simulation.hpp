@@ -57,8 +57,11 @@ inline framework::WorldConfiguration world_configuration_of(
   std::size_t entities = 1 + count(scenario.radars) +
                          count(scenario.launchers) +
                          3 * count(scenario.drones) + 2 * interceptors;
-  return framework::WorldConfiguration{
-      .number = 1, .entities = entities, .components = entities};
+  // Cells a few times smaller than the sensor and weapon ranges (1 to 4 km).
+  return framework::WorldConfiguration{.number = 1,
+                                       .entities = entities,
+                                       .components = entities,
+                                       .cell_size = 250.0};
 }
 
 // A point `radius` from the origin at `bearing` radians from east.

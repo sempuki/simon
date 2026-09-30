@@ -338,6 +338,37 @@ TEST_CASE("World") {
     CHECK(found == std::vector<Entity>{near});
   }
 
+  SECTION("ShouldFindNearestAcceptedGivenSpatialQuery") {
+    Entity nearer = *world.create<Body>().with(Position{1.0}).build();
+    Entity farther = *world.create<Body>().with(Position{-3.0}).build();
+    REQUIRE(world.create<Body>().with(Position{9.0}).build());
+    world.sync();
+
+    auto any = [](Entity, const Position&) { return true; };
+    auto not_nearer = [&](Entity e, const Position&) { return e != nearer; };
+    CHECK(world.nearest(Position{0.0}, 5.0, any) == nearer);
+    CHECK(world.nearest(Position{0.0}, 5.0, not_nearer) == farther);
+    CHECK(world.nearest(Position{0.0}, 0.5, any) == std::nullopt);
+  }
+
+  SECTION("ShouldSeeCreatedAndDestroyedEntitiesGivenSyncAfterQuery") {
+    Entity first = *world.create<Body>().with(Position{1.0}).build();
+    world.sync();
+    auto found = [&] {
+      std::vector<Entity> entities;
+      world.within(Position{0.0}, 2.0,
+                   [&](Entity e, const Position&) { entities.push_back(e); });
+      return entities;
+    };
+    REQUIRE(found() == std::vector<Entity>{first});
+
+    Entity second = *world.create<Body>().with(Position{-1.0}).build();
+    REQUIRE(world.destroy(first).build());
+    world.sync();
+
+    CHECK(found() == std::vector<Entity>{second});
+  }
+
   SECTION("ShouldReturnErrorGivenEntityCapacityExhausted") {
     for (int i = 0; i < 16; ++i) {
       REQUIRE(world.create<Body>().build());

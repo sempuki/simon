@@ -4,6 +4,7 @@
 
 #include "Eigen/Geometry"
 #include "base/core.hpp"
+#include "framework/spatial_index.hpp"
 #include "model/units.hpp"
 
 namespace simon::model {
@@ -25,6 +26,18 @@ struct Kinematics final {
 
 inline Length distance(const Kinematics& a, const Kinematics& b) {
   return norm(a.position - b.position);
+}
+
+// Coordinates for a spatial index, in meters.
+inline framework::Coordinates coordinates(const Position& position) {
+  const Vector3d& meters = position.numerical_value_ref_in(meter);
+  return {meters.x(), meters.y(), meters.z()};
+}
+inline framework::Coordinates coordinates(const Kinematics& kinematics) {
+  return coordinates(kinematics.position);
+}
+inline double coordinate_length(const Kinematics&, Length length) {
+  return length.numerical_value_in(meter);
 }
 
 inline Pose pose(const Kinematics& kinematics) {

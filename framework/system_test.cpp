@@ -112,6 +112,25 @@ TEST_CASE("System") {
     CHECK(world.store_of<Position>().component_of(entity).x == 2.0);
   }
 
+  SECTION("ShouldQueryMovedPositionsGivenSystemWroteSpatialComponent") {
+    Entity entity =
+        *world.create<Body>().with(Position{1.0}).with(Velocity{2.0}).build();
+    world.sync();
+    auto found_near = [&](double x) {
+      std::vector<Entity> found;
+      world.within(Position{x}, 0.5,
+                   [&](Entity e, const Position&) { found.push_back(e); });
+      return found;
+    };
+    REQUIRE(found_near(1.0) == std::vector<Entity>{entity});
+
+    Scheduler<TestWorld, SystemList<Integrate>> scheduler;
+    scheduler.step(lib::InOut(world), STEP);
+
+    CHECK(found_near(1.0).empty());
+    CHECK(found_near(2.0) == std::vector<Entity>{entity});
+  }
+
   SECTION("ShouldReadOtherEntitiesGivenDeclaredLookup") {
     Entity target = *world.create<Body>().with(Position{10.0}).build();
     Entity chaser =

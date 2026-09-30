@@ -14,6 +14,7 @@
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -25,18 +26,22 @@
 #include "framework/command.hpp"
 #include "framework/entity.hpp"
 #include "framework/name.hpp"
+#include "framework/spatial_index.hpp"
 #include "framework/store.hpp"
 #include "framework/type_list.hpp"
 
 namespace simon::framework {
 
-// What a world needs to know about space: a distance and a pose. The world
-// indexes every entity-component of its spatial type. Distances may carry
-// units; they only need to be ordered.
+// What a world needs to know about space: a distance, a pose, and, for its
+// spatial index, plain coordinates. The world indexes every entity-component
+// of its spatial type. Distances may carry units; `coordinate_length` gives
+// one as a plain number in the same unit as `coordinates`.
 template <typename Type>
 concept Spatial = requires(const Type& a, const Type& b) {
   { distance(a, b) < distance(a, b) } -> std::convertible_to<bool>;
   pose(a);
+  { coordinates(a) } -> std::same_as<Coordinates>;
+  { coordinate_length(a, distance(a, b)) } -> std::same_as<double>;
 };
 
 template <Spatial Type>
@@ -47,6 +52,9 @@ struct WorldConfiguration final {
   std::uint32_t number = 0;    // The world's instance in its Name and Identity.
   std::size_t entities = 0;    // Entity capacity.
   std::size_t components = 0;  // Capacity of each component store.
+  // The edge of a spatial index cell, in the spatial component's coordinate
+  // unit. About the radius of a typical query works well.
+  double cell_size = 1.0;
 };
 
 // Unlocks mutable store access. Only the scheduler, which runs systems, can
@@ -90,6 +98,7 @@ class World final {
                Plan<EntityArchetype>{configuration.entities},
                Plan<Parent>{configuration.entities},
                Plan<ComponentTypes>{configuration.entities}...},
+        spatial_index_{configuration.components, configuration.cell_size},
         destroying_(configuration.entities, false),
         instance_of_index_(configuration.entities, 0) {
     // Components are aliased by their type names, qualified and short.
@@ -162,15 +171,34 @@ class World final {
 
   // Visits every entity whose spatial entity-component is within `radius` of
   // `center`, as `visit(Entity, const SpatialType&)`.
+  //
+  // Spatial queries go through an index, rebuilt on the first query after the
+  // spatial store changes, which is why they are not const.
   template <typename VisitorType>
   void within(const SpatialType& center, distance_of_t<SpatialType> radius,
-              VisitorType&& visit) const {
-    const Store<SpatialType>& spatial = store_of<SpatialType>();
-    for (std::size_t i = 0; i < spatial.size(); ++i) {
-      if (distance(center, spatial.data(i)) <= radius) {
-        visit(spatial.owner(i), spatial.data(i));
-      }
-    }
+              VisitorType&& visit) {
+    const Store<SpatialType>& spatial = refresh_spatial_index();
+    spatial_index_.within(coordinates(center),
+                          coordinate_length(center, radius),
+                          [&](std::uint32_t slot) {
+                            visit(spatial.owner(slot), spatial.data(slot));
+                          });
+  }
+
+  // The entity nearest `center`, within `radius`, for which
+  // `accept(Entity, const SpatialType&)` is true. Ties go to the entity that
+  // comes first in the spatial store.
+  template <typename AcceptType>
+  std::optional<Entity> nearest(const SpatialType& center,
+                                distance_of_t<SpatialType> radius,
+                                AcceptType&& accept) {
+    const Store<SpatialType>& spatial = refresh_spatial_index();
+    std::optional<std::uint32_t> slot = spatial_index_.nearest(
+        coordinates(center), coordinate_length(center, radius),
+        [&](std::uint32_t candidate) {
+          return accept(spatial.owner(candidate), spatial.data(candidate));
+        });
+    return slot ? std::optional{spatial.owner(*slot)} : std::nullopt;
   }
 
   //-- Read: names, identities and aliases -----------------------------------
@@ -265,10 +293,15 @@ class World final {
 
   //-- Systems ----------------------------------------------------------------
 
+  // A store a system writes. Handing out the spatial store marks the spatial
+  // index stale, since the system may move things.
   template <typename ComponentType>
   Store<ComponentType>& mutable_store_of(SchedulerKey) {
     static_assert(contains_v<ComponentList, ComponentType>,
                   "This component is not in the world's component list.");
+    if constexpr (std::is_same_v<ComponentType, SpatialType>) {
+      spatial_index_current_ = false;
+    }
     return std::get<Store<ComponentType>>(stores_);
   }
 
@@ -309,6 +342,19 @@ class World final {
         break;
     }
     return false;
+  }
+
+  // The spatial store, after bringing the index up to date with it. The
+  // index's slots are positions in this store.
+  const Store<SpatialType>& refresh_spatial_index() {
+    const Store<SpatialType>& spatial = store_of<SpatialType>();
+    if (!spatial_index_current_) {
+      spatial_index_.rebuild(spatial.size(), [&](std::size_t slot) {
+        return coordinates(spatial.data(slot));
+      });
+      spatial_index_current_ = true;
+    }
+    return spatial;
   }
 
   bool has_component_number(Entity entity, std::uint32_t number) const {
@@ -578,6 +624,8 @@ class World final {
   template <typename ComponentType>
   void apply(lib::InOut<AttachCommand<ComponentType>> command) {
     CHECK_INVARIANT(alive(command->entity));
+    spatial_index_current_ =
+        spatial_index_current_ && !std::is_same_v<ComponentType, SpatialType>;
     std::get<Store<ComponentType>>(stores_).append(
         command->entity, std::move(command->component));
   }
@@ -585,6 +633,8 @@ class World final {
   template <typename ComponentType>
   void apply(lib::InOut<DetachCommand<ComponentType>> command) {
     CHECK_INVARIANT(alive(command->entity));
+    spatial_index_current_ =
+        spatial_index_current_ && !std::is_same_v<ComponentType, SpatialType>;
     std::get<Store<ComponentType>>(stores_).erase(command->entity);
   }
 
@@ -596,6 +646,8 @@ class World final {
       take_alias(name, alias);
     }
     entity_of_instance_.erase(name.instance);
+    spatial_index_current_ =
+        spatial_index_current_ && !store_of<SpatialType>().contains(entity);
     std::apply(
         [entity](auto&... store) {
           ((store.contains(entity) ? store.erase(entity) : void()), ...);
@@ -613,6 +665,9 @@ class World final {
   std::tuple<Plan<SpatialType>, Plan<EntityArchetype>, Plan<Parent>,
              Plan<ComponentTypes>...>
       plans_;
+  // Current while its slots match the spatial store. See within().
+  SpatialIndex spatial_index_;
+  bool spatial_index_current_ = false;
   std::vector<bool> destroying_;
   std::vector<std::uint32_t> destroying_list_;
 
