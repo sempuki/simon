@@ -1097,11 +1097,29 @@ Measured with the missile benchmark over the same 100 steps at 100,000 drones
 | Grid, ring search only | 430 | 84 | 342 |
 | Grid, skipping cells beyond the best match | 162 | 85 | 73 |
 
-`ScanRadars` got slower. The benchmark scales radars with drones inside a fixed
-band, so every radar's 4 km range covers nearly every drone and the grid
-filters nothing, while visiting in grid order costs random store accesses.
+`ScanRadars` got slower. That benchmark scaled radars with drones inside a
+fixed band, so every radar's 4 km range covered nearly every drone and the grid
+filtered nothing, while visiting in grid order cost random store accesses.
 Compare runs only over the same number of steps (`--steps N`): radars scan once
 a second, so averages over different windows mix different amounts of scanning.
+
+The benchmark now keeps density constant instead. `Scenario::sites` builds
+copies of the whole site (asset, radars, launchers, drones) on a grid 20 km
+apart, and the benchmark uses one site per 1,000 drones, each with 10 radars
+and 50 launchers. One site builds exactly the single-site scenario. Over 500
+steps, after archetype segments:
+
+| Drones | Sites | ms per step | ns per entity-step |
+|---:|---:|---:|---:|
+| 1,000 | 1 | 0.039 | 18.0 |
+| 10,000 | 10 | 0.651 | 32.2 |
+| 100,000 | 100 | 6.885 | 34.3 |
+
+From 10,000 to 100,000 drones the cost per entity is nearly flat; the step
+from 1,000 is the working set leaving the core's caches. `UpdateTracks` does
+not scale: every radar scans on the same steps, and each track then checks
+every scanning radar in the world, so it goes from 0.011 to 0.824 ms per step
+for ten times the population.
 
 Entities replicated from another process enter the same indexes, so a spatial
 query finds a red drone whether red is simulated locally or remotely.
@@ -1569,7 +1587,8 @@ Each step ends with a working application and passing tests.
    development machine". It is scale on cloud machines whose cache and memory
    bandwidth are contended by other heavy loads, and we have not met it yet.
    Benchmarks run idle and under `--contend`.
-   - Done: `missile_benchmark` (per-system cost at 1k to 100k drones),
+   - Done: `missile_benchmark` (per-system cost at 1k to 100k drones, at
+     constant density),
      prepare-time indexes in `UpdateTracks` and `ResolveEngagements`, the
      spatial index, `system_benchmark` (the cost of reaching a sibling) and
      `churn_benchmark` (layouts under churn).
@@ -1593,9 +1612,9 @@ interop.
 - **A realistic contention load.** `--contend` runs a streaming thread on every
   spare core, close to the worst case on the development machine. A cloud
   neighbor is likely milder, so the load should become a parameter.
-- **A missile benchmark whose area grows with the population,** so sensor
-  density stays realistic and `ScanRadars` measures the index rather than the
-  scenario.
+- **`UpdateTracks` checks every scanning radar per track,** which grows with
+  the square of the population when sites are tiled. An index over the step's
+  scanning radars would make it local.
 
 ## Lessons from the older simulator
 

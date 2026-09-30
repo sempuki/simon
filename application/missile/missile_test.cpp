@@ -136,6 +136,33 @@ TEST_CASE("MissileSimulation") {
     CHECK(result.outcome == Outcome::RED_WINS);
     CHECK(result.fired == 9u);  // Every interceptor was used.
   }
+
+  SECTION("ShouldAimEachSitesDronesAtItsOwnAssetGivenSeveralSites") {
+    Scenario scenario{.drones = 10, .sites = 4};
+    World world{world_configuration_of(scenario)};
+    Entity first = build_scenario(lib::InOut(world), scenario);
+
+    std::vector<Entity> assets = owners_of<Asset>(world);
+    REQUIRE(assets.size() == 4u);
+    CHECK(assets.front() == first);
+    CHECK(owners_of<RedDrone>(world).size() == 40u);
+    CHECK(owners_of<Radar>(world).size() == 12u);
+    // Each drone flies at the asset of the site it spawned in, which is the
+    // nearest asset: sites are 20 km apart and drones spawn within 6.5 km.
+    world.store_of<RedDrone>().for_each([&](Entity drone, const RedDrone& red) {
+      const Position& at =
+          world.store_of<Kinematics>().component_of(drone).position;
+      Entity nearest = assets.front();
+      for (Entity asset : assets) {
+        auto distance_to = [&](Entity to) {
+          return norm(world.store_of<Kinematics>().component_of(to).position -
+                      at);
+        };
+        nearest = distance_to(asset) < distance_to(nearest) ? asset : nearest;
+      }
+      CHECK(red.target == nearest);
+    });
+  }
 }
 
 TEST_CASE("ScanRadars") {

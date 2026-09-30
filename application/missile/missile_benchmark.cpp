@@ -34,13 +34,21 @@ constexpr Duration DT = 10ms;
 constexpr int DEFAULT_STEPS = 500;  // 5 s simulated.
 constexpr auto WALL_BUDGET = 30s;   // Per population, unless --steps is given.
 
+// One site per 1,000 drones, each with the density of the single-site
+// benchmark: 10 radars, 50 launchers and 1,000 drones spawning 3 to 4 km from
+// its asset. The area grows with the population, so each radar and launcher
+// sees about as many drones at any size.
 Scenario scenario_of(int drones) {
+  constexpr int DRONES_PER_SITE = 1000;
+  int sites = std::max(1, drones / DRONES_PER_SITE);
+  int per_site = drones / sites;
   return Scenario{.seed = 1,
-                  .radars = std::max(3, drones / 100),
-                  .launchers = std::max(3, drones / 20),
-                  .drones = drones,
+                  .radars = std::max(3, per_site / 100),
+                  .launchers = std::max(3, per_site / 20),
+                  .drones = per_site,
                   .spawn_distance = 3500.0 * model::meter,
-                  .spawn_spread = 1000.0 * model::meter};
+                  .spawn_spread = 1000.0 * model::meter,
+                  .sites = sites};
 }
 
 template <typename... SystemTypes>
@@ -95,9 +103,11 @@ void measure(int drones, int maximum_steps, bool budgeted) {
   double total = 0.0;
   for (double value : seconds) total += value;
   std::println(
-      "\n{} drones, {} radars, {} launchers: {} steps, {:.0f} entities "
-      "on average",
-      drones, scenario.radars, scenario.launchers, steps,
+      "\n{} drones, {} radars, {} launchers on {} site{}: {} steps, {:.0f} "
+      "entities on average",
+      scenario.drones * scenario.sites, scenario.radars * scenario.sites,
+      scenario.launchers * scenario.sites, scenario.sites,
+      scenario.sites == 1 ? "" : "s", steps,
       static_cast<double>(entity_steps) / std::max(steps, 1));
   std::println("  total {:10.3f} ms/step {:10.1f} ns/entity-step",
                1e3 * total / std::max(steps, 1),
