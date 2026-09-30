@@ -3,6 +3,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -68,18 +69,45 @@ class SchedulerKey final {
 // The entity database: a factory of builders (the only way to write) and a
 // query interface over the result (the only way to read).
 //
+// A world is declared by its spatial component, its other components and its
+// archetypes, every one of which it may create:
+//
+//   using World = World<Kinematics, TypeList<Control, Health>,
+//                       TypeList<archetype::Drone, archetype::Blast>>;
+//
 // Everything in it has a Name ({kind, instance}), an Identity computed from the
 // Name ("/world/1/entity/2"), and any number of Aliases ("ego"). See name.hpp.
-template <Spatial SpatialType, typename... ComponentTypes>
-class World final {
+template <Spatial SpatialType, typename ComponentListType,
+          typename ArchetypeListType>
+class World;
+
+template <Spatial SpatialType, typename... ComponentTypes,
+          typename... ArchetypeTypes>
+class World<SpatialType, TypeList<ComponentTypes...>,
+            TypeList<ArchetypeTypes...>>
+    final {
  public:
   using SpatialComponent = SpatialType;
   using ComponentList =
       TypeList<SpatialType, EntityArchetype, Parent, ComponentTypes...>;
+  using ArchetypeList = TypeList<ArchetypeTypes...>;
   using Command = command_for_t<ComponentList>;
 
   static_assert(is_unique_v<ComponentList>,
                 "Each component may appear once in a world's component list.");
+  static_assert((Archetypal<ArchetypeTypes> && ...),
+                "Every archetype in a world's archetype list must be an "
+                "Archetype.");
+  static_assert(is_unique_v<ArchetypeList>,
+                "Each archetype may appear once in a world's archetype list.");
+  static_assert(sizeof...(ArchetypeTypes) <
+                    std::numeric_limits<std::uint8_t>::max(),
+                "A world has fewer than 255 archetypes.");
+  static_assert((is_subset_v<typename ArchetypeTypes::PermittedComponentList,
+                             ComponentList> &&
+                 ...),
+                "An archetype requires or allows a component that is not in "
+                "the world's component list.");
 
   DECLARE_COPY_DELETE(World);
   DECLARE_MOVE_DELETE(World);  // Builders hold a pointer to their world.
@@ -87,20 +115,20 @@ class World final {
   explicit World(WorldConfiguration configuration)
       : number_{configuration.number},
         entities_{configuration.entities},
-        stores_{Store<SpatialType>{configuration.components,
-                                   configuration.entities},
-                Store<EntityArchetype>{configuration.entities,
-                                       configuration.entities},
-                Store<Parent>{configuration.entities, configuration.entities},
-                Store<ComponentTypes>{configuration.components,
-                                      configuration.entities}...},
+        stores_{
+            store_for<SpatialType>(configuration, configuration.components),
+            store_for<EntityArchetype>(configuration, configuration.entities),
+            store_for<Parent>(configuration, configuration.entities),
+            store_for<ComponentTypes>(configuration,
+                                      configuration.components)...},
         plans_{Plan<SpatialType>{configuration.entities},
                Plan<EntityArchetype>{configuration.entities},
                Plan<Parent>{configuration.entities},
                Plan<ComponentTypes>{configuration.entities}...},
         spatial_index_{configuration.components, configuration.cell_size},
         destroying_(configuration.entities, false),
-        instance_of_index_(configuration.entities, 0) {
+        instance_of_index_(configuration.entities, 0),
+        archetype_of_index_(configuration.entities, 0) {
     // Components are aliased by their type names, qualified and short.
     for_each_type(ComponentList{}, [&]<typename ComponentType>() {
       std::string type_name = lib::to_type_string<ComponentType>();
@@ -119,6 +147,8 @@ class World final {
   // Creates an entity of `ArchetypeType`, with an optional alias.
   template <Archetypal ArchetypeType>
   auto create(Alias alias = {}) {
+    static_assert(contains_v<ArchetypeList, ArchetypeType>,
+                  "This archetype is not in the world's archetype list.");
     return CreateBuilder<World, ArchetypeType, true>{
         lib::Depend<World>{*this}, std::move(alias), std::nullopt, {}};
   }
@@ -178,16 +208,16 @@ class World final {
   void within(const SpatialType& center, distance_of_t<SpatialType> radius,
               VisitorType&& visit) {
     const Store<SpatialType>& spatial = refresh_spatial_index();
-    spatial_index_.within(coordinates(center),
-                          coordinate_length(center, radius),
-                          [&](std::uint32_t slot) {
-                            visit(spatial.owner(slot), spatial.data(slot));
-                          });
+    spatial_index_.within(
+        coordinates(center), coordinate_length(center, radius),
+        [&](std::uint32_t slot) {
+          visit(spatial.owner_at(slot), spatial.component_at(slot));
+        });
   }
 
   // The entity nearest `center`, within `radius`, for which
-  // `accept(Entity, const SpatialType&)` is true. Ties go to the entity that
-  // comes first in the spatial store.
+  // `accept(Entity, const SpatialType&)` is true. Ties go to the entity in the
+  // lowest store slot.
   template <typename AcceptType>
   std::optional<Entity> nearest(const SpatialType& center,
                                 distance_of_t<SpatialType> radius,
@@ -196,9 +226,10 @@ class World final {
     std::optional<std::uint32_t> slot = spatial_index_.nearest(
         coordinates(center), coordinate_length(center, radius),
         [&](std::uint32_t candidate) {
-          return accept(spatial.owner(candidate), spatial.data(candidate));
+          return accept(spatial.owner_at(candidate),
+                        spatial.component_at(candidate));
         });
-    return slot ? std::optional{spatial.owner(*slot)} : std::nullopt;
+    return slot ? std::optional{spatial.owner_at(*slot)} : std::nullopt;
   }
 
   //-- Read: names, identities and aliases -----------------------------------
@@ -291,6 +322,55 @@ class World final {
     return text;
   }
 
+  //-- Archetypes and segments, for the framework -----------------------------
+
+  // Whether archetype number `archetype` (its position in ArchetypeList)
+  // requires, or requires or allows, `ComponentType`. Every archetype
+  // requires EntityArchetype and allows Parent.
+  template <typename ComponentType>
+  static constexpr bool archetype_requires(std::size_t archetype) {
+    constexpr std::array<bool, sizeof...(ArchetypeTypes)> TABLE{
+        (contains_v<typename ArchetypeTypes::RequiredComponentList,
+                    ComponentType> ||
+         std::is_same_v<ComponentType, EntityArchetype>)...};
+    return TABLE[archetype];
+  }
+  template <typename ComponentType>
+  static constexpr bool archetype_permits(std::size_t archetype) {
+    constexpr std::array<bool, sizeof...(ArchetypeTypes)> TABLE{
+        (contains_v<typename ArchetypeTypes::PermittedComponentList,
+                    ComponentType> ||
+         is_built_in_v<ComponentType>)...};
+    return TABLE[archetype];
+  }
+
+  // Each store has a segment per archetype that requires its component, in
+  // archetype order, then one for entities whose archetype only allows it.
+
+  template <typename ComponentType>
+  static constexpr std::size_t segments_of() {
+    std::size_t required = 0;
+    for (std::size_t archetype = 0; archetype < sizeof...(ArchetypeTypes);
+         ++archetype) {
+      required += archetype_requires<ComponentType>(archetype);
+    }
+    return required + 1;
+  }
+
+  // The segment an entity of archetype number `archetype` uses in the store
+  // of `ComponentType`.
+  template <typename ComponentType>
+  static constexpr std::size_t segment_of(std::size_t archetype) {
+    if (!archetype_requires<ComponentType>(archetype)) {
+      return segments_of<ComponentType>() - 1;
+    }
+    std::size_t segment = 0;
+    for (std::size_t before = 0; before < archetype; ++before) {
+      segment += archetype_requires<ComponentType>(before);
+    }
+    return segment;
+  }
+
   //-- Systems ----------------------------------------------------------------
 
   // A store a system writes. Handing out the spatial store marks the spatial
@@ -349,12 +429,30 @@ class World final {
   const Store<SpatialType>& refresh_spatial_index() {
     const Store<SpatialType>& spatial = store_of<SpatialType>();
     if (!spatial_index_current_) {
-      spatial_index_.rebuild(spatial.size(), [&](std::size_t slot) {
-        return coordinates(spatial.data(slot));
+      spatial_index_.rebuild([&](auto&& insert) {
+        spatial.for_each_slot(
+            [&](std::uint32_t slot, Entity, const SpatialType& component) {
+              insert(slot, coordinates(component));
+            });
       });
       spatial_index_current_ = true;
     }
     return spatial;
+  }
+
+  // Every store of a world uses the same chunk size, so an archetype's
+  // segments line up chunk for chunk.
+  static std::size_t chunk_size_of(const WorldConfiguration& configuration) {
+    return Store<EntityArchetype>::default_chunk_size(
+        std::max(configuration.entities, configuration.components));
+  }
+
+  template <typename ComponentType>
+  static Store<ComponentType> store_for(const WorldConfiguration& configuration,
+                                        std::size_t capacity) {
+    return Store<ComponentType>{capacity, configuration.entities,
+                                segments_of<ComponentType>(),
+                                chunk_size_of(configuration)};
   }
 
   bool has_component_number(Entity entity, std::uint32_t number) const {
@@ -505,6 +603,8 @@ class World final {
     Entity entity = entities_.create();
     std::uint32_t instance = next_entity_instance_++;
     instance_of_index_[entity.index] = instance;
+    archetype_of_index_[entity.index] =
+        static_cast<std::uint8_t>(index_of_v<ArchetypeList, ArchetypeType>);
     entity_of_instance_.emplace(instance, entity);
     if (!alias.empty()) {
       give_alias(Name{Kind::ENTITY, instance}, alias);
@@ -532,6 +632,26 @@ class World final {
           lib::raise(BuildError::ENTITY_NOT_ALIVE, "The entity is not alive."));
     }
     std::optional<Status> failure;
+    std::uint8_t archetype = archetype_of_index_[entity.index];
+    [[maybe_unused]] auto permit = [&]<typename ComponentType>(bool attaching) {
+      if (failure) {
+        return;
+      }
+      std::string type_name = lib::to_type_string<ComponentType>();
+      if (attaching && !archetype_permits<ComponentType>(archetype)) {
+        failure = lib::raise(
+            BuildError::COMPONENT_NOT_PERMITTED,
+            std::format("The entity's archetype neither requires nor allows "
+                        "a {}.",
+                        type_name));
+      } else if (!attaching && archetype_requires<ComponentType>(archetype)) {
+        failure = lib::raise(
+            BuildError::COMPONENT_REQUIRED,
+            std::format("The entity's archetype requires a {}.", type_name));
+      }
+    };
+    (permit.template operator()<AttachedTypes>(true), ...);
+    (permit.template operator()<DetachedTypes>(false), ...);
     [[maybe_unused]] auto require = [&]<typename ComponentType>(
                                         bool present, BuildError condition,
                                         const char* message) {
@@ -605,12 +725,15 @@ class World final {
     return {};
   }
 
+  // The entity's archetype must already be recorded, since it picks the
+  // segment.
   template <typename ComponentType>
   void record_attach(Entity entity, ComponentType component) {
     plan<ComponentType>().mark(entity.index, +1);
     ++plan<ComponentType>().attaching;
-    commands_.push_back(
-        AttachCommand<ComponentType>{entity, std::move(component)});
+    commands_.push_back(AttachCommand<ComponentType>{
+        entity, std::move(component),
+        segment_of<ComponentType>(archetype_of_index_[entity.index])});
   }
 
   template <typename ComponentType>
@@ -627,7 +750,7 @@ class World final {
     spatial_index_current_ =
         spatial_index_current_ && !std::is_same_v<ComponentType, SpatialType>;
     std::get<Store<ComponentType>>(stores_).append(
-        command->entity, std::move(command->component));
+        command->entity, std::move(command->component), command->segment);
   }
 
   template <typename ComponentType>
@@ -674,6 +797,8 @@ class World final {
   // Names. Entity instances are never reused; Entity indices are.
   std::uint32_t next_entity_instance_ = 0;
   std::vector<std::uint32_t> instance_of_index_;
+  // Each live entity's archetype, as its position in ArchetypeList.
+  std::vector<std::uint8_t> archetype_of_index_;
   std::unordered_map<std::uint32_t, Entity> entity_of_instance_;
   std::uint32_t next_archetype_instance_ = 0;
   std::map<std::string, Name, std::less<>> archetypes_;

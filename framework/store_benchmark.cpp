@@ -174,9 +174,7 @@ Result measure_dense(std::size_t count, double churn,
   return measure(
       lib::InOut(store), population,
       [](auto& dense, auto&& visit) {
-        for (Body& body : dense.values()) {
-          visit(body);
-        }
+        dense.for_each([&](Entity, Body& body) { visit(body); });
       },
       random);
 }

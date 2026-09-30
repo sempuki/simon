@@ -30,7 +30,7 @@ using Coordinates = std::array<double, 3>;
 // after construction.
 //
 // Queries are deterministic: they visit cells in a fixed order, and within a
-// bucket, points in slot order.
+// bucket, points in the order the rebuild gave them.
 class SpatialIndex final {
  public:
   DECLARE_COPY_DELETE(SpatialIndex);
@@ -56,36 +56,46 @@ class SpatialIndex final {
   // gives the point in each slot.
   template <typename CoordinatesOfType>
   void rebuild(std::size_t count, CoordinatesOfType&& coordinates_of) {
-    CHECK_PRECONDITION(count <= capacity());
+    rebuild([&](auto&& insert) {
+      for (std::size_t slot = 0; slot < count; ++slot) {
+        insert(static_cast<std::uint32_t>(slot), coordinates_of(slot));
+      }
+    });
+  }
+
+  // Replaces the contents with the points `for_each_point(insert)` gives, by
+  // calling `insert(slot, coordinates)` once for each, with distinct slots.
+  template <typename ForEachPointType>
+  void rebuild(ForEachPointType&& for_each_point) {
     unsorted_.clear();
     buckets_.clear();
     std::ranges::fill(starts_, 0);
     lowest_ = {0, 0, 0};
     highest_ = {-1, -1, -1};
-    for (std::size_t slot = 0; slot < count; ++slot) {
-      Coordinates point = coordinates_of(slot);
+    for_each_point([&](std::uint32_t slot, const Coordinates& point) {
+      CHECK_PRECONDITION(unsorted_.size() < capacity());
       Cell cell = cell_of(point);
+      bool first = unsorted_.empty();
       for (std::size_t axis = 0; axis < 3; ++axis) {
         lowest_[axis] =
-            slot == 0 ? cell[axis] : std::min(lowest_[axis], cell[axis]);
+            first ? cell[axis] : std::min(lowest_[axis], cell[axis]);
         highest_[axis] =
-            slot == 0 ? cell[axis] : std::max(highest_[axis], cell[axis]);
+            first ? cell[axis] : std::max(highest_[axis], cell[axis]);
       }
       std::uint32_t bucket = bucket_of(cell);
-      unsorted_.push_back(
-          Entry{.point = point, .slot = static_cast<std::uint32_t>(slot)});
+      unsorted_.push_back(Entry{.point = point, .slot = slot});
       buckets_.push_back(bucket);
       ++starts_[bucket + 1];
-    }
+    });
     for (std::size_t bucket = 1; bucket < starts_.size(); ++bucket) {
       starts_[bucket] += starts_[bucket - 1];
     }
-    // starts_[b] is now where bucket b begins. Scatters in slot order, using
-    // it as each bucket's cursor, so each bucket keeps its points in slot
-    // order. Afterwards starts_[b] is where bucket b + 1 begins, so shift back.
-    entries_.resize(count);
-    for (std::size_t slot = 0; slot < count; ++slot) {
-      entries_[starts_[buckets_[slot]]++] = unsorted_[slot];
+    // starts_[b] is now where bucket b begins. Scatters in the order given,
+    // using it as each bucket's cursor, so each bucket keeps that order.
+    // Afterwards starts_[b] is where bucket b + 1 begins, so shift back.
+    entries_.resize(unsorted_.size());
+    for (std::size_t i = 0; i < unsorted_.size(); ++i) {
+      entries_[starts_[buckets_[i]]++] = unsorted_[i];
     }
     for (std::size_t bucket = starts_.size() - 1; bucket > 0; --bucket) {
       starts_[bucket] = starts_[bucket - 1];
@@ -300,7 +310,7 @@ class SpatialIndex final {
   // ends.
   std::vector<std::uint32_t> starts_;
   std::vector<Entry> entries_;
-  // Rebuild scratch: points in slot order, and each one's bucket.
+  // Rebuild scratch: points in the order given, and each one's bucket.
   std::vector<Entry> unsorted_;
   std::vector<std::uint32_t> buckets_;
   // The range of cells that hold points, per axis.

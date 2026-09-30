@@ -85,15 +85,13 @@ struct UpdateTracks final : System<Track> {
   // only those. Radars scan a few times a second, so most steps there are none.
   void prepare(LocalWorld& world) {
     scanning_.clear();
-    const auto& radars = world.store_of<Radar>();
-    for (std::size_t i = 0; i < radars.size(); ++i) {
-      const Kinematics* radar =
-          world.try_component_of<Kinematics>(radars.owner(i));
-      if (radars.data(i).scanned && radar) {
+    world.store_of<Radar>().for_each([&](Entity owner, const Radar& radar) {
+      const Kinematics* kinematics = world.try_component_of<Kinematics>(owner);
+      if (radar.scanned && kinematics) {
         scanning_.push_back(
-            Scanning{.radar = radar, .range = radars.data(i).range});
+            Scanning{.radar = kinematics, .range = radar.range});
       }
-    }
+    });
   }
 
   void operator()(LocalWorld& world, Entity, Track& track, Step step) {
@@ -175,8 +173,11 @@ struct ProposeEngagements final : System<Launcher, const Kinematics> {
       if (!tracks_) {
         tracks_.emplace(tracks.capacity(), CELL_SIZE);
       }
-      tracks_->rebuild(tracks.size(), [&](std::size_t slot) {
-        return model::coordinates(tracks.data(slot).position);
+      tracks_->rebuild([&](auto&& insert) {
+        tracks.for_each_slot(
+            [&](std::uint32_t slot, Entity, const Track& track) {
+              insert(slot, model::coordinates(track.position));
+            });
       });
       indexed_ = true;
     }
@@ -184,11 +185,11 @@ struct ProposeEngagements final : System<Launcher, const Kinematics> {
         model::coordinates(kinematics->position),
         launcher.range.numerical_value_in(model::meter),
         [&](std::uint32_t slot) {
-          const Track& track = tracks.data(slot);
+          const Track& track = tracks.component_at(slot);
           return track.engaged_by == Entity{} || now >= track.engaged_until;
         });
     if (nearest) {
-      launcher.proposal = tracks.owner(*nearest);
+      launcher.proposal = tracks.owner_at(*nearest);
     }
   }
 
@@ -210,14 +211,13 @@ struct ResolveEngagements final : System<Track> {
   // order, so ties still go to the launcher that comes first.
   void prepare(LocalWorld& world) {
     proposals_.clear();
-    const auto& launchers = world.store_of<Launcher>();
-    for (std::size_t i = 0; i < launchers.size(); ++i) {
-      Entity track = launchers.data(i).proposal;
-      if (track != Entity{}) {
-        proposals_.push_back(
-            Proposal{.track = track.index, .launcher = launchers.owner(i)});
-      }
-    }
+    world.store_of<Launcher>().for_each(
+        [&](Entity owner, const Launcher& launcher) {
+          if (launcher.proposal != Entity{}) {
+            proposals_.push_back(
+                Proposal{.track = launcher.proposal.index, .launcher = owner});
+          }
+        });
     std::ranges::stable_sort(proposals_, {}, &Proposal::track);
   }
 
@@ -439,14 +439,12 @@ struct ApplyBlasts final : System<Health, const Kinematics> {
     if (!kinematics) {
       return;
     }
-    const auto& blasts = world.store_of<Blast>();
-    for (std::size_t i = 0; i < blasts.size(); ++i) {
-      const Kinematics* blast =
-          world.try_component_of<Kinematics>(blasts.owner(i));
-      if (blast && distance(*kinematics, *blast) <= blasts.data(i).radius) {
-        health.points -= blasts.data(i).damage;
+    world.store_of<Blast>().for_each([&](Entity owner, const Blast& blast) {
+      const Kinematics* center = world.try_component_of<Kinematics>(owner);
+      if (center && distance(*kinematics, *center) <= blast.radius) {
+        health.points -= blast.damage;
       }
-    }
+    });
     if (health.points <= 0.0) {
       auto destroyed = world.destroy(self).build();
       DECLARE_UNUSED(destroyed);

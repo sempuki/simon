@@ -31,8 +31,6 @@ struct Health final {
   double points = 0.0;
 };
 
-using TestWorld = World<Position, Velocity, Health>;
-
 // A body may have any of the test components.
 struct Body final
     : Archetype<"body", Requires<>, Allows<Position, Velocity, Health>> {};
@@ -40,6 +38,9 @@ struct Body final
 struct Launcher final : Archetype<"launcher", Requires<Position>> {};
 struct Interceptor final
     : Archetype<"interceptor", Requires<Position, Velocity>> {};
+
+using TestWorld = World<Position, TypeList<Velocity, Health>,
+                        TypeList<Body, Launcher, Interceptor>>;
 
 inline WorldConfiguration small_world() {
   return WorldConfiguration{.number = 1, .entities = 16, .components = 16};

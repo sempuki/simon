@@ -8,11 +8,12 @@
 // entity has a Body (the driving component, 72 bytes); most also have a Sibling
 // (24, 256 or 1024 bytes), which one system reads beside the Body each step.
 //
-//   dense         framework::Store with swap-erase, and no reordering (the
-//                 committed design). The sibling is found by try_component_of.
+//   dense         one array per component with swap-erase, and no
+//                 reordering (the framework's store before archetype
+//                 segments). The sibling is found by try_component_of.
 //   sorted        the same, and each store is sorted by entity index at the
 //                 step's sync point once 1 in 8 of it is out of order. The
-//                 framework does not sort, so this uses SortableStore below.
+//                 framework does not sort, so this uses DenseStore below.
 //   group         an EnTT-style owning group: every entity with both
 //                 components sits at the same position at the front of both
 //                 stores, kept there by swaps on each structural change. The
@@ -227,13 +228,14 @@ Schedule schedule_of(const Workload& workload) {
 
 //-- Layouts ------------------------------------------------------------------
 
-// framework::Store's layout, plus what the sorted and hybrid layouts need: a
-// count of appends and erases that break entity order, and an in-place sort.
-// The framework chose archetype segments instead; see documents/design.md.
+// The framework's store before archetype segments: one dense array with
+// swap-erase, plus what the sorted and hybrid layouts need, a count of appends
+// and erases that break entity order and an in-place sort. The framework chose
+// archetype segments instead; see documents/design.md.
 template <typename ComponentType>
-class SortableStore final {
+class DenseStore final {
  public:
-  SortableStore(std::size_t capacity, std::size_t entity_capacity)
+  DenseStore(std::size_t capacity, std::size_t entity_capacity)
       : index_(entity_capacity) {
     owner_.reserve(capacity);
     data_.reserve(capacity);
@@ -310,12 +312,11 @@ class SortableStore final {
   std::size_t disorder_ = 0;
 };
 
-// The framework's store, or the sortable one.
-template <typename ComponentType, bool SORTABLE>
-using StoreOf = std::conditional_t<SORTABLE, SortableStore<ComponentType>,
-                                   Store<ComponentType>>;
+// Whether a layout sorts its dense stores is up to the layout.
+template <typename ComponentType, bool SORTED>
+using StoreOf = DenseStore<ComponentType>;
 
-// framework::Store, as committed, or sorted by entity index at sync points.
+// The dense store, sorted by entity index at sync points or not.
 template <typename SiblingType, bool SORTED>
 class StoreLayout final {
  public:

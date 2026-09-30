@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <variant>
 
 #include "framework/entity.hpp"
@@ -16,6 +17,7 @@ template <typename ComponentType>
 struct AttachCommand final {
   Entity entity;
   ComponentType component;
+  std::size_t segment = 0;  // In the component's store; see Store.
 };
 
 template <typename ComponentType>

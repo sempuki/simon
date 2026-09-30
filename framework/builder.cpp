@@ -12,6 +12,8 @@ const std::array<lib::StatusConditionEntry, simon::framework::BUILD_ERROR_COUNT>
         lib::StatusConditionEntry{"entity not alive"},
         lib::StatusConditionEntry{"component already attached"},
         lib::StatusConditionEntry{"component not attached"},
+        lib::StatusConditionEntry{"component not permitted"},
+        lib::StatusConditionEntry{"component required"},
         lib::StatusConditionEntry{"alias invalid"},
         lib::StatusConditionEntry{"alias already given"},
         lib::StatusConditionEntry{"alias not given"},

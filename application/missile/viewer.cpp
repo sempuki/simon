@@ -176,17 +176,16 @@ class Viewer final {
     const World& world = session_->simulation().world();
     std::unordered_map<Name, Sighting> seen;
     auto look = [&]<typename ComponentType>(double radius, ImVec4 color) {
-      const auto& group = world.store_of<ComponentType>();
-      for (std::size_t i = 0; i < group.size(); ++i) {
-        Entity entity = group.owner(i);
-        if (const Kinematics* kinematics =
-                world.store_of<Kinematics>().try_component_of(entity)) {
-          seen.emplace(world.name_of(entity),
-                       Sighting{.point = point_of(*kinematics),
-                                .radius = radius,
-                                .color = color});
-        }
-      }
+      world.store_of<ComponentType>().for_each(
+          [&](Entity entity, const ComponentType&) {
+            if (const Kinematics* kinematics =
+                    world.store_of<Kinematics>().try_component_of(entity)) {
+              seen.emplace(world.name_of(entity),
+                           Sighting{.point = point_of(*kinematics),
+                                    .radius = radius,
+                                    .color = color});
+            }
+          });
     };
     look.template operator()<RedDrone>(
         session_->scenario().drone_warhead.radius.numerical_value_in(
@@ -280,43 +279,40 @@ class Viewer final {
 
     auto positions = [&]<typename ComponentType>() {
       Scatter scatter;
-      const auto& group = world.store_of<ComponentType>();
-      for (std::size_t i = 0; i < group.size(); ++i) {
-        if (const Kinematics* kinematics =
-                world.store_of<Kinematics>().try_component_of(group.owner(i))) {
-          scatter.add(point_of(*kinematics));
-        }
-      }
+      world.store_of<ComponentType>().for_each(
+          [&](Entity entity, const ComponentType&) {
+            if (const Kinematics* kinematics =
+                    world.store_of<Kinematics>().try_component_of(entity)) {
+              scatter.add(point_of(*kinematics));
+            }
+          });
       return scatter;
     };
 
     // Coverage first, so markers draw over it.
-    const auto& radars = world.store_of<Radar>();
-    for (std::size_t i = 0; i < radars.size(); ++i) {
+    world.store_of<Radar>().for_each([&](Entity owner, const Radar& radar) {
       if (const Kinematics* kinematics =
-              world.store_of<Kinematics>().try_component_of(radars.owner(i))) {
+              world.store_of<Kinematics>().try_component_of(owner)) {
         plot_circle("Radar coverage", point_of(*kinematics),
-                    radars.data(i).range.numerical_value_in(model::meter),
-                    FAINT_GREEN);
+                    radar.range.numerical_value_in(model::meter), FAINT_GREEN);
       }
-    }
-    const auto& launchers = world.store_of<Launcher>();
-    for (std::size_t i = 0; i < launchers.size(); ++i) {
-      if (const Kinematics* kinematics =
-              world.store_of<Kinematics>().try_component_of(
-                  launchers.owner(i))) {
-        plot_circle("Launcher range", point_of(*kinematics),
-                    launchers.data(i).range.numerical_value_in(model::meter),
-                    FAINT_BLUE);
-      }
-    }
+    });
+    world.store_of<Launcher>().for_each(
+        [&](Entity owner, const Launcher& launcher) {
+          if (const Kinematics* kinematics =
+                  world.store_of<Kinematics>().try_component_of(owner)) {
+            plot_circle("Launcher range", point_of(*kinematics),
+                        launcher.range.numerical_value_in(model::meter),
+                        FAINT_BLUE);
+          }
+        });
 
     Scatter tracks;
-    for (const Track& track : world.store_of<Track>().values()) {
+    world.store_of<Track>().for_each([&](Entity, const Track& track) {
       model::Vector3d position =
           track.position.numerical_value_in(model::meter);
       tracks.add(Point{.x = position.x(), .y = position.y()});
-    }
+    });
 
     auto plot = [](const char* label, const Scatter& scatter,
                    ImPlotMarker marker, float size, ImVec4 fill,

@@ -369,6 +369,30 @@ TEST_CASE("World") {
     CHECK(found() == std::vector<Entity>{second});
   }
 
+  SECTION("ShouldRefuseDetachGivenComponentTheArchetypeRequires") {
+    Entity launcher =
+        *world.create<testing::Launcher>().with(Position{}).build();
+    world.sync();
+
+    auto detached = world.change(launcher).detach<Position>().build();
+
+    REQUIRE_FALSE(detached);
+    CHECK(detached.error() == lib::watch(BuildError::COMPONENT_REQUIRED));
+    CHECK(world.pending() == 0u);
+  }
+
+  SECTION("ShouldRefuseAttachGivenComponentTheArchetypeDoesNotPermit") {
+    Entity launcher =
+        *world.create<testing::Launcher>().with(Position{}).build();
+    world.sync();
+
+    auto attached = world.change(launcher).attach(Velocity{}).build();
+
+    REQUIRE_FALSE(attached);
+    CHECK(attached.error() == lib::watch(BuildError::COMPONENT_NOT_PERMITTED));
+    CHECK(world.pending() == 0u);
+  }
+
   SECTION("ShouldReturnErrorGivenEntityCapacityExhausted") {
     for (int i = 0; i < 16; ++i) {
       REQUIRE(world.create<Body>().build());

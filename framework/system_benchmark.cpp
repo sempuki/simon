@@ -1,22 +1,26 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
-// What a system pays to reach a sibling entity-component: another component of
-// the same entity that is structurally always there. One system integrates a
-// 72-byte driving component using a 24-byte sibling, four ways:
+// What a system pays to reach a sibling: another component of the same entity.
+// One system integrates a 72-byte driving component using a 24-byte sibling,
+// five ways:
 //
-//   framework   the scheduler's loop: try_component_of on the sibling's store
-//               for every entity (the current design).
-//   handle      a pointer resolved when the entity was built and dereferenced
-//               unconditionally (the old Handle design, without its upkeep).
-//   structural  the sibling at the same dense position, so both arrays are
-//               walked together (what an archetype-table ECS gets).
+//   allowed     the scheduler's loop, where the archetype only allows the
+//               sibling: it was attached after creation and is found by
+//               try_component_of.
+//   required    the scheduler's loop, where the archetype requires the
+//               sibling: it sits in the archetype's segment of its store, at
+//               the entity's own local index.
+//   handle      plain arrays, and a pointer to the sibling resolved when the
+//               entity was built (the older simulator's handle, without its
+//               upkeep).
+//   structural  plain arrays walked together.
 //   baseline    the driving component alone, with no sibling.
 //
-// "aligned" attaches the sibling in the same order as the driving component, so
-// both stores share an order. "shuffled" attaches it in a random order, as when
-// components arrive at different times, so reaching it is a random access.
-// "structural" needs a shared order, so it only runs aligned. See
-// churn_benchmark.cpp for layouts that keep stores in a shared order.
+// "aligned" attaches allowed siblings, and resolves handles, in the driving
+// component's order. "shuffled" uses a random order, as when components arrive
+// at different times, so reaching the sibling is a random access. Required
+// siblings and structural arrays share an order by construction, so they only
+// run aligned.
 //
 // --contend runs one thread per spare core streaming over a large buffer, to
 // compete for shared cache and memory bandwidth as a busy cloud host would.
@@ -27,8 +31,11 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <format>
+#include <numeric>
 #include <print>
 #include <random>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -41,14 +48,20 @@
 namespace simon::framework {
 namespace {
 
-// The world's spatial component, unused here.
+// The world's spatial component, unused here beyond satisfying Spatial.
 struct Point final {
   double x = 0.0;
 };
-inline double distance(const Point& a, const Point& b) { return a.x - b.x; }
-inline Point pose(const Point& a) { return a; }
-inline Coordinates coordinates(const Point& a) { return {a.x, 0.0, 0.0}; }
-inline double coordinate_length(const Point&, double length) { return length; }
+[[maybe_unused]] double distance(const Point& a, const Point& b) {
+  return a.x - b.x;
+}
+[[maybe_unused]] Point pose(const Point& a) { return a; }
+[[maybe_unused]] Coordinates coordinates(const Point& a) {
+  return {a.x, 0.0, 0.0};
+}
+[[maybe_unused]] double coordinate_length(const Point&, double length) {
+  return length;
+}
 
 // About the size of Kinematics: nine doubles, 72 bytes.
 struct Body final {
@@ -62,8 +75,10 @@ struct Thrust final {
   double acceleration[3] = {0.1, 0.2, 0.3};
 };
 
-using BenchmarkWorld = World<Point, Body, Thrust>;
 struct Craft final : Archetype<"craft", Requires<Body>, Allows<Thrust>> {};
+struct Rocket final : Archetype<"rocket", Requires<Body, Thrust>> {};
+using BenchmarkWorld =
+    World<Point, TypeList<Body, Thrust>, TypeList<Craft, Rocket>>;
 
 constexpr double DT = 0.01;
 
@@ -103,7 +118,8 @@ double median_nanoseconds(FunctionType&& function, int repetitions) {
 }
 
 struct Result final {
-  double framework = 0.0;  // Nanoseconds per entity, for each way.
+  double allowed = 0.0;  // Nanoseconds per entity, for each way.
+  double required = 0.0;
   double handle = 0.0;
   double structural = 0.0;
   double baseline = 0.0;
@@ -111,62 +127,69 @@ struct Result final {
 
 Result measure(std::size_t count, bool shuffled,
                lib::InOut<std::mt19937> random) {
-  BenchmarkWorld world{
-      WorldConfiguration{.number = 1, .entities = count, .components = count}};
-  std::vector<Entity> entities;
-  for (std::size_t i = 0; i < count; ++i) {
-    auto entity = world.create<Craft>().with(Body{}).build();
-    CHECK_POSTCONDITION(entity.has_value());
-    entities.push_back(*entity);
-  }
-  world.sync();
-  std::vector<Entity> order = entities;
+  std::vector<std::size_t> order(count);
+  std::iota(order.begin(), order.end(), 0);
   if (shuffled) {
     std::ranges::shuffle(order, *random);
   }
-  for (Entity entity : order) {
-    auto attached = world.change(entity).attach(Thrust{}).build();
+
+  // The framework: one world whose sibling is allowed, attached in `order`,
+  // and one whose sibling is required.
+  WorldConfiguration configuration{
+      .number = 1, .entities = count, .components = count};
+  BenchmarkWorld allowed{configuration};
+  BenchmarkWorld required{configuration};
+  std::vector<Entity> crafts;
+  for (std::size_t i = 0; i < count; ++i) {
+    auto craft = allowed.create<Craft>().with(Body{}).build();
+    auto rocket = required.create<Rocket>().with(Body{}).with(Thrust{}).build();
+    CHECK_POSTCONDITION(craft.has_value() && rocket.has_value());
+    crafts.push_back(*craft);
+  }
+  allowed.sync();
+  required.sync();
+  for (std::size_t i : order) {
+    auto attached = allowed.change(crafts[i]).attach(Thrust{}).build();
     CHECK_POSTCONDITION(attached.has_value());
   }
-  world.sync();
+  allowed.sync();
 
-  const Store<Body>& bodies = world.store_of<Body>();
-  const Store<Thrust>& thrusts = world.store_of<Thrust>();
-  // Handles, in the body store's order, as if each Body held one.
-  std::vector<const Thrust*> handles;
-  for (std::size_t i = 0; i < bodies.size(); ++i) {
-    handles.push_back(&thrusts.component_of(bodies.owner(i)));
+  // Plain arrays, with handles resolved in `order`.
+  std::vector<Body> bodies(count);
+  std::vector<Thrust> thrusts(count);
+  std::vector<const Thrust*> handles(count);
+  for (std::size_t i = 0; i < count; ++i) {
+    handles[i] = &thrusts[order[i]];
   }
-  // Writable spans for the hand-written loops. Only the scheduler may ask the
-  // world for them, so take them from the stores the world owns.
-  auto body_data = const_cast<Store<Body>&>(bodies).values();
-  auto thrust_data = thrusts.values();
 
   int repetitions = count < 50'000 ? 200 : 40;
   auto per_entity = [&](auto&& function) {
     return median_nanoseconds(function, repetitions) /
            static_cast<double>(count);
   };
-  Scheduler<BenchmarkWorld, SystemList<Integrate>> scheduler;
+  Scheduler<BenchmarkWorld, SystemList<Integrate>> allowed_scheduler;
+  Scheduler<BenchmarkWorld, SystemList<Integrate>> required_scheduler;
   Step step{.time = TimePoint{}, .dt = std::chrono::milliseconds{10}};
 
   Result result;
-  result.framework =
-      per_entity([&] { scheduler.step(lib::InOut(world), step); });
+  result.allowed =
+      per_entity([&] { allowed_scheduler.step(lib::InOut(allowed), step); });
   result.handle = per_entity([&] {
-    for (std::size_t i = 0; i < body_data.size(); ++i) {
-      integrate(body_data[i], *handles[i]);
+    for (std::size_t i = 0; i < count; ++i) {
+      integrate(bodies[i], *handles[i]);
     }
   });
   if (!shuffled) {
+    result.required = per_entity(
+        [&] { required_scheduler.step(lib::InOut(required), step); });
     result.structural = per_entity([&] {
-      for (std::size_t i = 0; i < body_data.size(); ++i) {
-        integrate(body_data[i], thrust_data[i]);
+      for (std::size_t i = 0; i < count; ++i) {
+        integrate(bodies[i], thrusts[i]);
       }
     });
   }
   result.baseline = per_entity([&] {
-    for (Body& body : body_data) {
+    for (Body& body : bodies) {
       integrate(body);
     }
   });
@@ -185,18 +208,20 @@ int main(int argc, char** argv) {
                              : std::string{"uncontended"});
 
   std::mt19937 random{42};
-  std::println("{:>8} {:>9} | {:>10} {:>10} {:>10} {:>10}", "entities", "order",
-               "framework", "handle", "structural", "baseline");
-  std::println("{:>8} {:>9} | {:>43}", "", "", "ns/entity");
+  std::println("{:>8} {:>9} | {:>10} {:>10} {:>10} {:>10} {:>10}", "entities",
+               "order", "allowed", "required", "handle", "structural",
+               "baseline");
+  std::println("{:>8} {:>9} | {:>54}", "", "", "ns/entity");
+  auto aligned_only = [](bool shuffled, double value) {
+    return shuffled ? std::string{"-"} : std::format("{:.2f}", value);
+  };
   for (std::size_t count : {1'000uz, 10'000uz, 100'000uz, 1'000'000uz}) {
     for (bool shuffled : {false, true}) {
       Result result = measure(count, shuffled, lib::InOut(random));
-      std::println("{:>8} {:>9} | {:>10.2f} {:>10.2f} {:>10} {:>10.2f}", count,
-                   shuffled ? "shuffled" : "aligned", result.framework,
-                   result.handle,
-                   shuffled ? std::string{"-"}
-                            : std::format("{:.2f}", result.structural),
-                   result.baseline);
+      std::println("{:>8} {:>9} | {:>10.2f} {:>10} {:>10.2f} {:>10} {:>10.2f}",
+                   count, shuffled ? "shuffled" : "aligned", result.allowed,
+                   aligned_only(shuffled, result.required), result.handle,
+                   aligned_only(shuffled, result.structural), result.baseline);
     }
   }
 }

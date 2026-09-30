@@ -1,6 +1,7 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
 #include <chrono>
+#include <vector>
 
 #include "application/missile/simulation.hpp"
 #include "base/testing.hpp"
@@ -93,6 +94,15 @@ Entity make_interceptor(lib::InOut<World> world, Position position,
               .build();
 }
 
+// The owners of every `ComponentType`, in store order.
+template <typename ComponentType>
+std::vector<Entity> owners_of(const World& world) {
+  std::vector<Entity> owners;
+  world.store_of<ComponentType>().for_each(
+      [&](Entity owner, const ComponentType&) { owners.push_back(owner); });
+  return owners;
+}
+
 }  // namespace
 
 TEST_CASE("MissileSimulation") {
@@ -142,9 +152,9 @@ TEST_CASE("ScanRadars") {
     step(scheduler, lib::InOut(world), TimePoint{});
 
     REQUIRE(world.store_of<Track>().size() == 1u);
-    CHECK(world.store_of<Track>().data(0).target == drone);
-    CHECK(world.store_of<Tracked>().component_of(drone).track ==
-          world.store_of<Track>().owner(0));
+    Entity track = owners_of<Track>(world).front();
+    CHECK(world.store_of<Track>().component_of(track).target == drone);
+    CHECK(world.store_of<Tracked>().component_of(drone).track == track);
   }
 
   SECTION("ShouldNotTrackGivenDroneOutOfRange") {
@@ -193,11 +203,12 @@ TEST_CASE("Engagement") {
 
     REQUIRE(world.store_of<Interceptor>().size() == 1u);
     // The nearer launcher, at 50 m, won the engagement.
-    Entity interceptor = world.store_of<Interceptor>().owner(0);
+    Entity interceptor = owners_of<Interceptor>(world).front();
     Entity launcher = *world.parent_of(interceptor);
     CHECK(world.store_of<Kinematics>().component_of(launcher).position ==
           model::meters(50.0, 0.0, 0.0));
-    CHECK(world.store_of<Interceptor>().data(0).target == drone);
+    CHECK(world.store_of<Interceptor>().component_of(interceptor).target ==
+          drone);
   }
 
   SECTION("ShouldWaitForReloadGivenSecondTrack") {

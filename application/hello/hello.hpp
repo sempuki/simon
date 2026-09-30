@@ -53,14 +53,16 @@ struct Collision final {
   Entity other;
 };
 
-using World = framework::World<Kinematics, Control, Thrust, Wind, Drag,
-                               Collider, Collision>;
-
 // A ball must have a position, a size and a collision record; it may be driven.
 struct Ball final
     : framework::Archetype<"ball",
                            framework::Requires<Kinematics, Collider, Collision>,
                            framework::Allows<Control, Thrust, Wind, Drag>> {};
+
+using World = framework::World<
+    Kinematics,
+    framework::TypeList<Control, Thrust, Wind, Drag, Collider, Collision>,
+    framework::TypeList<Ball>>;
 
 //-- Systems ------------------------------------------------------------------
 
@@ -89,9 +91,9 @@ struct DetectCollisions final
 
   void prepare(auto& world) {
     largest_radius = 0.0 * meter;
-    for (const Collider& collider : store_of<Collider>(world).values()) {
+    store_of<Collider>(world).for_each([&](Entity, const Collider& collider) {
       largest_radius = std::max(largest_radius, collider.radius);
-    }
+    });
   }
 
   void operator()(auto& world, Entity self, Collision& collision,
@@ -149,10 +151,10 @@ inline Balls build_balls(lib::InOut<World> world) {
 }
 
 inline bool any_collision(const World& world) {
-  for (const Collision& collision : world.store_of<Collision>().values()) {
-    if (collision.hit) return true;
-  }
-  return false;
+  bool hit = false;
+  world.store_of<Collision>().for_each(
+      [&](Entity, const Collision& collision) { hit = hit || collision.hit; });
+  return hit;
 }
 
 // The hello simulation: builds the balls when configured, and stops at the

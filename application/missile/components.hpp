@@ -95,10 +95,6 @@ struct Interceptor final {
   TimePoint expires_at{};
 };
 
-using World =
-    framework::World<Kinematics, Control, Health, Warhead, Blast, RedDrone,
-                     Tracked, Asset, Radar, Track, Launcher, Interceptor>;
-
 namespace archetype {
 
 using framework::Allows;
@@ -125,5 +121,13 @@ struct Blast final : Archetype<"blast", Requires<Kinematics, missile::Blast>> {
 };
 
 }  // namespace archetype
+
+using World = framework::World<
+    Kinematics,
+    framework::TypeList<Control, Health, Warhead, Blast, RedDrone, Tracked,
+                        Asset, Radar, Track, Launcher, Interceptor>,
+    framework::TypeList<archetype::Asset, archetype::Radar, archetype::Launcher,
+                        archetype::RedDrone, archetype::Interceptor,
+                        archetype::Track, archetype::Blast>>;
 
 }  // namespace simon::missile

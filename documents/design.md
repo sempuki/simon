@@ -182,30 +182,34 @@ Stores keep that array dense so that large simulations fit in cache. On the deve
 `Kinematics` take 360 KiB. That fits in one core's L2. With 50% holes the same
 store takes 720 KiB and spills into L3.
 
-The leading design keeps holes out of the component array by indexing through
-the entity:
+A store keeps holes out of its data by indexing through the entity, and
+divides the data into segments, one per archetype that requires the component
+(see [Archetype segments](#archetype-segments)):
 
 ```
 Store<Kinematics>
-  index[entity.index] ─▶ {dense position, generation}    8 bytes per entity slot
-  owner[dense]        ─▶ Entity                           dense
-  data[dense]         ─▶ Kinematics                       dense; systems iterate this
+  index[entity.index] ─▶ {slot, generation}    8 bytes per entity slot
+  segments            ─▶ [ drone chunks | interceptor chunks | ... | allowed chunks ]
+  owner[slot]         ─▶ Entity                dense within each segment
+  data[slot]          ─▶ Kinematics            dense within each segment; systems iterate this
 ```
 
-- **Iterate.** Walk `data` (and `owner` when the entity is needed) from start
-  to end. The index is never touched.
-- **Append.** Push onto `data` and `owner`, and write the index entry.
-- **Erase.** Move the last element into the gap, fix the moved element's
-  index entry, and clear the erased one. The array stays dense after every
-  erasure.
-- **Look up.** `index[e.index]` checks the generation, then reads `data`. The
+- **Iterate.** Walk each segment's chunks from start to end. The index is
+  never touched. Code outside systems walks a store with
+  `store.for_each([](Entity owner, const T& component) { ... })`.
+- **Append.** Write at the end of the entity's segment, taking a chunk from
+  the pool when the last one is full, and write the index entry.
+- **Erase.** Move the segment's last element into the gap, fix the moved
+  element's index entry, clear the erased one, and return the last chunk to
+  the pool when it empties. Every segment stays dense after every erasure.
+- **Look up.** `index[e.index]` checks the generation, then reads the slot. The
   index for 5,000 entities is 40 KiB and stays hot.
-- **Capacity.** Every array is allocated once, at a capacity chosen when the
-  world is created. Stores never reallocate, so references into them stay
-  valid until the element is erased or moved by an erasure.
+- **Capacity.** The pool is allocated once, at a capacity chosen when the world
+  is created, plus a partly filled chunk per segment. Stores never reallocate,
+  so references into them stay valid until the element is erased or moved by
+  an erasure.
 
-A hole now costs 8 bytes in the index, instead of a whole component in the
-array.
+A hole costs 8 bytes in the index, instead of a whole component in the array.
 
 **Decided by measurement: dense.** The alternative was a stable-slot store,
 where each entity index has a fixed slot, nothing moves, and a lookup is one
@@ -240,7 +244,8 @@ A system walks its driving component and reaches each entity's siblings (see
 [Terminology](#terminology)) through `try_component_of`. Siblings the
 archetype requires are the common case, since a drone's `Control` exists for
 as long as its `Kinematics` does. The older simulator's handles resolved such a
-sibling once, at creation. The dense store looks it up on every step.
+sibling once, at creation. The store before segments looked it up on every
+step.
 
 `framework/system_benchmark.cpp` measures that lookup against a handle (a
 pointer resolved at creation) and against "structural" access, where both
@@ -278,7 +283,7 @@ maintenance and iteration.
 
 | Layout | What it does |
 |---|---|
-| dense | The committed store: swap-erase, and a lookup per sibling |
+| dense | The store before segments: one array per component, swap-erase, and a lookup per sibling |
 | sorted | Dense, and each store is sorted by entity index at sync points once 1 in 8 of it is out of order |
 | group | An EnTT-style owning group: entities with both components sit at the same positions at the front of both stores, kept there by swaps |
 | hybrid | A group, plus sorting the stores it does not own into the owner's order |
@@ -332,7 +337,7 @@ What each layout taught:
   They trail a group only where a group also swallows siblings that were
   attached later; segments leave those in a sparse store.
 
-#### Decided: archetype segments (not yet built)
+#### Archetype segments
 
 Locality comes from correlations the world already knows. Components present
 together are declared by an archetype's `Requires`. Components read together
@@ -351,21 +356,30 @@ Store<Health>:     [ drone 0..n      | asset ]
   way, so drone i's `Kinematics` and `Control` sit at local index i of the drone
   segment in both. The shared index is the handle: nothing points, nothing
   dangles, and the same operation moves both.
-- **Segments are lists of fixed-size chunks** (1,024 entries in the
-  benchmark) drawn from a pool each store allocates once. A segment grows by
-  taking a chunk and shrinks by returning one, so growth never moves another
-  segment's data, and the only waste is one partly filled chunk per archetype
-  per store. Every store uses the same entries per chunk, so local index i is
-  chunk i / 1024, slot i % 1024 in each.
+- **Segments are lists of fixed-size chunks** drawn from a pool each store
+  allocates once. A segment grows by taking a chunk and shrinks by returning
+  one, so growth never moves another segment's data, and the only waste is one
+  partly filled chunk per segment. Every store in a world uses the same chunk
+  size, a power of two of at most 1,024 entries (smaller in small worlds), so
+  local index i is the same chunk and offset in each.
+- **Every archetype requires `EntityArchetype` and allows `Parent`.** The last
+  segment of each store holds entities whose archetype only allows the
+  component, whether they were created with it or it was attached later.
 - **Creation appends to the archetype's segment; destruction moves the
   segment's last entity into the gap in each of its stores.** Structural cost
   matches swap-erase.
 - **The runner walks segment by segment,** and knows at compile time, per
-  archetype, whether each other component is required (a reference to the
-  same slot), absent (a null pointer, and the branch compiles away), or allowed
-  (a lookup). This needs the world to list its archetypes:
-  `World<Spatial, Components..., ArchetypeList>`. Archetypes name only
+  archetype, whether each other component is required (a pointer to the same
+  slot of the matching chunk), absent (a null pointer, so that branch compiles
+  away), or allowed (a lookup). In the last segment every other component is
+  looked up. A contract check confirms, once per segment, that each required
+  sibling's segment has the same size. This needs the world to list its
+  archetypes (see [Configuration](#configuration)). Archetypes name only
   components, so there is no cycle with systems.
+- **The builder protects the alignment.** A `change` that detaches a component
+  the entity's archetype requires fails with `BuildError::COMPONENT_REQUIRED`,
+  and one that attaches a component the archetype neither requires nor allows
+  fails with `BuildError::COMPONENT_NOT_PERMITTED`.
 - **Components an archetype only `Allows` stay in sparse stores** with
   lookups. We accept that components outside the archetype do not get the
   automatic layout. Archetype-table ECSs (Unity DOTS, flecs) move the whole
@@ -378,6 +392,22 @@ Store<Health>:     [ drone 0..n      | asset ]
 - **Determinism.** Segment order follows the command sequence, so
   resimulation repeats it. A checkpoint saves segments as they are, with no
   extra bookkeeping.
+
+Measured with `system_benchmark` after the change (nanoseconds per entity,
+uncontended; "allowed" is a sibling attached after creation, "required" one in
+the archetype's segment):
+
+| Entities | Allowed, aligned | Allowed, shuffled | Required | Handle | Structural |
+|---:|---:|---:|---:|---:|---:|
+| 100,000 | 1.92 | 3.17 | 1.51 | 1.47 | 1.3–2.2 |
+| 1,000,000 | 6.03 | 13.46 | 5.18 | 5.54 | 5.17 |
+
+A required sibling now costs what a handle or a structural walk costs. Over
+3,000 steps at 10,000 drones, the missile step went from 0.738 to 0.691 ms:
+`Integrate` from 0.060 to 0.041, `TriggerWarheads` from 0.105 to 0.070 and
+`SteerRedDrones` from 0.078 to 0.067. `ApplyBlasts` went from 0.040 to 0.056;
+it walks the few blasts once per victim, and a segmented walk has more fixed
+cost than an array.
 
 ### Handles and references
 
@@ -595,7 +625,8 @@ only then emits commands.
 - **Data-dependent rules are checked by `build()` at runtime, against the state
   the world will be in once pending commands apply:** the entity (and any
   parent) is alive and not about to be destroyed, a component to attach is
-  absent and its store has room, a component to detach is present, an alias is
+  absent, permitted by the entity's archetype and its store has room, a
+  component to detach is present and not required by the archetype, an alias is
   non-empty and not already given, an alias to take was given. A refused
   utterance returns a `lib::Status` whose condition is a `BuildError`
   (compare with `status == lib::watch(BuildError::ALIAS_NOT_GIVEN)`), and
@@ -679,15 +710,22 @@ struct GuideInterceptors : System<const Interceptor, const Kinematics, Control> 
 ```
 
 The framework reads only the `System<...>` arguments. It walks the driving
-store and passes each entity's optional entity-components:
+store and passes each entity's optional entity-components. In outline, for the
+entities whose archetype only allows the driving component:
 
 ```cpp
 auto& drive = world.store_of<typename S::DrivingComponent>();   // const Store<Interceptor>& when const
-for (std::size_t i = 0; i < drive.size(); ++i) {
-  Entity e = drive.owner(i);
-  system(access, e, drive.data(i), world.store_of<OtherComponentTypes>().try_component_of(e)..., step);
-}
+for (each chunk in the last segment of drive)
+  for (std::size_t i = 0; i < chunk.size; ++i) {
+    Entity e = chunk.owners[i];
+    system(access, e, chunk.components[i],
+           world.store_of<OtherComponentTypes>().try_component_of(e)..., step);
+  }
 ```
+
+In each archetype's segment, a sibling the archetype requires comes from the
+same slot of the matching chunk instead of a lookup (see
+[Archetype segments](#archetype-segments)).
 
 Given a system driven by `A` with an optional `B`, and entities `x`, `y` and
 `z` holding `(a)`, `(b)` and `(a, b)`:
@@ -958,8 +996,8 @@ ordinary data: `Entity` fields in components, or relation entities (see
 
 #### Configuration
 
-A world is configured at compile time by a `Spatial` model and its component
-list:
+A world is configured at compile time by a `Spatial` model, its component
+list and its archetype list:
 
 ```cpp
 template <typename Type>
@@ -970,12 +1008,17 @@ concept Spatial = requires(const Type& a, const Type& b) {
   { coordinate_length(a, distance(a, b)) } -> std::same_as<double>;
 };
 
-template <Spatial SpatialType, typename... ComponentTypes>
+template <Spatial SpatialType, typename ComponentListType,
+          typename ArchetypeListType>
 class World;
 
-using MissileWorld = World<Kinematics,
-                           Team, Control, Health, Warhead, Blast,
-                           RedDrone, Asset, Radar, Track, Launcher, Interceptor>;
+using World = framework::World<
+    Kinematics,
+    TypeList<Control, Health, Warhead, Blast, RedDrone, Tracked, Asset, Radar,
+             Track, Launcher, Interceptor>,
+    TypeList<archetype::Asset, archetype::Radar, archetype::Launcher,
+             archetype::RedDrone, archetype::Interceptor, archetype::Track,
+             archetype::Blast>>;
 ```
 
 - **`Spatial` is the world's only configuration concept.** It needs a distance
@@ -988,6 +1031,11 @@ using MissileWorld = World<Kinematics,
 - **`WorldConfiguration`** sets the world's number, its entity and component
   capacities, and the spatial index's `cell_size`, in coordinate units. About
   the radius of a typical query works well; the missile world uses 250 m.
+- **The archetype list says what the world can create,** and orders each
+  store's segments. It is checked against the component list at compile time:
+  every archetype's components must be in it, and `create<A>()` of an archetype
+  not in it does not compile. Archetypes are declared before the world, since
+  they name only components.
 - **The component list is closed per build.** `world.store_of<T>()` resolves at
   compile time, nothing is type-erased, and the inliner sees every hot-path
   call. An application cannot declare a component type at runtime, which none of
@@ -1075,9 +1123,9 @@ needed.
 A run is reproducible from its scenario and seed. That requires:
 
 - A fixed schedule order (the schedule type).
-- A stable iteration order within a system. Dense stores change order only on
-  erasure, and erasure happens only at sync points, so the order depends only
-  on the history of commands.
+- A stable iteration order within a system. Systems walk segments in archetype
+  order, and a segment changes order only on erasure, which happens only at
+  sync points, so the order depends only on the history of commands.
 - Commands applied in recorded order.
 - Integer time (see below).
 - No iteration over unordered containers on the hot path.
@@ -1524,8 +1572,8 @@ Each step ends with a working application and passing tests.
      prepare-time indexes in `UpdateTracks` and `ResolveEngagements`, the
      spatial index, `system_benchmark` (the cost of reaching a sibling) and
      `churn_benchmark` (layouts under churn).
-   - Next: archetype segments (see [Stores](#stores)), then remeasure the
-     missile simulation idle and contended.
+   - Done: archetype segments (see [Stores](#stores)).
+   - Next: remeasure the missile simulation idle and contended.
    Consider struct-of-arrays layout inside hot components only if measurements
    call for it.
 
@@ -1537,7 +1585,7 @@ interop.
 
 - **ISQ quantity kinds** (and affine positions) once a Clang release compiles
   them.
-- **Segment chunk size.** 1,024 entries in the benchmark; to be measured with
+- **Segment chunk size.** At most 1,024 entries today; to be measured with
   large components, where a chunk spans a megabyte.
 - **Hierarchical locality names** (`/blue/radars`) for ordering segments,
   once a system walks several archetypes together.

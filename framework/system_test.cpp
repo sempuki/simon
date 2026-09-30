@@ -69,6 +69,23 @@ struct Spawn final : System<const Position> {
   }
 };
 
+// Counts, for each entity, whether it has a Velocity and whether that Velocity
+// is its own. Every entity in the test has equal Position and Velocity.
+struct CheckSiblings final : System<const Position, const Velocity> {
+  void operator()(auto&, Entity, const Position& position,
+                  const Velocity* velocity) {
+    if (!velocity) {
+      ++without;
+      return;
+    }
+    ++with;
+    matched += velocity->x == position.x;
+  }
+  int with = 0;
+  int without = 0;
+  int matched = 0;
+};
+
 // Counts entities with health; runs after Cull, so it sees Cull's commands.
 struct Count final : System<const Health> {
   using SequenceAfterSystemList = SystemList<Cull>;
@@ -129,6 +146,37 @@ TEST_CASE("System") {
 
     CHECK(found_near(1.0).empty());
     CHECK(found_near(2.0) == std::vector<Entity>{entity});
+  }
+
+  SECTION("ShouldPassEachEntitysOwnSiblingGivenArchetypesAndChurn") {
+    // Interceptors require both components, so their Velocity is found at the
+    // same slot. Launchers cannot have one, and bodies may.
+    std::vector<Entity> interceptors;
+    for (int i = 0; i < 4; ++i) {
+      interceptors.push_back(*world.create<testing::Interceptor>()
+                                  .with(Position{static_cast<double>(i)})
+                                  .with(Velocity{static_cast<double>(i)})
+                                  .build());
+    }
+    REQUIRE(world.create<testing::Launcher>().with(Position{20.0}).build());
+    REQUIRE(
+        world.create<Body>().with(Position{10.0}).with(Velocity{10.0}).build());
+    REQUIRE(world.create<Body>().with(Position{11.0}).build());
+    world.sync();
+    REQUIRE(world.destroy(interceptors[1]).build());
+    REQUIRE(world.create<testing::Interceptor>()
+                .with(Position{4.0})
+                .with(Velocity{4.0})
+                .build());
+    world.sync();
+
+    Scheduler<TestWorld, SystemList<CheckSiblings>> scheduler;
+    scheduler.step(lib::InOut(world), STEP);
+
+    const CheckSiblings& check = scheduler.system<CheckSiblings>();
+    CHECK(check.with == 5);
+    CHECK(check.matched == 5);
+    CHECK(check.without == 2);
   }
 
   SECTION("ShouldReadOtherEntitiesGivenDeclaredLookup") {
@@ -233,7 +281,10 @@ TEST_CASE("System") {
     scheduler.step(lib::InOut(world), STEP);
 
     REQUIRE(world.store_of<Position>().size() == 2u);
-    Entity child = world.store_of<Position>().owner(1);
+    Entity child;
+    world.store_of<Position>().for_each([&](Entity owner, const Position&) {
+      child = owner != launcher ? owner : child;
+    });
     CHECK(world.parent_of(child) == launcher);
     CHECK(world.store_of<Position>().component_of(child).x == 3.0);
   }

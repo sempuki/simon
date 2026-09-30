@@ -163,9 +163,9 @@ class Simulation final {
   // Interceptors fired so far, from what the launchers have left.
   std::uint32_t interceptors_fired() const {
     std::uint32_t remaining = 0;
-    for (const Launcher& launcher : world_.store_of<Launcher>().values()) {
+    world_.store_of<Launcher>().for_each([&](Entity, const Launcher& launcher) {
       remaining += launcher.inventory;
-    }
+    });
     return static_cast<std::uint32_t>(scenario_.launchers) *
                scenario_.inventory -
            remaining;
