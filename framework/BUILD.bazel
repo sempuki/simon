@@ -69,5 +69,29 @@ cc_binary(
     name = "system_benchmark",
     srcs = ["system_benchmark.cpp"],
     copts = COPTS,
-    deps = [":framework"],
+    deps = [
+        ":benchmark_support",
+        ":framework",
+    ],
+)
+
+# Store layouts under churn: dense, sorted, owning group, hybrid, generational
+# and archetype segments; backs the layout decision in documents/design.md.
+# Run with: bazel run -c opt //framework:churn_benchmark [-- --contend]
+cc_binary(
+    name = "churn_benchmark",
+    srcs = ["churn_benchmark.cpp"],
+    copts = COPTS,
+    deps = [
+        ":benchmark_support",
+        ":framework",
+    ],
+)
+
+cc_library(
+    name = "benchmark_support",
+    hdrs = ["benchmark_support.hpp"],
+    copts = COPTS,
+    visibility = ["//visibility:private"],
+    deps = ["@lib//base:core"],
 )

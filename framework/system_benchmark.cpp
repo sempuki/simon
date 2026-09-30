@@ -15,7 +15,8 @@
 // "aligned" attaches the sister in the same order as the driving component, so
 // both stores share an order. "shuffled" attaches it in a random order, as when
 // components arrive at different times, so reaching it is a random access.
-// "structural" only exists aligned.
+// "structural" needs a shared order, so it only runs aligned. See
+// churn_benchmark.cpp for layouts that keep stores in a shared order.
 //
 // --contend runs one thread per spare core streaming over a large buffer, to
 // compete for shared cache and memory bandwidth as a busy cloud host would.
@@ -23,18 +24,17 @@
 //   bazel run -c opt //framework:system_benchmark [-- --contend]
 
 #include <algorithm>
-#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <print>
 #include <random>
 #include <string_view>
-#include <thread>
 #include <vector>
 
 #include "base/core.hpp"
 #include "framework/archetype.hpp"
+#include "framework/benchmark_support.hpp"
 #include "framework/system.hpp"
 #include "framework/world.hpp"
 
@@ -173,47 +173,14 @@ Result measure(std::size_t count, bool shuffled,
   return result;
 }
 
-// Streams over a buffer much larger than any cache until told to stop.
-class Contention final {
- public:
-  DECLARE_COPY_DELETE(Contention);
-  DECLARE_MOVE_DELETE(Contention);
-
-  explicit Contention(unsigned threads) {
-    for (unsigned i = 0; i < threads; ++i) {
-      threads_.emplace_back([this] {
-        std::vector<std::uint64_t> buffer(32'000'000, 1);  // 256 MB.
-        std::uint64_t sum = 0;
-        while (!stop_.load(std::memory_order_relaxed)) {
-          for (std::uint64_t& value : buffer) {
-            sum += value;
-            value = sum;
-          }
-        }
-        DECLARE_UNUSED(sum);
-      });
-    }
-  }
-  ~Contention() {
-    stop_ = true;
-    for (std::thread& thread : threads_) {
-      thread.join();
-    }
-  }
-
- private:
-  std::atomic<bool> stop_ = false;
-  std::vector<std::thread> threads_;
-};
-
 }  // namespace
 }  // namespace simon::framework
 
 int main(int argc, char** argv) {
   using namespace simon::framework;
   bool contend = argc > 1 && std::string_view{argv[1]} == "--contend";
-  unsigned spare = std::max(1u, std::thread::hardware_concurrency()) - 1;
-  Contention contention{contend ? spare : 0u};
+  unsigned spare = benchmark::Contention::spare_cores();
+  benchmark::Contention contention{contend ? spare : 0u};
   std::println("{}", contend ? std::format("contended by {} threads", spare)
                              : std::string{"uncontended"});
 
