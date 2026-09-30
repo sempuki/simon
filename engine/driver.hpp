@@ -163,8 +163,31 @@ class RealTimeDriver final {
     if (driver_.phase() != Phase::RUNNING) {
       return Flow::STOP;
     }
+    if (paused_) {
+      return Flow::CONTINUE;
+    }
     return driver_.advance_to(target_at(WallClockType::now()));
   }
+
+  // Stops simulated time until `resume`. Wall time that passes while paused is
+  // never caught up.
+  void pause() { paused_ = true; }
+  void resume() {
+    if (paused_) {
+      paused_ = false;
+      rebase();
+    }
+  }
+  bool paused() const { return paused_; }
+
+  // Changes how many simulated seconds pass per wall second, from now on.
+  // Simulated time does not jump.
+  void set_speed(double speed) {
+    CHECK_PRECONDITION(speed > 0.0);
+    rebase();
+    speed_ = speed;
+  }
+  double speed() const { return speed_; }
 
   // Ticks until the simulation stops, sleeping until each step is due. For
   // headless runs; it needs a WallClockType that sleep_until understands.
@@ -198,6 +221,15 @@ class RealTimeDriver final {
     return start_ + (simulated / step) * step;
   }
 
+  // Anchors the wall clock to the simulation's current time, so targets are
+  // measured from here. The simulation's time is always a whole number of
+  // steps from its start, so targets stay whole steps and runs stay
+  // deterministic.
+  void rebase() {
+    start_ = driver_.now();
+    wall_start_ = WallClockType::now();
+  }
+
   typename WallClockType::time_point wall_time_of(TimePoint time) const {
     auto simulated = std::chrono::duration<double>(time - start_);
     return wall_start_ +
@@ -209,6 +241,7 @@ class RealTimeDriver final {
   TimePoint start_;
   double speed_;
   typename WallClockType::time_point wall_start_{};
+  bool paused_ = false;
 };
 
 }  // namespace simon::engine

@@ -188,6 +188,41 @@ TEST_CASE("RealTimeDriver") {
     }
   }
 
+  SECTION("ShouldNotStepOrCatchUpGivenPauseThenResume") {
+    REQUIRE(driver.tick() == Flow::CONTINUE);
+    FakeClock::current += 20ms;  // 40 ms simulated: two steps.
+    REQUIRE(driver.tick() == Flow::CONTINUE);
+    REQUIRE(recorder.steps.size() == 2u);
+
+    driver.pause();
+    FakeClock::current += 1s;
+    REQUIRE(driver.tick() == Flow::CONTINUE);
+    CHECK(recorder.steps.size() == 2u);  // Paused.
+
+    driver.resume();
+    REQUIRE(driver.tick() == Flow::CONTINUE);
+    CHECK(recorder.steps.size() == 2u);  // The paused second is not caught up.
+    FakeClock::current += 10ms;          // 20 ms simulated: one step.
+    REQUIRE(driver.tick() == Flow::CONTINUE);
+    CHECK(recorder.steps.size() == 3u);
+    CHECK(driver.driver().now() == TimePoint{60ms});
+  }
+
+  SECTION("ShouldChangeRateWithoutJumpGivenNewSpeed") {
+    REQUIRE(driver.tick() == Flow::CONTINUE);
+    FakeClock::current += 20ms;  // 40 ms simulated at 2x.
+    REQUIRE(driver.tick() == Flow::CONTINUE);
+    REQUIRE(driver.driver().now() == TimePoint{40ms});
+
+    driver.set_speed(4.0);
+    REQUIRE(driver.tick() == Flow::CONTINUE);
+    CHECK(driver.driver().now() == TimePoint{40ms});  // No jump.
+    FakeClock::current += 10ms;                       // 40 ms simulated at 4x.
+    REQUIRE(driver.tick() == Flow::CONTINUE);
+    CHECK(driver.driver().now() == TimePoint{80ms});
+    CHECK(driver.speed() == 4.0);
+  }
+
   SECTION("ShouldReportStopGivenSimulationStopped") {
     recorder.stop_at = TimePoint{0ms};
     REQUIRE(driver.tick() == Flow::CONTINUE);

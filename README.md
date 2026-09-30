@@ -17,6 +17,8 @@ git submodule update --init
 
 bazel test //...
 bazel run //application/hello
+bazel run //application/missile:viewer   # watch a missile scenario
+bazel run //application/missile -- 7    # run seed 7 headless
 ```
 
 Code targets C++26; flags come from `@lib//bazel:copts.bzl`.

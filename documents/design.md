@@ -1087,6 +1087,10 @@ simulation's time and phase. The other drivers wrap it:
   an application calls it once per frame. `run()` ticks and sleeps until the
   simulation stops, for headless use. The wall clock is a template parameter,
   so tests drive it by hand.
+- **`RealTimeDriver` can pause, resume and change speed** (`pause()`,
+  `resume()`, `set_speed()`). Each re-anchors the wall clock at the
+  simulation's current time, so paused wall time is never caught up and a new
+  speed never makes simulated time jump.
 - **Real-time runs are deterministic.** `RealTimeDriver` only ever targets whole
   multiples of the maximum step, so the wall clock decides when steps happen,
   never how long they are. A test checks that irregular wall-clock ticks take
@@ -1265,6 +1269,15 @@ exactly) and each rule on a small world (one track per drone however many radars
 see it, one launch per contested track, reload, retargeting, self-destruct,
 blast damage).
 
+`bazel run //application/missile:viewer -- <seed>` watches a scenario under
+`RealTimeDriver`. An ImPlot map shows the asset, radars and launchers with
+their coverage, red drones, interceptors, tracks at their estimated positions,
+and explosions. A side panel shows time, counts, the asset's health and the
+outcome, with pause (also Space), a speed slider and restart with a seed.
+Blasts last a single step, so the viewer never sees one; it draws an
+explosion wherever a drone or interceptor disappears. That is presentation
+only and changes nothing in the simulation.
+
 ## Libraries
 
 | Need | Library |
@@ -1273,7 +1286,7 @@ blast damage).
 | Units | `std::chrono` for time; mp-units in plain SI units for everything else |
 | Tests | Catch2 (have) |
 | Benchmarks | A small `std::chrono` harness per benchmark, printing one table per question. Benchmarks sit beside what they measure, like tests; only ones that measure several things go in a common directory. |
-| UI | Dear ImGui (have), ImPlot for the top-down view |
+| UI | Dear ImGui, and ImPlot (0.17) for the missile viewer's map |
 | Window and input | SDL2 now; SDL3 when it is in the Bazel Central Registry |
 | Profiling, later | Tracy |
 
@@ -1295,7 +1308,7 @@ Each step ends with a working application and passing tests.
    `RealTimeDriver` and `RateGate`. Run `hello` under the real-time driver.
 3. **Missile, headless (done).** The components and schedule above, with a
    `BatchDriver` test that checks a deterministic outcome for a fixed seed.
-4. **Missile demo.** An ImGui and ImPlot view under `RealTimeDriver`.
+4. **Missile viewer (done).** An ImGui and ImPlot view under `RealTimeDriver`.
 5. **Performance.** Profile at thousands to hundreds of thousands of agents.
    Consider struct-of-arrays layout inside hot components only if measurements
    call for it.

@@ -50,3 +50,20 @@ cc_binary(
         "//engine:driver",
     ],
 )
+
+# Watches one scenario in real time, with a map and controls.
+cc_binary(
+    name = "viewer",
+    srcs = ["viewer.cpp"],
+    copts = COPTS,
+    deps = [
+        ":missile_library",
+        "//engine:driver",
+        "@imgui",
+        "@imgui//backends:platform-sdl2",
+        "@imgui//backends:renderer-sdl2",
+        "@implot",
+        "@lib//base:core",
+        "@sdl2",
+    ],
+)
