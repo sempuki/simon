@@ -71,6 +71,7 @@ pay for `CheckedPointer`'s null check on every access.
 | Component | A type with a name/identity suitable for debugging. |
 | Entity-component | A single object of a component type, associated with a single entity. |
 | Archetype | What sort of object an entity is: a name, and the components an entity of it must and may have. Every entity is created from one. |
+| Sibling | Another entity-component of the same entity, as seen from one of its components. In `System<Kinematics, const Control>`, each entity's `Control` is a sibling of its `Kinematics`. A sibling the entity's archetype requires exists for the entity's whole life; one the archetype only allows may be attached and detached. |
 
 ## Architecture
 
@@ -233,6 +234,151 @@ Systems iterate far more than they look up, and a missile run is mostly agents
 dying, so the dense store wins. Run the benchmark with
 `bazel run -c opt //framework:store_benchmark`.
 
+#### Sibling components
+
+A system walks its driving component and reaches each entity's siblings (see
+[Terminology](#terminology)) through `try_component_of`. Siblings the
+archetype requires are the common case, since a drone's `Control` exists for
+as long as its `Kinematics` does. The older simulator's handles resolved such a
+sibling once, at creation. The dense store looks it up on every step.
+
+`framework/system_benchmark.cpp` measures that lookup against a handle (a
+pointer resolved at creation) and against "structural" access, where both
+arrays share an order and are walked together. A 72-byte driving component
+reads a 24-byte sibling; times are nanoseconds per entity, uncontended:
+
+| Entities | Sibling order | Lookup | Handle | Structural | No sibling |
+|---:|---|---:|---:|---:|---:|
+| 100,000 | aligned | 1.85 | 1.48 | 1.3–2.4 | 0.84 |
+| 100,000 | shuffled | 3.33 | 2.44 | | 0.84 |
+| 1,000,000 | aligned | 6.1 | 5.6 | 5.1 | 3.8 |
+| 1,000,000 | shuffled | 14–16 | 12–13.6 | | 3.9 |
+
+- **The lookup itself costs about 0.4 ns per entity** over a handle when both
+  stores fit in cache, and 8 to 30% at a million entities.
+- **Order matters more than lookup against handle.** When the sibling store's
+  order diverges from the driving store's, both lookup and handle slow by about
+  2.3 times, because each access lands on a random cache line.
+- **Under contention** (`--contend`, 31 threads streaming 256 MB each),
+  everything at a million entities costs 150 to 660 ns per entity, and lookup
+  against handle stays within about 15%. Cache misses decide the cost.
+
+So the question is how to keep siblings in a shared order under churn, without
+asking users to manage it.
+
+#### Layouts under churn
+
+`framework/churn_benchmark.cpp` replays one schedule of operations against
+six layouts. The population is constant; half the births live 1 to 4 steps
+(like blasts) and the rest an average of 500 (like drones). An entity's
+archetype is the set of siblings it is created with. It may attach and detach
+only siblings its archetype allows, as `Tracked` is attached to a drone
+partway through its life. Each step is timed as structural changes, layout
+maintenance and iteration.
+
+| Layout | What it does |
+|---|---|
+| dense | The committed store: swap-erase, and a lookup per sibling |
+| sorted | Dense, and each store is sorted by entity index at sync points once 1 in 8 of it is out of order |
+| group | An EnTT-style owning group: entities with both components sit at the same positions at the front of both stores, kept there by swaps |
+| hybrid | A group, plus sorting the stores it does not own into the owner's order |
+| generational | A settled region in entity order and a nursery in append order; survivors are merged into the settled region |
+| segmented | One chunked segment per archetype in each store, lined up across the archetype's stores (below) |
+
+The case that matters is two systems competing for one store, as `Integrate`
+(Kinematics, Control) and `ApplyBlasts` (Kinematics, Health) both want
+Kinematics. One sibling is on 80% of entities and the other on 50%.
+Nanoseconds per entity-step, uncontended, including structural changes and
+maintenance:
+
+| Entities, sibling size | dense | sorted | group | hybrid | segmented |
+|---|---:|---:|---:|---:|---:|
+| 100,000, 24 B | 22.3 | 14.8 | 11.6 | 16.1 | **4.2** |
+| 100,000, 256 B | 68.6 | 46.3 | 20.0 | 31.5 | **16.7** |
+| 1,000,000, 24 B | 88.4 | 25.5 | 33.8 | 28.3 | **18.1** |
+| 1,000,000, 256 B | 122.2 | 69.7 | 57.8 | 63.7 | **32.6** |
+
+With a single pair, the best case for a group:
+
+| Entities, sibling size | dense | sorted | group | generational | segmented |
+|---|---:|---:|---:|---:|---:|
+| 100,000, 24 B | 5.3 | 4.5 | 2.1 | 4.7 | **1.9** |
+| 100,000, 256 B | 11.2 | 9.5 | **6.3** | 15.1 | 7.6 |
+| 100,000, 1 KB | 18.2 | 24.5 | **13.3** | 28.0 | 14.3 |
+| 1,000,000, 24 B | 18.3 | 10.3 | **5.8** | 9.0 | 7.4 |
+| 1,000,000, 256 B | 23.1 | 23.7 | **13.4** | 26.7 | 16.4 |
+
+Run-to-run noise is about 10%. An earlier contended run at 100,000 entities
+(before toggles were limited to allowed siblings) kept the same ranking:
+dense 570, sorted 283, group 169, generational 284 ns per entity-step with
+24-byte siblings.
+
+What each layout taught:
+
+- **Sorting** helps small components and hurts large ones: a comparison sort
+  moves every component about log n times, so with 1 KB siblings it costs more
+  than it saves. It also pauses, up to 880 ms in one contended step. A
+  permutation sort would move each component once, but the pauses and the
+  tuning threshold remain. Dropped.
+- **Groups** are the fastest single pair, but a store can belong to only one
+  group, so the system that loses the store is left with lookups in an order
+  the group scrambles: 2 times slower than sorting at a million entities. They
+  also need the user, or a solver, to choose owners.
+- **The hybrid** speeds up the loser, and spends the gain sorting.
+- **The generational layout** doubles memory and loses with large components.
+  Entity lifetimes here do follow the generational hypothesis, but the layout
+  answers "when to compact", which is not the question.
+- **Segments** win whenever systems compete, because no store has an owner.
+  They trail a group only where a group also swallows siblings that were
+  attached later; segments leave those in a sparse store.
+
+#### Decided: archetype segments (not yet built)
+
+Locality comes from correlations the world already knows. Components present
+together are declared by an archetype's `Requires`. Components read together
+are declared by each `System<Driving, Others...>`. The older simulator's
+handles modeled the same dependency at creation. Segments use the archetype
+directly:
+
+```
+Store<Kinematics>: [ drone 0..n      | interceptor 0..m | radar | launcher | blast ]
+Store<Control>:    [ drone 0..n      | interceptor 0..m ]
+Store<Health>:     [ drone 0..n      | asset ]
+```
+
+- **Each store is divided into one segment per archetype that has the
+  component.** Within an archetype, every store orders its segment the same
+  way, so drone i's `Kinematics` and `Control` sit at local index i of the drone
+  segment in both. The shared index is the handle: nothing points, nothing
+  dangles, and the same operation moves both.
+- **Segments are lists of fixed-size chunks** (1,024 entries in the
+  benchmark) drawn from a pool each store allocates once. A segment grows by
+  taking a chunk and shrinks by returning one, so growth never moves another
+  segment's data, and the only waste is one partly filled chunk per archetype
+  per store. Every store uses the same entries per chunk, so local index i is
+  chunk i / 1024, slot i % 1024 in each.
+- **Creation appends to the archetype's segment; destruction moves the
+  segment's last entity into the gap in each of its stores.** Structural cost
+  matches swap-erase.
+- **The runner walks segment by segment,** and knows at compile time, per
+  archetype, whether each other component is required (a reference to the
+  same slot), absent (a null pointer, and the branch compiles away), or allowed
+  (a lookup). This needs the world to list its archetypes:
+  `World<Spatial, Components..., ArchetypeList>`. Archetypes name only
+  components, so there is no cycle with systems.
+- **Components an archetype only `Allows` stay in sparse stores** with
+  lookups. We accept that components outside the archetype do not get the
+  automatic layout. Archetype-table ECSs (Unity DOTS, flecs) move the whole
+  entity to another table instead, which is where their 10 to 30 times slower
+  attach and detach comes from.
+- **Later, hierarchical locality.** Names such as `/blue/radars` could order
+  segments within each store, so a system that walks every blue archetype
+  streams one range. This is the slab arrangement games have used for decades,
+  applied to segments that already exist.
+- **Determinism.** Segment order follows the command sequence, so
+  resimulation repeats it. A checkpoint saves segments as they are, with no
+  extra bookkeeping.
+
 ### Handles and references
 
 A handle has three duties, carried over from the older simulator:
@@ -262,6 +408,12 @@ Nothing registers handles or patches them. The older simulator's self-patching
 handle met the same three duties, but every copy made a virtual call and a hash
 insert to follow objects that reallocation had moved. Fixed capacity removes
 the reallocation, and the generation check replaces the patching.
+
+The older handle also made a structural sibling, such as a drone's `Control`,
+free to reach on every step. Archetype segments (see
+[Sibling components](#sibling-components)) recover that without a handle: a
+component the archetype requires sits at the entity's own index in the
+sibling's store.
 
 ### Names, identities and aliases
 
@@ -741,7 +893,7 @@ Schedules compose:
 
 ```cpp
 // Toolkit pieces.
-using Motion  = SystemList<Integrate, UpdateSpatialIndex>;
+using Motion  = SystemList<Integrate>;
 using Sensing = SystemList<ScanRadars, UpdateTracks, DropStaleTracks>;
 using Blasts  = SystemList<TriggerWarheads, ApplyBlasts, ExpireBlasts>;
 
@@ -785,7 +937,7 @@ A world is the entity database. It has two halves:
           write                                           read
 world.create<C>()...build() ─▶ commands ─▶ World ─▶ by name       world.find_name_of(identity)
 world.change(e)...build()   (applied at            by component  System<A, B...>, world.query<...>()
-world.destroy(e).build()     sync points)          by space      world.within(center, radius), world.nearest(p)
+world.destroy(e).build()     sync points)          by space      world.within(center, radius, visit), world.nearest(center, radius, accept)
                                                    by relation   world.parent(e), world.children(e)
 ```
 
@@ -810,13 +962,15 @@ A world is configured at compile time by a `Spatial` model and its component
 list:
 
 ```cpp
-template <typename S>
-concept Spatial = requires(const S& a, const S& b) {
-  { distance(a, b) } -> std::convertible_to<double>;
-  { pose(a) } -> std::convertible_to<Pose>;
+template <typename Type>
+concept Spatial = requires(const Type& a, const Type& b) {
+  { distance(a, b) < distance(a, b) } -> std::convertible_to<bool>;
+  pose(a);
+  { coordinates(a) } -> std::same_as<Coordinates>;  // std::array<double, 3>
+  { coordinate_length(a, distance(a, b)) } -> std::same_as<double>;
 };
 
-template <Spatial S, typename... Components>
+template <Spatial SpatialType, typename... ComponentTypes>
 class World;
 
 using MissileWorld = World<Kinematics,
@@ -825,10 +979,15 @@ using MissileWorld = World<Kinematics,
 ```
 
 - **`Spatial` is the world's only configuration concept.** It needs a distance
-  and a pose. The toolkit ships `Kinematics`, a local Cartesian 3D model, as
+  (which may carry units, and only needs to be ordered), a pose, and plain
+  coordinates for the spatial index. `coordinate_length` converts a distance
+  into the same unit as the coordinates; `Kinematics` uses meters. The toolkit ships `Kinematics`, a local Cartesian 3D model, as
   the default, so interop layers share one notion of position unless an
   application opts out. Other models (geodetic for DIS, 2D, a grid, a network
   where distance is hop count) fit without changing the framework.
+- **`WorldConfiguration`** sets the world's number, its entity and component
+  capacities, and the spatial index's `cell_size`, in coordinate units. About
+  the radius of a typical query works well; the missile world uses 250 m.
 - **The component list is closed per build.** `world.store_of<T>()` resolves at
   compile time, nothing is type-erased, and the inliner sees every hot-path
   call. An application cannot declare a component type at runtime, which none of
@@ -846,17 +1005,54 @@ queries:
   poses for mounted entities such as a radar on a vehicle. It is built from
   `pose()` and a parent relation.
 
-Indexes are updated at defined points, so every query within a step sees a
-consistent snapshot:
+The spatial index is a uniform grid, in `framework/spatial_index.hpp`:
 
-- Created and destroyed entities enter and leave the indexes at sync points.
-- Moved entities are re-indexed by a world-provided system,
-  `UpdateSpatialIndex`, which the schedule places after `Motion`. The world
-  maintains its indexes, and the schedule says when.
+- **Cells hash into a fixed table of buckets,** so the grid is unbounded and
+  its memory follows its capacity, not the space it covers.
+- **A rebuild is a counting sort** into one flat array of entries, each a
+  point's coordinates beside its slot in the spatial store. A query reads a few
+  runs of that array and never touches store data for points it rejects.
+  Nothing allocates after construction.
+- **`within(center, radius, visit)`** visits the cells the radius covers,
+  clipped to the cells that hold points. When that box has more cells than
+  there are points, it reads every entry instead.
+- **`nearest(center, radius, accept)`** searches outward in rings of cells.
+  Each cell is skipped when its nearest face is farther than the best match so
+  far, and the search stops when a whole ring is. Ties go to the lowest slot.
+- **Queries are deterministic:** cells are visited in a fixed order, and a
+  bucket's entries in slot order.
 
-Step 1 answers `within()` with a linear scan of the spatial store, which is
-always current, so `UpdateSpatialIndex` does not exist yet. The real index and
-its system arrive with the missile application, where the population makes a scan too slow.
+The world rebuilds the index lazily, on the first query after anything could
+have moved:
+
+- A system that writes the spatial component marks it stale, because the
+  scheduler hands it the mutable store. No system can write the spatial
+  component and query space in the same run; the existing rule against writing
+  and reading one component already forbids it.
+- A sync that attaches, detaches or destroys a spatial entity-component marks
+  it stale.
+
+So no schedule entry maintains it, and a query always sees the positions of the
+last sync. Queries are not const on the world, because they may rebuild.
+
+The grid is also a toolkit class that a system can own over positions that are
+not the world's spatial component. `ProposeEngagements` indexes track
+estimates this way (see [missile](#missile)).
+
+Measured with the missile benchmark over the same 100 steps at 100,000 drones
+(ms per step):
+
+| | Total | ScanRadars | ProposeEngagements |
+|---|---:|---:|---:|
+| Linear scans | 516 | 51 | 462 |
+| Grid, ring search only | 430 | 84 | 342 |
+| Grid, skipping cells beyond the best match | 162 | 85 | 73 |
+
+`ScanRadars` got slower. The benchmark scales radars with drones inside a fixed
+band, so every radar's 4 km range covers nearly every drone and the grid
+filters nothing, while visiting in grid order costs random store accesses.
+Compare runs only over the same number of steps (`--steps N`): radars scan once
+a second, so averages over different windows mix different amounts of scanning.
 
 Entities replicated from another process enter the same indexes, so a spatial
 query finds a red drone whether red is simulated locally or remotely.
@@ -886,6 +1082,11 @@ A run is reproducible from its scenario and seed. That requires:
 - Integer time (see below).
 - No iteration over unordered containers on the hot path.
 - Random numbers drawn from generators the simulation owns and seeds.
+- Spatial queries that visit in a fixed order and break ties by store position.
+- A checkpoint that saves every store's order as it is, so a resimulation from
+  it iterates the same way. Layouts that reorder on a heuristic (such as sorting
+  once a store is disordered) would also have to save their bookkeeping, one
+  more reason archetype segments were chosen.
 
 ## Extensible edges
 
@@ -1256,8 +1457,14 @@ Decisions made while building it:
 - **Randomness is `model::Random`,** which converts `std::mt19937_64`'s raw
   bits itself: the engine's output is fixed by the standard, but the standard
   distributions are not, so this is the same on every platform.
-- **Entity lookups use a linear scan for now.** A few hundred entities do not
-  need the spatial index; step 5 measures when they do.
+- **Spatial queries use the world's index.** `ScanRadars` uses `within()`, and
+  `GuideInterceptors` retargets with `nearest()`.
+- **Tracks are not in the world's spatial index.** A track's position is blue's
+  estimate. Giving tracks a `Kinematics` would have them coast between radar
+  updates, but `UpdateTracks` would then write track `Kinematics` while reading
+  its target's, which the rule against writing and reading one component
+  forbids. `ProposeEngagements` owns a `SpatialIndex` over the estimates
+  instead, rebuilt on the first query of each step.
 - **Systems name their concrete access type** with a member alias,
   `using LocalWorld = WorldAccess<ThisSystem>;`, so builder
   calls with explicit template arguments, such as `detach<Tracked>()`, need no
@@ -1309,7 +1516,16 @@ Each step ends with a working application and passing tests.
 3. **Missile, headless (done).** The components and schedule above, with a
    `BatchDriver` test that checks a deterministic outcome for a fixed seed.
 4. **Missile viewer (done).** An ImGui and ImPlot view under `RealTimeDriver`.
-5. **Performance.** Profile at thousands to hundreds of thousands of agents.
+5. **Performance (in progress).** The bar is not "thousands of agents on the
+   development machine". It is scale on cloud machines whose cache and memory
+   bandwidth are contended by other heavy loads, and we have not met it yet.
+   Benchmarks run idle and under `--contend`.
+   - Done: `missile_benchmark` (per-system cost at 1k to 100k drones),
+     prepare-time indexes in `UpdateTracks` and `ResolveEngagements`, the
+     spatial index, `system_benchmark` (the cost of reaching a sibling) and
+     `churn_benchmark` (layouts under churn).
+   - Next: archetype segments (see [Stores](#stores)), then remeasure the
+     missile simulation idle and contended.
    Consider struct-of-arrays layout inside hot components only if measurements
    call for it.
 
@@ -1321,8 +1537,16 @@ interop.
 
 - **ISQ quantity kinds** (and affine positions) once a Clang release compiles
   them.
-- **Spatial index structure.** A uniform grid is the likely start; to be
-  measured with the missile application at scale.
+- **Segment chunk size.** 1,024 entries in the benchmark; to be measured with
+  large components, where a chunk spans a megabyte.
+- **Hierarchical locality names** (`/blue/radars`) for ordering segments,
+  once a system walks several archetypes together.
+- **A realistic contention load.** `--contend` runs a streaming thread on every
+  spare core, close to the worst case on the development machine. A cloud
+  neighbor is likely milder, so the load should become a parameter.
+- **A missile benchmark whose area grows with the population,** so sensor
+  density stays realistic and `ScanRadars` measures the index rather than the
+  scenario.
 
 ## Lessons from the older simulator
 

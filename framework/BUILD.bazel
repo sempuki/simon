@@ -62,7 +62,7 @@ cc_binary(
     deps = [":framework"],
 )
 
-# What a system pays to reach a sister entity-component, against a handle and a
+# What a system pays to reach a sibling entity-component, against a handle and a
 # shared dense order; see the notes at the top of the file. Run with:
 # bazel run -c opt //framework:system_benchmark [-- --contend]
 cc_binary(

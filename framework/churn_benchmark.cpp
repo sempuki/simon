@@ -2,27 +2,27 @@
 
 // Compares store layouts under churn: entities are born and die every step,
 // some within a few steps and some after hundreds, and some gain or lose a
-// component partway through life. An entity's archetype is the set of sisters
+// component partway through life. An entity's archetype is the set of siblings
 // it is created with; those it Requires and never loses. It may gain and lose
-// only the sisters its archetype Allows (those it was created without). Every
-// entity has a Body (the driving component, 72 bytes); most also have a Sister
+// only the siblings its archetype Allows (those it was created without). Every
+// entity has a Body (the driving component, 72 bytes); most also have a Sibling
 // (24, 256 or 1024 bytes), which one system reads beside the Body each step.
 //
 //   dense         framework::Store with swap-erase, and no reordering (the
-//                 committed design). The sister is found by try_component_of.
+//                 committed design). The sibling is found by try_component_of.
 //   sorted        the same, and each store is sorted by entity index at the
 //                 step's sync point once 1 in 8 of it is out of order. The
 //                 framework does not sort, so this uses SortableStore below.
 //   group         an EnTT-style owning group: every entity with both
 //                 components sits at the same position at the front of both
 //                 stores, kept there by swaps on each structural change. The
-//                 sister needs no lookup.
+//                 sibling needs no lookup.
 //   segmented     each store is divided into one segment per archetype, and
 //                 an archetype's segments line up across its stores, so a
-//                 sister the archetype Requires sits at the entity's own local
+//                 sibling the archetype Requires sits at the entity's own local
 //                 index. Segments are lists of fixed-size chunks drawn from
 //                 each store's pool, so they grow and shrink without moving
-//                 other segments. Sisters an entity was not created with are
+//                 other segments. Siblings an entity was not created with are
 //                 Allowed, and live in a sparse store with lookups.
 //   generational  each store is a settled region in entity order, then a
 //                 nursery in append order. Young entity-components are never
@@ -30,10 +30,10 @@
 //                 into the settled region. Settled erases leave tombstones that
 //                 the next merge removes.
 //
-// The competing case adds a second sister and a second system that walks the
+// The competing case adds a second sibling and a second system that walks the
 // Body with it, as Integrate (Kinematics, Control) and ApplyBlasts (Kinematics,
 // Health) both want Kinematics. A store can belong to only one group, so there
-// the group owns (Body, first sister) and the second system looks its sister
+// the group owns (Body, first sibling) and the second system looks its sibling
 // up in a dense store, walking the Body in the group's order. The hybrid
 // layout also keeps that store sorted into the Body's current order, once
 // group swaps and its own churn have moved 1 in 8 of it out of that order.
@@ -87,18 +87,18 @@ struct Body final {
   double acceleration[3] = {};
 };
 
-// A sister of `BYTES` bytes, of which the system reads the first three
+// A sibling of `BYTES` bytes, of which the system reads the first three
 // doubles, as a system reads a few fields of a larger component.
 template <std::size_t BYTES>
-struct Sister final {
+struct Sibling final {
   static_assert(BYTES >= 24 && BYTES % 8 == 0);
   std::array<double, BYTES / 8> values{0.1, 0.2, 0.3};
 };
 
-template <typename SisterType>
-void integrate(Body& body, const SisterType& sister) {
+template <typename SiblingType>
+void integrate(Body& body, const SiblingType& sibling) {
   for (int axis = 0; axis < 3; ++axis) {
-    body.velocity[axis] += sister.values[axis] * DT;
+    body.velocity[axis] += sibling.values[axis] * DT;
     body.position[axis] += body.velocity[axis] * DT;
   }
 }
@@ -109,17 +109,17 @@ void integrate(Body& body) {
   }
 }
 
-// How many entities a step visited, with and without a sister. Every layout
+// How many entities a step visited, with and without a sibling. Every layout
 // must agree.
 struct Visits final {
-  std::uint64_t with_sister = 0;
-  std::uint64_t without_sister = 0;
+  std::uint64_t with_sibling = 0;
+  std::uint64_t without_sibling = 0;
   std::uint64_t with_second = 0;  // For the second system, if any.
   std::uint64_t without_second = 0;
   bool operator==(const Visits&) const = default;
   Visits& operator+=(const Visits& that) {
-    with_sister += that.with_sister;
-    without_sister += that.without_sister;
+    with_sibling += that.with_sibling;
+    without_sibling += that.without_sibling;
     with_second += that.with_second;
     without_second += that.without_second;
     return *this;
@@ -130,8 +130,8 @@ struct Visits final {
 
 struct Workload final {
   std::size_t population = 0;
-  double sister_share = 0.8;     // Of births that carry a sister.
-  double second_share = 0.0;     // Of births that carry a second sister.
+  double sibling_share = 0.8;    // Of births that carry a sibling.
+  double second_share = 0.0;     // Of births that carry a second sibling.
   double short_share = 0.5;      // Of births that live 1 to 4 steps.
   double long_lifetime = 500.0;  // Mean steps, for the rest.
   double toggle_share = 0.001;   // Of the population, per step.
@@ -139,14 +139,14 @@ struct Workload final {
   int measured = 200;            // Steps measured.
 };
 
-// Which sisters, as bits.
+// Which siblings, as bits.
 constexpr std::uint8_t FIRST = 1;
 constexpr std::uint8_t SECOND = 2;
 
 struct Operation final {
   enum class Kind : std::uint8_t { CREATE, DESTROY, ATTACH, DETACH };
   Kind kind;
-  std::uint8_t sisters;  // Created with, or attached or detached.
+  std::uint8_t siblings;  // Created with, or attached or detached.
   Entity entity;
 };
 
@@ -160,7 +160,7 @@ Schedule schedule_of(const Workload& workload) {
 
   EntityTable table{workload.population};
   std::vector<std::vector<Entity>> dying(static_cast<std::size_t>(steps));
-  std::vector<std::uint8_t> sisters_of(workload.population, 0);
+  std::vector<std::uint8_t> siblings_of(workload.population, 0);
   std::vector<std::uint8_t> created_with(workload.population, 0);
   std::vector<Entity> live;  // For choosing entities to toggle.
   std::vector<std::uint32_t> live_position(workload.population, ABSENT);
@@ -168,11 +168,11 @@ Schedule schedule_of(const Workload& workload) {
 
   auto bear = [&](int step) {
     Entity entity = table.create();
-    std::uint8_t sisters = static_cast<std::uint8_t>(
-        (unit() < workload.sister_share ? FIRST : 0) |
+    std::uint8_t siblings = static_cast<std::uint8_t>(
+        (unit() < workload.sibling_share ? FIRST : 0) |
         (unit() < workload.second_share ? SECOND : 0));
-    sisters_of[entity.index] = sisters;
-    created_with[entity.index] = sisters;
+    siblings_of[entity.index] = siblings;
+    created_with[entity.index] = siblings;
     live_position[entity.index] = static_cast<std::uint32_t>(live.size());
     live.push_back(entity);
     double lifetime = unit() < workload.short_share
@@ -183,7 +183,7 @@ Schedule schedule_of(const Workload& workload) {
       dying[static_cast<std::size_t>(death)].push_back(entity);
     }
     schedule[static_cast<std::size_t>(step)].push_back(
-        Operation{Operation::Kind::CREATE, sisters, entity});
+        Operation{Operation::Kind::CREATE, siblings, entity});
   };
 
   for (std::size_t i = 0; i < workload.population; ++i) {
@@ -215,11 +215,11 @@ Schedule schedule_of(const Workload& workload) {
       if (created_with[entity.index] & which) {
         continue;  // Required by its archetype.
       }
-      bool has = (sisters_of[entity.index] & which) != 0;
+      bool has = (siblings_of[entity.index] & which) != 0;
       operations.push_back(
           Operation{has ? Operation::Kind::DETACH : Operation::Kind::ATTACH,
                     which, entity});
-      sisters_of[entity.index] ^= which;
+      siblings_of[entity.index] ^= which;
     }
   }
   return schedule;
@@ -316,26 +316,26 @@ using StoreOf = std::conditional_t<SORTABLE, SortableStore<ComponentType>,
                                    Store<ComponentType>>;
 
 // framework::Store, as committed, or sorted by entity index at sync points.
-template <typename SisterType, bool SORTED>
+template <typename SiblingType, bool SORTED>
 class StoreLayout final {
  public:
   explicit StoreLayout(std::size_t capacity)
-      : bodies_{capacity, capacity}, sisters_{capacity, capacity} {}
+      : bodies_{capacity, capacity}, siblings_{capacity, capacity} {}
 
-  void create(Entity entity, bool sister) {
+  void create(Entity entity, bool sibling) {
     bodies_.append(entity, Body{});
-    if (sister) {
-      sisters_.append(entity, SisterType{});
+    if (sibling) {
+      siblings_.append(entity, SiblingType{});
     }
   }
   void destroy(Entity entity) {
     bodies_.erase(entity);
-    if (sisters_.contains(entity)) {
-      sisters_.erase(entity);
+    if (siblings_.contains(entity)) {
+      siblings_.erase(entity);
     }
   }
-  void attach(Entity entity) { sisters_.append(entity, SisterType{}); }
-  void detach(Entity entity) { sisters_.erase(entity); }
+  void attach(Entity entity) { siblings_.append(entity, SiblingType{}); }
+  void detach(Entity entity) { siblings_.erase(entity); }
 
   void maintain(int) {
     if constexpr (SORTED) {
@@ -343,8 +343,8 @@ class StoreLayout final {
       if (bodies_.disorder() * DISORDER_SHARE > bodies_.size()) {
         bodies_.sort_by_entity();
       }
-      if (sisters_.disorder() * DISORDER_SHARE > sisters_.size()) {
-        sisters_.sort_by_entity();
+      if (siblings_.disorder() * DISORDER_SHARE > siblings_.size()) {
+        siblings_.sort_by_entity();
       }
     }
   }
@@ -353,13 +353,13 @@ class StoreLayout final {
     Visits visits;
     auto bodies = bodies_.values();
     for (std::size_t i = 0; i < bodies.size(); ++i) {
-      if (const SisterType* sister =
-              sisters_.try_component_of(bodies_.owner(i))) {
-        integrate(bodies[i], *sister);
-        ++visits.with_sister;
+      if (const SiblingType* sibling =
+              siblings_.try_component_of(bodies_.owner(i))) {
+        integrate(bodies[i], *sibling);
+        ++visits.with_sibling;
       } else {
         integrate(bodies[i]);
-        ++visits.without_sister;
+        ++visits.without_sibling;
       }
     }
     return visits;
@@ -368,30 +368,30 @@ class StoreLayout final {
   // An entity index slot, an owner and a value per entity, in each store.
   static constexpr std::size_t bytes_per_entity() {
     return 2 * 8 + sizeof(Entity) + sizeof(Body) + sizeof(Entity) +
-           sizeof(SisterType);
+           sizeof(SiblingType);
   }
 
  private:
   StoreOf<Body, SORTED> bodies_;
-  StoreOf<SisterType, SORTED> sisters_;
+  StoreOf<SiblingType, SORTED> siblings_;
 };
 
-// An owning group over (Body, Sister). Entities with both occupy positions
+// An owning group over (Body, Sibling). Entities with both occupy positions
 // [0, group_) of both arrays, in the same order; the rest of the bodies follow.
-template <typename SisterType>
+template <typename SiblingType>
 class GroupLayout final {
  public:
   explicit GroupLayout(std::size_t capacity) : position_(capacity, ABSENT) {
     owners_.reserve(capacity);
     bodies_.reserve(capacity);
-    sisters_.reserve(capacity);
+    siblings_.reserve(capacity);
   }
 
-  void create(Entity entity, bool sister) {
+  void create(Entity entity, bool sibling) {
     position_[entity.index] = static_cast<std::uint32_t>(bodies_.size());
     owners_.push_back(entity);
     bodies_.push_back(Body{});
-    if (sister) {
+    if (sibling) {
       attach(entity);
     }
   }
@@ -405,22 +405,22 @@ class GroupLayout final {
     bodies_.pop_back();
     position_[entity.index] = ABSENT;
   }
-  // Moves the body to the group's end, and appends the sister beside it.
+  // Moves the body to the group's end, and appends the sibling beside it.
   void attach(Entity entity) {
     swap_bodies(position_[entity.index], group_);
-    sisters_.push_back(SisterType{});
+    siblings_.push_back(SiblingType{});
     ++group_;
   }
-  // Moves the body and sister to the group's last position, then shrinks the
+  // Moves the body and sibling to the group's last position, then shrinks the
   // group past them.
   void detach(Entity entity) {
     std::uint32_t position = position_[entity.index];
     std::uint32_t last = group_ - 1;
     if (position != last) {
-      std::swap(sisters_[position], sisters_[last]);
+      std::swap(siblings_[position], siblings_[last]);
     }
     swap_bodies(position, last);
-    sisters_.pop_back();
+    siblings_.pop_back();
     --group_;
   }
 
@@ -429,18 +429,18 @@ class GroupLayout final {
   Visits iterate() {
     Visits visits;
     for (std::uint32_t i = 0; i < group_; ++i) {
-      integrate(bodies_[i], sisters_[i]);
+      integrate(bodies_[i], siblings_[i]);
     }
     for (std::size_t i = group_; i < bodies_.size(); ++i) {
       integrate(bodies_[i]);
     }
-    visits.with_sister = group_;
-    visits.without_sister = bodies_.size() - group_;
+    visits.with_sibling = group_;
+    visits.without_sibling = bodies_.size() - group_;
     return visits;
   }
 
   static constexpr std::size_t bytes_per_entity() {
-    return 4 + sizeof(Entity) + sizeof(Body) + sizeof(SisterType);
+    return 4 + sizeof(Entity) + sizeof(Body) + sizeof(SiblingType);
   }
 
   // Every body, group first, for another system to walk.
@@ -468,7 +468,7 @@ class GroupLayout final {
   std::vector<std::uint32_t> position_;  // By entity index.
   std::vector<Entity> owners_;
   std::vector<Body> bodies_;
-  std::vector<SisterType> sisters_;
+  std::vector<SiblingType> siblings_;
   std::uint32_t group_ = 0;
   std::uint64_t moves_ = 0;
 };
@@ -616,34 +616,34 @@ class GenerationalStore final {
   std::size_t tombstones_ = 0;
 };
 
-template <typename SisterType>
+template <typename SiblingType>
 class GenerationalLayout final {
  public:
   static constexpr int MINIMUM_AGE = 16;  // Steps.
 
   explicit GenerationalLayout(std::size_t capacity)
-      : bodies_{capacity, capacity}, sisters_{capacity, capacity} {}
+      : bodies_{capacity, capacity}, siblings_{capacity, capacity} {}
 
   void set_step(int step) { step_ = step; }
 
-  void create(Entity entity, bool sister) {
+  void create(Entity entity, bool sibling) {
     bodies_.append(entity, Body{}, step_);
-    if (sister) {
-      sisters_.append(entity, SisterType{}, step_);
+    if (sibling) {
+      siblings_.append(entity, SiblingType{}, step_);
     }
   }
   void destroy(Entity entity) {
     bodies_.erase(entity);
-    if (sisters_.contains(entity)) {
-      sisters_.erase(entity);
+    if (siblings_.contains(entity)) {
+      siblings_.erase(entity);
     }
   }
-  void attach(Entity entity) { sisters_.append(entity, SisterType{}, step_); }
-  void detach(Entity entity) { sisters_.erase(entity); }
+  void attach(Entity entity) { siblings_.append(entity, SiblingType{}, step_); }
+  void detach(Entity entity) { siblings_.erase(entity); }
 
   void maintain(int step) {
     bodies_.maintain(step, MINIMUM_AGE);
-    sisters_.maintain(step, MINIMUM_AGE);
+    siblings_.maintain(step, MINIMUM_AGE);
   }
 
   Visits iterate() {
@@ -652,13 +652,13 @@ class GenerationalLayout final {
       if (!bodies_.live(i)) {
         continue;
       }
-      if (const SisterType* sister =
-              sisters_.try_component_of(bodies_.owner(i))) {
-        integrate(bodies_.data(i), *sister);
-        ++visits.with_sister;
+      if (const SiblingType* sibling =
+              siblings_.try_component_of(bodies_.owner(i))) {
+        integrate(bodies_.data(i), *sibling);
+        ++visits.with_sibling;
       } else {
         integrate(bodies_.data(i));
-        ++visits.without_sister;
+        ++visits.without_sibling;
       }
     }
     return visits;
@@ -666,25 +666,25 @@ class GenerationalLayout final {
 
   static constexpr std::size_t bytes_per_entity() {
     return GenerationalStore<Body>::bytes_per_entity() +
-           GenerationalStore<SisterType>::bytes_per_entity();
+           GenerationalStore<SiblingType>::bytes_per_entity();
   }
 
  private:
   GenerationalStore<Body> bodies_;
-  GenerationalStore<SisterType> sisters_;
+  GenerationalStore<SiblingType> siblings_;
   int step_ = 0;
 };
 
 //-- Competing layouts --------------------------------------------------------
 
-// Walks `size` bodies and looks each one's sister up in `sisters`.
+// Walks `size` bodies and looks each one's sibling up in `siblings`.
 template <typename StoreType, typename BodyOfType, typename OwnerOfType>
 void walk(std::size_t size, BodyOfType&& body_of, OwnerOfType&& owner_of,
-          StoreType& sisters, lib::Out<std::uint64_t> with,
+          StoreType& siblings, lib::Out<std::uint64_t> with,
           lib::Out<std::uint64_t> without) {
   for (std::size_t i = 0; i < size; ++i) {
-    if (const auto* sister = sisters.try_component_of(owner_of(i))) {
-      integrate(body_of(i), *sister);
+    if (const auto* sibling = siblings.try_component_of(owner_of(i))) {
+      integrate(body_of(i), *sibling);
       ++*with;
     } else {
       integrate(body_of(i));
@@ -693,7 +693,7 @@ void walk(std::size_t size, BodyOfType&& body_of, OwnerOfType&& owner_of,
   }
 }
 
-// Two sisters in framework stores, looked up from the Body store; sorted at
+// Two siblings in framework stores, looked up from the Body store; sorted at
 // sync points or not.
 template <typename FirstType, typename SecondType, bool SORTED>
 class CompetingStoreLayout final {
@@ -703,10 +703,10 @@ class CompetingStoreLayout final {
         first_{capacity, capacity},
         second_{capacity, capacity} {}
 
-  void create(Entity entity, std::uint8_t sisters) {
+  void create(Entity entity, std::uint8_t siblings) {
     bodies_.append(entity, Body{});
-    if (sisters & FIRST) first_.append(entity, FirstType{});
-    if (sisters & SECOND) second_.append(entity, SecondType{});
+    if (siblings & FIRST) first_.append(entity, FirstType{});
+    if (siblings & SECOND) second_.append(entity, SecondType{});
   }
   void destroy(Entity entity) {
     bodies_.erase(entity);
@@ -747,14 +747,14 @@ class CompetingStoreLayout final {
   }
 
   template <typename StoreType>
-  Visits iterate(lib::InOut<StoreType> sisters, bool first) {
+  Visits iterate(lib::InOut<StoreType> siblings, bool first) {
     Visits visits;
     auto bodies = bodies_.values();
     walk(
         bodies.size(), [&](std::size_t i) -> Body& { return bodies[i]; },
-        [&](std::size_t i) { return bodies_.owner(i); }, *sisters,
-        lib::Out(first ? visits.with_sister : visits.with_second),
-        lib::Out(first ? visits.without_sister : visits.without_second));
+        [&](std::size_t i) { return bodies_.owner(i); }, *siblings,
+        lib::Out(first ? visits.with_sibling : visits.with_second),
+        lib::Out(first ? visits.without_sibling : visits.without_second));
     return visits;
   }
 
@@ -763,7 +763,7 @@ class CompetingStoreLayout final {
   StoreOf<SecondType, SORTED> second_;
 };
 
-// The group owns (Body, first sister). The second sister is in a framework
+// The group owns (Body, first sibling). The second sibling is in a framework
 // store, looked up while walking the bodies in the group's order. HYBRID keeps
 // that store sorted by its owners' Body positions.
 template <typename FirstType, typename SecondType, bool HYBRID>
@@ -772,9 +772,9 @@ class CompetingGroupLayout final {
   explicit CompetingGroupLayout(std::size_t capacity)
       : group_{capacity}, second_{capacity, capacity} {}
 
-  void create(Entity entity, std::uint8_t sisters) {
-    group_.create(entity, (sisters & FIRST) != 0);
-    if (sisters & SECOND) {
+  void create(Entity entity, std::uint8_t siblings) {
+    group_.create(entity, (siblings & FIRST) != 0);
+    if (siblings & SECOND) {
       second_.append(entity, SecondType{});
       ++churn_;
     }
@@ -894,8 +894,8 @@ class Segment final {
   std::vector<std::uint32_t> chunks_;
 };
 
-// Archetypes are the sets of sisters an entity is created with, as bits.
-// Single-sister workloads use two of them; the competing workload, four.
+// Archetypes are the sets of siblings an entity is created with, as bits.
+// Single-sibling workloads use two of them; the competing workload, four.
 template <typename FirstType, typename SecondType, bool COMPETING>
 class SegmentedLayout final {
  public:
@@ -914,31 +914,31 @@ class SegmentedLayout final {
     }
   }
 
-  // The single-sister interface.
-  void create(Entity entity, bool sister) {
-    create(entity, static_cast<std::uint8_t>(sister ? FIRST : 0));
+  // The single-sibling interface.
+  void create(Entity entity, bool sibling) {
+    create(entity, static_cast<std::uint8_t>(sibling ? FIRST : 0));
   }
   void attach(Entity entity) { attach(entity, FIRST); }
   void detach(Entity entity) { detach(entity, FIRST); }
   Visits iterate() { return iterate_first(); }
 
-  void create(Entity entity, std::uint8_t sisters) {
-    Archetype& archetype = archetypes_[sisters];
+  void create(Entity entity, std::uint8_t siblings) {
+    Archetype& archetype = archetypes_[siblings];
     std::uint32_t local = archetype.count;
     archetype.body.grow(lib::InOut(bodies_), local);
     archetype.owner.grow(lib::InOut(owners_), local);
     archetype.body.at(lib::InOut(bodies_), local) = Body{};
     archetype.owner.at(lib::InOut(owners_), local) = entity;
-    if (sisters & FIRST) {
+    if (siblings & FIRST) {
       archetype.first.grow(lib::InOut(firsts_), local);
       archetype.first.at(lib::InOut(firsts_), local) = FirstType{};
     }
-    if (sisters & SECOND) {
+    if (siblings & SECOND) {
       archetype.second.grow(lib::InOut(seconds_), local);
       archetype.second.at(lib::InOut(seconds_), local) = SecondType{};
     }
     ++archetype.count;
-    location_[entity.index] = Location{.archetype = sisters, .local = local};
+    location_[entity.index] = Location{.archetype = siblings, .local = local};
   }
 
   // Moves the segment's last entity into the gap, in every column.
@@ -984,7 +984,8 @@ class SegmentedLayout final {
   Visits iterate_first() {
     Visits visits;
     walk<FIRST>(lib::InOut(firsts_), allowed_first_, &Archetype::first,
-                lib::Out(visits.with_sister), lib::Out(visits.without_sister));
+                lib::Out(visits.with_sibling),
+                lib::Out(visits.without_sibling));
     return visits;
   }
   Visits iterate_second()
@@ -997,7 +998,7 @@ class SegmentedLayout final {
   }
 
   // Columns, owners and a location per entity, plus the sparse stores for
-  // Allowed sisters.
+  // Allowed siblings.
   static constexpr std::size_t bytes_per_entity() {
     return 8 + sizeof(Entity) + sizeof(Body) + sizeof(FirstType) +
            (8 + sizeof(Entity) + sizeof(FirstType)) +
@@ -1028,11 +1029,12 @@ class SegmentedLayout final {
   }
 
   // Walks every archetype's bodies chunk by chunk. Where the archetype
-  // Requires the sister, it sits at the same slot of the matching chunk;
+  // Requires the sibling, it sits at the same slot of the matching chunk;
   // otherwise it is Allowed, and looked up in the sparse store.
-  template <std::uint8_t WHICH, typename SisterType>
-  void walk(lib::InOut<ChunkPool<SisterType>> pool, Store<SisterType>& allowed,
-            Segment<SisterType> Archetype::* sister_segment,
+  template <std::uint8_t WHICH, typename SiblingType>
+  void walk(lib::InOut<ChunkPool<SiblingType>> pool,
+            Store<SiblingType>& allowed,
+            Segment<SiblingType> Archetype::* sibling_segment,
             lib::Out<std::uint64_t> with, lib::Out<std::uint64_t> without) {
     for (std::uint8_t id = 0; id < ARCHETYPES; ++id) {
       Archetype& archetype = archetypes_[id];
@@ -1041,18 +1043,19 @@ class SegmentedLayout final {
             std::min<std::size_t>(CHUNK, archetype.count - chunk * CHUNK);
         Body* bodies = bodies_.chunk(archetype.body.chunk(chunk));
         if (id & WHICH) {
-          SisterType* sisters =
-              pool->chunk((archetype.*sister_segment).chunk(chunk));
+          SiblingType* siblings =
+              pool->chunk((archetype.*sibling_segment).chunk(chunk));
           for (std::size_t i = 0; i < count; ++i) {
-            integrate(bodies[i], sisters[i]);
+            integrate(bodies[i], siblings[i]);
           }
           *with += count;
           continue;
         }
         Entity* owners = owners_.chunk(archetype.owner.chunk(chunk));
         for (std::size_t i = 0; i < count; ++i) {
-          if (const SisterType* sister = allowed.try_component_of(owners[i])) {
-            integrate(bodies[i], *sister);
+          if (const SiblingType* sibling =
+                  allowed.try_component_of(owners[i])) {
+            integrate(bodies[i], *sibling);
             ++*with;
           } else {
             integrate(bodies[i]);
@@ -1102,9 +1105,9 @@ Result measure(const Workload& workload, const Schedule& schedule) {
       switch (operation.kind) {
         case Operation::Kind::CREATE:
           if constexpr (COMPETING) {
-            layout.create(operation.entity, operation.sisters);
+            layout.create(operation.entity, operation.siblings);
           } else {
-            layout.create(operation.entity, (operation.sisters & FIRST) != 0);
+            layout.create(operation.entity, (operation.siblings & FIRST) != 0);
           }
           break;
         case Operation::Kind::DESTROY:
@@ -1112,14 +1115,14 @@ Result measure(const Workload& workload, const Schedule& schedule) {
           break;
         case Operation::Kind::ATTACH:
           if constexpr (COMPETING) {
-            layout.attach(operation.entity, operation.sisters);
+            layout.attach(operation.entity, operation.siblings);
           } else {
             layout.attach(operation.entity);
           }
           break;
         case Operation::Kind::DETACH:
           if constexpr (COMPETING) {
-            layout.detach(operation.entity, operation.sisters);
+            layout.detach(operation.entity, operation.siblings);
           } else {
             layout.detach(operation.entity);
           }
@@ -1166,14 +1169,14 @@ Result measure(const Workload& workload, const Schedule& schedule) {
 
 template <std::size_t BYTES>
 void compare(const Workload& workload) {
-  using SisterType = Sister<BYTES>;
+  using SiblingType = Sibling<BYTES>;
   Schedule schedule = schedule_of(workload);
   std::size_t operations = 0;
   for (std::size_t step = 1; step < schedule.size(); ++step) {
     operations += schedule[step].size();
   }
   std::println(
-      "\n{} entities, {}-byte sister: {:.0f} structural operations per step",
+      "\n{} entities, {}-byte sibling: {:.0f} structural operations per step",
       workload.population, BYTES,
       static_cast<double>(operations) /
           static_cast<double>(schedule.size() - 1));
@@ -1195,25 +1198,25 @@ void compare(const Workload& workload) {
         result.bytes_per_entity,
         result.visits == expected ? "" : "  VISITS DIFFER");
   };
-  report("dense", measure<StoreLayout<SisterType, false>>(workload, schedule));
-  report("sorted", measure<StoreLayout<SisterType, true>>(workload, schedule));
-  report("group", measure<GroupLayout<SisterType>>(workload, schedule));
+  report("dense", measure<StoreLayout<SiblingType, false>>(workload, schedule));
+  report("sorted", measure<StoreLayout<SiblingType, true>>(workload, schedule));
+  report("group", measure<GroupLayout<SiblingType>>(workload, schedule));
   report("generational",
-         measure<GenerationalLayout<SisterType>>(workload, schedule));
-  report("segmented", measure<SegmentedLayout<SisterType, SisterType, false>>(
+         measure<GenerationalLayout<SiblingType>>(workload, schedule));
+  report("segmented", measure<SegmentedLayout<SiblingType, SiblingType, false>>(
                           workload, schedule));
 }
 
 template <std::size_t BYTES>
 void compare_competing(Workload workload) {
-  using FirstType = Sister<BYTES>;
-  using SecondType = Sister<BYTES>;
+  using FirstType = Sibling<BYTES>;
+  using SecondType = Sibling<BYTES>;
   workload.second_share = 0.5;
   Schedule schedule = schedule_of(workload);
   std::println(
-      "\n{} entities, two {}-byte sisters on {:.0f}% and {:.0f}% of entities, "
+      "\n{} entities, two {}-byte siblings on {:.0f}% and {:.0f}% of entities, "
       "two systems",
-      workload.population, BYTES, 100.0 * workload.sister_share,
+      workload.population, BYTES, 100.0 * workload.sibling_share,
       100.0 * workload.second_share);
   std::println("  {:<13} {:>10} {:>10} {:>10} {:>10} {:>10} {:>11}", "layout",
                "structural", "maintain", "system 1", "system 2", "total",
@@ -1270,7 +1273,7 @@ int main(int argc, char** argv) {
     }
     compare<24>(workload);
     compare<256>(workload);
-    // A million 1 KB sisters, twice over for the generational layout, is more
+    // A million 1 KB siblings, twice over for the generational layout, is more
     // memory than a benchmark should take.
     if (population <= 100'000) {
       compare<1024>(workload);

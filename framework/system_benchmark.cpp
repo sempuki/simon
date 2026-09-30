@@ -1,18 +1,18 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
-// What a system pays to reach a sister entity-component: another component of
+// What a system pays to reach a sibling entity-component: another component of
 // the same entity that is structurally always there. One system integrates a
-// 72-byte driving component using a 24-byte sister, four ways:
+// 72-byte driving component using a 24-byte sibling, four ways:
 //
-//   framework   the scheduler's loop: try_component_of on the sister's store
+//   framework   the scheduler's loop: try_component_of on the sibling's store
 //               for every entity (the current design).
 //   handle      a pointer resolved when the entity was built and dereferenced
 //               unconditionally (the old Handle design, without its upkeep).
-//   structural  the sister at the same dense position, so both arrays are
+//   structural  the sibling at the same dense position, so both arrays are
 //               walked together (what an archetype-table ECS gets).
-//   baseline    the driving component alone, with no sister.
+//   baseline    the driving component alone, with no sibling.
 //
-// "aligned" attaches the sister in the same order as the driving component, so
+// "aligned" attaches the sibling in the same order as the driving component, so
 // both stores share an order. "shuffled" attaches it in a random order, as when
 // components arrive at different times, so reaching it is a random access.
 // "structural" needs a shared order, so it only runs aligned. See
