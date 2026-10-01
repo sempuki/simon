@@ -39,6 +39,7 @@ cc_library(
 
 cc_library(
     name = "event_queue",
+    srcs = ["event_queue.cpp"],
     hdrs = ["event_queue.hpp"],
     copts = COPTS,
     deps = ["//framework"],

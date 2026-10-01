@@ -63,6 +63,21 @@ ASSIGN_OR_RETURN(asset_, build_scenario(scenario_, lib::InOut(world_)));
 `ASSIGN_OR_RETURN` does the same and otherwise moves the value into an existing
 variable or a new declaration (`Entity asset`).
 
+**Headers hold what must be inline; `.cpp` files hold the rest.** Templates,
+and code on hot paths that the inliner must see (a system's call operator,
+`Vector3d`, the spatial index's per-query helpers), stay in headers. Setup,
+string formatting and once-a-step code (`build_scenario`, the site builder's
+`build()`, `Simulation`, name parsing) go in `.cpp` files.
+
+**A class has one `public:` section, then one `protected:`, then one
+`private:`.** Compile-time checks and aliases may come first, before
+`public:`, unlabeled.
+
+**Every pointer is initialized,** `Type* pointer = nullptr;`, even when a
+constructor always sets it.
+
+**Implementation details live in a namespace named `internal`.**
+
 A plain `T&` parameter is only for what the language or the framework decides:
 operators, and a system's call operator, whose entity-components arrive by
 reference with constness declared in `System<...>`. Computing wrappers from

@@ -9,6 +9,7 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "hello_library",
+    srcs = ["hello.cpp"],
     hdrs = ["hello.hpp"],
     copts = COPTS,
     deps = [

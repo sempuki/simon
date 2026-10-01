@@ -8,7 +8,11 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "framework",
-    srcs = ["builder.cpp"],
+    srcs = [
+        "builder.cpp",
+        "name.cpp",
+        "spatial_index.cpp",
+    ],
     hdrs = [
         "archetype.hpp",
         "builder.hpp",
@@ -90,6 +94,7 @@ cc_binary(
 
 cc_library(
     name = "benchmark_support",
+    srcs = ["benchmark_support.cpp"],
     hdrs = ["benchmark_support.hpp"],
     copts = COPTS,
     # For benchmarks only.

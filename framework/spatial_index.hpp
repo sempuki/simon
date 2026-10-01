@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <array>
-#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -36,16 +35,8 @@ class SpatialIndex final {
   DECLARE_COPY_DELETE(SpatialIndex);
   DECLARE_MOVE_DEFAULT(SpatialIndex);
 
-  SpatialIndex(std::size_t capacity, double cell_size)
-      : cell_size_{cell_size},
-        inverse_cell_size_{1.0 / cell_size},
-        mask_{std::bit_ceil(std::max<std::size_t>(capacity, 1)) - 1},
-        starts_(mask_ + 2, 0) {
-    CHECK_PRECONDITION(cell_size > 0.0);
-    entries_.reserve(capacity);
-    unsorted_.reserve(capacity);
-    buckets_.reserve(capacity);
-  }
+  // Room for `capacity` points in cells `cell_size` across.
+  SpatialIndex(std::size_t capacity, double cell_size);
   ~SpatialIndex() = default;
 
   std::size_t size() const { return entries_.size(); }

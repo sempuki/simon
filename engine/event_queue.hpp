@@ -59,14 +59,7 @@ class Event final : public EventBase {
 // in components, not here.
 class EventQueue final {
  public:
-  EventQueue() {
-    // Install the bespoke timer handler.
-    handlers_[event_type_of<Timer>()].emplace_back(
-        [](TimePoint time, const EventBase* base) {
-          auto* event = static_cast<const Event<Timer>*>(base);
-          event->data().action(time);
-        });
-  }
+  EventQueue();
 
   template <typename HandlerType>
   void start_timer(TimePoint time, HandlerType&& handler) {
@@ -102,21 +95,7 @@ class EventQueue final {
   // Delivers every event at or before `time`, earliest first, and events with
   // equal times in the order they were published. Each handler receives the
   // event's own time. Handlers may publish or subscribe while being called.
-  void process_until(TimePoint time) {
-    while (!events_.empty() && events_.front().event->time() <= time) {
-      // Take ownership before calling handlers, since they may publish.
-      std::pop_heap(events_.begin(), events_.end(), Later{});
-      std::unique_ptr<EventBase> event = std::move(events_.back().event);
-      events_.pop_back();
-
-      // A deque keeps existing handlers in place when a handler subscribes.
-      // Handlers subscribed during delivery first see the next event.
-      auto& handlers = handlers_[event->event_type()];
-      for (std::size_t i = 0, count = handlers.size(); i < count; ++i) {
-        handlers[i](event->time(), event.get());
-      }
-    }
-  }
+  void process_until(TimePoint time);
 
  private:
   struct Timer final {

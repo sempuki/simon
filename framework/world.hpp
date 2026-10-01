@@ -127,63 +127,6 @@ class World<SpatialType,                  //
   // Starts the utterance that builds a world of this type. See SetUpBuilder.
   static auto set_up() { return SetUpBuilder<World>{}; }
 
- private:
-  friend class SetUpBuilder<World>;
-
-  // How big a world is, worked out by SetUpBuilder from how many of each
-  // archetype it holds.
-  struct Configuration final {
-    std::uint32_t number = 0;  // The world's instance in its Name and Identity.
-    std::size_t entities = 0;  // Entity capacity.
-    // Each store's capacity, by component number.
-    std::array<std::size_t, ComponentList::size> capacities{};
-    // The edge of a spatial index cell, in the spatial component's coordinate
-    // unit.
-    double cell_size = 1.0;
-  };
-
-  // Fills the world as `configuration` describes, discarding everything it
-  // held: entities, names, aliases and pending commands. Pointers into its
-  // stores no longer refer to anything.
-  void initialize(const Configuration& configuration) {
-    number_ = configuration.number;
-    entities_ = EntityTable{configuration.entities};
-    stores_ = {store_for<SpatialType>(configuration),
-               store_for<EntityArchetype>(configuration),
-               store_for<Parent>(configuration),
-               store_for<ComponentTypes>(configuration)...};
-    commands_.clear();
-    plans_ = {Plan<SpatialType>{configuration.entities},
-              Plan<EntityArchetype>{configuration.entities},
-              Plan<Parent>{configuration.entities},
-              Plan<ComponentTypes>{configuration.entities}...};
-    spatial_index_ =
-        SpatialIndex{configuration.capacities[component_number<SpatialType>()],
-                     configuration.cell_size};
-    spatial_index_current_ = false;
-    destroying_.assign(configuration.entities, false);
-    destroying_list_.clear();
-    next_entity_instance_ = 0;
-    instance_of_index_.assign(configuration.entities, 0);
-    archetype_of_index_.assign(configuration.entities, 0);
-    entity_of_instance_.clear();
-    next_archetype_instance_ = 0;
-    archetypes_.clear();
-    aliases_.clear();
-    aliases_of_name_.clear();
-    // Components are aliased by their type names, qualified and short.
-    for_each_type(ComponentList{}, [&]<typename ComponentType>() {
-      std::string type_name = lib::to_type_string<ComponentType>();
-      Name name = name_of<ComponentType>();
-      give_alias(name, Alias{type_name});
-      if (std::size_t colons = type_name.rfind("::");
-          colons != std::string::npos) {
-        give_alias(name, Alias{type_name.substr(colons + 2)});
-      }
-    });
-  }
-
- public:
   //-- Write -------------------------------------------------------------------
 
   // Creates an entity of `ArchetypeType`, with an optional alias.
@@ -428,6 +371,61 @@ class World<SpatialType,                  //
   }
 
  private:
+  friend class SetUpBuilder<World>;
+
+  // How big a world is, worked out by SetUpBuilder from how many of each
+  // archetype it holds.
+  struct Configuration final {
+    std::uint32_t number = 0;  // The world's instance in its Name and Identity.
+    std::size_t entities = 0;  // Entity capacity.
+    // Each store's capacity, by component number.
+    std::array<std::size_t, ComponentList::size> capacities{};
+    // The edge of a spatial index cell, in the spatial component's coordinate
+    // unit.
+    double cell_size = 1.0;
+  };
+
+  // Fills the world as `configuration` describes, discarding everything it
+  // held: entities, names, aliases and pending commands. Pointers into its
+  // stores no longer refer to anything.
+  void initialize(const Configuration& configuration) {
+    number_ = configuration.number;
+    entities_ = EntityTable{configuration.entities};
+    stores_ = {store_for<SpatialType>(configuration),
+               store_for<EntityArchetype>(configuration),
+               store_for<Parent>(configuration),
+               store_for<ComponentTypes>(configuration)...};
+    commands_.clear();
+    plans_ = {Plan<SpatialType>{configuration.entities},
+              Plan<EntityArchetype>{configuration.entities},
+              Plan<Parent>{configuration.entities},
+              Plan<ComponentTypes>{configuration.entities}...};
+    spatial_index_ =
+        SpatialIndex{configuration.capacities[component_number<SpatialType>()],
+                     configuration.cell_size};
+    spatial_index_current_ = false;
+    destroying_.assign(configuration.entities, false);
+    destroying_list_.clear();
+    next_entity_instance_ = 0;
+    instance_of_index_.assign(configuration.entities, 0);
+    archetype_of_index_.assign(configuration.entities, 0);
+    entity_of_instance_.clear();
+    next_archetype_instance_ = 0;
+    archetypes_.clear();
+    aliases_.clear();
+    aliases_of_name_.clear();
+    // Components are aliased by their type names, qualified and short.
+    for_each_type(ComponentList{}, [&]<typename ComponentType>() {
+      std::string type_name = lib::to_type_string<ComponentType>();
+      Name name = name_of<ComponentType>();
+      give_alias(name, Alias{type_name});
+      if (std::size_t colons = type_name.rfind("::");
+          colons != std::string::npos) {
+        give_alias(name, Alias{type_name.substr(colons + 2)});
+      }
+    });
+  }
+
   template <typename, Archetypal, bool, typename...>
   friend class CreateBuilder;
   template <typename, typename, typename, bool>
