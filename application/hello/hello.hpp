@@ -153,9 +153,9 @@ inline Balls build_balls(lib::InOut<World> world) {
   return Balls{.red = *red, .blue = *blue};
 }
 
-// A world with room for `balls` balls.
+// A world holding `balls` balls.
 inline std::expected<World, framework::Status> world_for(std::size_t balls) {
-  return World::set_up().numbered(1).room_for<Ball>(balls).build();
+  return World::set_up().numbered(1).holding<Ball>(balls).build();
 }
 
 inline bool any_collision(const World& world) {

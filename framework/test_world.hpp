@@ -44,13 +44,13 @@ struct Interceptor final
 using TestWorld = World<Position, TypeList<Velocity, Health>,
                         TypeList<Body, Launcher, Interceptor>>;
 
-// Room for 16 entities: 8 bodies, 4 launchers and 4 interceptors.
+// Holds 16 entities: 8 bodies, 4 launchers and 4 interceptors.
 inline TestWorld small_world() {
   std::expected<TestWorld, Status> world = TestWorld::set_up()
                                                .numbered(1)
-                                               .room_for<Body>(8)
-                                               .room_for<Launcher>(4)
-                                               .room_for<Interceptor>(4)
+                                               .holding<Body>(8)
+                                               .holding<Launcher>(4)
+                                               .holding<Interceptor>(4)
                                                .build();
   CHECK_POSTCONDITION(world.has_value());
   return *std::move(world);

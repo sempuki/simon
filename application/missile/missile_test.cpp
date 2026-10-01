@@ -15,18 +15,18 @@ namespace {
 using namespace std::chrono_literals;
 
 constexpr Duration DT = 10ms;
-// A world with room for 16 of each archetype, for testing systems alone.
+// A world holding 16 of each archetype, for testing systems alone.
 World small_world() {
   std::expected<World, framework::Status> world =
       World::set_up()
           .numbered(1)
-          .room_for<archetype::Asset>(16)
-          .room_for<archetype::Radar>(16)
-          .room_for<archetype::Launcher>(16)
-          .room_for<archetype::RedDrone>(16)
-          .room_for<archetype::Track>(16)
-          .room_for<archetype::Interceptor>(16)
-          .room_for<archetype::Blast>(16)
+          .holding<archetype::Asset>(16)
+          .holding<archetype::Radar>(16)
+          .holding<archetype::Launcher>(16)
+          .holding<archetype::RedDrone>(16)
+          .holding<archetype::Track>(16)
+          .holding<archetype::Interceptor>(16)
+          .holding<archetype::Blast>(16)
           .build();
   CHECK_POSTCONDITION(world.has_value());
   return *std::move(world);

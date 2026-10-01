@@ -136,9 +136,8 @@ Result measure(std::size_t count, bool shuffled,
 
   // The framework: one world whose sibling is allowed, attached in `order`,
   // and one whose sibling is required.
-  auto allowed_world = BenchmarkWorld::set_up().room_for<Craft>(count).build();
-  auto required_world =
-      BenchmarkWorld::set_up().room_for<Rocket>(count).build();
+  auto allowed_world = BenchmarkWorld::set_up().holding<Craft>(count).build();
+  auto required_world = BenchmarkWorld::set_up().holding<Rocket>(count).build();
   CHECK_POSTCONDITION(allowed_world.has_value() && required_world.has_value());
   BenchmarkWorld& allowed = *allowed_world;
   BenchmarkWorld& required = *required_world;

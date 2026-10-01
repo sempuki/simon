@@ -57,7 +57,7 @@ struct Scenario final {
 
 enum class Outcome { UNDECIDED, BLUE_WINS, RED_WINS };
 
-// The world a scenario needs: room, at every site, for the asset, radars and
+// The world a scenario needs: at every site, holding the asset, radars and
 // launchers, every drone with its track and blast, and every interceptor with
 // its blast.
 inline std::expected<World, framework::Status> world_for(
@@ -72,13 +72,13 @@ inline std::expected<World, framework::Status> world_for(
   // Cells a few times smaller than the sensor and weapon ranges (1 to 4 km).
   return World::set_up()
       .numbered(1)
-      .room_for<archetype::Asset>(sites)
-      .room_for<archetype::Radar>(sites * count(scenario.radars))
-      .room_for<archetype::Launcher>(sites * count(scenario.launchers))
-      .room_for<archetype::RedDrone>(drones)
-      .room_for<archetype::Track>(drones)
-      .room_for<archetype::Interceptor>(interceptors)
-      .room_for<archetype::Blast>(drones + interceptors)
+      .holding<archetype::Asset>(sites)
+      .holding<archetype::Radar>(sites * count(scenario.radars))
+      .holding<archetype::Launcher>(sites * count(scenario.launchers))
+      .holding<archetype::RedDrone>(drones)
+      .holding<archetype::Track>(drones)
+      .holding<archetype::Interceptor>(interceptors)
+      .holding<archetype::Blast>(drones + interceptors)
       .cells_of(250.0 * model::meter)
       .build();
 }

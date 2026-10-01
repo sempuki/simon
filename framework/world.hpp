@@ -66,13 +66,13 @@ class SchedulerKey final {
 //
 // A world's type is declared by its spatial component, its other components
 // and its archetypes, every one of which it may create. A world is built by
-// the builder `set_up()` returns, which sizes it by the room for each
-// archetype:
+// the builder `set_up()` returns, which sizes it by how many of each archetype
+// it holds:
 //
 //   using World = World<Kinematics, TypeList<Control, Health>,
 //                       TypeList<archetype::Drone, archetype::Blast>>;
 //   std::expected<World, Status> world =
-//       World::set_up().numbered(1).room_for<archetype::Drone>(1000).build();
+//       World::set_up().numbered(1).holding<archetype::Drone>(1000).build();
 //
 // Everything in it has a Name ({kind, instance}), an Identity computed from the
 // Name ("/world/1/entity/2"), and any number of Aliases ("ego"). See name.hpp.
@@ -121,8 +121,8 @@ class World<SpatialType, TypeList<ComponentTypes...>,
  private:
   friend class SetUpBuilder<World>;
 
-  // How big a world is, worked out by SetUpBuilder from the room for each
-  // archetype.
+  // How big a world is, worked out by SetUpBuilder from how many of each
+  // archetype it holds.
   struct Configuration final {
     std::uint32_t number = 0;  // The world's instance in its Name and Identity.
     std::size_t entities = 0;  // Entity capacity.
@@ -828,14 +828,15 @@ class World<SpatialType, TypeList<ComponentTypes...>,
   std::unordered_map<Name, std::vector<Alias>> aliases_of_name_;
 };
 
-// Builds a world. The room for each archetype sizes it: the entity capacity is
-// the total, and each component's store holds the room of every archetype that
-// requires or allows the component. Start with `World::set_up()`:
+// Builds a world. How many of each archetype it holds at once sizes it: the
+// entity capacity is the total, and each component's store holds as many as
+// every archetype that requires or allows the component. Nothing is reserved
+// per archetype; capacity is pooled. Start with `World::set_up()`:
 //
 //   auto world = World::set_up()
 //                    .numbered(1)
-//                    .room_for<archetype::RedDrone>(drones)
-//                    .room_for<archetype::Track>(drones)
+//                    .holding<archetype::RedDrone>(drones)
+//                    .holding<archetype::Track>(drones)
 //                    .cells_of(250.0 * model::meter)
 //                    .build();
 template <typename WorldType>
@@ -851,13 +852,13 @@ class [[nodiscard]] SetUpBuilder final {
     return std::move(*this);
   }
 
-  // Room for `count` more entities of `ArchetypeType`. Room adds up, so a
-  // scenario can make room for each thing that creates the archetype.
+  // Holds `count` more entities of `ArchetypeType` alive at once. Holdings add
+  // up, so a scenario can count each thing that creates the archetype.
   template <Archetypal ArchetypeType>
-  SetUpBuilder room_for(std::size_t count) && {
+  SetUpBuilder holding(std::size_t count) && {
     static_assert(contains_v<ArchetypeList, ArchetypeType>,
                   "This archetype is not in the world's archetype list.");
-    room_[index_of_v<ArchetypeList, ArchetypeType>] += count;
+    holdings_[index_of_v<ArchetypeList, ArchetypeType>] += count;
     return std::move(*this);
   }
 
@@ -880,25 +881,26 @@ class [[nodiscard]] SetUpBuilder final {
     }
     typename WorldType::Configuration configuration{.number = number_,
                                                     .cell_size = cell_size_};
-    for (std::size_t room : room_) {
-      configuration.entities += room;
+    for (std::size_t holding : holdings_) {
+      configuration.entities += holding;
     }
     // Every store indexes its pool with 32 bits, with a partly filled chunk
     // per segment to spare.
     constexpr std::size_t MOST =
         std::size_t{std::numeric_limits<std::uint32_t>::max()} / 2;
     if (configuration.entities > MOST) {
-      return std::unexpected(lib::raise(
-          BuildError::CAPACITY_TOO_LARGE,
-          std::format("A world has room for at most {} entities, not {}.", MOST,
-                      configuration.entities)));
+      return std::unexpected(
+          lib::raise(BuildError::CAPACITY_TOO_LARGE,
+                     std::format("A world holds at most {} entities, not {}.",
+                                 MOST, configuration.entities)));
     }
     for_each_type(ComponentList{}, [&]<typename ComponentType>() {
       std::size_t& capacity =
           configuration.capacities[index_of_v<ComponentList, ComponentType>];
-      for (std::size_t archetype = 0; archetype < room_.size(); ++archetype) {
+      for (std::size_t archetype = 0; archetype < holdings_.size();
+           ++archetype) {
         if (WorldType::template archetype_permits<ComponentType>(archetype)) {
-          capacity += room_[archetype];
+          capacity += holdings_[archetype];
         }
       }
     });
@@ -907,7 +909,8 @@ class [[nodiscard]] SetUpBuilder final {
 
  private:
   std::uint32_t number_ = 0;
-  std::array<std::size_t, ArchetypeList::size> room_{};
+  // How many of each archetype, by its position in ArchetypeList.
+  std::array<std::size_t, ArchetypeList::size> holdings_{};
   double cell_size_ = 1.0;
 };
 

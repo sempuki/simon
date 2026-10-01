@@ -22,13 +22,13 @@ concept CanParent =
     requires(BuilderType builder) { std::move(builder).under(Entity{}); };
 
 TEST_CASE("SetUpBuilder") {
-  SECTION("ShouldSizeStoresByRoomOfArchetypesThatPermitThemGivenRoom") {
+  SECTION("ShouldSizeEachStoreByArchetypesThatPermitItGivenHoldings") {
     std::expected<TestWorld, Status> world =
         TestWorld::set_up()
             .numbered(3)
-            .room_for<Body>(5)
-            .room_for<testing::Launcher>(2)
-            .room_for<testing::Launcher>(1)  // Room adds up.
+            .holding<Body>(5)
+            .holding<testing::Launcher>(2)
+            .holding<testing::Launcher>(1)  // Holdings add up.
             .build();
 
     REQUIRE(world.has_value());
@@ -41,15 +41,15 @@ TEST_CASE("SetUpBuilder") {
   }
 
   SECTION("ShouldRefuseGivenCellSizeNotPositive") {
-    auto world = TestWorld::set_up().room_for<Body>(1).cells_of(0.0).build();
+    auto world = TestWorld::set_up().holding<Body>(1).cells_of(0.0).build();
 
     REQUIRE_FALSE(world.has_value());
     CHECK(world.error() == lib::watch(BuildError::CELL_SIZE_INVALID));
   }
 
-  SECTION("ShouldRefuseGivenMoreRoomThanAStoreCanIndex") {
+  SECTION("ShouldRefuseGivenHoldingMoreThanAStoreCanIndex") {
     auto world =
-        TestWorld::set_up().room_for<Body>(std::size_t{1} << 40).build();
+        TestWorld::set_up().holding<Body>(std::size_t{1} << 40).build();
 
     REQUIRE_FALSE(world.has_value());
     CHECK(world.error() == lib::watch(BuildError::CAPACITY_TOO_LARGE));
@@ -94,7 +94,7 @@ TEST_CASE("World") {
   }
 
   SECTION("ShouldNeverReuseNameGivenIndexReused") {
-    TestWorld tiny = *TestWorld::set_up().numbered(1).room_for<Body>(1).build();
+    TestWorld tiny = *TestWorld::set_up().numbered(1).holding<Body>(1).build();
     Entity first = *tiny.create<Body>().build();
     tiny.sync();
     REQUIRE(tiny.destroy(first).build());
@@ -339,8 +339,8 @@ TEST_CASE("World") {
     // rest of the 8 entities.
     TestWorld small = *TestWorld::set_up()
                            .numbered(1)
-                           .room_for<Body>(2)
-                           .room_for<testing::Launcher>(6)
+                           .holding<Body>(2)
+                           .holding<testing::Launcher>(6)
                            .build();
     REQUIRE(small.create<Body>().with(Health{}).build());
     REQUIRE(small.create<Body>()

@@ -1039,29 +1039,30 @@ using World = framework::World<
   std::expected<World, Status> world =
       World::set_up()
           .numbered(1)
-          .room_for<archetype::RedDrone>(drones)
-          .room_for<archetype::Track>(drones)
-          .room_for<archetype::Blast>(drones + interceptors)
+          .holding<archetype::RedDrone>(drones)
+          .holding<archetype::Track>(drones)
+          .holding<archetype::Blast>(drones + interceptors)
           .cells_of(250.0 * model::meter)
           .build();
   ```
 
-  - `room_for<A>(n)` makes room for `n` more entities of archetype `A`; room
-    adds up. The entity capacity is the total, and each component's store
-    holds the room of every archetype that requires or allows the component,
-    so `Tracked` is sized for red drones and `Radar` for radars, instead of
-    every store for every entity.
+  - `holding<A>(n)` says the world holds `n` more entities of archetype `A`
+    alive at once; holdings add up. The entity capacity is the total, and each
+    component's store holds as many as every archetype that requires or allows
+    the component, so `Tracked` is sized for red drones and `Radar` for radars,
+    instead of every store for every entity. Capacity is pooled, not reserved
+    per archetype: one archetype may use another's slack.
   - `cells_of(size)` is the spatial index's cell edge, converted with
     `coordinate_length`. About the radius of a typical query works well.
   - `build()` returns `std::expected<World, Status>` like every builder. It
-    refuses a cell size that is not positive (`CELL_SIZE_INVALID`) and more
-    room than a store's 32-bit slots can index (`CAPACITY_TOO_LARGE`).
+    refuses a cell size that is not positive (`CELL_SIZE_INVALID`) and holding
+    more than a store's 32-bit slots can index (`CAPACITY_TOO_LARGE`).
   - A world is movable, so it can live in an `expected` or an `optional`.
     Moving one leaves dangling any builder or `WorldAccess` that refers to it,
     and both are temporaries. Applications build their world in the
     `configure` phase, so a plan too big for a world fails that phase with the
-    builder's Status: missile's `world_for(scenario)` gives the room for every
-    archetype a scenario creates.
+    builder's Status: missile's `world_for(scenario)` says how many of each
+    archetype a scenario holds.
 - **The archetype list says what the world can create,** and orders each
   store's segments. It is checked against the component list at compile time:
   every archetype's components must be in it, and `create<A>()` of an archetype
