@@ -38,6 +38,30 @@ cc_library(
     ],
 )
 
+# Continuous state, an opt-in schedule element. Only simulations that
+# integrate continuous state depend on it.
+cc_library(
+    name = "continuous",
+    hdrs = ["continuous.hpp"],
+    copts = COPTS,
+    deps = [
+        ":framework",
+        "@lib//base:core",
+    ],
+)
+
+cc_test(
+    name = "continuous_test",
+    size = "small",
+    srcs = ["continuous_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":continuous",
+        ":framework",
+        "@lib//base:testing",
+    ],
+)
+
 [cc_test(
     name = test + "_test",
     size = "small",

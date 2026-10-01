@@ -613,6 +613,14 @@ auto flatten_systems(ScheduleType&& schedule) {
   }
 }
 
+// A schedule element that runs itself instead of being run per entity, such
+// as Continuous. It declares what it reads and writes as a system does.
+template <typename Type, typename WorldType>
+concept RunsItself = requires(Type& element, const Step& step,
+                              lib::InOut<WorldType> world) {
+  element.run(step, world);
+};
+
 // Runs a schedule's systems in order, applying each system's commands before
 // the next one runs. Holds one instance of each system, so systems may keep
 // state between stages and steps.
@@ -635,10 +643,7 @@ class Scheduler final {
 
   auto step(const Step& step, lib::InOut<WorldType> world) -> void {
     std::apply(
-        [&](auto&... system) {
-          ((SystemRunner::run(step, lib::InOut(system), world), world->sync()),
-           ...);
-        },
+        [&](auto&... system) { ((run(step, system, world), world->sync()), ...); },
         systems_);
   }
 
@@ -673,6 +678,17 @@ class Scheduler final {
   }
 
  private:
+  // A schedule element that runs itself, such as Continuous, or a system.
+  template <typename SystemType>
+  static auto run(const Step& step, SystemType& system,
+                  lib::InOut<WorldType> world) -> void {
+    if constexpr (RunsItself<SystemType, WorldType>) {
+      system.run(step, world);
+    } else {
+      SystemRunner::run(step, lib::InOut(system), world);
+    }
+  }
+
   template <typename... Types>
   static auto names(TypeList<Types...>) -> std::string {
     std::string text;

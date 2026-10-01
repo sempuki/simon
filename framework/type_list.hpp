@@ -117,6 +117,42 @@ struct Intersects<TypeList<Types...>, SecondType> final
 template <typename FirstType, typename SecondType>
 inline constexpr bool intersects_v = Intersects<FirstType, SecondType>::value;
 
+// `ListType` without repeats, keeping each type's first position.
+template <typename ResultType, typename ListType>
+struct Unique;
+
+template <typename ResultType>
+struct Unique<ResultType, TypeList<>> final {
+  using type = ResultType;
+};
+
+template <typename... ResultTypes, typename FirstType, typename... RestTypes>
+struct Unique<TypeList<ResultTypes...>, TypeList<FirstType, RestTypes...>>
+    final {
+  using type = typename Unique<
+      std::conditional_t<contains_v<TypeList<ResultTypes...>, FirstType>,
+                         TypeList<ResultTypes...>,
+                         TypeList<ResultTypes..., FirstType>>,
+      TypeList<RestTypes...>>::type;
+};
+
+template <typename ListType>
+using unique_t = typename Unique<TypeList<>, ListType>::type;
+
+// `ListType` without the types in `RemoveListType`.
+template <typename ListType, typename RemoveListType>
+struct Without;
+
+template <typename... Types, typename RemoveListType>
+struct Without<TypeList<Types...>, RemoveListType> final {
+  using type =
+      concatenate_t<std::conditional_t<contains_v<RemoveListType, Types>,
+                                       TypeList<>, TypeList<Types>>...>;
+};
+
+template <typename ListType, typename RemoveListType>
+using without_t = typename Without<ListType, RemoveListType>::type;
+
 // Calls `visit.template operator()<Type>()` for each type, in order.
 template <typename... Types, typename VisitorType>
 constexpr auto for_each_type(TypeList<Types...>, VisitorType&& visit) -> void {

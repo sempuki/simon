@@ -39,12 +39,16 @@
 
 namespace simon::framework {
 
-// Unlocks mutable store access. Only the scheduler, which runs systems, can
-// construct one.
+struct SystemRunner;
+struct ContinuousRunner;
+
+// Unlocks mutable store access. Only the scheduler, which runs systems, and
+// the integrator of continuous state can construct one.
 class SchedulerKey final {
  private:
   SchedulerKey() = default;
   friend struct SystemRunner;
+  friend struct ContinuousRunner;
 };
 
 // The entity database: a factory of builders (the only way to write) and a
