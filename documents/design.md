@@ -1187,6 +1187,100 @@ A run is reproducible from its scenario and seed. That requires:
   once a store is disordered) would also have to save their bookkeeping, one
   more reason archetype segments were chosen.
 
+## Using the framework well
+
+The applications are examples of how to use the framework, so they follow
+these practices, and the framework tries to make each one the easy path. They
+come from measuring the missile simulation at 100,000 drones on an idle and a
+contended machine (see [Indexes](#indexes)). At scale the simulation is bound
+by memory bandwidth, so most of them are about the bytes each entity touches
+per step.
+
+### Make components thin, and require what is always there
+
+Size a component by what systems read together, not by what it means. Split
+fields read every step from fields read rarely, and do not store data nothing
+reads, such as a copy of a value another component already holds.
+
+Archetype segments make splitting free. Components an archetype requires sit
+at the same slot of their stores, so a system reaches a required sibling
+without a lookup (see [Archetype segments](#archetype-segments)). A fat
+component used to save lookups; with segments it only costs bandwidth, because
+every system that reads one field streams the whole component.
+
+```cpp
+// Thin components an archetype requires: Steer, Integrate and the spatial index
+// each stream only what they read.
+struct Kinematics final { Position position; Velocity velocity; };
+struct Orientation final { Quaternion orientation; };   // Only where needed.
+struct Drone final : Archetype<"drone", Requires<Kinematics, Control, Health>> {};
+```
+
+### Allow only what comes and goes
+
+Put a component in `Requires` when every entity of the archetype has it for
+its whole life, and in `Allows` only when it is attached and detached during
+life. Allowed components live in a sparse segment and are reached by lookup,
+which is the right cost for something rare. `Tracked`, attached to a drone
+when it is first seen, is allowed for that reason. A component every entity
+always has, declared as allowed, costs a lookup on every step for nothing.
+
+### Let the entity being written drive the loop, and query what is near it
+
+A system writes only the entity it is called for (see
+[Relations between entities](#relations-between-entities)). Pick the driving
+component so that each entity's work is local: the entity asks an index about
+the few things near it, never "for each X, visit every Y".
+
+- **Build a small view once per step in `prepare`.** `UpdateTracks` indexes
+  the radars that scanned this step, and `ApplyBlasts` collects the step's
+  blasts, so each track or victim reads a short array or asks an index instead
+  of walking a store.
+- **Use the world's spatial index for the spatial component, and a system's
+  own `SpatialIndex` for other positions,** as `ProposeEngagements` does for
+  track estimates. Size cells near the query radius; with cells a quarter of
+  the radius, `UpdateTracks` was more than twice as slow.
+- **Invert a loop when the side being written is the side with sparse work.**
+  A sensor that visits every target in range, to change a few of them, is the
+  inverted loop: the targets that need changing should ask the sensors.
+
+### Do nothing on steps with nothing to do
+
+A system whose work is rate-gated (radar scans) or event-driven (blasts) should
+not touch every entity on the steps in between. Today a system can only return
+early from its call operator, which still walks the driving store.
+
+### Measure each system, idle and contended
+
+Time every system at the population you care about, on an idle machine and
+under `--contend=N`, over the same number of steps. Contention shows which
+systems are bandwidth-bound: at 100,000 drones, four streaming neighbors slowed
+`ScanRadars` 2.6 times but `TriggerWarheads` 12 times.
+
+### What we do not recommend
+
+Each of these trades architectural simplicity, our first goal, for gains the
+practices above already give:
+
+- Merging systems to save passes over a store.
+- Groups or orderings the user has to manage.
+- Packing several components into one struct to keep them together.
+- Giving up units or `double` for speed.
+
+### Where the applications and framework stand
+
+- **The missile simulation does not follow all of these yet.** `Kinematics`
+  carries an orientation and a stored acceleration that it does not read (112
+  bytes, of which `position` and `velocity` are 48). `Track` keeps its target,
+  estimate and engagement in one 80-byte component, although
+  `DropStaleTracks` and `ResolveEngagements` each read 16 bytes of it every
+  step. `ScanRadars` visits every entity within 4 km of every scanning radar
+  and looks up two components for each, instead of untracked drones asking an
+  index of the radars that scanned.
+- **Framework support to add:** a `prepare` stage that can skip the loop on
+  steps with nothing to do, and a report in the benchmarks of the bytes each
+  system touches per entity, from the sizes of the components it names.
+
 ## Extensible edges
 
 Large simulations connect to other input formats and co-simulators, so we
