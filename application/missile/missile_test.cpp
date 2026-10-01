@@ -26,7 +26,7 @@ struct Run final {
 
 Run run(Scenario scenario) {
   Simulation simulation{scenario};
-  engine::BatchDriver driver{lib::Depend<Simulation>{simulation},
+  engine::BatchDriver driver{lib::Depend(simulation),
                              engine::Timing{.max_step = DT}};
   auto end = driver.run(TimePoint{10min});
   REQUIRE(end);
@@ -53,7 +53,8 @@ Entity make_drone(lib::InOut<World> world, Position position,
               .with(Warhead{.fuse = 30.0 * model::meter,
                             .radius = 100.0 * model::meter,
                             .damage = 10.0})
-              .with(RedDrone{.target = target})
+              .with(Target{.entity = target})
+              .with(RedDrone{})
               .build();
 }
 
@@ -87,8 +88,8 @@ Entity make_interceptor(lib::InOut<World> world, Position position,
               .with(Kinematics{.position = position})
               .with(Control{})
               .with(InterceptorDesign{}.warhead)
+              .with(Target{.entity = target})
               .with(Interceptor{
-                  .target = target,
                   .speed = 150.0 * model::meter_per_second,
                   .agility = 300.0 * model::meter_per_second_squared,
                   .seeker_range = 1000.0 * model::meter,
@@ -151,7 +152,10 @@ TEST_CASE("MissileSimulation") {
     CHECK(owners_of<Radar>(world).size() == 12u);
     // Each drone flies at the asset of the site it spawned in, which is the
     // nearest asset: sites are 20 km apart and drones spawn within 6.5 km.
-    world.store_of<RedDrone>().for_each([&](Entity drone, const RedDrone& red) {
+    world.store_of<Target>().for_each([&](Entity drone, const Target& target) {
+      if (!world.store_of<RedDrone>().contains(drone)) {
+        return;
+      }
       const Position& at =
           world.store_of<Kinematics>().component_of(drone).position;
       Entity nearest = assets.front();
@@ -162,7 +166,7 @@ TEST_CASE("MissileSimulation") {
         };
         nearest = distance_to(asset) < distance_to(nearest) ? asset : nearest;
       }
-      CHECK(red.target == nearest);
+      CHECK(target.entity == nearest);
     });
   }
 }
@@ -283,8 +287,7 @@ TEST_CASE("Engaging") {
     Entity launcher = *world.parent_of(interceptor);
     CHECK(world.store_of<Kinematics>().component_of(launcher).position ==
           model::meters(50.0, 0.0, 0.0));
-    CHECK(world.store_of<Interceptor>().component_of(interceptor).target ==
-          drone);
+    CHECK(world.store_of<Target>().component_of(interceptor).entity == drone);
   }
 
   SECTION("ShouldWaitForReloadGivenSecondTrack") {
@@ -331,8 +334,7 @@ TEST_CASE("GuideInterceptors") {
 
     step(scheduler, lib::InOut(world), TimePoint{});
 
-    CHECK(world.store_of<Interceptor>().component_of(interceptor).target ==
-          near);
+    CHECK(world.store_of<Target>().component_of(interceptor).entity == near);
   }
 
   SECTION("ShouldSelfDestructGivenNoDroneInSeekerRange") {

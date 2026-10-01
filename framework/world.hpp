@@ -150,13 +150,13 @@ class World<SpatialType, TypeList<ComponentTypes...>,
     static_assert(contains_v<ArchetypeList, ArchetypeType>,
                   "This archetype is not in the world's archetype list.");
     return CreateBuilder<World, ArchetypeType, true>{
-        lib::Depend<World>{*this}, std::move(alias), std::nullopt, {}};
+        lib::Depend(*this), std::move(alias), std::nullopt, {}};
   }
   auto change(Entity entity) {
-    return ChangeBuilder<World>{lib::Depend<World>{*this}, entity, {}, {}};
+    return ChangeBuilder<World>{lib::Depend(*this), entity, {}, {}};
   }
   auto destroy(Entity entity) {
-    return DestroyBuilder<World>{lib::Depend<World>{*this}, entity};
+    return DestroyBuilder<World>{lib::Depend(*this), entity};
   }
 
   // Applies every pending command, in the order it was recorded. Builders

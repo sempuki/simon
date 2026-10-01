@@ -245,7 +245,7 @@ TEST_CASE("System") {
     Entity placed = *world.create<Body>().with(Position{2.0}).build();
     world.sync();
 
-    WorldAccess<Chase, TestWorld> access{lib::Depend<TestWorld>{world}};
+    WorldAccess<Chase, TestWorld> access{lib::Depend(world)};
 
     CHECK(access.component_of<Position>(placed).x == 2.0);
     CHECK(access.try_component_of<Position>(bare) == nullptr);

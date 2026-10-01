@@ -147,8 +147,8 @@ inline Entity build_scenario(lib::InOut<World> world,
                        .with(Control{})
                        .with(Health{.points = 1.0})
                        .with(scenario.drone_warhead)
-                       .with(RedDrone{.target = *asset,
-                                      .cruise = scenario.drone_cruise,
+                       .with(Target{.entity = *asset})
+                       .with(RedDrone{.cruise = scenario.drone_cruise,
                                       .agility = scenario.drone_agility})
                        .build();
       CHECK_POSTCONDITION(drone.has_value());

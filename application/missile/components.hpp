@@ -49,8 +49,14 @@ struct Blast final {
   Name source;  // The warhead's entity.
 };
 
+// What an entity flies at: the asset for a red drone, the drone for an
+// interceptor. A sibling both archetypes require, so a system that needs only
+// the target, such as TriggerWarheads, reads 8 bytes.
+struct Target final {
+  Entity entity;
+};
+
 struct RedDrone final {
-  Entity target;  // The asset it flies at.
   Speed cruise = 0.0 * model::meter_per_second;
   AccelerationMagnitude agility = 0.0 * model::meter_per_second_squared;
 };
@@ -97,7 +103,6 @@ struct Launcher final {
 };
 
 struct Interceptor final {
-  Entity target;  // The red drone it homes on.
   double navigation_gain = 4.0;
   Speed speed = 0.0 * model::meter_per_second;
   AccelerationMagnitude agility = 0.0 * model::meter_per_second_squared;
@@ -111,33 +116,38 @@ using framework::Allows;
 using framework::Archetype;
 using framework::Requires;
 
-struct Asset final
-    : Archetype<"asset", Requires<Kinematics, Health, missile::Asset>> {};
-struct Radar final : Archetype<"radar", Requires<Kinematics, missile::Radar>> {
-};
-struct Launcher final
-    : Archetype<"launcher", Requires<Kinematics, missile::Launcher>> {};
-struct RedDrone final
-    : Archetype<
-          "red drone",
-          Requires<Kinematics, Control, Health, Warhead, missile::RedDrone>,
-          Allows<Tracked>> {};
-struct Interceptor final
-    : Archetype<"interceptor",
-                Requires<Kinematics, Control, Warhead, missile::Interceptor>> {
-};
-struct Track final
-    : Archetype<"track", Requires<missile::Track, Estimate, Engagement>> {};
-struct Blast final : Archetype<"blast", Requires<Kinematics, missile::Blast>> {
-};
+struct Asset final        //
+    : Archetype<"asset",  //
+                Requires<Kinematics, Health, missile::Asset>> {};
+struct Radar final        //
+    : Archetype<"radar",  //
+                Requires<Kinematics, missile::Radar>> {};
+struct Launcher final        //
+    : Archetype<"launcher",  //
+                Requires<Kinematics, missile::Launcher>> {};
+struct RedDrone final         //
+    : Archetype<"red drone",  //
+                Requires<Kinematics, Control, Health, Warhead, Target,
+                         missile::RedDrone>,
+                Allows<Tracked>> {};
+struct Interceptor final        //
+    : Archetype<"interceptor",  //
+                Requires<Kinematics, Control, Warhead, Target,
+                         missile::Interceptor>> {};
+struct Track final        //
+    : Archetype<"track",  //
+                Requires<missile::Track, Estimate, Engagement>> {};
+struct Blast final        //
+    : Archetype<"blast",  //
+                Requires<Kinematics, missile::Blast>> {};
 
 }  // namespace archetype
 
 using World = framework::World<
     Kinematics,
-    framework::TypeList<Control, Health, Warhead, Blast, RedDrone, Tracked,
-                        Asset, Radar, Track, Estimate, Engagement, Launcher,
-                        Interceptor>,
+    framework::TypeList<Control, Health, Warhead, Blast, Target, RedDrone,
+                        Tracked, Asset, Radar, Track, Estimate, Engagement,
+                        Launcher, Interceptor>,
     framework::TypeList<archetype::Asset, archetype::Radar, archetype::Launcher,
                         archetype::RedDrone, archetype::Interceptor,
                         archetype::Track, archetype::Blast>>;

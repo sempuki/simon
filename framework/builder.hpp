@@ -85,7 +85,7 @@ class [[nodiscard]] CreateBuilder final {
     requires CanParent
   {
     return CreateBuilder<WorldType, ArchetypeType, false>{
-        lib::Depend<WorldType>{*world_}, std::move(alias_), parent, {}};
+        lib::Depend(*world_), std::move(alias_), parent, {}};
   }
 
   // Declares a component the entity starts with.
@@ -105,7 +105,7 @@ class [[nodiscard]] CreateBuilder final {
                   "The entity already starts with this component.");
     return CreateBuilder<WorldType, ArchetypeType, false, InitialTypes...,
                          ComponentType>{
-        lib::Depend<WorldType>{*world_}, std::move(alias_), parent_,
+        lib::Depend(*world_), std::move(alias_), parent_,
         std::tuple_cat(
             std::move(components_),
             std::tuple<ComponentType>{std::forward<ArgumentType>(component)})};
@@ -157,7 +157,7 @@ ChangeBuilder<WorldType, TypeList<AttachedTypes...>, TypeList<DetachedTypes...>,
     check_component<ComponentType>();
     return ChangeBuilder<WorldType, TypeList<AttachedTypes..., ComponentType>,
                          TypeList<DetachedTypes...>, Aliasing>{
-        lib::Depend<WorldType>{*world_}, entity_,
+        lib::Depend(*world_), entity_,
         std::tuple_cat(
             std::move(components_),
             std::tuple<ComponentType>{std::forward<ArgumentType>(component)}),
@@ -170,7 +170,7 @@ ChangeBuilder<WorldType, TypeList<AttachedTypes...>, TypeList<DetachedTypes...>,
     check_component<ComponentType>();
     return ChangeBuilder<WorldType, TypeList<AttachedTypes...>,
                          TypeList<DetachedTypes..., ComponentType>, Aliasing>{
-        lib::Depend<WorldType>{*world_}, entity_, std::move(components_),
+        lib::Depend(*world_), entity_, std::move(components_),
         std::move(aliases_)};
   }
 
@@ -179,7 +179,7 @@ ChangeBuilder<WorldType, TypeList<AttachedTypes...>, TypeList<DetachedTypes...>,
     aliases_.given.push_back(std::move(alias));
     return ChangeBuilder<WorldType, TypeList<AttachedTypes...>,
                          TypeList<DetachedTypes...>, true>{
-        lib::Depend<WorldType>{*world_}, entity_, std::move(components_),
+        lib::Depend(*world_), entity_, std::move(components_),
         std::move(aliases_)};
   }
 
@@ -188,7 +188,7 @@ ChangeBuilder<WorldType, TypeList<AttachedTypes...>, TypeList<DetachedTypes...>,
     aliases_.taken.push_back(std::move(alias));
     return ChangeBuilder<WorldType, TypeList<AttachedTypes...>,
                          TypeList<DetachedTypes...>, true>{
-        lib::Depend<WorldType>{*world_}, entity_, std::move(components_),
+        lib::Depend(*world_), entity_, std::move(components_),
         std::move(aliases_)};
   }
 

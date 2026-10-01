@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
     scenario.seed = std::strtoull(argv[1], nullptr, 10);
   }
   missile::Simulation simulation{scenario};
-  engine::BatchDriver driver{lib::Depend<missile::Simulation>{simulation},
+  engine::BatchDriver driver{lib::Depend(simulation),
                              engine::Timing{.max_step = 10ms}};
 
   auto reached = driver.run(framework::TimePoint{10min});

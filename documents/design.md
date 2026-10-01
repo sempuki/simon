@@ -36,7 +36,10 @@ and handle rules are the point of the project.
 |---|---|---|
 | `Out<T>` | writes the argument, and may ignore it | `parse(text, Out(result))` |
 | `InOut<T>` | reads and writes the argument | `scheduler.step(InOut(world), step)` |
-| `Depend<T>` | keeps a reference that can dangle | `WorldAccess{Depend<World>{world}}` |
+| `Depend<T>` | keeps a reference that can dangle | `BatchDriver{Depend(simulation), timing}` |
+
+Call sites use the constructor function, `Out(x)`, `InOut(x)` or `Depend(x)`,
+and let it deduce the type; only parameters name it.
 
 A plain `T&` parameter is only for what the language or the framework decides:
 operators, and a system's call operator, whose entity-components arrive by
@@ -1321,14 +1324,19 @@ prints it beside each system's time:
 
 | System | B/entity | System | B/entity |
 |---|---:|---|---:|
-| `SteerRedDrones` | 104 | `TriggerWarheads` | 152 |
+| `SteerRedDrones` | 104 | `TriggerWarheads` | 88 |
 | `Integrate` | 80 | `DropStaleTracks` | 24 |
 | `DetectDrones` | 88 | `ResolveEngagements` | 72 |
 
-`TriggerWarheads` names both `Interceptor` (48 bytes) and `RedDrone` (24),
-because either holds a warhead's target. For a drone the interceptor is absent,
-so it reads about 104 bytes; a `Target` component both archetypes require would
-make it 88 and remove the either-or.
+`TriggerWarheads` first named both `Interceptor` (48 bytes) and `RedDrone`
+(24), because either held a warhead's target, so its report said 152. A
+`Target` component that both archetypes require now holds it, and the system
+names `Warhead`, `Kinematics` and `Target`: 88 bytes. Its time did not change
+(0.57 to 0.60 ms per step at 100,000 drones, within noise). The runner already
+passed a null `Interceptor` to drones without reading it, so the drone loop
+read about 104 bytes before; most of the remaining time is each drone looking
+up its target's `Kinematics`. The gain is a simpler system and one less copy of
+the target.
 
 ## Extensible edges
 
@@ -1647,7 +1655,8 @@ Components (`application/missile/components.hpp`):
 | `Health` | Hit points |
 | `Warhead` | Fuse distance, blast radius, damage |
 | `Blast` | Radius, damage, the warhead's Name; lives for one step |
-| `RedDrone` | Target entity (the asset), cruise speed, agility |
+| `Target` | What a red drone (the asset) or an interceptor (a drone) flies at |
+| `RedDrone` | Cruise speed, agility |
 | `Tracked` | Marks a red drone that has a track, and names the track |
 | `Asset` | Marks the protected asset |
 | `Radar` | Range, a `RateGate` for the scan, whether it scanned this step |
@@ -1655,7 +1664,7 @@ Components (`application/missile/components.hpp`):
 | `Estimate` | A track's estimated position and velocity |
 | `Engagement` | The launcher engaging a track, if any, and until when |
 | `Launcher` | Range, inventory, reload time, ready time, this step's proposal |
-| `Interceptor` | Target entity, navigation gain, speed, agility, seeker range, flight time |
+| `Interceptor` | Navigation gain, speed, agility, seeker range, flight time |
 
 Each component has an archetype in `missile::archetype` (asset, radar,
 launcher, red drone, interceptor, track, blast).

@@ -355,7 +355,7 @@ struct SystemRunner final {
                   "reading an array partway through writing it depends on "
                   "iteration order.");
 
-    WorldAccess<SystemType, WorldType> access{lib::Depend<WorldType>{*world}};
+    WorldAccess<SystemType, WorldType> access{lib::Depend(*world)};
     // A prepare stage that returns false skips the per-entity loop, for steps
     // with nothing to do.
     bool proceed =

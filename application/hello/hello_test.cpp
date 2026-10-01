@@ -82,7 +82,7 @@ TEST_CASE("HelloSimulation") {
 
   SECTION("ShouldStopAtFirstCollisionGivenBatchRun") {
     Simulation simulation;
-    engine::BatchDriver driver{lib::Depend<Simulation>{simulation}, timing};
+    engine::BatchDriver driver{lib::Depend(simulation), timing};
 
     auto reached = driver.run(framework::TimePoint{60s});
 
@@ -94,8 +94,8 @@ TEST_CASE("HelloSimulation") {
   SECTION("ShouldEndAtSameTimeAndPlaceGivenTwoRuns") {
     Simulation first;
     Simulation second;
-    engine::BatchDriver first_driver{lib::Depend<Simulation>{first}, timing};
-    engine::BatchDriver second_driver{lib::Depend<Simulation>{second}, timing};
+    engine::BatchDriver first_driver{lib::Depend(first), timing};
+    engine::BatchDriver second_driver{lib::Depend(second), timing};
 
     auto first_end = first_driver.run(framework::TimePoint{60s});
     auto second_end = second_driver.run(framework::TimePoint{60s});

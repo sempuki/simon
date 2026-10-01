@@ -352,8 +352,8 @@ struct LaunchInterceptors final : System<Launcher, const Kinematics> {
                              .velocity = velocity})
             .with(Control{})
             .with(design.warhead)
-            .with(Interceptor{.target = track->target,
-                              .navigation_gain = design.navigation_gain,
+            .with(Target{.entity = track->target})
+            .with(Interceptor{.navigation_gain = design.navigation_gain,
                               .speed = design.speed,
                               .agility = design.agility,
                               .seeker_range = design.seeker_range,
@@ -377,14 +377,15 @@ using Engaging =
 // is gone, retargets the nearest red drone within seeker range, or
 // self-destructs. Also self-destructs when its flight time runs out.
 struct GuideInterceptors final
-    : System<Interceptor, const Kinematics, Control> {
+    : System<const Interceptor, const Kinematics, Control, Target> {
   using LocalWorld = WorldAccess<GuideInterceptors>;
   using SequenceAfterSystemList = SystemList<LaunchInterceptors>;
   using AllowComponentList = TypeList<Kinematics, RedDrone>;
 
-  void operator()(LocalWorld& world, Entity self, Interceptor& interceptor,
-                  const Kinematics* kinematics, Control* control, Step step) {
-    if (!kinematics || !control) {
+  void operator()(LocalWorld& world, Entity self,
+                  const Interceptor& interceptor, const Kinematics* kinematics,
+                  Control* control, Target* target_of, Step step) {
+    if (!kinematics || !control || !target_of) {
       return;
     }
     if (step.time >= interceptor.expires_at) {
@@ -393,9 +394,9 @@ struct GuideInterceptors final
       return;
     }
     const Kinematics* target =
-        world.try_component_of<Kinematics>(interceptor.target);
+        world.try_component_of<Kinematics>(target_of->entity);
     if (!target) {
-      target = retarget(interceptor, *kinematics, world);
+      target = retarget(interceptor, *kinematics, *target_of, world);
     }
     if (!target) {
       auto destroyed = world.destroy(self).build();
@@ -411,9 +412,9 @@ struct GuideInterceptors final
   }
 
  private:
-  static const Kinematics* retarget(Interceptor& interceptor,
+  static const Kinematics* retarget(const Interceptor& interceptor,
                                     const Kinematics& kinematics,
-                                    LocalWorld& world) {
+                                    Target& target, LocalWorld& world) {
     std::optional<Entity> nearest = world.nearest(
         kinematics, interceptor.seeker_range,
         [&](Entity candidate, const Kinematics&) {
@@ -422,24 +423,26 @@ struct GuideInterceptors final
     if (!nearest) {
       return nullptr;
     }
-    interceptor.target = *nearest;
+    target.entity = *nearest;
     return &world.component_of<Kinematics>(*nearest);
   }
 };
 
 // Red drones steer at their target at cruise speed.
 struct SteerRedDrones final
-    : System<const RedDrone, const Kinematics, Control> {
+    : System<const RedDrone, const Kinematics, Control, const Target> {
   using LocalWorld = WorldAccess<SteerRedDrones>;
   using AllowComponentList = TypeList<Kinematics>;
 
   void operator()(LocalWorld& world, Entity, const RedDrone& drone,
-                  const Kinematics* kinematics, Control* control) {
-    if (!kinematics || !control) {
+                  const Kinematics* kinematics, Control* control,
+                  const Target* target_of) {
+    if (!kinematics || !control || !target_of) {
       return;
     }
     constexpr Rate RESPONSE = 1.0 * model::per_second;
-    const Kinematics* target = world.try_component_of<Kinematics>(drone.target);
+    const Kinematics* target =
+        world.try_component_of<Kinematics>(target_of->entity);
     control->acceleration =
         target ? model::limit(model::steer_toward(*kinematics, target->position,
                                                   drone.cruise, RESPONSE),
@@ -452,20 +455,16 @@ struct SteerRedDrones final
 
 // A warhead within its fuse distance of its target detonates: it creates a
 // Blast and destroys itself.
-struct TriggerWarheads final : System<const Warhead, const Kinematics,
-                                      const Interceptor, const RedDrone> {
+struct TriggerWarheads final
+    : System<const Warhead, const Kinematics, const Target> {
   using LocalWorld = WorldAccess<TriggerWarheads>;
   using SequenceAfterSystemList = SystemList<model::Integrate>;
   using AllowComponentList = TypeList<Kinematics>;
 
   void operator()(LocalWorld& world, Entity self, const Warhead& warhead,
-                  const Kinematics* kinematics, const Interceptor* interceptor,
-                  const RedDrone* drone) {
-    Entity target = interceptor ? interceptor->target
-                    : drone     ? drone->target
-                                : Entity{};
+                  const Kinematics* kinematics, const Target* target) {
     const Kinematics* target_kinematics =
-        world.try_component_of<Kinematics>(target);
+        target ? world.try_component_of<Kinematics>(target->entity) : nullptr;
     if (!kinematics || !target_kinematics ||
         distance(*kinematics, *target_kinematics) > warhead.fuse) {
       return;

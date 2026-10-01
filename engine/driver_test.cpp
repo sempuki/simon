@@ -79,7 +79,7 @@ std::vector<Duration> step_lengths(const Recorder& recorder) {
 
 TEST_CASE("Driver") {
   Recorder recorder;
-  Driver driver{lib::Depend<Recorder>{recorder}, Timing{.max_step = 30ms}};
+  Driver driver{lib::Depend(recorder), Timing{.max_step = 30ms}};
 
   SECTION("ShouldLandExactlyOnTargetGivenStepNotDividingIt") {
     REQUIRE(driver.start());
@@ -107,7 +107,7 @@ TEST_CASE("Driver") {
 
 TEST_CASE("BatchDriver") {
   Recorder recorder;
-  BatchDriver driver{lib::Depend<Recorder>{recorder}, Timing{.max_step = 10ms}};
+  BatchDriver driver{lib::Depend(recorder), Timing{.max_step = 10ms}};
 
   SECTION("ShouldRunLifecycleInOrderGivenRunToEnd") {
     auto reached = driver.run(TimePoint{50ms});
@@ -154,7 +154,7 @@ TEST_CASE("BatchDriver") {
 TEST_CASE("RealTimeDriver") {
   Recorder recorder;
   FakeClock::current = FakeClock::time_point{};
-  RealTimeDriver<Recorder, FakeClock> driver{lib::Depend<Recorder>{recorder},
+  RealTimeDriver<Recorder, FakeClock> driver{lib::Depend(recorder),
                                              Timing{.max_step = 20ms}, 2.0};
 
   SECTION("ShouldTakeOnlyWholeStepsGivenWallTimeBetweenSteps") {
@@ -177,8 +177,7 @@ TEST_CASE("RealTimeDriver") {
       REQUIRE(driver.tick() == Flow::CONTINUE);
     }
     Recorder batch_recorder;
-    BatchDriver batch{lib::Depend<Recorder>{batch_recorder},
-                      Timing{.max_step = 20ms}};
+    BatchDriver batch{lib::Depend(batch_recorder), Timing{.max_step = 20ms}};
     REQUIRE(batch.run(driver.driver().now()));
 
     REQUIRE(recorder.steps.size() == batch_recorder.steps.size());

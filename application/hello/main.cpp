@@ -64,7 +64,7 @@ int main(int, char**) {
   // Simulator: 10 ms steps, paced to the wall clock at five times real time.
   hello::Simulation simulation;
   engine::RealTimeDriver driver{
-      lib::Depend<hello::Simulation>{simulation},
+      lib::Depend(simulation),
       engine::Timing{.max_step = std::chrono::milliseconds{10}}, 5.0};
 
   bool done = false;
