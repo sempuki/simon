@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <vector>
 
 #include "model/units.hpp"
 
@@ -63,5 +65,46 @@ inline auto standard_air(Length altitude) -> Air {
                         meter_per_second,
   };
 }
+
+// The standard atmosphere, tabulated every `spacing` from sea level to 20 km
+// and interpolated linearly. Much cheaper than standard_air, which takes a
+// power or an exponential, and within a few parts in 10^5 of it at the default
+// 100 m. Altitudes outside the table get the air at its ends.
+class StandardAirTable final {
+ public:
+  explicit StandardAirTable(Length spacing = 100.0 * meter)
+      : spacing_{spacing.numerical_value_in(meter)} {
+    auto points = static_cast<std::size_t>(
+                      std::ceil(internal::CEILING / spacing_)) +
+                  1;
+    density_.reserve(points);
+    sound_.reserve(points);
+    for (std::size_t i = 0; i < points; ++i) {
+      Air air = standard_air(static_cast<double>(i) * spacing_ * meter);
+      density_.push_back(
+          air.density.numerical_value_in(kilogram_per_cubic_meter));
+      sound_.push_back(air.speed_of_sound.numerical_value_in(meter_per_second));
+    }
+  }
+
+  auto operator()(Length altitude) const -> Air {
+    double position = std::clamp(altitude.numerical_value_in(meter) / spacing_,
+                                 0.0, static_cast<double>(density_.size() - 1));
+    auto i = std::min(static_cast<std::size_t>(position), density_.size() - 2);
+    double weight = position - static_cast<double>(i);
+    return Air{
+        .density = (density_[i] + (density_[i + 1] - density_[i]) * weight) *
+                   kilogram_per_cubic_meter,
+        .speed_of_sound =
+            (sound_[i] + (sound_[i + 1] - sound_[i]) * weight) *
+            meter_per_second,
+    };
+  }
+
+ private:
+  double spacing_;
+  std::vector<double> density_;
+  std::vector<double> sound_;
+};
 
 }  // namespace simon::model

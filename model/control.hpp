@@ -43,6 +43,31 @@ auto approach(const ValueType& value, const ValueType& target,
   return value + std::clamp(target - value, -most, most);
 }
 
+// A proportional-integral controller's gains and output limits. The integral
+// is the caller's state.
+struct PiGains final {
+  double proportional = 0.0;
+  double integral = 0.0;  // Per second.
+  double low = 0.0;       // The lowest output.
+  double high = 1.0;      // The highest output.
+};
+
+// The output of a PI controller for `error`, integrating over `dt` into
+// `integral`. The integral stops growing while the output is held at a limit
+// in the error's direction, so it does not wind up.
+inline auto pi_control(double error, const PiGains& gains, Time dt,
+                       lib::InOut<double> integral) -> double {
+  double unlimited = gains.proportional * error + *integral;
+  bool saturated = (unlimited >= gains.high && error > 0.0) ||
+                   (unlimited <= gains.low && error < 0.0);
+  if (!saturated) {
+    *integral += gains.integral * error * dt.numerical_value_in(second);
+    *integral = std::clamp(*integral, gains.low, gains.high);
+  }
+  return std::clamp(gains.proportional * error + *integral, gains.low,
+                    gains.high);
+}
+
 // A function of one variable, linear between breakpoints and constant beyond
 // the first and last. Breakpoints must be strictly increasing.
 class Table1 final {

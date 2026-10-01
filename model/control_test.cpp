@@ -55,6 +55,30 @@ TEST_CASE("Approach") {
   }
 }
 
+TEST_CASE("PiControl") {
+  PiGains gains{.proportional = 0.5, .integral = 0.1, .low = 0.0, .high = 1.0};
+
+  SECTION("ShouldAddProportionalAndIntegralGivenSmallError") {
+    double integral = 0.2;
+    double output = pi_control(0.4, gains, 1.0 * second, lib::InOut(integral));
+    CHECK_THAT(integral, WithinAbs(0.24, 1e-12));
+    CHECK_THAT(output, WithinAbs(0.44, 1e-12));
+  }
+
+  SECTION("ShouldHoldIntegralGivenOutputAtLimit") {
+    double integral = 0.9;
+    double output = pi_control(2.0, gains, 1.0 * second, lib::InOut(integral));
+    CHECK(output == 1.0);
+    CHECK(integral == 0.9);
+  }
+
+  SECTION("ShouldUnwindGivenErrorAwayFromLimit") {
+    double integral = 0.9;
+    pi_control(-1.0, gains, 1.0 * second, lib::InOut(integral));
+    CHECK_THAT(integral, WithinAbs(0.8, 1e-12));
+  }
+}
+
 TEST_CASE("Table1") {
   Table1 table{{0.0, 1.0, 3.0}, {0.0, 10.0, 30.0}};
 

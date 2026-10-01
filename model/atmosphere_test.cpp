@@ -41,4 +41,28 @@ TEST_CASE("StandardAir") {
   }
 }
 
+TEST_CASE("StandardAirTable") {
+  StandardAirTable table;
+
+  SECTION("ShouldMatchStandardAirGivenAnyAltitude") {
+    for (double altitude = 0.0; altitude <= 20000.0; altitude += 37.0) {
+      Air exact = standard_air(altitude * meter);
+      Air tabulated = table(altitude * meter);
+      CHECK_THAT(
+          tabulated.density.numerical_value_in(kilogram_per_cubic_meter),
+          WithinRel(exact.density.numerical_value_in(kilogram_per_cubic_meter),
+                    1e-4));
+      CHECK_THAT(
+          tabulated.speed_of_sound.numerical_value_in(meter_per_second),
+          WithinRel(exact.speed_of_sound.numerical_value_in(meter_per_second),
+                    1e-4));
+    }
+  }
+
+  SECTION("ShouldClampGivenAltitudeOutsideTable") {
+    CHECK(table(-100.0 * meter).density == table(0.0 * meter).density);
+    CHECK(table(25000.0 * meter).density == table(20000.0 * meter).density);
+  }
+}
+
 }  // namespace simon::model
