@@ -108,6 +108,16 @@ struct Count final : System<const Health> {
 
 }  // namespace
 
+TEST_CASE("BytesPerEntity") {
+  SECTION("ShouldCountOwnerAndNamedComponentsGivenSystem") {
+    // Integrate names Position and const Velocity.
+    STATIC_CHECK(bytes_per_entity_v<Integrate> ==
+                 sizeof(Entity) + sizeof(Position) + sizeof(Velocity));
+    // Cull names only const Health.
+    STATIC_CHECK(bytes_per_entity_v<Cull> == sizeof(Entity) + sizeof(Health));
+  }
+}
+
 TEST_CASE("System") {
   TestWorld world{testing::small_world()};
 

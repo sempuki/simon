@@ -163,6 +163,23 @@ template <typename SystemType>
 using read_list_of_t =
     typename ReadListOf<declared_list_of_t<SystemType>>::type;
 
+template <typename ListType>
+struct BytesOf;
+
+template <typename... Types>
+struct BytesOf<TypeList<Types...>> final {
+  static constexpr std::size_t value = (sizeof(Types) + ... + 0);
+};
+
+// The bytes a system's per-entity loop can read for each entity: the owner,
+// the driving component and every other component it names. An upper bound:
+// a sibling the entity's archetype cannot have costs nothing, and one it only
+// allows also costs an index entry. Reads of other entities through
+// WorldAccess come on top.
+template <typename SystemType>
+inline constexpr std::size_t bytes_per_entity_v =
+    sizeof(Entity) + BytesOf<declared_list_of_t<SystemType>>::value;
+
 // Whether every system `SystemType` must run after that is in `ListType` comes
 // earlier in it.
 template <typename ListType, typename SystemType>

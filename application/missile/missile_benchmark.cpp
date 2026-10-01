@@ -8,7 +8,9 @@
 // Each scenario spawns its drones inside radar and launcher range, so
 // sensing, engagement, guidance and blasts all run from the first steps.
 // Sites (each with its asset, radars, launchers and 1,000 drones) scale with
-// the drones, so density stays the same. --contend runs one thread per spare
+// the drones, so density stays the same. Each system's line ends with the
+// bytes its loop can read per entity, from the sizes of the components it
+// names (framework::bytes_per_entity_v). --contend runs one thread per spare
 // core streaming over a large buffer, to compete for shared cache and memory
 // bandwidth as a busy cloud host would; --contend=N runs N. Each system runs in
 // its own single-system scheduler, in schedule order, against one world; that
@@ -75,6 +77,14 @@ std::array<std::string, sizeof...(SystemTypes)> names_of(
   return {short_name(lib::to_type_string<SystemTypes>())...};
 }
 
+// What each system's per-entity loop can read for each entity; see
+// framework::bytes_per_entity_v.
+template <typename... SystemTypes>
+std::array<std::size_t, sizeof...(SystemTypes)> bytes_of(
+    framework::TypeList<SystemTypes...>) {
+  return {framework::bytes_per_entity_v<SystemTypes>...};
+}
+
 void measure(int drones, int maximum_steps, bool budgeted) {
   using List = Scheduler::FlattenedSystemList;
   constexpr std::size_t SYSTEM_COUNT = List::size;
@@ -122,10 +132,11 @@ void measure(int drones, int maximum_steps, bool budgeted) {
                1e3 * total / std::max(steps, 1),
                1e9 * total / std::max<double>(entity_steps, 1));
   auto names = names_of(List{});
+  auto bytes = bytes_of(List{});
   for (std::size_t i = 0; i < SYSTEM_COUNT; ++i) {
-    std::println("  {:<20} {:10.3f} ms/step {:6.1f}%", names[i],
+    std::println("  {:<20} {:10.3f} ms/step {:6.1f}% {:6} B/entity", names[i],
                  1e3 * seconds[i] / std::max(steps, 1),
-                 total > 0.0 ? 100.0 * seconds[i] / total : 0.0);
+                 total > 0.0 ? 100.0 * seconds[i] / total : 0.0, bytes[i]);
   }
 }
 

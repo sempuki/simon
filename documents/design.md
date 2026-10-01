@@ -1258,7 +1258,8 @@ bool prepare(LocalWorld& world) { return radars_.collect(world); }
 ### Measure each system, idle and contended
 
 Time every system at the population you care about, on an idle machine and
-under `--contend=N`, over the same number of steps. Contention shows which
+under `--contend=N`, over the same number of steps, and check the bytes each
+loop reads per entity (`framework::bytes_per_entity_v`). Contention shows which
 systems are bandwidth-bound: at 100,000 drones, four streaming neighbors slowed
 `ScanRadars` 2.6 times but `TriggerWarheads` 12 times.
 
@@ -1312,8 +1313,22 @@ is freed only at the next sync. At ten sites the first scan ran out of entity
 capacity and silently tracked 5,000 of 10,000 drones. Each drone now creates at
 most one track.
 
-Still to add to the framework: a report in the benchmarks of the bytes each
-system touches per entity, from the sizes of the components it names.
+`framework::bytes_per_entity_v<System>` gives the bytes a system's loop can
+read per entity: the owner, the driving component and every other component it
+names. It is an upper bound, since a sibling the entity's archetype cannot have
+costs nothing, and reads of other entities come on top. `missile_benchmark`
+prints it beside each system's time:
+
+| System | B/entity | System | B/entity |
+|---|---:|---|---:|
+| `SteerRedDrones` | 104 | `TriggerWarheads` | 152 |
+| `Integrate` | 80 | `DropStaleTracks` | 24 |
+| `DetectDrones` | 88 | `ResolveEngagements` | 72 |
+
+`TriggerWarheads` names both `Interceptor` (48 bytes) and `RedDrone` (24),
+because either holds a warhead's target. For a drone the interceptor is absent,
+so it reads about 104 bytes; a `Target` component both archetypes require would
+make it 88 and remove the either-or.
 
 ## Extensible edges
 
@@ -1765,7 +1780,7 @@ Each step ends with a working application and passing tests.
    - Done: missile follows the practices in
      [Using the framework well](#using-the-framework-well): 2.2 times faster
      idle and 7.7 times faster under contention at 100,000 drones.
-   - Next: report the bytes each system touches per entity.
+   - Done: `bytes_per_entity_v`, reported per system by `missile_benchmark`.
    Consider struct-of-arrays layout inside hot components only if measurements
    call for it.
 
