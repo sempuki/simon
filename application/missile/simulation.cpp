@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <numbers>
 #include <optional>
 
@@ -49,11 +50,19 @@ auto SiteBuilder::build() && -> std::expected<Entity, framework::Status> {
   for (std::size_t i = 0; i < radars_.count; ++i) {
     double bearing =
         TURN * static_cast<double>(i) / static_cast<double>(radars_.count);
+    Radar radar = radars_.unit;
+    if (in_turn_) {
+      Duration period = radar.scan.period();
+      radar.scan = engine::RateGate{
+          period, radar.scan.catch_up(),
+          TimePoint{} + period * static_cast<std::int64_t>(i) /
+                            static_cast<std::int64_t>(radars_.count)};
+    }
     RETURN_IF_UNEXPECTED(
         world_->create<archetype::Radar>()
             .with(Kinematics{.position =
                                  origin_ + on_ring(radars_.radius, bearing)})
-            .with(radars_.unit)
+            .with(radar)
             .build());
   }
   for (std::size_t i = 0; i < launchers_.count; ++i) {
@@ -105,14 +114,19 @@ auto build_scenario(const Scenario& scenario, lib::InOut<World> world)
   for (int site = 0; site < scenario.sites; ++site) {
     Position origin =
         model::meters(spacing * (site % side), spacing * (site / side), 0.0);
-    ASSIGN_OR_RETURN(
-        Entity asset,
+    SiteBuilder watched =
         create_site(origin, lib::Depend(*world))
             .protecting(Health{.points = scenario.asset_health})
             .watched_by(count(scenario.radars),
                         Radar{.range = scenario.radar_range,
                               .scan = engine::RateGate{scenario.scan_period}},
-                        scenario.radar_ring)
+                        scenario.radar_ring);
+    if (scenario.radars_in_turn) {
+      watched = std::move(watched).scanning_in_turn();
+    }
+    ASSIGN_OR_RETURN(
+        Entity asset,
+        std::move(watched)
             .defended_by(count(scenario.launchers),
                          Launcher{.range = scenario.launcher_range,
                                   .inventory = scenario.inventory,

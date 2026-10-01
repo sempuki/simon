@@ -3,7 +3,10 @@
 // Times the missile simulation at growing populations, system by system.
 //
 //   bazel run -c opt //application/missile:missile_benchmark [-- --steps N]
-//       [--contend[=N]] [drones...]
+//       [--contend[=N]] [--in-turn] [drones...]
+//
+// --in-turn has each site's radars scan in turn (Scenario::radars_in_turn).
+// The total line reports the slowest step as well as the average.
 //
 // Each scenario spawns its drones inside radar and launcher range, so
 // sensing, engagement, guidance and blasts all run from the first steps.
@@ -86,11 +89,13 @@ auto bytes_of(framework::TypeList<SystemTypes...>)
   return {framework::bytes_per_entity_v<SystemTypes>...};
 }
 
-auto measure(int drones, int maximum_steps, bool budgeted) -> void {
+auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
+    -> void {
   using List = Scheduler::FlattenedSystemList;
   constexpr std::size_t SYSTEM_COUNT = List::size;
 
   Scenario scenario = scenario_of(drones);
+  scenario.radars_in_turn = in_turn;
   World world;
   std::expected<void, framework::Status> built =
       build_world(scenario, lib::Out(world));
@@ -102,6 +107,7 @@ auto measure(int drones, int maximum_steps, bool budgeted) -> void {
   auto schedulers = schedulers_of(List{});
   std::array<double, SYSTEM_COUNT> seconds{};
   std::size_t entity_steps = 0;
+  double slowest = 0.0;  // The slowest step, in seconds.
 
   auto wall_start = WallClock::now();
   int steps = 0;
@@ -112,18 +118,22 @@ auto measure(int drones, int maximum_steps, bool budgeted) -> void {
     framework::Step step{.time = TimePoint{} + steps * DT, .dt = DT};
     entity_steps += world.size();
     std::size_t index = 0;
+    double this_step = 0.0;
     std::apply(
         [&](auto&... scheduler) {
           (([&] {
              auto start = WallClock::now();
              scheduler.step(step, lib::InOut(world));
-             seconds[index++] +=
+             double elapsed =
                  std::chrono::duration<double>(WallClock::now() - start)
                      .count();
+             seconds[index++] += elapsed;
+             this_step += elapsed;
            }()),
            ...);
         },
         schedulers);
+    slowest = std::max(slowest, this_step);
   }
 
   double total = 0.0;
@@ -135,9 +145,10 @@ auto measure(int drones, int maximum_steps, bool budgeted) -> void {
       scenario.launchers * scenario.sites, scenario.sites,
       scenario.sites == 1 ? "" : "s", steps,
       static_cast<double>(entity_steps) / std::max(steps, 1));
-  std::println("  total {:10.3f} ms/step {:10.1f} ns/entity-step",
-               1e3 * total / std::max(steps, 1),
-               1e9 * total / std::max<double>(entity_steps, 1));
+  std::println(
+      "  total {:10.3f} ms/step {:10.1f} ns/entity-step, slowest step {:.3f} ms",
+      1e3 * total / std::max(steps, 1),
+      1e9 * total / std::max<double>(entity_steps, 1), 1e3 * slowest);
   auto names = names_of(List{});
   auto bytes = bytes_of(List{});
   for (std::size_t i = 0; i < SYSTEM_COUNT; ++i) {
@@ -165,7 +176,7 @@ auto count_of(std::string_view text) -> std::optional<int> {
 
 }  // namespace
 
-// missile_benchmark [--steps N] [--contend[=N]] [drones...]
+// missile_benchmark [--steps N] [--contend[=N]] [--in-turn] [drones...]
 //
 // Without --steps, each population runs up to 500 steps or 30 s of wall time,
 // whichever comes first. Radars scan once a second, so compare runs only over
@@ -174,12 +185,15 @@ auto main(int argc, char** argv) -> int {
   using simon::framework::benchmark::Contention;
   int steps = simon::missile::DEFAULT_STEPS;
   bool budgeted = true;
+  bool in_turn = false;
   unsigned threads = 0;
   std::vector<int> populations;
   for (int i = 1; i < argc; ++i) {
     std::string_view argument{argv[i]};
     std::optional<int> count;
-    if (argument == "--steps" && i + 1 < argc &&
+    if (argument == "--in-turn") {
+      in_turn = true;
+    } else if (argument == "--steps" && i + 1 < argc &&
         (count = count_of(argv[i + 1]))) {
       steps = *count;
       budgeted = false;
@@ -199,6 +213,6 @@ auto main(int argc, char** argv) -> int {
   Contention contention{threads};
   std::println("{}", Contention::describe(threads));
   for (int drones : populations) {
-    simon::missile::measure(drones, steps, budgeted);
+    simon::missile::measure(drones, steps, budgeted, in_turn);
   }
 }

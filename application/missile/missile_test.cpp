@@ -284,6 +284,41 @@ TEST_CASE("MissileSimulation") {
   }
 }
 
+TEST_CASE("ScanRadars") {
+  World world;
+  build_small_world(lib::Out(world));
+  framework::Scheduler<World, SystemList<ScanRadars>> scheduler;
+  Radar radar{.range = 1000.0 * model::meter, .scan = engine::RateGate{1s}};
+
+  // How many of a site's radars scanned on each step of the first second.
+  auto scans_per_step = [&](SiteBuilder site) {
+    REQUIRE(std::move(site).watched_by(4, radar, 500.0 * model::meter).build());
+    world.sync();
+    std::vector<int> scans;
+    for (TimePoint time{}; time < TimePoint{1s}; time += 250ms) {
+      scheduler.step(framework::Step{.time = time, .dt = 250ms},
+                     lib::InOut(world));
+      int scanned = 0;
+      world.store_of<Radar>().for_each(
+          [&](Entity, const Radar& radar) { scanned += radar.scanned; });
+      scans.push_back(scanned);
+    }
+    return scans;
+  };
+
+  SECTION("ShouldScanTogetherGivenSite") {
+    CHECK(scans_per_step(create_site(model::meters(0, 0, 0),
+                                     lib::Depend(world))) ==
+          std::vector<int>{4, 0, 0, 0});
+  }
+
+  SECTION("ShouldScanInTurnGivenSiteScanningInTurn") {
+    CHECK(scans_per_step(
+              create_site(model::meters(0, 0, 0), lib::Depend(world))
+                  .scanning_in_turn()) == std::vector<int>{1, 1, 1, 1});
+  }
+}
+
 TEST_CASE("DetectDrones") {
   World world;
   build_small_world(lib::Out(world));

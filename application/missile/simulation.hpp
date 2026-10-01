@@ -52,6 +52,8 @@ struct Scenario final {
   Length radar_ring = 500.0 * model::meter;
   Length radar_range = 4000.0 * model::meter;
   Duration scan_period = 1s;
+  // Whether each site's radars scan in turn; see SiteBuilder::scanning_in_turn.
+  bool radars_in_turn = false;
 
   int launchers = 3;
   Length launcher_ring = 300.0 * model::meter;
@@ -122,6 +124,15 @@ class [[nodiscard]] SiteBuilder final {
     return std::move(*this);
   }
 
+  // The radars scan in turn instead of together: radar i first scans i / count
+  // of the way through its scan period. That spreads the scanning over the
+  // period, lowering the slowest step, but every step with a scan pays for it,
+  // so the average step costs more.
+  auto scanning_in_turn() && -> SiteBuilder {
+    in_turn_ = true;
+    return std::move(*this);
+  }
+
   // `count` launchers like `launcher`, evenly spaced at `radius` from the
   // asset, starting half a spacing from the radars.
   auto defended_by(std::size_t count, Launcher launcher,
@@ -162,6 +173,7 @@ class [[nodiscard]] SiteBuilder final {
   World* world_ = nullptr;
   Health asset_health_{.points = 30.0};
   Placement<Radar> radars_;
+  bool in_turn_ = false;
   Placement<Launcher> launchers_;
   std::size_t drones_ = 0;
   RedDrone drone_;

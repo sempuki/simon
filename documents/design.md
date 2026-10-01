@@ -2159,6 +2159,17 @@ Decisions made while building it:
   instead, rebuilt on the first query of each step.
 - **`UpdateTracks` indexes the radars that scanned,** in `prepare`, so a track
   checks only the radars near its target.
+- **Radars scan together unless a site asks otherwise.** `SiteBuilder::
+  scanning_in_turn()` (`Scenario::radars_in_turn`, `missile_benchmark
+  --in-turn`) staggers each site's radars over the scan period. At 100,000
+  drones over 500 steps it lowers the slowest step from 137 to 105 ms, but
+  raises the average from 2.21 to 2.89 ms. Every step with a scan walks every
+  track and every untracked drone, and in turn there are ten such steps per
+  period instead of one: `UpdateTracks` goes from 0.19 to 0.90 ms per step.
+  The slowest step barely moves because it is the first scan, when every
+  drone creates its track, and each site's first radar still covers most of
+  them. Marking the covered tracks in `prepare`, from the scanning radars'
+  side, only brought `UpdateTracks` back to 0.76 ms, so it was not kept.
 - **Systems name their concrete access type** with a member alias,
   `using LocalWorld = WorldAccess<ThisSystem>;`, so builder
   calls with explicit template arguments, such as `detach<Tracked>()`, need no
