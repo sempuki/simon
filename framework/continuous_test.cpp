@@ -68,17 +68,21 @@ struct Probe final {
 struct Mass final : Archetype<"mass", Requires<Point, PointRate>> {};
 struct Follower final
     : Archetype<"follower", Requires<Point, PointRate, Follow>> {};
+// Requires the state but cannot have a rate, so Continuous leaves it to some
+// other system.
+struct Rigid final : Archetype<"rigid", Requires<Point>> {};
 // Allows the state without requiring it, so it may lack a rate.
 struct Loose final : Archetype<"loose", Requires<>, Allows<Point, PointRate>> {};
 
 using TestWorld = World<Point, TypeList<PointRate, Follow, Probe>,
-                        TypeList<Mass, Follower, Loose>>;
+                        TypeList<Mass, Follower, Rigid, Loose>>;
 
 auto build(lib::Out<TestWorld> world) -> void {
   std::expected<void, Status> built = TestWorld::set_up()
                                           .numbered(1)
                                           .holding<Mass>(4)
                                           .holding<Follower>(4)
+                                          .holding<Rigid>(4)
                                           .holding<Loose>(4)
                                           .build(world);
   REQUIRE(built);
@@ -252,6 +256,19 @@ TEST_CASE("Continuous") {
 
     CHECK(world.store_of<Point>().component_of(*without).x == 3.0);
     CHECK(world.store_of<Point>().component_of(*with).x < 1.0);
+  }
+
+  SECTION("ShouldSkipArchetypeThatCannotHaveRate") {
+    TestWorld world;
+    build(lib::Out(world));
+    auto rigid = world.create<Rigid>().with(Point{.x = 2.0, .v = 1.0}).build();
+    REQUIRE(rigid);
+    world.sync();
+
+    Scheduler<TestWorld, SystemList<Oscillate<RungeKutta4>>> scheduler;
+    scheduler.step(Step{.time = TimePoint{}, .dt = 100ms}, lib::InOut(world));
+
+    CHECK(world.store_of<Point>().component_of(*rigid).x == 2.0);
   }
 
   SECTION("ShouldMatchEulerGivenOneStageMethod") {

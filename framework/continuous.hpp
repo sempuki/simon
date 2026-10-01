@@ -124,11 +124,15 @@ struct ContinuousRunner final {
   static auto walk_archetype(StateStoreType& states, const RateStoreType& rates,
                              std::size_t& n, VisitorType& visit) -> void {
     using RateType = rate_of_t<StateType>;
+    // An archetype that cannot have the rate is not integrated here: it
+    // advances its state some other way, such as a cheaper single pass.
     if constexpr (WorldType::template archetype_requires<StateType>(
-                      ARCHETYPE)) {
-      static_assert(WorldType::template archetype_requires<RateType>(ARCHETYPE),
-                    "An archetype that requires a continuous state must also "
-                    "require its rate component.");
+                      ARCHETYPE) &&
+                  WorldType::template archetype_permits<RateType>(ARCHETYPE)) {
+      static_assert(
+          WorldType::template archetype_requires<RateType>(ARCHETYPE),
+          "An archetype that requires a continuous state and allows its rate "
+          "must require the rate.");
       constexpr std::size_t STATE_SEGMENT =
           WorldType::template segment_of<StateType>(ARCHETYPE);
       constexpr std::size_t RATE_SEGMENT =

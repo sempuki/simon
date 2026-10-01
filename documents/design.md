@@ -1950,10 +1950,13 @@ using AircraftSystems = SystemList<Sensors, FlightControl, Dynamics, CheckOutcom
   component, which marks the index stale, so a derivative system that queries
   space rebuilds the index once per stage. Only simulations that query space
   from a derivative system pay for that.
-- **An archetype that requires a state component must require its rate,** so
-  the integrator reaches the rate at the same slot. An entity whose archetype
-  only allows the state has its rate looked up, and keeps its state if it has
-  none.
+- **An archetype opts in by having the rate.** One that requires the state
+  and the rate is integrated, reaching the rate at the same slot. One that
+  requires the state but cannot have the rate is skipped at compile time, so
+  a cheaper fidelity level in the same world can advance the same state its
+  own way. An archetype may not require the state and only allow the rate. An
+  entity whose archetype only allows the state has its rate looked up, and
+  keeps its state if it has none.
 - **The integrator keeps its copies of state and rates itself,** sized to the
   state store's capacity on its first step. A Runge-Kutta 4 integrator over a
   48-byte state at 100,000 entities keeps about 24 MB and passes over the
