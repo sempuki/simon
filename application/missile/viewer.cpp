@@ -93,9 +93,8 @@ class Session final {
   Session(Scenario scenario, double speed)
       : scenario_{scenario},
         simulation_{std::make_unique<Simulation>(scenario)},
-        driver_{std::make_unique<Driver>(lib::Depend(*simulation_),
-                                         engine::Timing{.max_step = 10ms},
-                                         speed)} {}
+        driver_{std::make_unique<Driver>(engine::Timing{.max_step = 10ms},
+                                         speed, lib::Depend(*simulation_))} {}
 
   ~Session() {
     engine::Phase phase = driver_->driver().phase();

@@ -40,10 +40,10 @@ namespace simon::framework {
 // one as a plain number in the same unit as `coordinates`.
 template <typename Type>
 concept Spatial = requires(const Type& a, const Type& b) {
-  { distance(a, b) < distance(a, b) } -> std::convertible_to<bool>;
-  pose(a);
   { coordinates(a) } -> std::same_as<Coordinates>;
   { coordinate_length(a, distance(a, b)) } -> std::same_as<double>;
+  { distance(a, b) < distance(a, b) } -> std::convertible_to<bool>;
+  pose(a);
 };
 
 template <Spatial Type>
@@ -67,22 +67,30 @@ class SchedulerKey final {
 // A world's type is declared by its spatial component, its other components
 // and its archetypes, every one of which it may create. A world is built by
 // the builder `set_up()` returns, which sizes it by how many of each archetype
-// it holds:
+// it holds, and fills the caller's world:
 //
 //   using World = World<Kinematics, TypeList<Control, Health>,
 //                       TypeList<archetype::Drone, archetype::Blast>>;
-//   std::expected<World, Status> world =
-//       World::set_up().numbered(1).holding<archetype::Drone>(1000).build();
+//   World world;  // Empty until built.
+//   std::expected<void, Status> built = World::set_up().numbered(1)
+//       .holding<archetype::Drone>(1000).build(lib::Out(world));
+//
+// A world never moves. Builders and WorldAccess keep a pointer to it, and its
+// stores never reallocate, so nothing that refers to a world can dangle while
+// it lives.
 //
 // Everything in it has a Name ({kind, instance}), an Identity computed from the
 // Name ("/world/1/entity/2"), and any number of Aliases ("ego"). See name.hpp.
-template <Spatial SpatialType, typename ComponentListType,
+template <Spatial SpatialType,         //
+          typename ComponentListType,  //
           typename ArchetypeListType>
 class World;
 
-template <Spatial SpatialType, typename... ComponentTypes,
-          typename... ArchetypeTypes>
-class World<SpatialType, TypeList<ComponentTypes...>,
+template <Spatial SpatialType,            //
+          typename... ComponentTypes,     //
+          typename... ArchetypeTypes>     //
+class World<SpatialType,                  //
+            TypeList<ComponentTypes...>,  //
             TypeList<ArchetypeTypes...>>
     final {
  public:
@@ -109,10 +117,10 @@ class World<SpatialType, TypeList<ComponentTypes...>,
                 "the world's component list.");
 
   DECLARE_COPY_DELETE(World);
-  // Moving a world leaves dangling any builder or WorldAccess that refers to
-  // it; both are temporaries.
-  World(World&&) noexcept = default;
-  World& operator=(World&&) = delete;
+  DECLARE_MOVE_DELETE(World);
+
+  // An empty world, which holds nothing until a builder builds it.
+  World() { initialize(Configuration{}); }
   ~World() = default;
 
   // Starts the utterance that builds a world of this type. See SetUpBuilder.
@@ -133,23 +141,35 @@ class World<SpatialType, TypeList<ComponentTypes...>,
     double cell_size = 1.0;
   };
 
-  explicit World(const Configuration& configuration)
-      : number_{configuration.number},
-        entities_{configuration.entities},
-        stores_{store_for<SpatialType>(configuration),
-                store_for<EntityArchetype>(configuration),
-                store_for<Parent>(configuration),
-                store_for<ComponentTypes>(configuration)...},
-        plans_{Plan<SpatialType>{configuration.entities},
-               Plan<EntityArchetype>{configuration.entities},
-               Plan<Parent>{configuration.entities},
-               Plan<ComponentTypes>{configuration.entities}...},
-        spatial_index_{
-            configuration.capacities[component_number<SpatialType>()],
-            configuration.cell_size},
-        destroying_(configuration.entities, false),
-        instance_of_index_(configuration.entities, 0),
-        archetype_of_index_(configuration.entities, 0) {
+  // Fills the world as `configuration` describes, discarding everything it
+  // held: entities, names, aliases and pending commands. Pointers into its
+  // stores no longer refer to anything.
+  void initialize(const Configuration& configuration) {
+    number_ = configuration.number;
+    entities_ = EntityTable{configuration.entities};
+    stores_ = {store_for<SpatialType>(configuration),
+               store_for<EntityArchetype>(configuration),
+               store_for<Parent>(configuration),
+               store_for<ComponentTypes>(configuration)...};
+    commands_.clear();
+    plans_ = {Plan<SpatialType>{configuration.entities},
+              Plan<EntityArchetype>{configuration.entities},
+              Plan<Parent>{configuration.entities},
+              Plan<ComponentTypes>{configuration.entities}...};
+    spatial_index_ =
+        SpatialIndex{configuration.capacities[component_number<SpatialType>()],
+                     configuration.cell_size};
+    spatial_index_current_ = false;
+    destroying_.assign(configuration.entities, false);
+    destroying_list_.clear();
+    next_entity_instance_ = 0;
+    instance_of_index_.assign(configuration.entities, 0);
+    archetype_of_index_.assign(configuration.entities, 0);
+    entity_of_instance_.clear();
+    next_archetype_instance_ = 0;
+    archetypes_.clear();
+    aliases_.clear();
+    aliases_of_name_.clear();
     // Components are aliased by their type names, qualified and short.
     for_each_type(ComponentList{}, [&]<typename ComponentType>() {
       std::string type_name = lib::to_type_string<ComponentType>();
@@ -171,13 +191,13 @@ class World<SpatialType, TypeList<ComponentTypes...>,
     static_assert(contains_v<ArchetypeList, ArchetypeType>,
                   "This archetype is not in the world's archetype list.");
     return CreateBuilder<World, ArchetypeType, true>{
-        lib::Depend(*this), std::move(alias), std::nullopt, {}};
+        std::move(alias), std::nullopt, {}, lib::Depend(*this)};
   }
   auto change(Entity entity) {
-    return ChangeBuilder<World>{lib::Depend(*this), entity, {}, {}};
+    return ChangeBuilder<World>{entity, {}, {}, lib::Depend(*this)};
   }
   auto destroy(Entity entity) {
-    return DestroyBuilder<World>{lib::Depend(*this), entity};
+    return DestroyBuilder<World>{entity, lib::Depend(*this)};
   }
 
   // Applies every pending command, in the order it was recorded. Builders
@@ -526,7 +546,7 @@ class World<SpatialType, TypeList<ComponentTypes...>,
   // For one component: which entities will gain or lose it, and how many
   // entity-components are waiting to be attached.
   struct PlanState {
-    explicit PlanState(std::size_t entity_capacity)
+    explicit PlanState(std::size_t entity_capacity = 0)
         : change(entity_capacity, 0) {}
 
     std::vector<std::int8_t>
@@ -799,8 +819,9 @@ class World<SpatialType, TypeList<ComponentTypes...>,
     entities_.destroy(entity);
   }
 
-  std::uint32_t number_;
-  EntityTable entities_;
+  // Each is filled by initialize.
+  std::uint32_t number_ = 0;
+  EntityTable entities_{0};
   std::tuple<Store<SpatialType>, Store<EntityArchetype>, Store<Parent>,
              Store<ComponentTypes>...>
       stores_;
@@ -809,7 +830,7 @@ class World<SpatialType, TypeList<ComponentTypes...>,
              Plan<ComponentTypes>...>
       plans_;
   // Current while its slots match the spatial store. See within().
-  SpatialIndex spatial_index_;
+  SpatialIndex spatial_index_{0, 1.0};
   bool spatial_index_current_ = false;
   std::vector<bool> destroying_;
   std::vector<std::uint32_t> destroying_list_;
@@ -831,14 +852,17 @@ class World<SpatialType, TypeList<ComponentTypes...>,
 // Builds a world. How many of each archetype it holds at once sizes it: the
 // entity capacity is the total, and each component's store holds as many as
 // every archetype that requires or allows the component. Nothing is reserved
-// per archetype; capacity is pooled. Start with `World::set_up()`:
+// per archetype; capacity is pooled. Start with `World::set_up()`, and build
+// into the caller's world, since a world never moves:
 //
-//   auto world = World::set_up()
-//                    .numbered(1)
-//                    .holding<archetype::RedDrone>(drones)
-//                    .holding<archetype::Track>(drones)
-//                    .cells_of(250.0 * model::meter)
-//                    .build();
+//   World world;
+//   std::expected<void, Status> built =
+//       World::set_up()
+//           .numbered(1)
+//           .holding<archetype::RedDrone>(drones)
+//           .holding<archetype::Track>(drones)
+//           .cells_of(250.0 * model::meter)
+//           .build(lib::Out(world));
 template <typename WorldType>
 class [[nodiscard]] SetUpBuilder final {
  public:
@@ -872,7 +896,9 @@ class [[nodiscard]] SetUpBuilder final {
     return std::move(*this);
   }
 
-  std::expected<WorldType, Status> build() && {
+  // Fills `world` as planned, discarding everything it held. A refused plan
+  // leaves `world` as it was.
+  std::expected<void, Status> build(lib::Out<WorldType> world) && {
     if (!(cell_size_ > 0.0) || !std::isfinite(cell_size_)) {
       return std::unexpected(
           lib::raise(BuildError::CELL_SIZE_INVALID,
@@ -904,7 +930,8 @@ class [[nodiscard]] SetUpBuilder final {
         }
       }
     });
-    return WorldType{configuration};
+    world->initialize(configuration);
+    return {};
   }
 
  private:

@@ -733,8 +733,8 @@ class CompetingStoreLayout final {
     }
   }
 
-  Visits iterate_first() { return iterate(lib::InOut(first_), true); }
-  Visits iterate_second() { return iterate(lib::InOut(second_), false); }
+  Visits iterate_first() { return iterate(true, lib::InOut(first_)); }
+  Visits iterate_second() { return iterate(false, lib::InOut(second_)); }
 
   static constexpr std::size_t bytes_per_entity() {
     return 3 * (8 + sizeof(Entity)) + sizeof(Body) + sizeof(FirstType) +
@@ -751,7 +751,7 @@ class CompetingStoreLayout final {
   }
 
   template <typename StoreType>
-  Visits iterate(lib::InOut<StoreType> siblings, bool first) {
+  Visits iterate(bool first, lib::InOut<StoreType> siblings) {
     Visits visits;
     auto bodies = bodies_.values();
     walk(
@@ -874,18 +874,18 @@ class Segment final {
  public:
   explicit Segment(std::size_t chunks) { chunks_.reserve(chunks); }
 
-  ComponentType& at(lib::InOut<ChunkPool<ComponentType>> pool,
-                    std::uint32_t local) {
+  ComponentType& at(std::uint32_t local,
+                    lib::InOut<ChunkPool<ComponentType>> pool) {
     return pool->chunk(chunks_[local / CHUNK])[local % CHUNK];
   }
   // Makes room for local index `count` before it is used.
-  void grow(lib::InOut<ChunkPool<ComponentType>> pool, std::uint32_t count) {
+  void grow(std::uint32_t count, lib::InOut<ChunkPool<ComponentType>> pool) {
     if (count % CHUNK == 0) {
       chunks_.push_back(pool->take());
     }
   }
   // Returns the last chunk once `count` entries no longer reach it.
-  void shrink(lib::InOut<ChunkPool<ComponentType>> pool, std::uint32_t count) {
+  void shrink(std::uint32_t count, lib::InOut<ChunkPool<ComponentType>> pool) {
     if (count % CHUNK == 0) {
       pool->give(chunks_.back());
       chunks_.pop_back();
@@ -929,17 +929,17 @@ class SegmentedLayout final {
   void create(Entity entity, std::uint8_t siblings) {
     Archetype& archetype = archetypes_[siblings];
     std::uint32_t local = archetype.count;
-    archetype.body.grow(lib::InOut(bodies_), local);
-    archetype.owner.grow(lib::InOut(owners_), local);
-    archetype.body.at(lib::InOut(bodies_), local) = Body{};
-    archetype.owner.at(lib::InOut(owners_), local) = entity;
+    archetype.body.grow(local, lib::InOut(bodies_));
+    archetype.owner.grow(local, lib::InOut(owners_));
+    archetype.body.at(local, lib::InOut(bodies_)) = Body{};
+    archetype.owner.at(local, lib::InOut(owners_)) = entity;
     if (siblings & FIRST) {
-      archetype.first.grow(lib::InOut(firsts_), local);
-      archetype.first.at(lib::InOut(firsts_), local) = FirstType{};
+      archetype.first.grow(local, lib::InOut(firsts_));
+      archetype.first.at(local, lib::InOut(firsts_)) = FirstType{};
     }
     if (siblings & SECOND) {
-      archetype.second.grow(lib::InOut(seconds_), local);
-      archetype.second.at(lib::InOut(seconds_), local) = SecondType{};
+      archetype.second.grow(local, lib::InOut(seconds_));
+      archetype.second.at(local, lib::InOut(seconds_)) = SecondType{};
     }
     ++archetype.count;
     location_[entity.index] = Location{.archetype = siblings, .local = local};
@@ -952,23 +952,23 @@ class SegmentedLayout final {
     std::uint32_t last = --archetype.count;
     if (location.local != last) {
       auto move = [&](auto& segment, auto& pool) {
-        segment.at(lib::InOut(pool), location.local) =
-            std::move(segment.at(lib::InOut(pool), last));
+        segment.at(location.local, lib::InOut(pool)) =
+            std::move(segment.at(last, lib::InOut(pool)));
       };
       move(archetype.body, bodies_);
       move(archetype.owner, owners_);
       if (location.archetype & FIRST) move(archetype.first, firsts_);
       if (location.archetype & SECOND) move(archetype.second, seconds_);
-      Entity moved = archetype.owner.at(lib::InOut(owners_), location.local);
+      Entity moved = archetype.owner.at(location.local, lib::InOut(owners_));
       location_[moved.index].local = location.local;
     }
-    archetype.body.shrink(lib::InOut(bodies_), last);
-    archetype.owner.shrink(lib::InOut(owners_), last);
+    archetype.body.shrink(last, lib::InOut(bodies_));
+    archetype.owner.shrink(last, lib::InOut(owners_));
     if (location.archetype & FIRST) {
-      archetype.first.shrink(lib::InOut(firsts_), last);
+      archetype.first.shrink(last, lib::InOut(firsts_));
     }
     if (location.archetype & SECOND) {
-      archetype.second.shrink(lib::InOut(seconds_), last);
+      archetype.second.shrink(last, lib::InOut(seconds_));
     }
     if (allowed_first_.contains(entity)) allowed_first_.erase(entity);
     if (allowed_second_.contains(entity)) allowed_second_.erase(entity);
@@ -987,7 +987,7 @@ class SegmentedLayout final {
 
   Visits iterate_first() {
     Visits visits;
-    walk<FIRST>(lib::InOut(firsts_), allowed_first_, &Archetype::first,
+    walk<FIRST>(&Archetype::first, allowed_first_, lib::InOut(firsts_),
                 lib::Out(visits.with_sibling),
                 lib::Out(visits.without_sibling));
     return visits;
@@ -996,7 +996,7 @@ class SegmentedLayout final {
     requires COMPETING
   {
     Visits visits;
-    walk<SECOND>(lib::InOut(seconds_), allowed_second_, &Archetype::second,
+    walk<SECOND>(&Archetype::second, allowed_second_, lib::InOut(seconds_),
                  lib::Out(visits.with_second), lib::Out(visits.without_second));
     return visits;
   }
@@ -1036,9 +1036,9 @@ class SegmentedLayout final {
   // Requires the sibling, it sits at the same slot of the matching chunk;
   // otherwise it is Allowed, and looked up in the sparse store.
   template <std::uint8_t WHICH, typename SiblingType>
-  void walk(lib::InOut<ChunkPool<SiblingType>> pool,
-            Store<SiblingType>& allowed,
-            Segment<SiblingType> Archetype::* sibling_segment,
+  void walk(Segment<SiblingType> Archetype::* sibling_segment,
+            const Store<SiblingType>& allowed,
+            lib::InOut<ChunkPool<SiblingType>> pool,
             lib::Out<std::uint64_t> with, lib::Out<std::uint64_t> without) {
     for (std::uint8_t id = 0; id < ARCHETYPES; ++id) {
       Archetype& archetype = archetypes_[id];

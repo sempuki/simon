@@ -9,6 +9,7 @@
 #include <expected>
 #include <numbers>
 #include <optional>
+#include <vector>
 
 #include "application/missile/components.hpp"
 #include "application/missile/systems.hpp"
@@ -57,11 +58,11 @@ struct Scenario final {
 
 enum class Outcome { UNDECIDED, BLUE_WINS, RED_WINS };
 
-// The world a scenario needs: at every site, holding the asset, radars and
-// launchers, every drone with its track and blast, and every interceptor with
-// its blast.
-inline std::expected<World, framework::Status> world_for(
-    const Scenario& scenario) {
+// Builds in `world` the world a scenario needs: at every site, holding the
+// asset, radars and launchers, every drone with its track and blast, and every
+// interceptor with its blast.
+inline std::expected<void, framework::Status> build_world(
+    const Scenario& scenario, lib::Out<World> world) {
   auto count = [](int value) {
     return static_cast<std::size_t>(std::max(value, 0));
   };
@@ -80,7 +81,7 @@ inline std::expected<World, framework::Status> world_for(
       .holding<archetype::Interceptor>(interceptors)
       .holding<archetype::Blast>(drones + interceptors)
       .cells_of(250.0 * model::meter)
-      .build();
+      .build(world);
 }
 
 // A point `radius` from the origin at `bearing` radians from east.
@@ -90,79 +91,208 @@ inline Position on_ring(Length radius, double bearing) {
                        0.0);
 }
 
-// For each site, places the asset at the site's origin, radars and launchers
-// on rings around it, and red drones at random bearings, flying at it. Returns
-// the first site's asset.
-inline Entity build_scenario(lib::InOut<World> world,
-                             const Scenario& scenario) {
-  CHECK_PRECONDITION(scenario.sites >= 1);
-  constexpr double TURN = 2.0 * std::numbers::pi;
-  model::Random random{scenario.seed};
-  int side = static_cast<int>(std::ceil(std::sqrt(scenario.sites)));
-  std::optional<Entity> first_asset;
+// A band around a site: things fall at `radius`, give or take half of
+// `width`.
+struct Ring final {
+  Length radius = 0.0 * model::meter;
+  Length width = 0.0 * model::meter;
+};
 
-  for (int site = 0; site < scenario.sites; ++site) {
-    double spacing = scenario.site_spacing.numerical_value_in(model::meter);
-    Position origin =
-        model::meters(spacing * (site % side), spacing * (site / side), 0.0);
-    auto asset = world->create<archetype::Asset>("asset")
-                     .with(Kinematics{.position = origin})
-                     .with(Health{.points = scenario.asset_health})
+// Builds one defended site: an asset at its origin, the radars and launchers
+// that defend it on rings around it, and the red drones that attack it, flying
+// at the asset. A domain builder (see "Domain builders" in
+// documents/design.md): one utterance becomes an entity utterance for each
+// thing on the site. Start with create_site.
+class [[nodiscard]] SiteBuilder final {
+ public:
+  // Keeps a reference to `world` until the utterance is built.
+  SiteBuilder(Position origin, lib::Depend<World> world)
+      : origin_{origin}, world_{world.get()} {}
+
+  // The asset the site protects, and its health. 30 points unless given.
+  SiteBuilder protecting(Health health) && {
+    asset_health_ = health;
+    return std::move(*this);
+  }
+
+  // `count` radars like `radar`, evenly spaced at `radius` from the asset.
+  SiteBuilder watched_by(std::size_t count, Radar radar, Length radius) && {
+    radars_ = Placement<Radar>{.count = count, .unit = radar, .radius = radius};
+    return std::move(*this);
+  }
+
+  // `count` launchers like `launcher`, evenly spaced at `radius` from the
+  // asset, starting half a spacing from the radars.
+  SiteBuilder defended_by(std::size_t count, Launcher launcher,
+                          Length radius) && {
+    launchers_ =
+        Placement<Launcher>{.count = count, .unit = launcher, .radius = radius};
+    return std::move(*this);
+  }
+
+  // `count` red drones like `drone`, carrying `warhead`, spawning at random
+  // bearings within `ring` and flying at the asset at cruise speed. Draws
+  // from `random`, which it keeps until the utterance is built.
+  SiteBuilder attacked_by(std::size_t count, RedDrone drone, Warhead warhead,
+                          Ring ring, lib::Depend<model::Random> random) && {
+    drones_ = count;
+    drone_ = drone;
+    warhead_ = warhead;
+    spawn_ = ring;
+    random_ = random.get();
+    return std::move(*this);
+  }
+
+  // Creates the site and returns its asset. If the world refuses any entity,
+  // destroys those already created by this utterance, so nothing of the site
+  // is left after the next sync, and returns the world's framework::Status.
+  std::expected<Entity, framework::Status> build() && {
+    constexpr double TURN = 2.0 * std::numbers::pi;
+    std::vector<Entity> created;
+    auto refuse = [&](framework::Status status)
+        -> std::expected<Entity, framework::Status> {
+      for (Entity entity : created) {
+        auto destroyed = world_->destroy(entity).build();
+        DECLARE_UNUSED(destroyed);
+      }
+      return std::unexpected(status);
+    };
+    auto keep = [&](std::expected<Entity, framework::Status> entity) {
+      if (entity) {
+        created.push_back(*entity);
+      }
+      return entity.has_value();
+    };
+
+    auto asset = world_->create<archetype::Asset>("asset")
+                     .with(Kinematics{.position = origin_})
+                     .with(asset_health_)
                      .with(Asset{})
                      .build();
-    CHECK_POSTCONDITION(asset.has_value());
-    if (!first_asset) {
-      first_asset = *asset;
+    if (!keep(asset)) {
+      return refuse(asset.error());
     }
-
-    for (int i = 0; i < scenario.radars; ++i) {
-      double bearing = TURN * i / scenario.radars;
+    for (std::size_t i = 0; i < radars_.count; ++i) {
+      double bearing =
+          TURN * static_cast<double>(i) / static_cast<double>(radars_.count);
       auto radar =
-          world->create<archetype::Radar>()
-              .with(Kinematics{
-                  .position = origin + on_ring(scenario.radar_ring, bearing)})
-              .with(Radar{.range = scenario.radar_range,
-                          .scan = engine::RateGate{scenario.scan_period}})
-              .build();
-      CHECK_POSTCONDITION(radar.has_value());
-    }
-
-    for (int i = 0; i < scenario.launchers; ++i) {
-      double bearing = TURN * (i + 0.5) / scenario.launchers;
-      auto launcher =
-          world->create<archetype::Launcher>()
+          world_->create<archetype::Radar>()
               .with(Kinematics{.position =
-                                   origin +
-                                   on_ring(scenario.launcher_ring, bearing)})
-              .with(Launcher{.range = scenario.launcher_range,
-                             .inventory = scenario.inventory,
-                             .reload = scenario.reload})
+                                   origin_ + on_ring(radars_.radius, bearing)})
+              .with(radars_.unit)
               .build();
-      CHECK_POSTCONDITION(launcher.has_value());
+      if (!keep(radar)) {
+        return refuse(radar.error());
+      }
     }
-
-    for (int i = 0; i < scenario.drones; ++i) {
-      double bearing = random.uniform(0.0, TURN);
-      Length radius = scenario.spawn_distance +
-                      scenario.spawn_spread * random.uniform(-0.5, 0.5);
-      Kinematics kinematics{.position = origin + on_ring(radius, bearing)};
+    for (std::size_t i = 0; i < launchers_.count; ++i) {
+      double bearing = TURN * (static_cast<double>(i) + 0.5) /
+                       static_cast<double>(launchers_.count);
+      auto launcher =
+          world_->create<archetype::Launcher>()
+              .with(Kinematics{.position = origin_ +
+                                           on_ring(launchers_.radius, bearing)})
+              .with(launchers_.unit)
+              .build();
+      if (!keep(launcher)) {
+        return refuse(launcher.error());
+      }
+    }
+    for (std::size_t i = 0; i < drones_; ++i) {
+      double bearing = random_->uniform(0.0, TURN);
+      Length radius =
+          spawn_.radius + spawn_.width * random_->uniform(-0.5, 0.5);
+      Kinematics kinematics{.position = origin_ + on_ring(radius, bearing)};
       kinematics.velocity =
-          (origin - kinematics.position) *
-          (scenario.drone_cruise / norm(origin - kinematics.position));
-      auto drone = world->create<archetype::RedDrone>()
+          (origin_ - kinematics.position) *
+          (drone_.cruise / norm(origin_ - kinematics.position));
+      auto drone = world_->create<archetype::RedDrone>()
                        .with(kinematics)
                        .with(Control{})
                        .with(Health{.points = 1.0})
-                       .with(scenario.drone_warhead)
+                       .with(warhead_)
                        .with(Target{.entity = *asset})
-                       .with(RedDrone{.cruise = scenario.drone_cruise,
-                                      .agility = scenario.drone_agility})
+                       .with(drone_)
                        .build();
-      CHECK_POSTCONDITION(drone.has_value());
+      if (!keep(drone)) {
+        return refuse(drone.error());
+      }
+    }
+    return *asset;
+  }
+
+ private:
+  template <typename UnitType>
+  struct Placement final {
+    std::size_t count = 0;
+    UnitType unit{};
+    Length radius = 0.0 * model::meter;
+  };
+
+  Position origin_;
+  World* world_;  // Never null; checked once by Depend at construction.
+  Health asset_health_{.points = 30.0};
+  Placement<Radar> radars_;
+  Placement<Launcher> launchers_;
+  std::size_t drones_ = 0;
+  RedDrone drone_;
+  Warhead warhead_;
+  Ring spawn_;
+  model::Random* random_ = nullptr;  // Set with any drones.
+};
+
+// Starts the utterance that builds a defended site at `origin` in `world`.
+inline SiteBuilder create_site(Position origin, lib::Depend<World> world) {
+  return SiteBuilder{origin, world};
+}
+
+// Builds every site of a scenario on a square grid, the first at the origin,
+// and returns the first site's asset.
+inline std::expected<Entity, framework::Status> build_scenario(
+    const Scenario& scenario, lib::InOut<World> world) {
+  auto count = [](int value) {
+    return static_cast<std::size_t>(std::max(value, 0));
+  };
+  model::Random random{scenario.seed};
+  int side = static_cast<int>(std::ceil(std::sqrt(scenario.sites)));
+  double spacing = scenario.site_spacing.numerical_value_in(model::meter);
+  std::optional<Entity> first;
+  for (int site = 0; site < scenario.sites; ++site) {
+    Position origin =
+        model::meters(spacing * (site % side), spacing * (site / side), 0.0);
+    std::expected<Entity, framework::Status> asset =
+        create_site(origin, lib::Depend(*world))
+            .protecting(Health{.points = scenario.asset_health})
+            .watched_by(count(scenario.radars),
+                        Radar{.range = scenario.radar_range,
+                              .scan = engine::RateGate{scenario.scan_period}},
+                        scenario.radar_ring)
+            .defended_by(count(scenario.launchers),
+                         Launcher{.range = scenario.launcher_range,
+                                  .inventory = scenario.inventory,
+                                  .reload = scenario.reload},
+                         scenario.launcher_ring)
+            .attacked_by(count(scenario.drones),
+                         RedDrone{.cruise = scenario.drone_cruise,
+                                  .agility = scenario.drone_agility},
+                         scenario.drone_warhead,
+                         Ring{.radius = scenario.spawn_distance,
+                              .width = scenario.spawn_spread},
+                         lib::Depend(random))
+            .build();
+    if (!asset) {
+      return asset;
+    }
+    if (!first) {
+      first = *asset;
     }
   }
   world->sync();
-  return *first_asset;
+  if (!first) {
+    return std::unexpected(lib::raise(framework::BuildError::ENTITY_NOT_ALIVE,
+                                      "A scenario needs at least one site."));
+  }
+  return *first;
 }
 
 // The missile simulation: builds the scenario when configured, and stops when
@@ -174,20 +304,25 @@ class Simulation final {
   // Builds the world and the scenario in it. A scenario too big for a world
   // fails this phase with the builder's Status.
   engine::PhaseResult configure() {
-    std::expected<World, framework::Status> world = world_for(scenario_);
-    if (!world) {
-      return std::unexpected(world.error());
+    std::expected<void, framework::Status> built =
+        build_world(scenario_, lib::Out(world_));
+    if (!built) {
+      return std::unexpected(built.error());
     }
-    world_.emplace(*std::move(world));
-    asset_ = build_scenario(lib::InOut(*world_), scenario_);
+    std::expected<Entity, framework::Status> asset =
+        build_scenario(scenario_, lib::InOut(world_));
+    if (!asset) {
+      return std::unexpected(asset.error());
+    }
+    asset_ = *asset;
     return engine::Flow::CONTINUE;
   }
 
   engine::PhaseResult step(const framework::Step& step) {
-    scheduler_.step(lib::InOut(*world_), step);
-    if (!world_->alive(asset_)) {
+    scheduler_.step(step, lib::InOut(world_));
+    if (!world_.alive(asset_)) {
       outcome_ = Outcome::RED_WINS;
-    } else if (world_->store_of<RedDrone>().size() == 0) {
+    } else if (world_.store_of<RedDrone>().size() == 0) {
       outcome_ = Outcome::BLUE_WINS;
     }
     return outcome_ == Outcome::UNDECIDED ? engine::Flow::CONTINUE
@@ -195,11 +330,8 @@ class Simulation final {
   }
 
   Outcome outcome() const { return outcome_; }
-  // The world, once configured.
-  const World& world() const {
-    CHECK_PRECONDITION(world_.has_value());
-    return *world_;
-  }
+  // The world: empty until configured.
+  const World& world() const { return world_; }
   Entity asset() const { return asset_; }
 
   // Interceptors fired so far, from what the launchers have left.
@@ -216,7 +348,7 @@ class Simulation final {
 
  private:
   Scenario scenario_;
-  std::optional<World> world_;  // Built by configure.
+  World world_;  // Empty until configure builds it.
   Scheduler scheduler_;
   Entity asset_;
   Outcome outcome_ = Outcome::UNDECIDED;

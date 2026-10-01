@@ -64,8 +64,8 @@ struct Control final {
 
 // Advances `kinematics` by `dt` under constant `acceleration`, using the
 // midpoint method (exact for constant acceleration).
-inline void integrate_midpoint(lib::InOut<Kinematics> kinematics,
-                               const Acceleration& acceleration, Time dt) {
+inline void integrate_midpoint(const Acceleration& acceleration, Time dt,
+                               lib::InOut<Kinematics> kinematics) {
   Velocity mid_velocity = kinematics->velocity + acceleration * (dt * 0.5);
   kinematics->position += mid_velocity * dt;
   kinematics->velocity += acceleration * dt;

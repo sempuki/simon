@@ -136,11 +136,13 @@ Result measure(std::size_t count, bool shuffled,
 
   // The framework: one world whose sibling is allowed, attached in `order`,
   // and one whose sibling is required.
-  auto allowed_world = BenchmarkWorld::set_up().holding<Craft>(count).build();
-  auto required_world = BenchmarkWorld::set_up().holding<Rocket>(count).build();
-  CHECK_POSTCONDITION(allowed_world.has_value() && required_world.has_value());
-  BenchmarkWorld& allowed = *allowed_world;
-  BenchmarkWorld& required = *required_world;
+  BenchmarkWorld allowed;
+  BenchmarkWorld required;
+  auto allowed_built =
+      BenchmarkWorld::set_up().holding<Craft>(count).build(lib::Out(allowed));
+  auto required_built =
+      BenchmarkWorld::set_up().holding<Rocket>(count).build(lib::Out(required));
+  CHECK_POSTCONDITION(allowed_built.has_value() && required_built.has_value());
   std::vector<Entity> crafts;
   for (std::size_t i = 0; i < count; ++i) {
     auto craft = allowed.create<Craft>().with(Body{}).build();
@@ -175,7 +177,7 @@ Result measure(std::size_t count, bool shuffled,
 
   Result result;
   result.allowed =
-      per_entity([&] { allowed_scheduler.step(lib::InOut(allowed), step); });
+      per_entity([&] { allowed_scheduler.step(step, lib::InOut(allowed)); });
   result.handle = per_entity([&] {
     for (std::size_t i = 0; i < count; ++i) {
       integrate(bodies[i], *handles[i]);
@@ -183,7 +185,7 @@ Result measure(std::size_t count, bool shuffled,
   });
   if (!shuffled) {
     result.required = per_entity(
-        [&] { required_scheduler.step(lib::InOut(required), step); });
+        [&] { required_scheduler.step(step, lib::InOut(required)); });
     result.structural = per_entity([&] {
       for (std::size_t i = 0; i < count; ++i) {
         integrate(bodies[i], thrusts[i]);

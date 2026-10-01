@@ -15,9 +15,8 @@ struct Integrate final : framework::System<Kinematics, const Control> {
   void operator()(auto&, framework::Entity, Kinematics& kinematics,
                   const Control* control, framework::Step step) const {
     integrate_midpoint(
-        lib::InOut(kinematics),
         control ? control->acceleration : meters_per_second_squared(0, 0, 0),
-        seconds(step.dt));
+        seconds(step.dt), lib::InOut(kinematics));
   }
 };
 

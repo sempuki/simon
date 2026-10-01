@@ -328,17 +328,21 @@ const Store<ComponentType>& store_of(
 }
 
 template <Archetypal ArchetypeType, typename SystemType, typename WorldType>
-auto create(lib::InOut<WorldAccess<SystemType, WorldType>> access,
-            Alias alias = {}) {
-  return access->template create<ArchetypeType>(alias);
+auto create(Alias alias,
+            lib::InOut<WorldAccess<SystemType, WorldType>> access) {
+  return access->template create<ArchetypeType>(std::move(alias));
+}
+template <Archetypal ArchetypeType, typename SystemType, typename WorldType>
+auto create(lib::InOut<WorldAccess<SystemType, WorldType>> access) {
+  return access->template create<ArchetypeType>();
 }
 
 //-- Running systems -----------------------------------------------------------
 
 struct SystemRunner final {
   template <typename SystemType, typename WorldType>
-  static void run(lib::InOut<SystemType> system, lib::InOut<WorldType> world,
-                  const Step& step) {
+  static void run(const Step& step, lib::InOut<SystemType> system,
+                  lib::InOut<WorldType> world) {
     using ComponentList = component_list_of_t<SystemType>;
     using AllowComponentList = allow_component_list_of_t<SystemType>;
     using WriteList = write_list_of_t<SystemType>;
@@ -358,21 +362,24 @@ struct SystemRunner final {
     WorldAccess<SystemType, WorldType> access{lib::Depend(*world)};
     // A prepare stage that returns false skips the per-entity loop, for steps
     // with nothing to do.
-    bool proceed =
-        stage(system, access, step,
-              [](auto& target,
-                 auto&... arguments) -> decltype(target.prepare(arguments...)) {
-                return target.prepare(arguments...);
-              });
+    bool proceed = stage(
+        step,
+        [](auto& target,
+           auto&... arguments) -> decltype(target.prepare(arguments...)) {
+          return target.prepare(arguments...);
+        },
+        system, lib::InOut(access));
     if (proceed) {
-      loop(system, world, lib::InOut(access), step,
-           typename SystemType::OtherComponentList{});
+      loop(step, typename SystemType::OtherComponentList{}, system, world,
+           lib::InOut(access));
     }
-    stage(system, access, step,
-          [](auto& target,
-             auto&... arguments) -> decltype(target.resolve(arguments...)) {
-            return target.resolve(arguments...);
-          });
+    stage(
+        step,
+        [](auto& target,
+           auto&... arguments) -> decltype(target.resolve(arguments...)) {
+          return target.resolve(arguments...);
+        },
+        system, lib::InOut(access));
   }
 
  private:
@@ -390,8 +397,9 @@ struct SystemRunner final {
   // stage(world), whichever the system declares. Returns what a stage that
   // returns bool returned, and true otherwise.
   template <typename SystemType, typename WorldAccessType, typename CallType>
-  static bool stage(lib::InOut<SystemType> system, WorldAccessType& access,
-                    const Step& step, CallType call) {
+  static bool stage(const Step& step, CallType call,
+                    lib::InOut<SystemType> system,
+                    lib::InOut<WorldAccessType> access) {
     Step copy = step;
     auto outcome = [](auto&& invoke) {
       if constexpr (std::is_same_v<decltype(invoke()), bool>) {
@@ -403,10 +411,10 @@ struct SystemRunner final {
     };
     if constexpr (std::is_invocable_v<CallType, SystemType&, WorldAccessType&,
                                       Step&>) {
-      return outcome([&] { return call(*system, access, copy); });
+      return outcome([&] { return call(*system, *access, copy); });
     } else if constexpr (std::is_invocable_v<CallType, SystemType&,
                                              WorldAccessType&>) {
-      return outcome([&] { return call(*system, access); });
+      return outcome([&] { return call(*system, *access); });
     } else {
       return true;
     }
@@ -414,9 +422,9 @@ struct SystemRunner final {
 
   template <typename SystemType, typename WorldType, typename WorldAccessType,
             typename... OtherComponentTypes>
-  static void loop(lib::InOut<SystemType> system, lib::InOut<WorldType> world,
-                   lib::InOut<WorldAccessType> access, const Step& step,
-                   TypeList<OtherComponentTypes...>) {
+  static void loop(const Step& step, TypeList<OtherComponentTypes...>,
+                   lib::InOut<SystemType> system, lib::InOut<WorldType> world,
+                   lib::InOut<WorldAccessType> access) {
     using DrivingComponentType = typename SystemType::DrivingComponent;
     constexpr bool TAKES_STEP =
         std::is_invocable_v<SystemType&, WorldAccessType&, Entity,
@@ -605,10 +613,10 @@ class Scheduler final {
   explicit Scheduler(ScheduleType schedule)
       : systems_{flatten_systems(std::move(schedule))} {}
 
-  void step(lib::InOut<WorldType> world, const Step& step) {
+  void step(const Step& step, lib::InOut<WorldType> world) {
     std::apply(
         [&](auto&... system) {
-          ((SystemRunner::run(lib::InOut(system), world, step), world->sync()),
+          ((SystemRunner::run(step, lib::InOut(system), world), world->sync()),
            ...);
         },
         systems_);

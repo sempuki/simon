@@ -4,7 +4,6 @@
 
 #include <cmath>
 #include <expected>
-#include <utility>
 
 #include "framework/archetype.hpp"
 #include "framework/world.hpp"
@@ -44,16 +43,16 @@ struct Interceptor final
 using TestWorld = World<Position, TypeList<Velocity, Health>,
                         TypeList<Body, Launcher, Interceptor>>;
 
-// Holds 16 entities: 8 bodies, 4 launchers and 4 interceptors.
-inline TestWorld small_world() {
-  std::expected<TestWorld, Status> world = TestWorld::set_up()
-                                               .numbered(1)
-                                               .holding<Body>(8)
-                                               .holding<Launcher>(4)
-                                               .holding<Interceptor>(4)
-                                               .build();
-  CHECK_POSTCONDITION(world.has_value());
-  return *std::move(world);
+// Builds a world holding 16 entities: 8 bodies, 4 launchers and 4
+// interceptors.
+inline void build_small_world(lib::Out<TestWorld> world) {
+  std::expected<void, Status> built = TestWorld::set_up()
+                                          .numbered(1)
+                                          .holding<Body>(8)
+                                          .holding<Launcher>(4)
+                                          .holding<Interceptor>(4)
+                                          .build(world);
+  CHECK_POSTCONDITION(built.has_value());
 }
 
 }  // namespace simon::framework::testing

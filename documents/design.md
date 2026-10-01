@@ -41,6 +41,16 @@ and handle rules are the point of the project.
 Call sites use the constructor function, `Out(x)`, `InOut(x)` or `Depend(x)`,
 and let it deduce the type; only parameters name it.
 
+**Parameters read inputs first, then what the callee writes or keeps, then what
+it only writes:** `(In..., InOut..., Out)`, with `Depend` among the `InOut`s.
+`integrate_midpoint(acceleration, dt, InOut(kinematics))`,
+`scheduler.step(step, InOut(world))`, `BatchDriver{timing, Depend(simulation)}`.
+A system's call operator is the exception: the framework sets its order.
+
+**Return a value or write an `Out`, whichever suits the type.** An `Out`
+parameter fills an object the caller already owns, so it suits types that are
+large or never move, such as a world.
+
 A plain `T&` parameter is only for what the language or the framework decides:
 operators, and a system's call operator, whose entity-components arrive by
 reference with constness declared in `System<...>`. Computing wrappers from
@@ -653,12 +663,29 @@ erase types internally (a query, a set of archetypes), and the caller never
 sees those details. What leaves the builder is always a list of typed commands,
 so nothing is lost.
 
-Domain builders extend the same grammar with verbs of their own, for example
-`world.create<Ego>("ego").with_missiles(4).at(site).build()`, or a query form
-of destroy, `world.destroy().each<Team>(Team::Red).within(500 * m, of(asset))
-.build()`. Builders and commands are not isomorphic: one utterance can emit
-many commands, and a query emits a number that depends on the world at the
-time. Domain verbs arrive when an application needs them.
+Domain builders extend the same grammar with verbs of their own. Missile builds
+each defended site with one:
+
+```cpp
+std::expected<Entity, Status> asset =
+    create_site(origin, lib::Depend(world))
+        .protecting(Health{.points = 30.0})
+        .watched_by(10, radar, 500.0 * meter)
+        .defended_by(50, launcher, 300.0 * meter)
+        .attacked_by(1000, drone, warhead, Ring{.radius = 3500.0 * meter,
+                                               .width = 1000.0 * meter},
+                     lib::Depend(random))
+        .build();
+```
+
+`create_site` returns a builder whose type the caller never names, and
+`build()` becomes an entity utterance for each asset, radar, launcher and
+drone. Builders and commands are not isomorphic: one utterance emits many
+commands. If the world refuses one entity, the builder destroys those it
+already created, so nothing of the site is left after the next sync, and
+returns the world's Status. Other domain verbs, such as a query form of
+destroy (`world.destroy().each<Team>(Team::Red).within(500 * m, of(asset))
+.build()`), arrive when an application needs them.
 
 #### IO is not a builder verb
 
@@ -1036,14 +1063,15 @@ using World = framework::World<
   detail of the two:
 
   ```cpp
-  std::expected<World, Status> world =
+  World world;  // Empty: it holds nothing until built.
+  std::expected<void, Status> built =
       World::set_up()
           .numbered(1)
           .holding<archetype::RedDrone>(drones)
           .holding<archetype::Track>(drones)
           .holding<archetype::Blast>(drones + interceptors)
           .cells_of(250.0 * model::meter)
-          .build();
+          .build(lib::Out(world));
   ```
 
   - `holding<A>(n)` says the world holds `n` more entities of archetype `A`
@@ -1054,14 +1082,19 @@ using World = framework::World<
     per archetype: one archetype may use another's slack.
   - `cells_of(size)` is the spatial index's cell edge, converted with
     `coordinate_length`. About the radius of a typical query works well.
-  - `build()` returns `std::expected<World, Status>` like every builder. It
-    refuses a cell size that is not positive (`CELL_SIZE_INVALID`) and holding
-    more than a store's 32-bit slots can index (`CAPACITY_TOO_LARGE`).
-  - A world is movable, so it can live in an `expected` or an `optional`.
-    Moving one leaves dangling any builder or `WorldAccess` that refers to it,
-    and both are temporaries. Applications build their world in the
-    `configure` phase, so a plan too big for a world fails that phase with the
-    builder's Status: missile's `world_for(scenario)` says how many of each
+  - `build(lib::Out(world))` fills the caller's world, discarding everything it
+    held, and returns `std::expected<void, Status>`. It refuses a cell size
+    that is not positive (`CELL_SIZE_INVALID`) and holding more than a store's
+    32-bit slots can index (`CAPACITY_TOO_LARGE`), and a refused plan leaves
+    the world as it was.
+  - **A world never moves.** Builders, `WorldAccess` and domain builders keep a
+    pointer to it and its stores never reallocate, so nothing that refers to a
+    world can dangle while it lives. Its default constructor makes an empty
+    world, and the builder fills it in place through a private `initialize`,
+    the one description of how a configuration makes a world.
+  - Applications hold their world as a member and build it in the `configure`
+    phase, so a plan too big for a world fails that phase with the builder's
+    Status: missile's `build_world(scenario, Out(world))` says how many of each
     archetype a scenario holds.
 - **The archetype list says what the world can create,** and orders each
   store's segments. It is checked against the component list at compile time:

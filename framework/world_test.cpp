@@ -4,6 +4,7 @@
 
 #include <expected>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 
 #include "base/testing.hpp"
@@ -23,52 +24,87 @@ concept CanParent =
 
 TEST_CASE("SetUpBuilder") {
   SECTION("ShouldSizeEachStoreByArchetypesThatPermitItGivenHoldings") {
-    std::expected<TestWorld, Status> world =
+    TestWorld world;
+    std::expected<void, Status> built =
         TestWorld::set_up()
             .numbered(3)
             .holding<Body>(5)
             .holding<testing::Launcher>(2)
             .holding<testing::Launcher>(1)  // Holdings add up.
-            .build();
+            .build(lib::Out(world));
 
-    REQUIRE(world.has_value());
-    CHECK(world->number() == 3u);
+    REQUIRE(built.has_value());
+    CHECK(world.number() == 3u);
     // Every archetype requires or allows Position; only bodies allow Health;
     // bodies allow and interceptors require Velocity.
-    CHECK(world->store_of<Position>().capacity() == 8u);
-    CHECK(world->store_of<Health>().capacity() == 5u);
-    CHECK(world->store_of<Velocity>().capacity() == 5u);
+    CHECK(world.store_of<Position>().capacity() == 8u);
+    CHECK(world.store_of<Health>().capacity() == 5u);
+    CHECK(world.store_of<Velocity>().capacity() == 5u);
   }
 
   SECTION("ShouldRefuseGivenCellSizeNotPositive") {
-    auto world = TestWorld::set_up().holding<Body>(1).cells_of(0.0).build();
+    TestWorld world;
+    auto built = TestWorld::set_up().holding<Body>(1).cells_of(0.0).build(
+        lib::Out(world));
 
-    REQUIRE_FALSE(world.has_value());
-    CHECK(world.error() == lib::watch(BuildError::CELL_SIZE_INVALID));
+    REQUIRE_FALSE(built.has_value());
+    CHECK(built.error() == lib::watch(BuildError::CELL_SIZE_INVALID));
   }
 
   SECTION("ShouldRefuseGivenHoldingMoreThanAStoreCanIndex") {
-    auto world =
-        TestWorld::set_up().holding<Body>(std::size_t{1} << 40).build();
+    TestWorld world;
+    auto built = TestWorld::set_up()
+                     .holding<Body>(std::size_t{1} << 40)
+                     .build(lib::Out(world));
 
-    REQUIRE_FALSE(world.has_value());
-    CHECK(world.error() == lib::watch(BuildError::CAPACITY_TOO_LARGE));
+    REQUIRE_FALSE(built.has_value());
+    CHECK(built.error() == lib::watch(BuildError::CAPACITY_TOO_LARGE));
   }
 
-  SECTION("ShouldKeepEntitiesGivenWorldMoved") {
-    TestWorld first = testing::small_world();
-    Entity entity = *first.create<Body>().with(Position{2.0}).build();
-    first.sync();
+  SECTION("ShouldHoldNothingGivenDefaultWorld") {
+    TestWorld world;
 
-    TestWorld second = std::move(first);
+    auto created = world.create<Body>().build();
 
-    CHECK(second.alive(entity));
-    CHECK(second.store_of<Position>().component_of(entity).x == 2.0);
+    REQUIRE_FALSE(created.has_value());
+    CHECK(created.error() == lib::watch(BuildError::ENTITY_CAPACITY_EXHAUSTED));
+  }
+
+  SECTION("ShouldDiscardEverythingGivenWorldBuiltAgain") {
+    TestWorld world;
+    testing::build_small_world(lib::Out(world));
+    Entity entity = *world.create<Body>("ego").with(Position{}).build();
+    world.sync();
+
+    testing::build_small_world(lib::Out(world));
+
+    CHECK_FALSE(world.alive(entity));
+    CHECK(world.size() == 0u);
+    CHECK(world.find_name_of(Alias{"ego"}).empty());
+    CHECK(world.store_of<Position>().size() == 0u);
+  }
+
+  SECTION("ShouldKeepTheWorldGivenRefusedPlan") {
+    TestWorld world;
+    testing::build_small_world(lib::Out(world));
+    Entity entity = *world.create<Body>().build();
+    world.sync();
+
+    auto built = TestWorld::set_up().cells_of(-1.0).build(lib::Out(world));
+
+    REQUIRE_FALSE(built.has_value());
+    CHECK(world.alive(entity));
+  }
+
+  SECTION("ShouldNeverMoveGivenAWorld") {
+    STATIC_CHECK_FALSE(std::is_move_constructible_v<TestWorld>);
+    STATIC_CHECK_FALSE(std::is_move_assignable_v<TestWorld>);
   }
 }
 
 TEST_CASE("World") {
-  TestWorld world{testing::small_world()};
+  TestWorld world;
+  testing::build_small_world(lib::Out(world));
 
   SECTION("ShouldDeferComponentsUntilSyncGivenCreate") {
     auto entity =
@@ -94,7 +130,9 @@ TEST_CASE("World") {
   }
 
   SECTION("ShouldNeverReuseNameGivenIndexReused") {
-    TestWorld tiny = *TestWorld::set_up().numbered(1).holding<Body>(1).build();
+    TestWorld tiny;
+    REQUIRE(
+        TestWorld::set_up().numbered(1).holding<Body>(1).build(lib::Out(tiny)));
     Entity first = *tiny.create<Body>().build();
     tiny.sync();
     REQUIRE(tiny.destroy(first).build());
@@ -337,11 +375,12 @@ TEST_CASE("World") {
   SECTION("ShouldRefuseAttachGivenStoreFullAfterPendingAttaches") {
     // Only bodies allow Health, so its store holds 2; launchers fill the
     // rest of the 8 entities.
-    TestWorld small = *TestWorld::set_up()
-                           .numbered(1)
-                           .holding<Body>(2)
-                           .holding<testing::Launcher>(6)
-                           .build();
+    TestWorld small;
+    REQUIRE(TestWorld::set_up()
+                .numbered(1)
+                .holding<Body>(2)
+                .holding<testing::Launcher>(6)
+                .build(lib::Out(small)));
     REQUIRE(small.create<Body>().with(Health{}).build());
     REQUIRE(small.create<Body>()
                 .with(Health{})

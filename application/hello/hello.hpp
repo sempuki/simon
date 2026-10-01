@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <expected>
-#include <optional>
 
 #include "base/core.hpp"
 #include "engine/lifecycle.hpp"
@@ -153,9 +152,10 @@ inline Balls build_balls(lib::InOut<World> world) {
   return Balls{.red = *red, .blue = *blue};
 }
 
-// A world holding `balls` balls.
-inline std::expected<World, framework::Status> world_for(std::size_t balls) {
-  return World::set_up().numbered(1).holding<Ball>(balls).build();
+// Builds in `world` a world holding `balls` balls.
+inline std::expected<void, framework::Status> build_world(
+    std::size_t balls, lib::Out<World> world) {
+  return World::set_up().numbered(1).holding<Ball>(balls).build(world);
 }
 
 inline bool any_collision(const World& world) {
@@ -171,29 +171,26 @@ class Simulation final {
  public:
   // Builds the world and the two balls in it.
   engine::PhaseResult configure() {
-    std::expected<World, framework::Status> world = world_for(2);
-    if (!world) {
-      return std::unexpected(world.error());
+    std::expected<void, framework::Status> built =
+        build_world(2, lib::Out(world_));
+    if (!built) {
+      return std::unexpected(built.error());
     }
-    world_.emplace(*std::move(world));
-    balls_ = build_balls(lib::InOut(*world_));
+    balls_ = build_balls(lib::InOut(world_));
     return engine::Flow::CONTINUE;
   }
 
   engine::PhaseResult step(const framework::Step& step) {
-    scheduler_.step(lib::InOut(*world_), step);
-    return any_collision(*world_) ? engine::Flow::STOP : engine::Flow::CONTINUE;
+    scheduler_.step(step, lib::InOut(world_));
+    return any_collision(world_) ? engine::Flow::STOP : engine::Flow::CONTINUE;
   }
 
-  // The world, once configured.
-  const World& world() const {
-    CHECK_PRECONDITION(world_.has_value());
-    return *world_;
-  }
+  // The world: empty until configured.
+  const World& world() const { return world_; }
   const Balls& balls() const { return balls_; }
 
  private:
-  std::optional<World> world_;  // Built by configure.
+  World world_;  // Empty until configure builds it.
   Scheduler scheduler_;
   Balls balls_{};
 };

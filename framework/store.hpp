@@ -28,7 +28,16 @@ class Uninitialized final {
   Uninitialized(Uninitialized&& that) noexcept
       : data_{std::exchange(that.data_, nullptr)},
         size_{std::exchange(that.size_, 0)} {}
-  Uninitialized& operator=(Uninitialized&&) = delete;
+  Uninitialized& operator=(Uninitialized&& that) noexcept {
+    if (this != &that) {
+      if (data_) {
+        std::allocator<Type>{}.deallocate(data_, size_);
+      }
+      data_ = std::exchange(that.data_, nullptr);
+      size_ = std::exchange(that.size_, 0);
+    }
+    return *this;
+  }
   ~Uninitialized() {
     if (data_) {
       std::allocator<Type>{}.deallocate(data_, size_);
@@ -78,8 +87,27 @@ class Store final {
   }
 
   DECLARE_COPY_DELETE(Store);
+  // An empty store, with room for nothing.
+  Store() : Store{0, 0} {}
   Store(Store&&) noexcept = default;
-  Store& operator=(Store&&) = delete;
+  // Destroys what this store holds, then takes `that`'s, leaving it empty.
+  Store& operator=(Store&& that) noexcept {
+    if (this != &that) {
+      destroy_all();
+      capacity_ = that.capacity_;
+      chunk_size_ = that.chunk_size_;
+      chunks_ = that.chunks_;
+      data_ = std::move(that.data_);
+      owner_ = std::move(that.owner_);
+      place_ = std::move(that.place_);
+      index_ = std::move(that.index_);
+      segments_ = std::move(that.segments_);
+      free_ = std::move(that.free_);
+      size_ = std::exchange(that.size_, 0);
+      that.segments_.clear();
+    }
+    return *this;
+  }
 
   // Room for `capacity` entity-components among `segments` segments, for
   // entities whose indices are below `entity_capacity`. `chunk_size` must be a
@@ -109,10 +137,7 @@ class Store final {
     }
   }
 
-  ~Store() {
-    for_each(
-        [](Entity, ComponentType& component) { std::destroy_at(&component); });
-  }
+  ~Store() { destroy_all(); }
 
   std::size_t size() const { return size_; }
   std::size_t capacity() const { return capacity_; }
@@ -239,6 +264,11 @@ class Store final {
 
  private:
   static constexpr Slot ABSENT = std::numeric_limits<Slot>::max();
+
+  void destroy_all() {
+    for_each(
+        [](Entity, ComponentType& component) { std::destroy_at(&component); });
+  }
 
   struct IndexEntry final {
     Slot slot = ABSENT;

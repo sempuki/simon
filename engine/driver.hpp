@@ -34,7 +34,7 @@ template <Simulation SimulationType>
 class Driver final {
  public:
   // Keeps a reference to `simulation` for as long as the driver lives.
-  Driver(lib::Depend<SimulationType> simulation, Timing timing)
+  Driver(Timing timing, lib::Depend<SimulationType> simulation)
       : simulation_{simulation.get()},
         now_{timing.start},
         max_step_{timing.max_step} {
@@ -111,8 +111,8 @@ class Driver final {
 template <Simulation SimulationType>
 class BatchDriver final {
  public:
-  BatchDriver(lib::Depend<SimulationType> simulation, Timing timing)
-      : driver_{simulation, timing} {}
+  BatchDriver(Timing timing, lib::Depend<SimulationType> simulation)
+      : driver_{timing, simulation} {}
 
   // Runs the whole lifecycle. Returns the time the simulation reached.
   std::expected<TimePoint, Status> run(TimePoint end) {
@@ -144,9 +144,10 @@ template <Simulation SimulationType,
           typename WallClockType = std::chrono::steady_clock>
 class RealTimeDriver final {
  public:
-  RealTimeDriver(lib::Depend<SimulationType> simulation, Timing timing,
-                 double speed = 1.0)
-      : driver_{simulation, timing}, start_{timing.start}, speed_{speed} {
+  // Runs at `speed` times real time.
+  RealTimeDriver(Timing timing, double speed,
+                 lib::Depend<SimulationType> simulation)
+      : driver_{timing, simulation}, start_{timing.start}, speed_{speed} {
     CHECK_PRECONDITION(speed_ > 0.0);
   }
 

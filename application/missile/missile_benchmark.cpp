@@ -91,10 +91,14 @@ void measure(int drones, int maximum_steps, bool budgeted) {
   constexpr std::size_t SYSTEM_COUNT = List::size;
 
   Scenario scenario = scenario_of(drones);
-  std::expected<World, framework::Status> built = world_for(scenario);
+  World world;
+  std::expected<void, framework::Status> built =
+      build_world(scenario, lib::Out(world));
   CHECK_POSTCONDITION(built.has_value());
-  World& world = *built;
-  Entity asset = build_scenario(lib::InOut(world), scenario);
+  std::expected<Entity, framework::Status> built_asset =
+      build_scenario(scenario, lib::InOut(world));
+  CHECK_POSTCONDITION(built_asset.has_value());
+  Entity asset = *built_asset;
   auto schedulers = schedulers_of(List{});
   std::array<double, SYSTEM_COUNT> seconds{};
   std::size_t entity_steps = 0;
@@ -112,7 +116,7 @@ void measure(int drones, int maximum_steps, bool budgeted) {
         [&](auto&... scheduler) {
           (([&] {
              auto start = WallClock::now();
-             scheduler.step(lib::InOut(world), step);
+             scheduler.step(step, lib::InOut(world));
              seconds[index++] +=
                  std::chrono::duration<double>(WallClock::now() - start)
                      .count();
