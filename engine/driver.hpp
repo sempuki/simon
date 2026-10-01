@@ -122,12 +122,8 @@ class BatchDriver final {
       started = driver_.advance_to(end);
     }
     FinishResult finished = driver_.finish();
-    if (!started) {
-      return std::unexpected(started.error());
-    }
-    if (!finished) {
-      return std::unexpected(finished.error());
-    }
+    RETURN_IF_UNEXPECTED(started);
+    RETURN_IF_UNEXPECTED(finished);
     return driver_.now();
   }
 

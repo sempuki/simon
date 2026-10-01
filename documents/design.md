@@ -51,6 +51,18 @@ A system's call operator is the exception: the framework sets its order.
 parameter fills an object the caller already owns, so it suits types that are
 large or never move, such as a world.
 
+**Errors are `std::expected<T, lib::Status>`, propagated with `lib`'s macros**
+instead of an `if` per call:
+
+```cpp
+RETURN_IF_UNEXPECTED(build_world(scenario_, lib::Out(world_)));
+ASSIGN_OR_RETURN(asset_, build_scenario(scenario_, lib::InOut(world_)));
+```
+
+`RETURN_IF_UNEXPECTED` returns the error, if any, from the enclosing function.
+`ASSIGN_OR_RETURN` does the same and otherwise moves the value into an existing
+variable or a new declaration (`Entity asset`).
+
 A plain `T&` parameter is only for what the language or the framework decides:
 operators, and a system's call operator, whose entity-components arrive by
 reference with constness declared in `System<...>`. Computing wrappers from

@@ -171,11 +171,7 @@ class Simulation final {
  public:
   // Builds the world and the two balls in it.
   engine::PhaseResult configure() {
-    std::expected<void, framework::Status> built =
-        build_world(2, lib::Out(world_));
-    if (!built) {
-      return std::unexpected(built.error());
-    }
+    RETURN_IF_UNEXPECTED(build_world(2, lib::Out(world_)));
     balls_ = build_balls(lib::InOut(world_));
     return engine::Flow::CONTINUE;
   }

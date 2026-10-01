@@ -261,7 +261,8 @@ inline std::expected<Entity, framework::Status> build_scenario(
   for (int site = 0; site < scenario.sites; ++site) {
     Position origin =
         model::meters(spacing * (site % side), spacing * (site / side), 0.0);
-    std::expected<Entity, framework::Status> asset =
+    ASSIGN_OR_RETURN(
+        Entity asset,
         create_site(origin, lib::Depend(*world))
             .protecting(Health{.points = scenario.asset_health})
             .watched_by(count(scenario.radars),
@@ -280,12 +281,9 @@ inline std::expected<Entity, framework::Status> build_scenario(
                          Ring{.radius = scenario.spawn_distance,
                               .width = scenario.spawn_spread},
                          lib::Depend(random))
-            .build();
-    if (!asset) {
-      return asset;
-    }
+            .build());
     if (!first) {
-      first = *asset;
+      first = asset;
     }
   }
   world->sync();
@@ -305,17 +303,8 @@ class Simulation final {
   // Builds the world and the scenario in it. A scenario too big for a world
   // fails this phase with the builder's Status.
   engine::PhaseResult configure() {
-    std::expected<void, framework::Status> built =
-        build_world(scenario_, lib::Out(world_));
-    if (!built) {
-      return std::unexpected(built.error());
-    }
-    std::expected<Entity, framework::Status> asset =
-        build_scenario(scenario_, lib::InOut(world_));
-    if (!asset) {
-      return std::unexpected(asset.error());
-    }
-    asset_ = *asset;
+    RETURN_IF_UNEXPECTED(build_world(scenario_, lib::Out(world_)));
+    ASSIGN_OR_RETURN(asset_, build_scenario(scenario_, lib::InOut(world_)));
     return engine::Flow::CONTINUE;
   }
 
