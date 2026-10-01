@@ -288,6 +288,74 @@ TEST_CASE("DestroyQueryBuilder") {
   }
 }
 
+TEST_CASE("ChangeQueryBuilder") {
+  TestWorld world;
+  testing::build_small_world(lib::Out(world));
+  Entity wounded =
+      *world.create<Body>().with(Position{1.0}).with(Health{1.0}).build();
+  Entity healthy = *world.create<Body>().with(Position{1.5}).build();
+  Entity distant = *world.create<Body>().with(Position{9.0}).build();
+  Entity launcher =
+      *world.create<testing::Launcher>().with(Position{1.2}).build();
+  world.sync();
+
+  SECTION("ShouldChangeEveryEntityOfArchetypeGivenEachArchetype") {
+    auto changed = world.change().each<Body>().attach(Velocity{}).build();
+    world.sync();
+
+    REQUIRE(changed.has_value());
+    CHECK(*changed == 3u);
+    CHECK(world.store_of<Velocity>().contains(wounded));
+    CHECK(world.store_of<Velocity>().contains(healthy));
+    CHECK(world.store_of<Velocity>().contains(distant));
+  }
+
+  SECTION("ShouldChangeOnlyNearbyAcceptedGivenWithinAndWhere") {
+    auto changed = world.change()
+                       .each<Body>()
+                       .within(Position{0.0}, 2.0)
+                       .where([&](Entity entity) { return entity != wounded; })
+                       .detach<Position>()
+                       .build();
+    world.sync();
+
+    CHECK(changed == 1u);
+    CHECK_FALSE(world.store_of<Position>().contains(healthy));
+    CHECK(world.store_of<Position>().contains(wounded));
+    CHECK(world.store_of<Position>().contains(distant));
+    CHECK(world.store_of<Position>().contains(launcher));
+  }
+
+  SECTION("ShouldChangeNothingGivenAnyMatchRefuses") {
+    // Bodies allow Velocity; launchers do not.
+    auto changed = world.change().each<Position>().attach(Velocity{}).build();
+
+    REQUIRE_FALSE(changed.has_value());
+    CHECK(changed.error() == lib::watch(BuildError::COMPONENT_NOT_PERMITTED));
+    CHECK(world.pending() == 0u);
+  }
+
+  SECTION("ShouldSkipEntitiesGivenDestructionAlreadyPlanned") {
+    REQUIRE(world.destroy(distant).build());
+
+    auto changed = world.change().each<Body>().attach(Velocity{}).build();
+
+    CHECK(changed == 2u);
+  }
+
+  SECTION("ShouldAliasEveryMatchGivenAlias") {
+    auto changed = world.change()
+                       .each<Body>()
+                       .within(Position{0.0}, 2.0)
+                       .alias("hostile")
+                       .build();
+
+    CHECK(changed == 2u);
+    CHECK(world.find_name_of(Alias{"hostile"}).size() == 2u);
+    CHECK(world.aliases_of(world.name_of(distant)).empty());
+  }
+}
+
 TEST_CASE("World") {
   TestWorld world;
   testing::build_small_world(lib::Out(world));

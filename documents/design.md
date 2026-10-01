@@ -731,7 +731,7 @@ Registering an archetype on its first creation is not undone; it describes what
 the world can hold, not what the utterance planned.
 
 **Query forms** select entities and apply one verb to all of them, atomically.
-The first is destroy:
+Destroy and change have query forms. Destroy:
 
 ```cpp
 std::expected<std::size_t, Status> destroyed =
@@ -746,8 +746,34 @@ std::expected<std::size_t, Status> destroyed =
 or by component (walking its store). `within` narrows through the spatial
 index, and each `where` narrows by a predicate. `build()` plans every
 destruction in one transaction, skips entities already planned for
-destruction, and returns how many it destroyed. Query forms of `change`
-(attach or detach on every match) are next.
+destruction, and returns how many it destroyed.
+
+Change selects in the same words, then changes in the words of the
+single-entity `change`:
+
+```cpp
+std::expected<std::size_t, Status> changed =
+    world.change()
+        .each<archetype::RedDrone>()
+        .within(asset_kinematics, 4000.0 * meter)
+        .attach(Tracked{})
+        .detach<Health>()
+        .alias("hostile")
+        .build();
+```
+
+Every selected entity gets a copy of each attached component. `build()` makes
+the change to each entity in one transaction. If the world refuses it for any
+entity (an archetype that doesn't permit the component, a full store, an alias
+already given), nothing changes and `build()` returns that Status. The same
+compile-time checks apply as for one entity: the component is in the world's
+list, it isn't built in, and each is attached or detached once. A change that
+attaches, detaches and aliases nothing doesn't compile.
+
+Both query forms share `Query`, which holds the selection: the chosen archetype
+or component, the `within` region and the predicates. Selection happens before
+the transaction opens, so a predicate sees the world as it was before the
+utterance.
 
 #### IO is not a builder verb
 

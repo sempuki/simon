@@ -54,8 +54,13 @@ using distance_of_t = decltype(distance(std::declval<const Type&>(),
 template <typename WorldType>
 class SetUpBuilder;
 
-template <typename WorldType, typename SelectionType>
+template <typename WorldType, typename ChosenType>
+class Query;
+template <typename WorldType, typename ChosenType>
 class DestroyQueryBuilder;
+template <typename WorldType, typename ChosenType, typename AttachedListType,
+          typename DetachedListType, bool Aliasing>
+class ChangeQueryBuilder;
 
 // Unlocks mutable store access. Only the scheduler, which runs systems, can
 // construct one.
@@ -151,6 +156,12 @@ class World<SpatialType,                  //
   }
   auto change(Entity entity) {
     return ChangeBuilder<World>{entity, {}, {}, lib::Depend(*this)};
+  }
+  // Makes the same change to every entity a query selects. See
+  // ChangeQueryBuilder.
+  auto change() {
+    return ChangeQueryBuilder<World, void, TypeList<>, TypeList<>, false>{
+        lib::Depend(*this)};
   }
   auto destroy(Entity entity) {
     return DestroyBuilder<World>{entity, lib::Depend(*this)};
@@ -515,7 +526,7 @@ class World<SpatialType,                  //
   template <typename>
   friend class DestroyBuilder;
   template <typename, typename>
-  friend class DestroyQueryBuilder;
+  friend class Query;
 
   template <typename ComponentType>
   static constexpr std::uint32_t component_number() {
@@ -1105,6 +1116,101 @@ class [[nodiscard]] SetUpBuilder final {
   double cell_size_ = 1.0;
 };
 
+// Which entities a query form selects. `each<ChosenType>()` chose them by
+// archetype, if ChosenType is one, or else by component; `near` and `keep`
+// narrow them. Entities already planned for destruction are never selected.
+template <typename WorldType, typename ChosenType>
+class Query final {
+ public:
+  using SpatialType = typename WorldType::SpatialComponent;
+  using DistanceType = distance_of_t<SpatialType>;
+
+  static_assert(
+      Archetypal<ChosenType>
+          ? contains_v<typename WorldType::ArchetypeList, ChosenType>
+          : contains_v<typename WorldType::ComponentList, ChosenType>,
+      "Choose an archetype in the world's archetype list or a component in "
+      "its component list.");
+
+  // Keeps only entities whose spatial component is within `radius` of
+  // `center`.
+  void near(const SpatialType& center, DistanceType radius) {
+    near_ = Near{.center = center, .radius = radius};
+  }
+
+  // Keeps only entities for which `predicate(Entity)` is true.
+  template <typename PredicateType>
+  void keep(PredicateType&& predicate) {
+    predicates_.emplace_back(std::forward<PredicateType>(predicate));
+  }
+
+  // The selected entities, in a deterministic order: the archetype's segment
+  // or the component's store, or the spatial index's order when narrowed by
+  // `near`.
+  std::vector<Entity> select(lib::InOut<WorldType> world) const {
+    std::vector<Entity> selected;
+    auto consider = [&](Entity entity) {
+      if (world->will_be_alive(entity) &&
+          std::ranges::all_of(predicates_, [&](const auto& predicate) {
+            return predicate(entity);
+          })) {
+        selected.push_back(entity);
+      }
+    };
+    if (near_) {
+      world->within(near_->center, near_->radius,
+                    [&](Entity entity, const SpatialType&) {
+                      if (is_chosen(*world, entity)) {
+                        consider(entity);
+                      }
+                    });
+    } else {
+      for_each_chosen(*world, consider);
+    }
+    return selected;
+  }
+
+ private:
+  struct Near final {
+    SpatialType center;
+    DistanceType radius;
+  };
+
+  static bool is_chosen(const WorldType& world, Entity entity) {
+    if constexpr (Archetypal<ChosenType>) {
+      return world.archetype_of_index_[entity.index] ==
+             index_of_v<typename WorldType::ArchetypeList, ChosenType>;
+    } else {
+      return world.template store_of<ChosenType>().contains(entity);
+    }
+  }
+
+  // Visits every chosen entity: an archetype's segment of the EntityArchetype
+  // store, or every owner in the component's store.
+  template <typename VisitorType>
+  static void for_each_chosen(const WorldType& world, VisitorType&& visit) {
+    if constexpr (Archetypal<ChosenType>) {
+      const auto& archetypes = world.template store_of<EntityArchetype>();
+      constexpr std::size_t SEGMENT =
+          WorldType::template segment_of<EntityArchetype>(
+              index_of_v<typename WorldType::ArchetypeList, ChosenType>);
+      for (std::size_t ordinal = 0; ordinal < archetypes.chunks_in(SEGMENT);
+           ++ordinal) {
+        auto chunk = archetypes.chunk(SEGMENT, ordinal);
+        for (std::size_t i = 0; i < chunk.size; ++i) {
+          visit(chunk.owners[i]);
+        }
+      }
+    } else {
+      world.template store_of<ChosenType>().for_each(
+          [&](Entity owner, const ChosenType&) { visit(owner); });
+    }
+  }
+
+  std::optional<Near> near_;
+  std::vector<std::function<bool(Entity)>> predicates_;
+};
+
 // Destroys every entity a query selects, atomically, and returns how many:
 //
 //   world.destroy()
@@ -1113,12 +1219,9 @@ class [[nodiscard]] SetUpBuilder final {
 //       .where([&](Entity drone) { return drone != spared; })
 //       .build();
 //
-// `each` comes first and selects by archetype, if its type is one, or else by
-// component. `within` keeps entities whose spatial component is within a
-// radius, and each `where` keeps those its predicate accepts. `build()`
-// plans every destruction in one transaction, skipping entities already
-// planned for destruction, so it destroys all of them or none.
-template <typename WorldType, typename SelectionType>
+// `each` comes first. `build()` plans every destruction in one transaction,
+// so it destroys all of the selected entities or none.
+template <typename WorldType, typename ChosenType>
 class [[nodiscard]] DestroyQueryBuilder final {
  public:
   using SpatialType = typename WorldType::SpatialComponent;
@@ -1128,27 +1231,20 @@ class [[nodiscard]] DestroyQueryBuilder final {
   explicit DestroyQueryBuilder(lib::Depend<WorldType> world)
       : world_{world.get()} {}
 
-  // Selects every entity of archetype `ChosenType`, or every entity with
-  // component `ChosenType`.
-  template <typename ChosenType>
-    requires std::is_void_v<SelectionType>
+  // Selects every entity of archetype `NextType`, or every entity with
+  // component `NextType`.
+  template <typename NextType>
+    requires std::is_void_v<ChosenType>
   auto each() && {
-    if constexpr (Archetypal<ChosenType>) {
-      static_assert(contains_v<typename WorldType::ArchetypeList, ChosenType>,
-                    "This archetype is not in the world's archetype list.");
-    } else {
-      static_assert(contains_v<typename WorldType::ComponentList, ChosenType>,
-                    "This component is not in the world's component list.");
-    }
-    return DestroyQueryBuilder<WorldType, ChosenType>{lib::Depend(*world_)};
+    return DestroyQueryBuilder<WorldType, NextType>{lib::Depend(*world_)};
   }
 
   // Keeps only entities whose spatial component is within `radius` of
   // `center`.
   auto within(const SpatialType& center, DistanceType radius) &&
-    requires(!std::is_void_v<SelectionType>)
+    requires(!std::is_void_v<ChosenType>)
   {
-    near_ = Near{.center = center, .radius = radius};
+    query_.near(center, radius);
     return std::move(*this);
   }
 
@@ -1156,35 +1252,16 @@ class [[nodiscard]] DestroyQueryBuilder final {
   // up.
   template <typename PredicateType>
   auto where(PredicateType&& predicate) &&
-    requires(!std::is_void_v<SelectionType>)
+    requires(!std::is_void_v<ChosenType>)
   {
-    predicates_.emplace_back(std::forward<PredicateType>(predicate));
+    query_.keep(std::forward<PredicateType>(predicate));
     return std::move(*this);
   }
 
   std::expected<std::size_t, Status> build() &&
-    requires(!std::is_void_v<SelectionType>)
+    requires(!std::is_void_v<ChosenType>)
   {
-    std::vector<Entity> selected;
-    auto consider = [&](Entity entity) {
-      if (world_->will_be_alive(entity) &&
-          std::ranges::all_of(predicates_, [&](const auto& predicate) {
-            return predicate(entity);
-          })) {
-        selected.push_back(entity);
-      }
-    };
-    if (near_) {
-      world_->within(near_->center, near_->radius,
-                     [&](Entity entity, const SpatialType&) {
-                       if (is_selected(entity)) {
-                         consider(entity);
-                       }
-                     });
-    } else {
-      for_each_selected(consider);
-    }
-
+    std::vector<Entity> selected = query_.select(lib::InOut(*world_));
     auto transaction = world_->transaction();
     for (Entity entity : selected) {
       RETURN_IF_UNEXPECTED(world_->destroy(entity).build());
@@ -1194,47 +1271,184 @@ class [[nodiscard]] DestroyQueryBuilder final {
   }
 
  private:
-  struct Near final {
-    SpatialType center;
-    DistanceType radius;
-  };
+  template <typename, typename>
+  friend class DestroyQueryBuilder;
 
-  // Whether `entity` is of the chosen archetype, or has the chosen component.
-  bool is_selected(Entity entity) const {
-    if constexpr (Archetypal<SelectionType>) {
-      return world_->archetype_of_index_[entity.index] ==
-             index_of_v<typename WorldType::ArchetypeList, SelectionType>;
-    } else {
-      return world_->template store_of<SelectionType>().contains(entity);
-    }
+  struct Unchosen final {};
+  using QueryType = std::conditional_t<std::is_void_v<ChosenType>, Unchosen,
+                                       Query<WorldType, ChosenType>>;
+
+  // Never null once constructed; Depend checks it.
+  WorldType* world_ = nullptr;
+  QueryType query_;
+};
+
+// Makes the same change to every entity a query selects, atomically, and
+// returns how many it changed:
+//
+//   world.change()
+//       .each<archetype::RedDrone>()
+//       .within(asset_kinematics, 4000.0 * meter)
+//       .attach(Tracked{})
+//       .detach<Health>()
+//       .alias("hostile")
+//       .build();
+//
+// `each` comes first, then any of `within` and `where`, then the change in the
+// words of ChangeBuilder: `attach`, `detach`, `alias` and `unalias`. `build()`
+// makes the change to each selected entity in one transaction; if the world
+// refuses it for any of them, nothing changes and build() returns the Status.
+template <typename WorldType, typename ChosenType,
+          typename AttachedListType = TypeList<>,
+          typename DetachedListType = TypeList<>, bool Aliasing = false>
+class ChangeQueryBuilder;
+
+template <typename WorldType, typename ChosenType, typename... AttachedTypes,
+          typename... DetachedTypes, bool Aliasing>
+class [[nodiscard]]
+ChangeQueryBuilder<WorldType, ChosenType, TypeList<AttachedTypes...>,
+                   TypeList<DetachedTypes...>, Aliasing>
+    final {
+ public:
+  using SpatialType = typename WorldType::SpatialComponent;
+  using DistanceType = distance_of_t<SpatialType>;
+
+  // Keeps a reference to `world` until the utterance is built.
+  explicit ChangeQueryBuilder(lib::Depend<WorldType> world)
+      : world_{world.get()} {}
+
+  // Selects every entity of archetype `NextType`, or every entity with
+  // component `NextType`.
+  template <typename NextType>
+    requires std::is_void_v<ChosenType>
+  auto each() && {
+    return ChangeQueryBuilder<WorldType, NextType>{lib::Depend(*world_)};
   }
 
-  // Visits every selected entity: an archetype's segment of the
-  // EntityArchetype store, or every owner in the component's store.
-  template <typename VisitorType>
-  void for_each_selected(VisitorType&& visit) const {
-    if constexpr (Archetypal<SelectionType>) {
-      const auto& archetypes = world_->template store_of<EntityArchetype>();
-      constexpr std::size_t SEGMENT =
-          WorldType::template segment_of<EntityArchetype>(
-              index_of_v<typename WorldType::ArchetypeList, SelectionType>);
-      for (std::size_t ordinal = 0; ordinal < archetypes.chunks_in(SEGMENT);
-           ++ordinal) {
-        auto chunk = archetypes.chunk(SEGMENT, ordinal);
-        for (std::size_t i = 0; i < chunk.size; ++i) {
-          visit(chunk.owners[i]);
-        }
-      }
-    } else {
-      world_->template store_of<SelectionType>().for_each(
-          [&](Entity owner, const SelectionType&) { visit(owner); });
+  // Keeps only entities whose spatial component is within `radius` of
+  // `center`.
+  auto within(const SpatialType& center, DistanceType radius) &&
+    requires(!std::is_void_v<ChosenType>)
+  {
+    query_.near(center, radius);
+    return std::move(*this);
+  }
+
+  // Keeps only entities for which `predicate(Entity)` is true. Predicates add
+  // up.
+  template <typename PredicateType>
+  auto where(PredicateType&& predicate) &&
+    requires(!std::is_void_v<ChosenType>)
+  {
+    query_.keep(std::forward<PredicateType>(predicate));
+    return std::move(*this);
+  }
+
+  // Attaches a copy of `component` to every selected entity.
+  template <typename ArgumentType>
+  auto attach(ArgumentType&& component) &&
+    requires(!std::is_void_v<ChosenType>)
+  {
+    using ComponentType = std::remove_cvref_t<ArgumentType>;
+    check_component<ComponentType>();
+    return ChangeQueryBuilder<WorldType, ChosenType,
+                              TypeList<AttachedTypes..., ComponentType>,
+                              TypeList<DetachedTypes...>, Aliasing>{
+        lib::Depend(*world_), std::move(query_),
+        std::tuple_cat(
+            std::move(components_),
+            std::tuple<ComponentType>{std::forward<ArgumentType>(component)}),
+        std::move(aliases_)};
+  }
+
+  // Detaches `ComponentType` from every selected entity.
+  template <typename ComponentType>
+  auto detach() &&
+    requires(!std::is_void_v<ChosenType>)
+  {
+    check_component<ComponentType>();
+    return ChangeQueryBuilder<WorldType, ChosenType, TypeList<AttachedTypes...>,
+                              TypeList<DetachedTypes..., ComponentType>,
+                              Aliasing>{lib::Depend(*world_), std::move(query_),
+                                        std::move(components_),
+                                        std::move(aliases_)};
+  }
+
+  // Gives every selected entity the alias `alias`.
+  auto alias(Alias alias) &&
+    requires(!std::is_void_v<ChosenType>)
+  {
+    aliases_.given.push_back(std::move(alias));
+    return ChangeQueryBuilder<WorldType, ChosenType, TypeList<AttachedTypes...>,
+                              TypeList<DetachedTypes...>, true>{
+        lib::Depend(*world_), std::move(query_), std::move(components_),
+        std::move(aliases_)};
+  }
+
+  // Takes the alias `alias` from every selected entity.
+  auto unalias(Alias alias) &&
+    requires(!std::is_void_v<ChosenType>)
+  {
+    aliases_.taken.push_back(std::move(alias));
+    return ChangeQueryBuilder<WorldType, ChosenType, TypeList<AttachedTypes...>,
+                              TypeList<DetachedTypes...>, true>{
+        lib::Depend(*world_), std::move(query_), std::move(components_),
+        std::move(aliases_)};
+  }
+
+  std::expected<std::size_t, Status> build() &&
+    requires(!std::is_void_v<ChosenType>)
+  {
+    static_assert(
+        sizeof...(AttachedTypes) + sizeof...(DetachedTypes) > 0 || Aliasing,
+        "A change must attach, detach, alias or unalias something.");
+    std::vector<Entity> selected = query_.select(lib::InOut(*world_));
+    auto transaction = world_->transaction();
+    for (Entity entity : selected) {
+      RETURN_IF_UNEXPECTED(
+          (ChangeBuilder<WorldType, TypeList<AttachedTypes...>,
+                         TypeList<DetachedTypes...>, Aliasing>{
+               entity, components_, aliases_, lib::Depend(*world_)})
+              .build());
     }
+    transaction.commit();
+    return selected.size();
+  }
+
+ private:
+  template <typename, typename, typename, typename, bool>
+  friend class ChangeQueryBuilder;
+
+  struct Unchosen final {};
+  using QueryType = std::conditional_t<std::is_void_v<ChosenType>, Unchosen,
+                                       Query<WorldType, ChosenType>>;
+
+  ChangeQueryBuilder(lib::Depend<WorldType> world, QueryType query,
+                     std::tuple<AttachedTypes...> components,
+                     AliasChanges aliases)
+      : world_{world.get()},
+        query_{std::move(query)},
+        components_{std::move(components)},
+        aliases_{std::move(aliases)} {}
+
+  // The same checks as ChangeBuilder's, made where the word is spoken.
+  template <typename ComponentType>
+  static constexpr void check_component() {
+    static_assert(contains_v<typename WorldType::ComponentList, ComponentType>,
+                  "This component is not in the world's component list.");
+    static_assert(!is_built_in_v<ComponentType>,
+                  "An entity's archetype and parent cannot change.");
+    static_assert(
+        !contains_v<TypeList<AttachedTypes..., DetachedTypes...>,
+                    ComponentType>,
+        "Each component may be attached or detached once per change.");
   }
 
   // Never null once constructed; Depend checks it.
   WorldType* world_ = nullptr;
-  std::optional<Near> near_;
-  std::vector<std::function<bool(Entity)>> predicates_;
+  QueryType query_;
+  std::tuple<AttachedTypes...> components_;
+  AliasChanges aliases_;
 };
 
 }  // namespace simon::framework
