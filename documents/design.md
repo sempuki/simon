@@ -868,7 +868,8 @@ uses it from `prepare` or `resolve`, which run once per step, and not from the
 per-entity call:
 
 ```cpp
-struct ClearOrigin final : System<const Health> {
+struct ClearOrigin final  //
+    : System<const Health> {
   using AllowComponentList = TypeList<Position>;  // within reads Position.
   auto prepare(auto& world) -> bool {
     destroyed = world.destroy()
@@ -899,14 +900,19 @@ struct System {
   using OtherComponentList = TypeList<OtherComponentTypes...>;
 };
 
-struct GuideInterceptors : System<const Interceptor, const Kinematics, Control> {
+struct GuideInterceptors final   //
+    : System<const Interceptor,  //
+             const Kinematics,   //
+             Control> {
   using SequenceAfterSystemList = SystemList<UpdateTracks>;
   using AllowComponentList = TypeList<Kinematics>;   // other entities, always read-only
   using SystemWorld = ProjectedWorld<GuideInterceptors>;
 
-  auto operator()(SystemWorld& world, Entity self,
-                  const Interceptor& interceptor, const Kinematics* kinematics,
-                  Control* control, Step step) const -> void {
+  auto operator()(SystemWorld& world, Entity self,  //
+                  const Interceptor& interceptor,   //
+                  const Kinematics* kinematics,     //
+                  Control* control,                 //
+                  Step step) const -> void {
     if (!kinematics || !control) return;
     const Kinematics* target = world.maybe_component_of<Kinematics>(interceptor.target);
     if (!target) { ... }
@@ -1546,8 +1552,10 @@ entity pays for a function call. Keep the check every entity makes in the call
 operator, and move the rare work into a function marked cold:
 
 ```cpp
-auto operator()(SystemWorld& world, Entity self, const Warhead& warhead,
-                const Kinematics* kinematics, const Target* target) -> void {
+auto operator()(SystemWorld& world, Entity self,  //
+                const Warhead& warhead,           //
+                const Kinematics* kinematics,     //
+                const Target* target) -> void {
   const Kinematics* target_kinematics =
       target ? world.maybe_component_of<Kinematics>(target->entity) : nullptr;
   if (kinematics && target_kinematics &&
