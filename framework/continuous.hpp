@@ -98,6 +98,8 @@ struct ContinuousRunner final {
     auto& states =
         world->template mutable_store_of<StateType>(SchedulerKey{});
     const auto& rates = std::as_const(*world).template store_of<RateType>();
+
+    // Archetypes that require the state, segment by segment.
     std::size_t n = 0;
     [&]<std::size_t... ARCHETYPES>(std::index_sequence<ARCHETYPES...>) {
       (walk_archetype<StateType, WorldType, ARCHETYPES>(states, rates, n,
@@ -124,6 +126,7 @@ struct ContinuousRunner final {
   static auto walk_archetype(StateStoreType& states, const RateStoreType& rates,
                              std::size_t& n, VisitorType& visit) -> void {
     using RateType = rate_of_t<StateType>;
+
     // An archetype that cannot have the rate is not integrated here: it
     // advances its state some other way, such as a cheaper single pass.
     if constexpr (WorldType::template archetype_requires<StateType>(
@@ -133,12 +136,15 @@ struct ContinuousRunner final {
           WorldType::template archetype_requires<RateType>(ARCHETYPE),
           "An archetype that requires a continuous state and allows its rate "
           "must require the rate.");
+
+      // The state and its rate sit at the same slot of matching chunks.
       constexpr std::size_t STATE_SEGMENT =
           WorldType::template segment_of<StateType>(ARCHETYPE);
       constexpr std::size_t RATE_SEGMENT =
           WorldType::template segment_of<RateType>(ARCHETYPE);
       CHECK_INVARIANT(states.segment_size(STATE_SEGMENT) ==
                       rates.segment_size(RATE_SEGMENT));
+
       for (std::size_t ordinal = 0; ordinal < states.chunks_in(STATE_SEGMENT);
            ++ordinal) {
         auto state_chunk = states.chunk(STATE_SEGMENT, ordinal);
@@ -169,8 +175,10 @@ struct ContinuousDeclared<TypeList<StateTypes...>, TypeList<SystemTypes...>>
                 WriteList>;
   using DeclaredList =
       concatenate_t<WriteList, map_t<ReadList, std::add_const_t>>;
+
   using AllowList =
       unique_t<concatenate_t<allow_component_list_of_t<SystemTypes>...>>;
+
   static constexpr bool writes_no_state =
       (!intersects_v<write_list_of_t<SystemTypes>, TypeList<StateTypes...>> &&
        ...);
@@ -264,6 +272,7 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
       (advance_each<StateTypes>(step.dt, world), ...);
     } else {
       (keep_start<StateTypes>(world), ...);
+
       [&]<std::size_t... STAGE>(std::index_sequence<STAGE...>) {
         (stage<STAGE>(step, world), ...);
       }(std::make_index_sequence<STAGES>{});
@@ -298,11 +307,13 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
   template <typename WorldType>
   auto derive(const Step& step, lib::InOut<WorldType> world) -> void {
     std::size_t pending = world->pending();
+
     std::apply(
         [&](auto&... system) {
           (SystemRunner::run(step, lib::InOut(system), world), ...);
         },
         systems_);
+
     CHECK_INVARIANT(world->pending() == pending);  // No structural changes.
   }
 
@@ -320,6 +331,7 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
   template <typename StateType, typename WorldType>
   auto keep_start(lib::InOut<WorldType> world) -> void {
     Scratch<StateType>& scratch = std::get<Scratch<StateType>>(scratch_);
+
     // Sized once, to the store's capacity, on the first step.
     std::size_t capacity = world->template store_of<StateType>().capacity();
     if (scratch.start.size() < capacity) {
@@ -328,6 +340,7 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
         rates.resize(capacity);
       }
     }
+
     ContinuousRunner::walk<StateType>(
         world,
         [&](std::size_t n, StateType& state, const rate_of_t<StateType>*) {
@@ -367,7 +380,9 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
           if (!rate) {
             return;
           }
+
           scratch.rates[STAGE][n] = *rate;
+
           if constexpr (STAGE + 1 < STAGES) {
             state = advance(scratch.start[n],
                             weighted<StateType, STAGE + 1>(

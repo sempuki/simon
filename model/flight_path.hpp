@@ -151,32 +151,36 @@ inline auto point_mass_rate(const AirState& state,
     -> AirStateRate {
   constexpr double SEA_LEVEL_DENSITY = 1.225;  // kg / m^3.
   double g = STANDARD_GRAVITY.numerical_value_in(meter_per_second_squared);
-  double v = std::max(state.speed.numerical_value_in(meter_per_second), 1.0);
+  double mass = airframe.mass.numerical_value_in(kilogram);
+  double rho = air.density.numerical_value_in(kilogram_per_cubic_meter);
+  double speed = state.speed.numerical_value_in(meter_per_second);
+  double v = std::max(speed, 1.0);  // For dividing by.
+
   // Each sine and cosine once: they are most of this function's cost.
   double gamma = radians(state.flight_path_angle);
   double chi = radians(state.heading);
   double mu = radians(controls.bank);
+
   double sin_gamma = std::sin(gamma);
   double cos_gamma = std::cos(gamma);
   double sin_chi = std::sin(chi);
   double cos_chi = std::cos(chi);
   double sin_mu = std::sin(mu);
   double cos_mu = std::cos(mu);
-  double mass = airframe.mass.numerical_value_in(kilogram);
-  double rho = air.density.numerical_value_in(kilogram_per_cubic_meter);
 
+  // Lift, drag and thrust.
   double dynamic_pressure_area =
       0.5 * rho * v * v * airframe.wing_area.numerical_value_in(square_meter);
   double lift = controls.load_factor * mass * g;
   double lift_coefficient =
       dynamic_pressure_area > 0.0 ? lift / dynamic_pressure_area : 0.0;
+
   double drag = dynamic_pressure_area *
                 (airframe.zero_lift_drag +
                  airframe.induced_drag * lift_coefficient * lift_coefficient);
   double thrust = controls.throttle *
                   airframe.thrust.numerical_value_in(newton) * rho /
                   SEA_LEVEL_DENSITY;
-  double speed = state.speed.numerical_value_in(meter_per_second);
 
   return AirStateRate{
       .velocity = Vector3d{speed * cos_gamma * sin_chi,
@@ -209,20 +213,26 @@ inline auto fly(const AirState& state, const AirStateRate& rate,
       .flight_path_angle = state.flight_path_angle + rate.climb * seconds,
       .heading = wrap(state.heading + rate.turn * seconds),
   };
+
+  // At rest there is no direction of flight to work from.
   double speed = state.speed.numerical_value_in(meter_per_second);
   if (speed <= 0.0) {
     next.position += velocity_of(next) * seconds;
     return next;
   }
-  // The direction of flight, and its derivatives by flight-path angle and by
-  // heading.
+
+  // The direction of flight, and its sines and cosines, from the velocity.
   const Vector3d& velocity = rate.velocity.numerical_value_ref_in(
       meter_per_second);
   Vector3d along = velocity / speed;
+
   double sin_gamma = along.z();
   double cos_gamma = std::hypot(along.x(), along.y());
   double sin_chi = cos_gamma > 0.0 ? along.x() / cos_gamma : 0.0;
   double cos_chi = cos_gamma > 0.0 ? along.y() / cos_gamma : 1.0;
+
+  // How the velocity changes: along the direction of flight with speed, and
+  // across it with flight-path angle and heading.
   Vector3d by_gamma{-sin_gamma * sin_chi, -sin_gamma * cos_chi, cos_gamma};
   Vector3d by_heading{cos_gamma * cos_chi, -cos_gamma * sin_chi, 0.0};
   Vector3d acceleration =
@@ -230,6 +240,7 @@ inline auto fly(const AirState& state, const AirStateRate& rate,
       (by_gamma * rate.climb.numerical_value_in(radian_per_second) +
        by_heading * rate.turn.numerical_value_in(radian_per_second)) *
           speed;
+
   double dt_seconds = seconds.numerical_value_in(second);
   next.position += (velocity + acceleration * dt_seconds) * dt_seconds * meter;
   return next;

@@ -216,6 +216,7 @@ class ComponentStore final {
       }
     }
   }
+
   auto owner_at(Slot slot) const -> Entity { return owner_[slot]; }
   auto component_at(Slot slot) const -> const ComponentType& {
     return data_.data()[slot];
