@@ -63,6 +63,35 @@ TEST_CASE("RateGate") {
     CHECK_FALSE(gate.fire(Step{.time = TimePoint{10ms}, .dt = 90ms}));
     CHECK(gate.fire(Step{.time = TimePoint{100ms}, .dt = 1ms}));
   }
+
+  SECTION("ShouldFireFromFirstTimeGivenStaggeredGate") {
+    RateGate gate{100ms, CatchUp::SKIP, TimePoint{30ms}};
+    std::vector<TimePoint> fired;
+    std::vector<Duration> elapsed;
+
+    for (TimePoint time{}; time < TimePoint{300ms}; time += 10ms) {
+      if (auto firing = gate.fire(Step{.time = time, .dt = 10ms})) {
+        fired.push_back(time);
+        elapsed.push_back(firing->elapsed);
+      }
+    }
+
+    CHECK(fired ==
+          std::vector{TimePoint{30ms}, TimePoint{130ms}, TimePoint{230ms}});
+    CHECK(elapsed == std::vector<Duration>{0ms, 100ms, 100ms});
+  }
+
+  SECTION("ShouldFireOnFirstStepGivenFirstTimeAlreadyPassed") {
+    RateGate gate{100ms, CatchUp::EVERY, TimePoint{30ms}};
+
+    auto firing = gate.fire(Step{.time = TimePoint{250ms}, .dt = 10ms});
+
+    REQUIRE(firing);
+    CHECK(firing->periods == 3u);  // 30, 130, 230 ms.
+    CHECK(firing->elapsed == 0ms);
+    CHECK_FALSE(gate.fire(Step{.time = TimePoint{260ms}, .dt = 10ms}));
+    CHECK(gate.fire(Step{.time = TimePoint{330ms}, .dt = 10ms}));
+  }
 }
 
 }  // namespace simon::engine

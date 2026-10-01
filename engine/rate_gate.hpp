@@ -32,11 +32,19 @@ struct Firing final {
 // The gate fires on the first step it is asked about, then on each step that
 // contains one of its period boundaries. The work receives the elapsed time
 // since the gate last fired (zero the first time), never the driver's step.
+//
+// A gate given a first firing time fires first on the step that contains it
+// (or on the first step asked after it), and on each period after it. Gates of the same period with different first
+// times spread their work over the period instead of firing on one step.
 class RateGate final {
  public:
   RateGate() = default;
   explicit RateGate(Duration period, CatchUp catch_up = CatchUp::SKIP)
       : period_{period}, catch_up_{catch_up} {
+    CHECK_PRECONDITION(period_ > Duration::zero());
+  }
+  RateGate(Duration period, CatchUp catch_up, TimePoint first)
+      : period_{period}, catch_up_{catch_up}, next_{first} {
     CHECK_PRECONDITION(period_ > Duration::zero());
   }
 
@@ -46,7 +54,6 @@ class RateGate final {
     CHECK_PRECONDITION(period_ > Duration::zero());
     if (!next_) {
       next_ = step.time;
-      last_ = step.time;
     }
     TimePoint step_end = step.time + step.dt;
     if (*next_ >= step_end) {
@@ -57,7 +64,7 @@ class RateGate final {
         (step_end - *next_ - Duration{1}) / period_ + 1);
     *next_ += boundaries * period_;
     Firing firing{
-        .elapsed = step.time - *last_,
+        .elapsed = last_ ? step.time - *last_ : Duration::zero(),
         .periods = catch_up_ == CatchUp::EVERY ? boundaries : 1u,
     };
     last_ = step.time;
