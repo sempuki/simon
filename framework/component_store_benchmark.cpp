@@ -32,7 +32,7 @@ class StableSlotStore final {
   explicit StableSlotStore(std::size_t entity_capacity)
       : slots_(entity_capacity) {}
 
-  ComponentType* try_component_of(Entity entity) {
+  ComponentType* maybe_component_of(Entity entity) {
     Slot& slot = slots_[entity.index];
     return slot.generation == entity.generation ? &slot.value : nullptr;
   }
@@ -142,7 +142,7 @@ Result measure(const Population& population, IterateType&& iterate,
                       [&] {
                         double sum = 0.0;
                         for (Entity entity : order) {
-                          sum += store->try_component_of(entity)->position[0];
+                          sum += store->maybe_component_of(entity)->position[0];
                         }
                         keep(sum);
                       },

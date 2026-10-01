@@ -17,6 +17,7 @@ cc_library(
     ],
     copts = COPTS,
     deps = [
+        "//engine:event_queue",
         "//engine:lifecycle",
         "//engine:rate_gate",
         "//framework",

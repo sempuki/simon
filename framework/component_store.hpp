@@ -149,22 +149,22 @@ class ComponentStore final {
 
   bool contains(Entity entity) const { return slot_of(entity) != ABSENT; }
 
-  ComponentType* try_component_of(Entity entity) {
+  ComponentType* maybe_component_of(Entity entity) {
     Slot slot = slot_of(entity);
     return slot != ABSENT ? &data_.data()[slot] : nullptr;
   }
-  const ComponentType* try_component_of(Entity entity) const {
+  const ComponentType* maybe_component_of(Entity entity) const {
     Slot slot = slot_of(entity);
     return slot != ABSENT ? &data_.data()[slot] : nullptr;
   }
 
   ComponentType& component_of(Entity entity) {
-    ComponentType* component = try_component_of(entity);
+    ComponentType* component = maybe_component_of(entity);
     CHECK_PRECONDITION(component);
     return *component;
   }
   const ComponentType& component_of(Entity entity) const {
-    const ComponentType* component = try_component_of(entity);
+    const ComponentType* component = maybe_component_of(entity);
     CHECK_PRECONDITION(component);
     return *component;
   }

@@ -230,18 +230,19 @@ class WorldAccess final {
 
   // Another entity's `ComponentType`, or null if it is gone or lacks one.
   template <typename ComponentType>
-  const ComponentType* try_component_of(Entity entity) const {
+  const ComponentType* maybe_component_of(Entity entity) const {
     static_assert(
         contains_v<allow_component_list_of_t<SystemType>, ComponentType>,
         "Declare this component in the system's AllowComponentList to read "
         "it.");
-    return world_->template store_of<ComponentType>().try_component_of(entity);
+    return world_->template store_of<ComponentType>().maybe_component_of(
+        entity);
   }
 
   // Another entity's `ComponentType`. Fails a contract check if it has none.
   template <typename ComponentType>
   const ComponentType& component_of(Entity entity) const {
-    const ComponentType* component = try_component_of<ComponentType>(entity);
+    const ComponentType* component = maybe_component_of<ComponentType>(entity);
     CHECK_PRECONDITION(component);
     return *component;
   }
@@ -325,13 +326,13 @@ class WorldAccess final {
 
 // Free-function forms of the WorldAccess member templates, so a system whose
 // access parameter is `auto&` can write
-// `try_component_of<Collider>(access, other)` instead of
-// `access.template try_component_of<Collider>(other)`. Found by
+// `maybe_component_of<Collider>(access, other)` instead of
+// `access.template maybe_component_of<Collider>(other)`. Found by
 // argument-dependent lookup.
 template <typename ComponentType, typename SystemType, typename WorldType>
-const ComponentType* try_component_of(
+const ComponentType* maybe_component_of(
     const WorldAccess<SystemType, WorldType>& access, Entity entity) {
-  return access.template try_component_of<ComponentType>(entity);
+  return access.template maybe_component_of<ComponentType>(entity);
 }
 
 template <typename ComponentType, typename SystemType, typename WorldType>
@@ -521,7 +522,7 @@ struct SystemRunner final {
             auto chunk = drive.chunk(allowed, ordinal);
             for (std::size_t i = 0; i < chunk.size; ++i) {
               invoke(chunk.owners[i], chunk.components[i],
-                     optional_store.try_component_of(chunk.owners[i])...);
+                     optional_store.maybe_component_of(chunk.owners[i])...);
             }
           }
         },
@@ -575,7 +576,7 @@ struct SystemRunner final {
     } else if constexpr (ACCESS == Access::ABSENT) {
       return nullptr;
     } else {
-      return store.try_component_of(entity);
+      return store.maybe_component_of(entity);
     }
   }
 };

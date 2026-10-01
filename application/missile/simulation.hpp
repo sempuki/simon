@@ -3,16 +3,41 @@
 #pragma once
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <span>
+#include <vector>
 
 #include "application/missile/components.hpp"
 #include "application/missile/systems.hpp"
 #include "base/core.hpp"
+#include "engine/event_queue.hpp"
 #include "engine/lifecycle.hpp"
 #include "model/random.hpp"
 
 namespace simon::missile {
+
+// A circle an operator command applies to.
+struct Sector final {
+  Position center = model::meters(0.0, 0.0, 0.0);
+  Length radius = 0.0 * model::meter;
+};
+
+// A weapons hold an operator orders ahead of time, over `sector` from `from`
+// for `lasting`: to let friendly aircraft through, say.
+struct TimedHold final {
+  Sector sector;
+  TimePoint from{};
+  Duration lasting{};
+};
+
+// Raised when a timed hold ends. The simulation frees the hold's sector,
+// except where another hold is still in force, so where holds overlap, a
+// launcher stays held until the last of them ends.
+struct WeaponsHoldExpired final {
+  std::size_t hold = 0;  // Its position in Scenario::holds.
+};
 
 // Everything a run depends on. The same scenario gives the same run.
 //
@@ -49,6 +74,10 @@ struct Scenario final {
   // asset is destroyed; blue wins when no red drones remain at any site.
   int sites = 1;
   Length site_spacing = 20000.0 * model::meter;
+
+  // Weapons holds ordered ahead of time. Each starts on a timer, and when it
+  // ends, a second timer raises WeaponsHoldExpired.
+  std::vector<TimedHold> holds;
 };
 
 enum class Outcome { UNDECIDED, BLUE_WINS, RED_WINS };
@@ -150,12 +179,6 @@ std::expected<Entity, framework::Status> build_scenario(
 //-- Operator commands
 //----------------------------------------------------------
 
-// A circle an operator command applies to.
-struct Sector final {
-  Position center = model::meters(0.0, 0.0, 0.0);
-  Length radius = 0.0 * model::meter;
-};
-
 // Operator commands. Each is one query form: it selects what it applies to,
 // changes all of it or none, applies at the next sync, and returns how many
 // entities it affected.
@@ -165,9 +188,11 @@ struct Sector final {
 std::expected<std::size_t, framework::Status> hold_weapons(
     const Sector& sector, lib::InOut<World> world);
 
-// Frees every held launcher in `sector` to engage again.
+// Frees every held launcher in `sector` to engage again, except those inside
+// any sector of `keeping`.
 std::expected<std::size_t, framework::Status> free_weapons(
-    const Sector& sector, lib::InOut<World> world);
+    const Sector& sector, std::span<const Sector> keeping,
+    lib::InOut<World> world);
 
 // Destroys every interceptor in flight in `sector`. The tracks they were
 // engaging stay engaged until their engagements lapse.
@@ -180,16 +205,20 @@ class Simulation final {
  public:
   explicit Simulation(Scenario scenario = {}) : scenario_{scenario} {}
 
-  // Builds the world and the scenario in it. A scenario too big for a world
-  // fails this phase with the builder's Status.
+  // Builds the world and the scenario in it, and starts a timer for each
+  // timed hold. A scenario too big for a world fails this phase with the
+  // builder's Status.
   engine::PhaseResult configure();
 
+  // Delivers the events due by the step's time, then runs the schedule.
   engine::PhaseResult step(const framework::Step& step);
 
   Outcome outcome() const { return outcome_; }
   // The world: empty until configured.
   const World& world() const { return world_; }
   Entity asset() const { return asset_; }
+  // What the simulation raises, such as WeaponsHoldExpired, for subscribers.
+  engine::EventQueue& events() { return events_; }
 
   // Interceptors fired so far, from what the launchers have left.
   std::uint32_t interceptors_fired() const;
@@ -205,10 +234,15 @@ class Simulation final {
 
  private:
   std::uint32_t remaining_interceptors() const;
+  // Holds a timed hold's sector, and starts the timer that ends it.
+  void start_hold(TimePoint now, std::size_t hold);
+  // Frees an expired hold's sector, except where another hold is in force.
+  void end_hold(TimePoint now, const WeaponsHoldExpired& expired);
 
   Scenario scenario_;
   World world_;  // Empty until configure builds it.
   Scheduler scheduler_;
+  engine::EventQueue events_;
   Entity asset_;
   Outcome outcome_ = Outcome::UNDECIDED;
   std::uint32_t stock_ = 0;  // Interceptors the launchers held when built.

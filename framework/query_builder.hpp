@@ -259,7 +259,6 @@ class [[nodiscard]] DestroyQueryBuilder final {
   using QueryType = std::conditional_t<std::is_void_v<ChosenType>, Unchosen,
                                        Query<WorldType, ChosenType>>;
 
-  // Never null once constructed; Depend checks it.
   WorldType* world_ = nullptr;
   QueryType query_;
 };
@@ -467,7 +466,6 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
         "Each component may be attached or detached once per change.");
   }
 
-  // Never null once constructed; Depend checks it.
   WorldType* world_ = nullptr;
   QueryType query_;
   std::tuple<AttachedTypes...> components_;

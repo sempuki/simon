@@ -43,8 +43,8 @@ struct Integrate final : System<Position, const Velocity> {
 struct Chase final : System<Velocity, const Health> {
   using AllowComponentList = TypeList<Position>;
   void operator()(auto& world, Entity self, Velocity& velocity, const Health*) {
-    const Position* mine = try_component_of<Position>(world, self);
-    const Position* other = try_component_of<Position>(world, target);
+    const Position* mine = maybe_component_of<Position>(world, self);
+    const Position* other = maybe_component_of<Position>(world, target);
     velocity.x = (mine && other) ? other->x - mine->x : 0.0;
   }
   Entity target;
@@ -279,7 +279,7 @@ TEST_CASE("System") {
     WorldAccess<Chase, TestWorld> access{lib::Depend(world)};
 
     CHECK(access.component_of<Position>(placed).x == 2.0);
-    CHECK(access.try_component_of<Position>(bare) == nullptr);
+    CHECK(access.maybe_component_of<Position>(bare) == nullptr);
     CHECK_THROWS_AS(access.component_of<Position>(bare), std::logic_error);
   }
 
@@ -310,7 +310,7 @@ TEST_CASE("System") {
     auto chase = system<Velocity, const Position>(
         TypeList<Position>{}, [target](auto& world, Entity, Velocity& velocity,
                                        const Position* mine) {
-          const Position* other = try_component_of<Position>(world, target);
+          const Position* other = maybe_component_of<Position>(world, target);
           velocity.x = (mine && other) ? other->x - mine->x : 0.0;
         });
     Scheduler<TestWorld, SystemList<decltype(chase)>> scheduler{

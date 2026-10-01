@@ -63,6 +63,11 @@ ASSIGN_OR_RETURN(asset_, build_scenario(scenario_, lib::InOut(world_)));
 `ASSIGN_OR_RETURN` does the same and otherwise moves the value into an existing
 variable or a new declaration (`Entity asset`).
 
+**A getter that may return null is named `maybe_*`:**
+`maybe_component_of<Health>(entity)` returns a pointer, null if the entity has
+no Health. Its non-null counterpart drops the prefix, `component_of`, and
+returns a reference.
+
 **Headers hold what must be inline; `.cpp` files hold the rest.** Templates,
 and code on hot paths that the inliner must see (a system's call operator,
 `Vector3d`, the spatial index's per-query helpers), stay in headers. Setup,
@@ -95,7 +100,7 @@ property they check, as adjectives where they read well: `Spatial`,
 `write_list_of_t<SystemType>`.
 
 **Accessors are named for what they return, never `get`:** `component_of` and
-`try_component_of` (the `try_` form returns a pointer that may be null),
+`maybe_component_of` (the `try_` form returns a pointer that may be null),
 `store_of`, `name_of`. Where arguments of different strong types ask different
 questions, one name is overloaded: `find_name_of(Identity)` and
 `find_name_of(Alias)`.
@@ -279,7 +284,7 @@ dying, so the dense store wins. Run the benchmark with
 #### Sibling components
 
 A system walks its driving component and reaches each entity's siblings (see
-[Terminology](#terminology)) through `try_component_of`. Siblings the
+[Terminology](#terminology)) through `maybe_component_of`. Siblings the
 archetype requires are the common case, since a drone's `Control` exists for
 as long as its `Kinematics` does. The older simulator's handles resolved such a
 sibling once, at creation. The store before segments looked it up on every
@@ -460,16 +465,16 @@ A handle has three duties, carried over from the older simulator:
 store:
 
 ```cpp
-const Kinematics* target = world.try_component_of<Kinematics>(interceptor.target);  // null if gone
+const Kinematics* target = world.maybe_component_of<Kinematics>(interceptor.target);  // null if gone
 const Kinematics& target = world.component_of<Kinematics>(interceptor.target);      // contract check if gone
 ```
 
-`try_component_of` is the explicit path for "this may have disappeared".
+`maybe_component_of` is the explicit path for "this may have disappeared".
 `component_of` fails a contract check on a stale entity, so misuse stops
 loudly. `ComponentStore` has the same pair. Neither can read
 freed memory, because store memory lives as long as the world.
 
-Raw pointers or references returned by `try_component_of` or
+Raw pointers or references returned by `maybe_component_of` or
 `component_of` are only valid until the next
 sync point. Systems must not keep them across steps.
 
@@ -869,7 +874,7 @@ struct GuideInterceptors : System<const Interceptor, const Kinematics, Control> 
                   const Interceptor& interceptor, const Kinematics* kinematics,
                   Control* control, Step step) const {
     if (!kinematics || !control) return;
-    const Kinematics* target = world.try_component_of<Kinematics>(interceptor.target);
+    const Kinematics* target = world.maybe_component_of<Kinematics>(interceptor.target);
     if (!target) { ... }
     control->acceleration = model::proportional_navigation(*kinematics, *target, interceptor);
   }
@@ -886,7 +891,7 @@ for (each chunk in the last segment of drive)
   for (std::size_t i = 0; i < chunk.size; ++i) {
     Entity e = chunk.owners[i];
     system(access, e, chunk.components[i],
-           world.store_of<OtherComponentTypes>().try_component_of(e)..., step);
+           world.store_of<OtherComponentTypes>().maybe_component_of(e)..., step);
   }
 ```
 
@@ -918,7 +923,7 @@ Rules:
   declaration implies; a mismatch is a compile error.
 - **Other entities are reached through an allow list.** `using AllowComponentList =
   TypeList<...>;` opts the system in to reading those stores by entity.
-  `world.try_component_of<T>(e)` returns `const T*`, `world.component_of<T>(e)`
+  `world.maybe_component_of<T>(e)` returns `const T*`, `world.component_of<T>(e)`
   returns `const T&` with a contract check, and `world.store_of<T>()` returns
   the whole read-only store. Reads through the allow list are always
   read-only, and asking for a component not on it does not compile.
@@ -1054,7 +1059,7 @@ ExpireBlasts      driven by Blast                        destroys blasts older t
 - **Structural changes to other entities go through builders.** Their commands
   apply at the next sync point, so nothing is destroyed partway through an
   iteration.
-- **Pointers from `try_component_of` are valid only until the next sync point.** Debug
+- **Pointers from `maybe_component_of` are valid only until the next sync point.** Debug
   builds can wrap them to catch one kept longer.
 - **The event queue is for rare events.** Per-step traffic belongs in entities
   and components.
@@ -1807,7 +1812,9 @@ entity created. It is not for anything that happens every step, which belongs
 in components.
 
 Events are delivered in time order, ties in publish order, with the event's own
-time. simon's current `EventQueue` already does this.
+time. simon's current `EventQueue` already does this. missile's timed weapons
+holds use it: a timer starts each hold, and a second timer raises
+`WeaponsHoldExpired` when it ends.
 
 ## Distribution
 
@@ -1936,12 +1943,32 @@ world->change()
     .build();
 ```
 
-`free_weapons` detaches `WeaponsHold` from the held launchers in a sector, and
+`free_weapons` detaches `WeaponsHold` from the held launchers in a sector,
+except those inside sectors it is told to keep held, and
 `destruct_interceptors` destroys every interceptor in flight in one. A hold is
 a component, so holding a launcher is a structural change, and
 `ProposeEngagements` reads it as an optional sibling. `Simulation` forwards
 each command to its world. Like every builder, a command applies at the next
 sync point.
+
+A scenario can order weapons holds ahead of time (`Scenario::holds`), which
+exercises the event queue:
+
+```cpp
+scenario.holds = {TimedHold{.sector = {.radius = 1000.0 * meter},
+                            .from = TimePoint{20s}, .lasting = 30s}};
+```
+
+`configure` starts a timer for each hold. When it fires, the simulation holds
+the sector and starts a second timer for `lasting`. That timer publishes
+`WeaponsHoldExpired`, and the simulation's subscriber frees the sector, except
+where another hold is still in force, so overlapping holds end with the last of
+them. `Simulation::step` delivers the events due by the step's time before it
+runs the schedule, and `Simulation::events()` lets anyone else subscribe.
+
+Freeing a sector and then reasserting the holds still in force would be
+simpler, but a full store refuses the reattach: capacity checks do not count
+pending detaches, and the `WeaponsHold` store holds exactly one per launcher.
 
 Decisions made while building it:
 

@@ -10,7 +10,7 @@
 //
 //   dense         one array per component with swap-erase, and no
 //                 reordering (the framework's store before archetype
-//                 segments). The sibling is found by try_component_of.
+//                 segments). The sibling is found by maybe_component_of.
 //   sorted        the same, and each store is sorted by entity index at the
 //                 step's sync point once 1 in 8 of it is out of order. The
 //                 framework does not sort, so this uses DenseStore below.
@@ -246,7 +246,7 @@ class DenseStore final {
 
   std::size_t size() const { return data_.size(); }
   bool contains(Entity entity) const { return position_of(entity) != ABSENT; }
-  ComponentType* try_component_of(Entity entity) {
+  ComponentType* maybe_component_of(Entity entity) {
     std::uint32_t position = position_of(entity);
     return position != ABSENT ? &data_[position] : nullptr;
   }
@@ -358,7 +358,7 @@ class StoreLayout final {
     auto bodies = bodies_.values();
     for (std::size_t i = 0; i < bodies.size(); ++i) {
       if (const SiblingType* sibling =
-              siblings_.try_component_of(bodies_.owner(i))) {
+              siblings_.maybe_component_of(bodies_.owner(i))) {
         integrate(bodies[i], *sibling);
         ++visits.with_sibling;
       } else {
@@ -497,13 +497,13 @@ class GenerationalStore final {
   Entity owner(std::size_t position) const { return main_.owner[position]; }
   ComponentType& data(std::size_t position) { return main_.data[position]; }
 
-  ComponentType* try_component_of(Entity entity) {
+  ComponentType* maybe_component_of(Entity entity) {
     std::uint32_t position = index_[entity.index];
     return position != ABSENT && main_.owner[position] == entity
                ? &main_.data[position]
                : nullptr;
   }
-  bool contains(Entity entity) { return try_component_of(entity) != nullptr; }
+  bool contains(Entity entity) { return maybe_component_of(entity) != nullptr; }
 
   void append(Entity entity, ComponentType component, int step) {
     index_[entity.index] = static_cast<std::uint32_t>(size());
@@ -657,7 +657,7 @@ class GenerationalLayout final {
         continue;
       }
       if (const SiblingType* sibling =
-              siblings_.try_component_of(bodies_.owner(i))) {
+              siblings_.maybe_component_of(bodies_.owner(i))) {
         integrate(bodies_.data(i), *sibling);
         ++visits.with_sibling;
       } else {
@@ -687,7 +687,7 @@ void walk(std::size_t size, BodyOfType&& body_of, OwnerOfType&& owner_of,
           StoreType& siblings, lib::Out<std::uint64_t> with,
           lib::Out<std::uint64_t> without) {
   for (std::size_t i = 0; i < size; ++i) {
-    if (const auto* sibling = siblings.try_component_of(owner_of(i))) {
+    if (const auto* sibling = siblings.maybe_component_of(owner_of(i))) {
       integrate(body_of(i), *sibling);
       ++*with;
     } else {
@@ -1058,7 +1058,7 @@ class SegmentedLayout final {
         Entity* owners = owners_.chunk(archetype.owner.chunk(chunk));
         for (std::size_t i = 0; i < count; ++i) {
           if (const SiblingType* sibling =
-                  allowed.try_component_of(owners[i])) {
+                  allowed.maybe_component_of(owners[i])) {
             integrate(bodies[i], *sibling);
             ++*with;
           } else {

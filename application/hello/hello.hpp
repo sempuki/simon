@@ -105,7 +105,7 @@ struct DetectCollisions final
     world.within(*kinematics, collider->radius + largest_radius,
                  [&](Entity other, const Kinematics& other_kinematics) {
                    const Collider* other_collider =
-                       try_component_of<Collider>(world, other);
+                       maybe_component_of<Collider>(world, other);
                    if (other == self || !other_collider) return;
                    if (distance(*kinematics, other_kinematics) <=
                        collider->radius + other_collider->radius) {

@@ -43,13 +43,13 @@ TEST_CASE("ComponentStore") {
 
   SECTION("ShouldFindValueGivenAppended") {
     store.append(a, Mass{1.0});
-    REQUIRE(store.try_component_of(a));
+    REQUIRE(store.maybe_component_of(a));
     CHECK(store.component_of(a).kilograms == 1.0);
     CHECK(store.size() == 1u);
   }
 
   SECTION("ShouldReturnNullGivenAbsent") {
-    CHECK(store.try_component_of(a) == nullptr);
+    CHECK(store.maybe_component_of(a) == nullptr);
     CHECK_THROWS_AS(store.component_of(a), std::logic_error);
   }
 
@@ -80,16 +80,16 @@ TEST_CASE("ComponentStore") {
     REQUIRE(reused.index == a.index);
     store.append(reused, Mass{9.0});
 
-    CHECK(store.try_component_of(a) == nullptr);
+    CHECK(store.maybe_component_of(a) == nullptr);
     CHECK(store.component_of(reused).kilograms == 9.0);
   }
 
   SECTION("ShouldKeepAddressesGivenAddsWithinCapacity") {
     store.append(a, Mass{1.0});
-    const Mass* before = store.try_component_of(a);
+    const Mass* before = store.maybe_component_of(a);
     store.append(b, Mass{2.0});
     store.append(c, Mass{3.0});
-    CHECK(store.try_component_of(a) == before);
+    CHECK(store.maybe_component_of(a) == before);
   }
 
   SECTION("ShouldThrowGivenAppendBeyondCapacity") {

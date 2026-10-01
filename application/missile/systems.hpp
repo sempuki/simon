@@ -58,7 +58,7 @@ class ScanningRadars final {
     const auto& radars = world.template store_of<Radar>();
     radars.for_each([&](Entity owner, const Radar& radar) {
       const Kinematics* kinematics =
-          world.template try_component_of<Kinematics>(owner);
+          world.template maybe_component_of<Kinematics>(owner);
       if (radar.scanned && kinematics) {
         scanning_.push_back(
             Scanning{.radar = kinematics, .range = radar.range});
@@ -154,7 +154,8 @@ struct UpdateTracks final : System<Track, Estimate> {
 
   void operator()(LocalWorld& world, Entity, Track& track, Estimate* estimate,
                   Step step) {
-    const Kinematics* target = world.try_component_of<Kinematics>(track.target);
+    const Kinematics* target =
+        world.maybe_component_of<Kinematics>(track.target);
     if (!estimate || !target || !radars_.cover(*target)) {
       return;
     }
@@ -240,7 +241,7 @@ struct ProposeEngagements final
         launcher.range.numerical_value_in(model::meter),
         [&](std::uint32_t slot) {
           const Engagement* engagement =
-              world.try_component_of<Engagement>(estimates.owner_at(slot));
+              world.maybe_component_of<Engagement>(estimates.owner_at(slot));
           return engagement && (engagement->engaged_by == Entity{} ||
                                 now >= engagement->engaged_until);
         });
@@ -291,7 +292,7 @@ struct ResolveEngagements final : System<Engagement, const Estimate> {
     std::optional<Length> nearest;
     for (auto proposal = begin; proposal != end; ++proposal) {
       const Kinematics* launcher =
-          world.try_component_of<Kinematics>(proposal->launcher);
+          world.maybe_component_of<Kinematics>(proposal->launcher);
       if (!launcher || world.store_of<Launcher>()
                                .component_of(proposal->launcher)
                                .proposal != self) {
@@ -338,9 +339,10 @@ struct LaunchInterceptors final : System<Launcher, const Kinematics> {
   void operator()(LocalWorld& world, Entity self, Launcher& launcher,
                   const Kinematics* kinematics, Step step) {
     Entity proposal = std::exchange(launcher.proposal, Entity{});
-    const Track* track = world.try_component_of<Track>(proposal);
-    const Estimate* estimate = world.try_component_of<Estimate>(proposal);
-    const Engagement* engagement = world.try_component_of<Engagement>(proposal);
+    const Track* track = world.maybe_component_of<Track>(proposal);
+    const Estimate* estimate = world.maybe_component_of<Estimate>(proposal);
+    const Engagement* engagement =
+        world.maybe_component_of<Engagement>(proposal);
     if (!kinematics || !track || !estimate || !engagement ||
         engagement->engaged_by != self) {
       return;
@@ -400,7 +402,7 @@ struct GuideInterceptors final
       return;
     }
     const Kinematics* target =
-        world.try_component_of<Kinematics>(target_of->entity);
+        world.maybe_component_of<Kinematics>(target_of->entity);
     if (!target) {
       target = retarget(interceptor, *kinematics, *target_of, world);
     }
@@ -424,7 +426,7 @@ struct GuideInterceptors final
     std::optional<Entity> nearest = world.nearest(
         kinematics, interceptor.seeker_range,
         [&](Entity candidate, const Kinematics&) {
-          return world.try_component_of<RedDrone>(candidate) != nullptr;
+          return world.maybe_component_of<RedDrone>(candidate) != nullptr;
         });
     if (!nearest) {
       return nullptr;
@@ -448,7 +450,7 @@ struct SteerRedDrones final
     }
     constexpr Rate RESPONSE = 1.0 * model::per_second;
     const Kinematics* target =
-        world.try_component_of<Kinematics>(target_of->entity);
+        world.maybe_component_of<Kinematics>(target_of->entity);
     control->acceleration =
         target ? model::limit(model::steer_toward(*kinematics, target->position,
                                                   drone.cruise, RESPONSE),
@@ -470,7 +472,7 @@ struct TriggerWarheads final
   void operator()(LocalWorld& world, Entity self, const Warhead& warhead,
                   const Kinematics* kinematics, const Target* target) {
     const Kinematics* target_kinematics =
-        target ? world.try_component_of<Kinematics>(target->entity) : nullptr;
+        target ? world.maybe_component_of<Kinematics>(target->entity) : nullptr;
     if (!kinematics || !target_kinematics ||
         distance(*kinematics, *target_kinematics) > warhead.fuse) {
       return;
@@ -503,7 +505,7 @@ struct ApplyBlasts final : System<Health, const Kinematics> {
     blasts_.clear();
     world.store_of<Blast>().for_each([&](Entity owner, const Blast& blast) {
       if (const Kinematics* center =
-              world.try_component_of<Kinematics>(owner)) {
+              world.maybe_component_of<Kinematics>(owner)) {
         blasts_.push_back(Burst{
             .center = center, .radius = blast.radius, .damage = blast.damage});
       }

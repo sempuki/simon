@@ -83,8 +83,7 @@ class World<SpatialType,                  //
   using SpatialComponent = SpatialType;
   using ComponentList = TypeList<  //
       SpatialType, EntityArchetype, Parent, ComponentTypes...>;
-  using ArchetypeList = TypeList<  //
-      ArchetypeTypes...>;
+  using ArchetypeList = TypeList<ArchetypeTypes...>;
   using Command = command_for_t<ComponentList>;
 
   static_assert(is_unique_v<ComponentList>,
@@ -114,7 +113,6 @@ class World<SpatialType,                  //
   DECLARE_COPY_DELETE(World);
   DECLARE_MOVE_DELETE(World);
 
-  // An empty world, which holds nothing until a builder builds it.
   World() { initialize(Configuration{}); }
   ~World() = default;
 
@@ -248,7 +246,7 @@ class World<SpatialType,                  //
 
   // The entity `entity` was created under, if any. It may no longer be alive.
   std::optional<Entity> parent_of(Entity entity) const {
-    const Parent* parent = store_of<Parent>().try_component_of(entity);
+    const Parent* parent = store_of<Parent>().maybe_component_of(entity);
     return parent ? std::optional{parent->entity} : std::nullopt;
   }
 

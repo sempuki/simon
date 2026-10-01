@@ -213,7 +213,6 @@ class [[nodiscard]] DestroyBuilder final {
   }
 
  private:
-  // Never null once constructed; Depend checks it.
   WorldType* world_ = nullptr;
   Entity entity_;
 };

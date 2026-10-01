@@ -6,7 +6,7 @@
 //
 //   allowed     the scheduler's loop, where the archetype only allows the
 //               sibling: it was attached after creation and is found by
-//               try_component_of.
+//               maybe_component_of.
 //   required    the scheduler's loop, where the archetype requires the
 //               sibling: it sits in the archetype's segment of its store, at
 //               the entity's own local index.

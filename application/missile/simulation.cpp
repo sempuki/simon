@@ -141,10 +141,19 @@ engine::PhaseResult Simulation::configure() {
   RETURN_IF_UNEXPECTED(build_world(scenario_, lib::Out(world_)));
   ASSIGN_OR_RETURN(asset_, build_scenario(scenario_, lib::InOut(world_)));
   stock_ = remaining_interceptors();
+  for (std::size_t hold = 0; hold < scenario_.holds.size(); ++hold) {
+    events_.start_timer(scenario_.holds[hold].from,
+                        [this, hold](TimePoint now) { start_hold(now, hold); });
+  }
+  events_.subscribe<WeaponsHoldExpired>(
+      [this](TimePoint now, const WeaponsHoldExpired& expired) {
+        end_hold(now, expired);
+      });
   return engine::Flow::CONTINUE;
 }
 
 engine::PhaseResult Simulation::step(const framework::Step& step) {
+  events_.process_until(step.time);
   scheduler_.step(step, lib::InOut(world_));
   if (!world_.alive(asset_)) {
     outcome_ = Outcome::RED_WINS;
@@ -166,11 +175,19 @@ std::expected<std::size_t, framework::Status> hold_weapons(
 }
 
 std::expected<std::size_t, framework::Status> free_weapons(
-    const Sector& sector, lib::InOut<World> world) {
+    const Sector& sector, std::span<const Sector> keeping,
+    lib::InOut<World> world) {
+  const auto& kinematics = world->store_of<Kinematics>();
   return world->change()
       .each<archetype::Launcher>()
       .within(Kinematics{.position = sector.center}, sector.radius)
       .having<WeaponsHold>()
+      .where([&](Entity launcher) {
+        Position position = kinematics.component_of(launcher).position;
+        return std::ranges::none_of(keeping, [&](const Sector& kept) {
+          return distance_between(position, kept.center) <= kept.radius;
+        });
+      })
       .detach<WeaponsHold>()
       .build();
 }
@@ -190,12 +207,39 @@ std::expected<std::size_t, framework::Status> Simulation::hold_weapons(
 
 std::expected<std::size_t, framework::Status> Simulation::free_weapons(
     const Sector& sector) {
-  return missile::free_weapons(sector, lib::InOut(world_));
+  return missile::free_weapons(sector, {}, lib::InOut(world_));
 }
 
 std::expected<std::size_t, framework::Status> Simulation::destruct_interceptors(
     const Sector& sector) {
   return missile::destruct_interceptors(sector, lib::InOut(world_));
+}
+
+// Holds and frees cannot be refused: launchers allow WeaponsHold, the store
+// holds one for every launcher, and lacking and having skip launchers already
+// held or freed. A launcher is never freed and held again in one batch, which
+// a full store would refuse, since capacity checks do not count pending
+// detaches.
+void Simulation::start_hold(TimePoint now, std::size_t hold) {
+  const TimedHold& order = scenario_.holds[hold];
+  auto held = missile::hold_weapons(order.sector, lib::InOut(world_));
+  CHECK_INVARIANT(held.has_value());
+  events_.start_timer(now + order.lasting, [this, hold](TimePoint expiry) {
+    events_.publish<WeaponsHoldExpired>(expiry,
+                                        WeaponsHoldExpired{.hold = hold});
+  });
+}
+
+void Simulation::end_hold(TimePoint now, const WeaponsHoldExpired& expired) {
+  std::vector<Sector> in_force;
+  for (const TimedHold& order : scenario_.holds) {
+    if (order.from <= now && now < order.from + order.lasting) {
+      in_force.push_back(order.sector);
+    }
+  }
+  auto freed = missile::free_weapons(scenario_.holds[expired.hold].sector,
+                                     in_force, lib::InOut(world_));
+  CHECK_INVARIANT(freed.has_value());
 }
 
 std::uint32_t Simulation::interceptors_fired() const {

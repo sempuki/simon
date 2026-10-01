@@ -44,12 +44,27 @@ Run run(Scenario scenario) {
                              lib::Depend(simulation)};
   auto end = driver.run(TimePoint{10min});
   REQUIRE(end);
-  const Health* asset = simulation.world().store_of<Health>().try_component_of(
-      simulation.asset());
+  const Health* asset =
+      simulation.world().store_of<Health>().maybe_component_of(
+          simulation.asset());
   return Run{.outcome = simulation.outcome(),
              .end = *end,
              .fired = simulation.interceptors_fired(),
              .asset_health = asset ? asset->points : 0.0};
+}
+
+// Steps `simulation` from `from` until `until`, DT at a time.
+void advance(TimePoint from, TimePoint until,
+             lib::InOut<Simulation> simulation) {
+  for (TimePoint time = from; time < until; time += DT) {
+    REQUIRE(simulation->step(framework::Step{.time = time, .dt = DT}));
+  }
+}
+
+// Configures `simulation`, then steps it until `until`, DT at a time.
+void run_until(TimePoint until, lib::InOut<Simulation> simulation) {
+  REQUIRE(simulation->configure());
+  advance(TimePoint{}, until, simulation);
 }
 
 template <typename ScheduleType>
@@ -161,6 +176,44 @@ TEST_CASE("MissileSimulation") {
     REQUIRE(simulation.configure());
 
     CHECK(simulation.interceptors_fired() == 0u);
+  }
+
+  SECTION("ShouldHoldFireUntilHoldExpiresGivenTimedHold") {
+    Scenario scenario;
+    scenario.holds = {TimedHold{.sector = {.radius = 1000.0 * model::meter},
+                                .from = TimePoint{},
+                                .lasting = 90s}};
+    Simulation simulation{scenario};
+    std::vector<TimePoint> expired;
+    simulation.events().subscribe<WeaponsHoldExpired>(
+        [&](TimePoint time, const WeaponsHoldExpired&) {
+          expired.push_back(time);
+        });
+    Simulation unheld;
+
+    run_until(TimePoint{90s}, lib::InOut(simulation));
+    run_until(TimePoint{90s}, lib::InOut(unheld));
+    REQUIRE(unheld.interceptors_fired() > 0u);  // So the hold mattered.
+    CHECK(simulation.interceptors_fired() == 0u);
+    CHECK(expired.empty());
+
+    advance(TimePoint{90s}, TimePoint{100s}, lib::InOut(simulation));
+    CHECK(expired == std::vector{TimePoint{90s}});
+    CHECK(simulation.interceptors_fired() > 0u);
+  }
+
+  SECTION("ShouldStayHeldGivenOverlappingHoldExpiresFirst") {
+    Scenario scenario;
+    const Sector home{.radius = 1000.0 * model::meter};
+    scenario.holds = {
+        TimedHold{.sector = home, .from = TimePoint{}, .lasting = 120s},
+        TimedHold{.sector = home, .from = TimePoint{30s}, .lasting = 30s}};
+    Simulation simulation{scenario};
+
+    run_until(TimePoint{100s}, lib::InOut(simulation));
+
+    CHECK(simulation.interceptors_fired() == 0u);
+    CHECK(simulation.world().store_of<WeaponsHold>().size() == 3u);
   }
 
   SECTION("ShouldFailConfigureGivenNoSites") {
@@ -416,7 +469,7 @@ TEST_CASE("OperatorCommands") {
     step(TimePoint{}, lib::InOut(scheduler), lib::InOut(world));
     REQUIRE(world.store_of<Interceptor>().size() == 0u);
 
-    auto freed = free_weapons(home, lib::InOut(world));
+    auto freed = free_weapons(home, {}, lib::InOut(world));
     world.sync();
     step(TimePoint{1s}, lib::InOut(scheduler), lib::InOut(world));
 

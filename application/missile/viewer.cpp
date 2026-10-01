@@ -178,7 +178,7 @@ class Viewer final {
       world.store_of<ComponentType>().for_each(
           [&](Entity entity, const ComponentType&) {
             if (const Kinematics* kinematics =
-                    world.store_of<Kinematics>().try_component_of(entity)) {
+                    world.store_of<Kinematics>().maybe_component_of(entity)) {
               seen.emplace(world.name_of(entity),
                            Sighting{.point = point_of(*kinematics),
                                     .radius = radius,
@@ -242,7 +242,7 @@ class Viewer final {
 
     ImGui::SeparatorText("Blue");
     const Health* asset =
-        world.store_of<Health>().try_component_of(simulation.asset());
+        world.store_of<Health>().maybe_component_of(simulation.asset());
     ImGui::TextColored(GREEN, "Asset health  %.0f / %.0f",
                        asset ? asset->points : 0.0,
                        session_->scenario().asset_health);
@@ -281,7 +281,7 @@ class Viewer final {
       world.store_of<ComponentType>().for_each(
           [&](Entity entity, const ComponentType&) {
             if (const Kinematics* kinematics =
-                    world.store_of<Kinematics>().try_component_of(entity)) {
+                    world.store_of<Kinematics>().maybe_component_of(entity)) {
               scatter.add(point_of(*kinematics));
             }
           });
@@ -291,7 +291,7 @@ class Viewer final {
     // Coverage first, so markers draw over it.
     world.store_of<Radar>().for_each([&](Entity owner, const Radar& radar) {
       if (const Kinematics* kinematics =
-              world.store_of<Kinematics>().try_component_of(owner)) {
+              world.store_of<Kinematics>().maybe_component_of(owner)) {
         plot_circle("Radar coverage", point_of(*kinematics),
                     radar.range.numerical_value_in(model::meter), FAINT_GREEN);
       }
@@ -299,7 +299,7 @@ class Viewer final {
     world.store_of<Launcher>().for_each(
         [&](Entity owner, const Launcher& launcher) {
           if (const Kinematics* kinematics =
-                  world.store_of<Kinematics>().try_component_of(owner)) {
+                  world.store_of<Kinematics>().maybe_component_of(owner)) {
             plot_circle("Launcher range", point_of(*kinematics),
                         launcher.range.numerical_value_in(model::meter),
                         FAINT_BLUE);
