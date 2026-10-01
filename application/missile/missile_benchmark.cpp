@@ -22,6 +22,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdio>
+#include <expected>
 #include <optional>
 #include <print>
 #include <string>
@@ -90,7 +91,9 @@ void measure(int drones, int maximum_steps, bool budgeted) {
   constexpr std::size_t SYSTEM_COUNT = List::size;
 
   Scenario scenario = scenario_of(drones);
-  World world{world_configuration_of(scenario)};
+  std::expected<World, framework::Status> built = world_for(scenario);
+  CHECK_POSTCONDITION(built.has_value());
+  World& world = *built;
   Entity asset = build_scenario(lib::InOut(world), scenario);
   auto schedulers = schedulers_of(List{});
   std::array<double, SYSTEM_COUNT> seconds{};

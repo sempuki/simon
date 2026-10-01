@@ -3,6 +3,7 @@
 #include "application/hello/hello.hpp"
 
 #include <chrono>
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -12,13 +13,13 @@
 namespace simon::hello {
 
 namespace {
-const framework::WorldConfiguration CONFIGURATION{
-    .number = 1, .entities = 8, .components = 8};
 const framework::Duration DT = std::chrono::milliseconds{10};
 }  // namespace
 
 TEST_CASE("Hello") {
-  World world{CONFIGURATION};
+  std::expected<World, framework::Status> built = world_for(8);
+  REQUIRE(built.has_value());
+  World& world = *built;
   Scheduler scheduler;
   Balls balls = build_balls(lib::InOut(world));
 

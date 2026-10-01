@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -49,14 +50,8 @@ template <Spatial Type>
 using distance_of_t = decltype(distance(std::declval<const Type&>(),
                                         std::declval<const Type&>()));
 
-struct WorldConfiguration final {
-  std::uint32_t number = 0;    // The world's instance in its Name and Identity.
-  std::size_t entities = 0;    // Entity capacity.
-  std::size_t components = 0;  // Capacity of each component store.
-  // The edge of a spatial index cell, in the spatial component's coordinate
-  // unit. About the radius of a typical query works well.
-  double cell_size = 1.0;
-};
+template <typename WorldType>
+class SetUpBuilder;
 
 // Unlocks mutable store access. Only the scheduler, which runs systems, can
 // construct one.
@@ -69,11 +64,15 @@ class SchedulerKey final {
 // The entity database: a factory of builders (the only way to write) and a
 // query interface over the result (the only way to read).
 //
-// A world is declared by its spatial component, its other components and its
-// archetypes, every one of which it may create:
+// A world's type is declared by its spatial component, its other components
+// and its archetypes, every one of which it may create. A world is built by
+// the builder `set_up()` returns, which sizes it by the room for each
+// archetype:
 //
 //   using World = World<Kinematics, TypeList<Control, Health>,
 //                       TypeList<archetype::Drone, archetype::Blast>>;
+//   std::expected<World, Status> world =
+//       World::set_up().numbered(1).room_for<archetype::Drone>(1000).build();
 //
 // Everything in it has a Name ({kind, instance}), an Identity computed from the
 // Name ("/world/1/entity/2"), and any number of Aliases ("ego"). See name.hpp.
@@ -110,22 +109,44 @@ class World<SpatialType, TypeList<ComponentTypes...>,
                 "the world's component list.");
 
   DECLARE_COPY_DELETE(World);
-  DECLARE_MOVE_DELETE(World);  // Builders hold a pointer to their world.
+  // Moving a world leaves dangling any builder or WorldAccess that refers to
+  // it; both are temporaries.
+  World(World&&) noexcept = default;
+  World& operator=(World&&) = delete;
+  ~World() = default;
 
-  explicit World(WorldConfiguration configuration)
+  // Starts the utterance that builds a world of this type. See SetUpBuilder.
+  static auto set_up() { return SetUpBuilder<World>{}; }
+
+ private:
+  friend class SetUpBuilder<World>;
+
+  // How big a world is, worked out by SetUpBuilder from the room for each
+  // archetype.
+  struct Configuration final {
+    std::uint32_t number = 0;  // The world's instance in its Name and Identity.
+    std::size_t entities = 0;  // Entity capacity.
+    // Each store's capacity, by component number.
+    std::array<std::size_t, ComponentList::size> capacities{};
+    // The edge of a spatial index cell, in the spatial component's coordinate
+    // unit.
+    double cell_size = 1.0;
+  };
+
+  explicit World(const Configuration& configuration)
       : number_{configuration.number},
         entities_{configuration.entities},
-        stores_{
-            store_for<SpatialType>(configuration, configuration.components),
-            store_for<EntityArchetype>(configuration, configuration.entities),
-            store_for<Parent>(configuration, configuration.entities),
-            store_for<ComponentTypes>(configuration,
-                                      configuration.components)...},
+        stores_{store_for<SpatialType>(configuration),
+                store_for<EntityArchetype>(configuration),
+                store_for<Parent>(configuration),
+                store_for<ComponentTypes>(configuration)...},
         plans_{Plan<SpatialType>{configuration.entities},
                Plan<EntityArchetype>{configuration.entities},
                Plan<Parent>{configuration.entities},
                Plan<ComponentTypes>{configuration.entities}...},
-        spatial_index_{configuration.components, configuration.cell_size},
+        spatial_index_{
+            configuration.capacities[component_number<SpatialType>()],
+            configuration.cell_size},
         destroying_(configuration.entities, false),
         instance_of_index_(configuration.entities, 0),
         archetype_of_index_(configuration.entities, 0) {
@@ -140,8 +161,8 @@ class World<SpatialType, TypeList<ComponentTypes...>,
       }
     });
   }
-  ~World() = default;
 
+ public:
   //-- Write -------------------------------------------------------------------
 
   // Creates an entity of `ArchetypeType`, with an optional alias.
@@ -442,17 +463,16 @@ class World<SpatialType, TypeList<ComponentTypes...>,
 
   // Every store of a world uses the same chunk size, so an archetype's
   // segments line up chunk for chunk.
-  static std::size_t chunk_size_of(const WorldConfiguration& configuration) {
-    return Store<EntityArchetype>::default_chunk_size(
-        std::max(configuration.entities, configuration.components));
+  static std::size_t chunk_size_of(const Configuration& configuration) {
+    return Store<EntityArchetype>::default_chunk_size(configuration.entities);
   }
 
   template <typename ComponentType>
-  static Store<ComponentType> store_for(const WorldConfiguration& configuration,
-                                        std::size_t capacity) {
-    return Store<ComponentType>{capacity, configuration.entities,
-                                segments_of<ComponentType>(),
-                                chunk_size_of(configuration)};
+  static Store<ComponentType> store_for(const Configuration& configuration) {
+    return Store<ComponentType>{
+        configuration.capacities[component_number<ComponentType>()],
+        configuration.entities, segments_of<ComponentType>(),
+        chunk_size_of(configuration)};
   }
 
   bool has_component_number(Entity entity, std::uint32_t number) const {
@@ -806,6 +826,89 @@ class World<SpatialType, TypeList<ComponentTypes...>,
   // Aliases, many-to-many. A multimap keeps equal aliases in the order given.
   std::multimap<Alias, Name> aliases_;
   std::unordered_map<Name, std::vector<Alias>> aliases_of_name_;
+};
+
+// Builds a world. The room for each archetype sizes it: the entity capacity is
+// the total, and each component's store holds the room of every archetype that
+// requires or allows the component. Start with `World::set_up()`:
+//
+//   auto world = World::set_up()
+//                    .numbered(1)
+//                    .room_for<archetype::RedDrone>(drones)
+//                    .room_for<archetype::Track>(drones)
+//                    .cells_of(250.0 * model::meter)
+//                    .build();
+template <typename WorldType>
+class [[nodiscard]] SetUpBuilder final {
+ public:
+  using SpatialType = typename WorldType::SpatialComponent;
+  using ArchetypeList = typename WorldType::ArchetypeList;
+  using ComponentList = typename WorldType::ComponentList;
+
+  // The world's instance in its Name and Identity. Zero unless given.
+  SetUpBuilder numbered(std::uint32_t number) && {
+    number_ = number;
+    return std::move(*this);
+  }
+
+  // Room for `count` more entities of `ArchetypeType`. Room adds up, so a
+  // scenario can make room for each thing that creates the archetype.
+  template <Archetypal ArchetypeType>
+  SetUpBuilder room_for(std::size_t count) && {
+    static_assert(contains_v<ArchetypeList, ArchetypeType>,
+                  "This archetype is not in the world's archetype list.");
+    room_[index_of_v<ArchetypeList, ArchetypeType>] += count;
+    return std::move(*this);
+  }
+
+  // The edge of a spatial index cell. About the radius of a typical query
+  // works well. One coordinate unit unless given.
+  SetUpBuilder cells_of(distance_of_t<SpatialType> size) && {
+    static_assert(std::default_initializable<SpatialType>,
+                  "Sizing cells needs a default spatial component to convert "
+                  "the distance with.");
+    cell_size_ = coordinate_length(SpatialType{}, size);
+    return std::move(*this);
+  }
+
+  std::expected<WorldType, Status> build() && {
+    if (!(cell_size_ > 0.0) || !std::isfinite(cell_size_)) {
+      return std::unexpected(
+          lib::raise(BuildError::CELL_SIZE_INVALID,
+                     "A world's spatial index cells must have a positive, "
+                     "finite size."));
+    }
+    typename WorldType::Configuration configuration{.number = number_,
+                                                    .cell_size = cell_size_};
+    for (std::size_t room : room_) {
+      configuration.entities += room;
+    }
+    // Every store indexes its pool with 32 bits, with a partly filled chunk
+    // per segment to spare.
+    constexpr std::size_t MOST =
+        std::size_t{std::numeric_limits<std::uint32_t>::max()} / 2;
+    if (configuration.entities > MOST) {
+      return std::unexpected(lib::raise(
+          BuildError::CAPACITY_TOO_LARGE,
+          std::format("A world has room for at most {} entities, not {}.", MOST,
+                      configuration.entities)));
+    }
+    for_each_type(ComponentList{}, [&]<typename ComponentType>() {
+      std::size_t& capacity =
+          configuration.capacities[index_of_v<ComponentList, ComponentType>];
+      for (std::size_t archetype = 0; archetype < room_.size(); ++archetype) {
+        if (WorldType::template archetype_permits<ComponentType>(archetype)) {
+          capacity += room_[archetype];
+        }
+      }
+    });
+    return WorldType{configuration};
+  }
+
+ private:
+  std::uint32_t number_ = 0;
+  std::array<std::size_t, ArchetypeList::size> room_{};
+  double cell_size_ = 1.0;
 };
 
 }  // namespace simon::framework

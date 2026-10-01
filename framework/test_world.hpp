@@ -3,6 +3,8 @@
 #pragma once
 
 #include <cmath>
+#include <expected>
+#include <utility>
 
 #include "framework/archetype.hpp"
 #include "framework/world.hpp"
@@ -42,8 +44,16 @@ struct Interceptor final
 using TestWorld = World<Position, TypeList<Velocity, Health>,
                         TypeList<Body, Launcher, Interceptor>>;
 
-inline WorldConfiguration small_world() {
-  return WorldConfiguration{.number = 1, .entities = 16, .components = 16};
+// Room for 16 entities: 8 bodies, 4 launchers and 4 interceptors.
+inline TestWorld small_world() {
+  std::expected<TestWorld, Status> world = TestWorld::set_up()
+                                               .numbered(1)
+                                               .room_for<Body>(8)
+                                               .room_for<Launcher>(4)
+                                               .room_for<Interceptor>(4)
+                                               .build();
+  CHECK_POSTCONDITION(world.has_value());
+  return *std::move(world);
 }
 
 }  // namespace simon::framework::testing

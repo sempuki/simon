@@ -17,4 +17,6 @@ const std::array<lib::StatusConditionEntry, simon::framework::BUILD_ERROR_COUNT>
         lib::StatusConditionEntry{"alias invalid"},
         lib::StatusConditionEntry{"alias already given"},
         lib::StatusConditionEntry{"alias not given"},
+        lib::StatusConditionEntry{"cell size invalid"},
+        lib::StatusConditionEntry{"capacity too large"},
 };

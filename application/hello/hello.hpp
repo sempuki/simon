@@ -3,6 +3,9 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
+#include <expected>
+#include <optional>
 
 #include "base/core.hpp"
 #include "engine/lifecycle.hpp"
@@ -150,6 +153,11 @@ inline Balls build_balls(lib::InOut<World> world) {
   return Balls{.red = *red, .blue = *blue};
 }
 
+// A world with room for `balls` balls.
+inline std::expected<World, framework::Status> world_for(std::size_t balls) {
+  return World::set_up().numbered(1).room_for<Ball>(balls).build();
+}
+
 inline bool any_collision(const World& world) {
   bool hit = false;
   world.store_of<Collision>().for_each(
@@ -161,25 +169,31 @@ inline bool any_collision(const World& world) {
 // first collision. Any driver can run it.
 class Simulation final {
  public:
-  explicit Simulation(framework::WorldConfiguration configuration =
-                          {.number = 1, .entities = 16, .components = 16})
-      : world_{configuration} {}
-
+  // Builds the world and the two balls in it.
   engine::PhaseResult configure() {
-    balls_ = build_balls(lib::InOut(world_));
+    std::expected<World, framework::Status> world = world_for(2);
+    if (!world) {
+      return std::unexpected(world.error());
+    }
+    world_.emplace(*std::move(world));
+    balls_ = build_balls(lib::InOut(*world_));
     return engine::Flow::CONTINUE;
   }
 
   engine::PhaseResult step(const framework::Step& step) {
-    scheduler_.step(lib::InOut(world_), step);
-    return any_collision(world_) ? engine::Flow::STOP : engine::Flow::CONTINUE;
+    scheduler_.step(lib::InOut(*world_), step);
+    return any_collision(*world_) ? engine::Flow::STOP : engine::Flow::CONTINUE;
   }
 
-  const World& world() const { return world_; }
+  // The world, once configured.
+  const World& world() const {
+    CHECK_PRECONDITION(world_.has_value());
+    return *world_;
+  }
   const Balls& balls() const { return balls_; }
 
  private:
-  World world_;
+  std::optional<World> world_;  // Built by configure.
   Scheduler scheduler_;
   Balls balls_{};
 };

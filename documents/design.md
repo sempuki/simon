@@ -482,8 +482,8 @@ which one:
   `Entity` indices are recycled; entity Names are not. A Name stays meaningful
   after its entity is destroyed, the same scenario gives the same Names on every
   run and machine, and Names can cross processes.
-- **The world's number is given when it is constructed**
-  (`WorldConfiguration::number`). There is no global counter; the older
+- **The world's number is given when it is built**
+  (`World::set_up().numbered(n)`). There is no global counter; the older
   simulator's static identity source had to be set before anything could be
   constructed.
 
@@ -1030,9 +1030,38 @@ using World = framework::World<
   the default, so interop layers share one notion of position unless an
   application opts out. Other models (geodetic for DIS, 2D, a grid, a network
   where distance is hop count) fit without changing the framework.
-- **`WorldConfiguration`** sets the world's number, its entity and component
-  capacities, and the spatial index's `cell_size`, in coordinate units. About
-  the radius of a typical query works well; the missile world uses 250 m.
+- **Every world is built by a builder,** which `World::set_up()` returns. The
+  world's type says what it can hold; the builder says how much, so the world
+  is decoupled from how it is configured, and its configuration is a private
+  detail of the two:
+
+  ```cpp
+  std::expected<World, Status> world =
+      World::set_up()
+          .numbered(1)
+          .room_for<archetype::RedDrone>(drones)
+          .room_for<archetype::Track>(drones)
+          .room_for<archetype::Blast>(drones + interceptors)
+          .cells_of(250.0 * model::meter)
+          .build();
+  ```
+
+  - `room_for<A>(n)` makes room for `n` more entities of archetype `A`; room
+    adds up. The entity capacity is the total, and each component's store
+    holds the room of every archetype that requires or allows the component,
+    so `Tracked` is sized for red drones and `Radar` for radars, instead of
+    every store for every entity.
+  - `cells_of(size)` is the spatial index's cell edge, converted with
+    `coordinate_length`. About the radius of a typical query works well.
+  - `build()` returns `std::expected<World, Status>` like every builder. It
+    refuses a cell size that is not positive (`CELL_SIZE_INVALID`) and more
+    room than a store's 32-bit slots can index (`CAPACITY_TOO_LARGE`).
+  - A world is movable, so it can live in an `expected` or an `optional`.
+    Moving one leaves dangling any builder or `WorldAccess` that refers to it,
+    and both are temporaries. Applications build their world in the
+    `configure` phase, so a plan too big for a world fails that phase with the
+    builder's Status: missile's `world_for(scenario)` gives the room for every
+    archetype a scenario creates.
 - **The archetype list says what the world can create,** and orders each
   store's segments. It is checked against the component list at compile time:
   every archetype's components must be in it, and `create<A>()` of an archetype

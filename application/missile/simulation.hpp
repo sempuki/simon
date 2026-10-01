@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <expected>
 #include <numbers>
 #include <optional>
 
@@ -56,24 +57,30 @@ struct Scenario final {
 
 enum class Outcome { UNDECIDED, BLUE_WINS, RED_WINS };
 
-// A world big enough for everything a scenario can create at once: the asset,
-// radars, launchers, every drone with its track and blast, and every
-// interceptor with its blast.
-inline framework::WorldConfiguration world_configuration_of(
+// The world a scenario needs: room, at every site, for the asset, radars and
+// launchers, every drone with its track and blast, and every interceptor with
+// its blast.
+inline std::expected<World, framework::Status> world_for(
     const Scenario& scenario) {
   auto count = [](int value) {
     return static_cast<std::size_t>(std::max(value, 0));
   };
-  std::size_t interceptors = count(scenario.launchers) * scenario.inventory;
-  std::size_t entities =
-      count(scenario.sites) *
-      (1 + count(scenario.radars) + count(scenario.launchers) +
-       3 * count(scenario.drones) + 2 * interceptors);
+  std::size_t sites = count(scenario.sites);
+  std::size_t drones = sites * count(scenario.drones);
+  std::size_t interceptors =
+      sites * count(scenario.launchers) * scenario.inventory;
   // Cells a few times smaller than the sensor and weapon ranges (1 to 4 km).
-  return framework::WorldConfiguration{.number = 1,
-                                       .entities = entities,
-                                       .components = entities,
-                                       .cell_size = 250.0};
+  return World::set_up()
+      .numbered(1)
+      .room_for<archetype::Asset>(sites)
+      .room_for<archetype::Radar>(sites * count(scenario.radars))
+      .room_for<archetype::Launcher>(sites * count(scenario.launchers))
+      .room_for<archetype::RedDrone>(drones)
+      .room_for<archetype::Track>(drones)
+      .room_for<archetype::Interceptor>(interceptors)
+      .room_for<archetype::Blast>(drones + interceptors)
+      .cells_of(250.0 * model::meter)
+      .build();
 }
 
 // A point `radius` from the origin at `bearing` radians from east.
@@ -162,19 +169,25 @@ inline Entity build_scenario(lib::InOut<World> world,
 // red is defeated or the asset is destroyed. Any driver can run it.
 class Simulation final {
  public:
-  explicit Simulation(Scenario scenario = {})
-      : scenario_{scenario}, world_{world_configuration_of(scenario)} {}
+  explicit Simulation(Scenario scenario = {}) : scenario_{scenario} {}
 
+  // Builds the world and the scenario in it. A scenario too big for a world
+  // fails this phase with the builder's Status.
   engine::PhaseResult configure() {
-    asset_ = build_scenario(lib::InOut(world_), scenario_);
+    std::expected<World, framework::Status> world = world_for(scenario_);
+    if (!world) {
+      return std::unexpected(world.error());
+    }
+    world_.emplace(*std::move(world));
+    asset_ = build_scenario(lib::InOut(*world_), scenario_);
     return engine::Flow::CONTINUE;
   }
 
   engine::PhaseResult step(const framework::Step& step) {
-    scheduler_.step(lib::InOut(world_), step);
-    if (!world_.alive(asset_)) {
+    scheduler_.step(lib::InOut(*world_), step);
+    if (!world_->alive(asset_)) {
       outcome_ = Outcome::RED_WINS;
-    } else if (world_.store_of<RedDrone>().size() == 0) {
+    } else if (world_->store_of<RedDrone>().size() == 0) {
       outcome_ = Outcome::BLUE_WINS;
     }
     return outcome_ == Outcome::UNDECIDED ? engine::Flow::CONTINUE
@@ -182,15 +195,20 @@ class Simulation final {
   }
 
   Outcome outcome() const { return outcome_; }
-  const World& world() const { return world_; }
+  // The world, once configured.
+  const World& world() const {
+    CHECK_PRECONDITION(world_.has_value());
+    return *world_;
+  }
   Entity asset() const { return asset_; }
 
   // Interceptors fired so far, from what the launchers have left.
   std::uint32_t interceptors_fired() const {
     std::uint32_t remaining = 0;
-    world_.store_of<Launcher>().for_each([&](Entity, const Launcher& launcher) {
-      remaining += launcher.inventory;
-    });
+    world().store_of<Launcher>().for_each(
+        [&](Entity, const Launcher& launcher) {
+          remaining += launcher.inventory;
+        });
     return static_cast<std::uint32_t>(scenario_.launchers) *
                scenario_.inventory -
            remaining;
@@ -198,7 +216,7 @@ class Simulation final {
 
  private:
   Scenario scenario_;
-  World world_;
+  std::optional<World> world_;  // Built by configure.
   Scheduler scheduler_;
   Entity asset_;
   Outcome outcome_ = Outcome::UNDECIDED;

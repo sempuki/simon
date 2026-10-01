@@ -2,6 +2,7 @@
 
 #include "framework/world.hpp"
 
+#include <expected>
 #include <stdexcept>
 #include <vector>
 
@@ -19,6 +20,52 @@ using testing::Velocity;
 template <typename BuilderType>
 concept CanParent =
     requires(BuilderType builder) { std::move(builder).under(Entity{}); };
+
+TEST_CASE("SetUpBuilder") {
+  SECTION("ShouldSizeStoresByRoomOfArchetypesThatPermitThemGivenRoom") {
+    std::expected<TestWorld, Status> world =
+        TestWorld::set_up()
+            .numbered(3)
+            .room_for<Body>(5)
+            .room_for<testing::Launcher>(2)
+            .room_for<testing::Launcher>(1)  // Room adds up.
+            .build();
+
+    REQUIRE(world.has_value());
+    CHECK(world->number() == 3u);
+    // Every archetype requires or allows Position; only bodies allow Health;
+    // bodies allow and interceptors require Velocity.
+    CHECK(world->store_of<Position>().capacity() == 8u);
+    CHECK(world->store_of<Health>().capacity() == 5u);
+    CHECK(world->store_of<Velocity>().capacity() == 5u);
+  }
+
+  SECTION("ShouldRefuseGivenCellSizeNotPositive") {
+    auto world = TestWorld::set_up().room_for<Body>(1).cells_of(0.0).build();
+
+    REQUIRE_FALSE(world.has_value());
+    CHECK(world.error() == lib::watch(BuildError::CELL_SIZE_INVALID));
+  }
+
+  SECTION("ShouldRefuseGivenMoreRoomThanAStoreCanIndex") {
+    auto world =
+        TestWorld::set_up().room_for<Body>(std::size_t{1} << 40).build();
+
+    REQUIRE_FALSE(world.has_value());
+    CHECK(world.error() == lib::watch(BuildError::CAPACITY_TOO_LARGE));
+  }
+
+  SECTION("ShouldKeepEntitiesGivenWorldMoved") {
+    TestWorld first = testing::small_world();
+    Entity entity = *first.create<Body>().with(Position{2.0}).build();
+    first.sync();
+
+    TestWorld second = std::move(first);
+
+    CHECK(second.alive(entity));
+    CHECK(second.store_of<Position>().component_of(entity).x == 2.0);
+  }
+}
 
 TEST_CASE("World") {
   TestWorld world{testing::small_world()};
@@ -47,8 +94,7 @@ TEST_CASE("World") {
   }
 
   SECTION("ShouldNeverReuseNameGivenIndexReused") {
-    TestWorld tiny{
-        WorldConfiguration{.number = 1, .entities = 1, .components = 1}};
+    TestWorld tiny = *TestWorld::set_up().numbered(1).room_for<Body>(1).build();
     Entity first = *tiny.create<Body>().build();
     tiny.sync();
     REQUIRE(tiny.destroy(first).build());
@@ -289,8 +335,13 @@ TEST_CASE("World") {
   }
 
   SECTION("ShouldRefuseAttachGivenStoreFullAfterPendingAttaches") {
-    TestWorld small{
-        WorldConfiguration{.number = 1, .entities = 8, .components = 2}};
+    // Only bodies allow Health, so its store holds 2; launchers fill the
+    // rest of the 8 entities.
+    TestWorld small = *TestWorld::set_up()
+                           .numbered(1)
+                           .room_for<Body>(2)
+                           .room_for<testing::Launcher>(6)
+                           .build();
     REQUIRE(small.create<Body>().with(Health{}).build());
     REQUIRE(small.create<Body>()
                 .with(Health{})

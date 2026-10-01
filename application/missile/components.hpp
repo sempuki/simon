@@ -116,30 +116,37 @@ using framework::Allows;
 using framework::Archetype;
 using framework::Requires;
 
-struct Asset final        //
-    : Archetype<"asset",  //
-                Requires<Kinematics, Health, missile::Asset>> {};
-struct Radar final        //
-    : Archetype<"radar",  //
-                Requires<Kinematics, missile::Radar>> {};
-struct Launcher final        //
-    : Archetype<"launcher",  //
-                Requires<Kinematics, missile::Launcher>> {};
-struct RedDrone final         //
-    : Archetype<"red drone",  //
-                Requires<Kinematics, Control, Health, Warhead, Target,
-                         missile::RedDrone>,
-                Allows<Tracked>> {};
-struct Interceptor final        //
-    : Archetype<"interceptor",  //
-                Requires<Kinematics, Control, Warhead, Target,
-                         missile::Interceptor>> {};
-struct Track final        //
-    : Archetype<"track",  //
-                Requires<missile::Track, Estimate, Engagement>> {};
-struct Blast final        //
-    : Archetype<"blast",  //
-                Requires<Kinematics, missile::Blast>> {};
+struct Asset final                                                   //
+    : Archetype<"asset",                                             //
+                Requires<Kinematics, Health, missile::Asset>> {};    //
+struct Radar final                                                   //
+    : Archetype<"radar",                                             //
+                Requires<Kinematics, missile::Radar>> {};            //
+struct Launcher final                                                //
+    : Archetype<"launcher",                                          //
+                Requires<Kinematics, missile::Launcher>> {};         //
+struct RedDrone final                                                //
+    : Archetype<"red drone",                                         //
+                Requires<Kinematics,                                 //
+                         Control,                                    //
+                         Health,                                     //
+                         Warhead,                                    //
+                         Target,                                     //
+                         missile::RedDrone>,                         //
+                Allows<Tracked>> {};                                 //
+struct Interceptor final                                             //
+    : Archetype<"interceptor",                                       //
+                Requires<Kinematics,                                 //
+                         Control,                                    //
+                         Warhead,                                    //
+                         Target,                                     //
+                         missile::Interceptor>> {};                  //
+struct Track final                                                   //
+    : Archetype<"track",                                             //
+                Requires<missile::Track, Estimate, Engagement>> {};  //
+struct Blast final                                                   //
+    : Archetype<"blast",                                             //
+                Requires<Kinematics, missile::Blast>> {};            //
 
 }  // namespace archetype
 

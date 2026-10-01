@@ -55,6 +55,8 @@ enum class BuildError {
   ALIAS_INVALID,
   ALIAS_ALREADY_GIVEN,
   ALIAS_NOT_GIVEN,
+  CELL_SIZE_INVALID,   // A world's spatial index cell size is not positive.
+  CAPACITY_TOO_LARGE,  // A world's room exceeds what a store can index.
   COUNT,
 };
 

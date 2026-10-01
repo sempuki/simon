@@ -1,6 +1,7 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
 #include <chrono>
+#include <expected>
 #include <vector>
 
 #include "application/missile/simulation.hpp"
@@ -14,8 +15,22 @@ namespace {
 using namespace std::chrono_literals;
 
 constexpr Duration DT = 10ms;
-const framework::WorldConfiguration SMALL{
-    .number = 1, .entities = 64, .components = 64};
+// A world with room for 16 of each archetype, for testing systems alone.
+World small_world() {
+  std::expected<World, framework::Status> world =
+      World::set_up()
+          .numbered(1)
+          .room_for<archetype::Asset>(16)
+          .room_for<archetype::Radar>(16)
+          .room_for<archetype::Launcher>(16)
+          .room_for<archetype::RedDrone>(16)
+          .room_for<archetype::Track>(16)
+          .room_for<archetype::Interceptor>(16)
+          .room_for<archetype::Blast>(16)
+          .build();
+  CHECK_POSTCONDITION(world.has_value());
+  return *std::move(world);
+}
 
 struct Run final {
   Outcome outcome;
@@ -142,7 +157,9 @@ TEST_CASE("MissileSimulation") {
 
   SECTION("ShouldAimEachSitesDronesAtItsOwnAssetGivenSeveralSites") {
     Scenario scenario{.drones = 10, .sites = 4};
-    World world{world_configuration_of(scenario)};
+    std::expected<World, framework::Status> built = world_for(scenario);
+    REQUIRE(built.has_value());
+    World& world = *built;
     Entity first = build_scenario(lib::InOut(world), scenario);
 
     std::vector<Entity> assets = owners_of<Asset>(world);
@@ -172,7 +189,7 @@ TEST_CASE("MissileSimulation") {
 }
 
 TEST_CASE("DetectDrones") {
-  World world{SMALL};
+  World world = small_world();
   framework::Scheduler<World, SystemList<ScanRadars, DetectDrones>> scheduler;
 
   SECTION("ShouldCreateOneTrackGivenTwoRadarsSeeingOneDrone") {
@@ -213,7 +230,7 @@ TEST_CASE("DetectDrones") {
 }
 
 TEST_CASE("UpdateTracks") {
-  World world{SMALL};
+  World world = small_world();
   framework::Scheduler<World, SystemList<ScanRadars, UpdateTracks>> scheduler;
 
   SECTION("ShouldUpdateEstimateGivenScanningRadarCoversTarget") {
@@ -249,7 +266,7 @@ TEST_CASE("UpdateTracks") {
 }
 
 TEST_CASE("DropStaleTracks") {
-  World world{SMALL};
+  World world = small_world();
   framework::Scheduler<World, SystemList<DropStaleTracks>> scheduler;
 
   SECTION("ShouldDropTrackAndUnmarkDroneGivenNotSeenForTimeout") {
@@ -268,7 +285,7 @@ TEST_CASE("DropStaleTracks") {
 }
 
 TEST_CASE("Engaging") {
-  World world{SMALL};
+  World world = small_world();
   framework::Scheduler<World, Engaging> scheduler;
 
   SECTION("ShouldLaunchOneInterceptorGivenTwoLaunchersProposingOneTrack") {
@@ -322,7 +339,7 @@ TEST_CASE("Engaging") {
 }
 
 TEST_CASE("GuideInterceptors") {
-  World world{SMALL};
+  World world = small_world();
   framework::Scheduler<World, SystemList<GuideInterceptors>> scheduler;
 
   SECTION("ShouldRetargetNearestDroneGivenTargetGone") {
@@ -362,7 +379,7 @@ TEST_CASE("GuideInterceptors") {
 }
 
 TEST_CASE("Blasts") {
-  World world{SMALL};
+  World world = small_world();
   framework::Scheduler<World, Blasts> scheduler;
 
   SECTION("ShouldDestroyDroneAndInterceptorGivenFuseDistance") {

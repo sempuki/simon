@@ -136,10 +136,12 @@ Result measure(std::size_t count, bool shuffled,
 
   // The framework: one world whose sibling is allowed, attached in `order`,
   // and one whose sibling is required.
-  WorldConfiguration configuration{
-      .number = 1, .entities = count, .components = count};
-  BenchmarkWorld allowed{configuration};
-  BenchmarkWorld required{configuration};
+  auto allowed_world = BenchmarkWorld::set_up().room_for<Craft>(count).build();
+  auto required_world =
+      BenchmarkWorld::set_up().room_for<Rocket>(count).build();
+  CHECK_POSTCONDITION(allowed_world.has_value() && required_world.has_value());
+  BenchmarkWorld& allowed = *allowed_world;
+  BenchmarkWorld& required = *required_world;
   std::vector<Entity> crafts;
   for (std::size_t i = 0; i < count; ++i) {
     auto craft = allowed.create<Craft>().with(Body{}).build();
