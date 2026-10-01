@@ -56,6 +56,16 @@ TEST_CASE("Limit") {
     Acceleration small = meters_per_second_squared(3.0, 4.0, 0.0);
     CHECK(limit(small, 10.0 * meter_per_second_squared) == small);
   }
+
+  SECTION("ShouldPassThroughGivenCommandExactlyAtLimit") {
+    Acceleration exact = meters_per_second_squared(6.0, 8.0, 0.0);
+    CHECK(limit(exact, 10.0 * meter_per_second_squared) == exact);
+  }
+
+  SECTION("ShouldPassThroughGivenZeroCommandAndZeroLimit") {
+    Acceleration zero = meters_per_second_squared(0.0, 0.0, 0.0);
+    CHECK(limit(zero, 0.0 * meter_per_second_squared) == zero);
+  }
 }
 
 TEST_CASE("SteerToward") {

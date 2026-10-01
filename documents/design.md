@@ -1517,7 +1517,11 @@ auto operator()(LocalWorld& world, Entity self, const Warhead& warhead,
 ```
 
 A check most entities fail should be cheap: `within_distance` compares squared
-distances, so it takes no square root.
+distances, so it takes no square root. `model::limit` does the same for the
+common case, a command already within the limit, and takes a square root only
+to scale one down. That took `SteerRedDrones` from 0.72 to 0.59 ms per step at
+100,000 drones, and `GuideInterceptors`, which also limits its command, from
+0.166 to 0.152 ms.
 
 `TriggerWarheads` had both problems. perf showed its call operator as a
 separate function, because the same function built the Blast. Moving the

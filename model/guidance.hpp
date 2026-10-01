@@ -11,14 +11,16 @@
 // returns a commanded acceleration for Control.
 namespace simon::model {
 
-// `acceleration`, scaled down if needed so its magnitude is at most `limit`.
+// `acceleration`, scaled down if needed so its magnitude is at most `limit`,
+// which must not be negative. Most commands are within the limit, so it
+// compares squares and takes a square root only to scale one down.
 inline auto limit(const Acceleration& acceleration, AccelerationMagnitude limit)
     -> Acceleration {
-  AccelerationMagnitude magnitude = norm(acceleration);
-  if (magnitude <= limit || magnitude == 0.0 * meter_per_second_squared) {
+  if (dot(acceleration, acceleration) <= limit * limit) {
     return acceleration;
   }
-  return acceleration * (limit / magnitude).numerical_value_in(units::one);
+  return acceleration *
+         (limit / norm(acceleration)).numerical_value_in(units::one);
 }
 
 // True proportional navigation: acceleration perpendicular to the line of
