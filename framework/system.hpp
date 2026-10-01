@@ -300,7 +300,25 @@ class WorldAccess final {
   auto change(Entity entity) { return world_->change(entity); }
   auto destroy(Entity entity) { return world_->destroy(entity); }
 
+  // Query forms, which select only by what the system's AllowComponentList
+  // declares. Use them from prepare or resolve, which run once per step, not
+  // from the per-entity call.
+  auto change() {
+    return ChangeQueryBuilder<WorldType, ReadAllowed, void, TypeList<>,
+                              TypeList<>, false>{lib::Depend(*world_)};
+  }
+  auto destroy() {
+    return DestroyQueryBuilder<WorldType, ReadAllowed, void>{
+        lib::Depend(*world_)};
+  }
+
  private:
+  struct ReadAllowed final {
+    template <typename ComponentType>
+    static constexpr bool can_read =
+        contains_v<allow_component_list_of_t<SystemType>, ComponentType>;
+  };
+
   // Never null once constructed; Depend checks it.
   WorldType* world_ = nullptr;
 };

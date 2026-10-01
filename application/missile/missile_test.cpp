@@ -386,6 +386,85 @@ TEST_CASE("Engaging") {
   }
 }
 
+TEST_CASE("OperatorCommands") {
+  World world;
+  build_small_world(lib::Out(world));
+  framework::Scheduler<World, Engaging> scheduler;
+  const Sector home{.center = model::meters(0.0, 0.0, 0.0),
+                    .radius = 500.0 * model::meter};
+  Entity drone =
+      make_drone(model::meters(2000.0, 0.0, 0.0), Entity{}, lib::InOut(world));
+  make_track(drone, model::meters(2000.0, 0.0, 0.0), lib::InOut(world));
+
+  SECTION("ShouldNotEngageGivenWeaponsHold") {
+    make_launcher(model::meters(0.0, 0.0, 0.0), lib::InOut(world));
+    world.sync();
+
+    auto held = hold_weapons(home, lib::InOut(world));
+    world.sync();  // Commands apply at the next sync.
+    step(TimePoint{}, lib::InOut(scheduler), lib::InOut(world));
+
+    CHECK(held == 1u);
+    CHECK(world.store_of<Interceptor>().size() == 0u);
+  }
+
+  SECTION("ShouldEngageAgainGivenWeaponsFree") {
+    make_launcher(model::meters(0.0, 0.0, 0.0), lib::InOut(world));
+    world.sync();
+    REQUIRE(hold_weapons(home, lib::InOut(world)));
+    world.sync();
+    step(TimePoint{}, lib::InOut(scheduler), lib::InOut(world));
+    REQUIRE(world.store_of<Interceptor>().size() == 0u);
+
+    auto freed = free_weapons(home, lib::InOut(world));
+    world.sync();
+    step(TimePoint{1s}, lib::InOut(scheduler), lib::InOut(world));
+
+    CHECK(freed == 1u);
+    CHECK(world.store_of<Interceptor>().size() == 1u);
+  }
+
+  SECTION("ShouldHoldOnlyLaunchersInSectorGivenSector") {
+    make_launcher(model::meters(0.0, 0.0, 0.0), lib::InOut(world));
+    Entity distant =
+        make_launcher(model::meters(4000.0, 0.0, 0.0), lib::InOut(world));
+    world.sync();
+
+    REQUIRE(hold_weapons(home, lib::InOut(world)) == 1u);
+    world.sync();
+    step(TimePoint{}, lib::InOut(scheduler), lib::InOut(world));
+
+    REQUIRE(world.store_of<Interceptor>().size() == 1u);
+    CHECK(world.parent_of(owners_of<Interceptor>(world).front()) == distant);
+  }
+
+  SECTION("ShouldSkipHeldLaunchersGivenSecondHoldBeforeSync") {
+    make_launcher(model::meters(0.0, 0.0, 0.0), lib::InOut(world));
+    world.sync();
+
+    auto first = hold_weapons(home, lib::InOut(world));
+    auto second = hold_weapons(home, lib::InOut(world));
+
+    CHECK(first == 1u);
+    CHECK(second == 0u);
+  }
+
+  SECTION("ShouldDestroyInterceptorsInSectorGivenCommandDestruct") {
+    Entity near = make_interceptor(model::meters(100.0, 0.0, 0.0), drone,
+                                   TimePoint{1min}, lib::InOut(world));
+    Entity far = make_interceptor(model::meters(1500.0, 0.0, 0.0), drone,
+                                  TimePoint{1min}, lib::InOut(world));
+    world.sync();
+
+    auto destroyed = destruct_interceptors(home, lib::InOut(world));
+    world.sync();
+
+    CHECK(destroyed == 1u);
+    CHECK_FALSE(world.alive(near));
+    CHECK(world.alive(far));
+  }
+}
+
 TEST_CASE("GuideInterceptors") {
   World world;
   build_small_world(lib::Out(world));

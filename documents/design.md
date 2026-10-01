@@ -744,8 +744,10 @@ std::expected<std::size_t, Status> destroyed =
 
 `each` comes first, selecting by archetype (walking that archetype's segment)
 or by component (walking its store). `within` narrows through the spatial
-index, and each `where` narrows by a predicate. `build()` plans every
-destruction in one transaction, skips entities already planned for
+index, and each `where` narrows by a predicate. `having<T>()` and
+`lacking<T>()` narrow by whether an entity will have a component once pending
+commands apply, which is the state a builder validates against. `build()`
+plans every destruction in one transaction, skips entities already planned for
 destruction, and returns how many it destroyed.
 
 Change selects in the same words, then changes in the words of the
@@ -816,6 +818,34 @@ Systems use builders too, through their `WorldAccess`:
 `world.create<Interceptor>().under(self).with(...).build()`. Inside a system
 whose access parameter is `auto&`, the free-function form avoids the
 `template` keyword: `create<Interceptor>(lib::InOut(world))`.
+
+`WorldAccess` has the query forms as well, `world.destroy()` and
+`world.change()`, limited to what the system declares it reads. Selecting by a
+component reads that component's store, so the component must be in the
+system's `AllowComponentList`. `within` reads the spatial index, so the
+spatial component must be there too. Selecting by archetype reads nothing the
+system must declare. A query form selects across every entity, so a system
+uses it from `prepare` or `resolve`, which run once per step, and not from the
+per-entity call:
+
+```cpp
+struct ClearOrigin final : System<const Health> {
+  using AllowComponentList = TypeList<Position>;  // within reads Position.
+  bool prepare(auto& world) {
+    destroyed = world.destroy()
+                    .template each<Body>()
+                    .within(Position{0.0}, 2.0)
+                    .build();
+    return false;  // Nothing to do per entity.
+  }
+  ...
+};
+```
+
+The query builders carry a read policy as a template parameter. The world's
+query forms use `ReadAnything`; `WorldAccess` passes one that answers from the
+system's `AllowComponentList`, and `each` and `within` check it with a
+`static_assert`.
 
 ### Systems
 
@@ -1859,6 +1889,7 @@ Components (`application/missile/components.hpp`):
 | `Estimate` | A track's estimated position and velocity |
 | `Engagement` | The launcher engaging a track, if any, and until when |
 | `Launcher` | Range, inventory, reload time, ready time, this step's proposal |
+| `WeaponsHold` | Marks a launcher an operator has held; launchers allow it |
 | `Interceptor` | Navigation gain, speed, agility, seeker range, flight time |
 
 Each component has an archetype in `missile::archetype` (asset, radar,
@@ -1881,7 +1912,7 @@ Schedule (`application/missile/systems.hpp`):
 | `DetectDrones` | Each untracked red drone that a scanning radar covers creates its track and marks itself `Tracked`. Skips steps without a scan. |
 | `UpdateTracks` | Each track updates its own estimate from a radar that scanned its target. Radars are perfect for now. Skips steps without a scan. |
 | `DropStaleTracks` | Destroys tracks whose target is gone or unseen for 5 s, and unmarks a surviving target |
-| `ProposeEngagements` | Each ready launcher with inventory proposes the nearest unengaged track in range |
+| `ProposeEngagements` | Each ready launcher with inventory and no `WeaponsHold` proposes the nearest unengaged track in range |
 | `ResolveEngagements` | Each unengaged track accepts the nearest launcher that proposed it, for 30 s |
 | `LaunchInterceptors` | Launchers whose proposal was accepted build an interceptor under themselves, aimed at the track |
 | `GuideInterceptors` | Proportional navigation plus speed hold into `Control`. Retargets the nearest red drone within seeker range when the target is gone; self-destructs when there is none or its flight time is up. |
@@ -1890,6 +1921,27 @@ Schedule (`application/missile/systems.hpp`):
 | `TriggerWarheads` | A warhead within fuse distance of its target creates a Blast and destroys itself |
 | `ApplyBlasts` | Every `Health` inside a blast takes its damage, and is destroyed at zero |
 | `ExpireBlasts` | Destroys every blast; they live for one step |
+
+Operator commands (`application/missile/simulation.hpp`) are query forms. Each
+selects what it applies to, changes all of it or none, and returns how many
+entities it affected:
+
+```cpp
+// Holds every launcher in a sector, so none engages until freed.
+world->change()
+    .each<archetype::Launcher>()
+    .within(Kinematics{.position = sector.center}, sector.radius)
+    .lacking<WeaponsHold>()  // Already held, or held by a pending command.
+    .attach(WeaponsHold{})
+    .build();
+```
+
+`free_weapons` detaches `WeaponsHold` from the held launchers in a sector, and
+`destruct_interceptors` destroys every interceptor in flight in one. A hold is
+a component, so holding a launcher is a structural change, and
+`ProposeEngagements` reads it as an optional sibling. `Simulation` forwards
+each command to its world. Like every builder, a command applies at the next
+sync point.
 
 Decisions made while building it:
 

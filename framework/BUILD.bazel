@@ -9,22 +9,26 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "framework",
     srcs = [
-        "builder.cpp",
+        "build_error.cpp",
         "name.cpp",
         "spatial_index.cpp",
     ],
     hdrs = [
         "archetype.hpp",
-        "builder.hpp",
+        "build_error.hpp",
+        "entity_builder.hpp",
         "command.hpp",
         "entity.hpp",
         "name.hpp",
+        "query_builder.hpp",
+        "spatial.hpp",
         "spatial_index.hpp",
         "step.hpp",
         "component_store.hpp",
         "system.hpp",
         "type_list.hpp",
         "world.hpp",
+        "world_builder.hpp",
     ],
     copts = COPTS,
     deps = [

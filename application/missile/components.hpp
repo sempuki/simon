@@ -102,6 +102,10 @@ struct Launcher final {
   Entity proposal;  // The track it proposes to engage this step.
 };
 
+// Keeps a launcher from engaging. Operators impose and lift it over a sector;
+// see hold_weapons and free_weapons.
+struct WeaponsHold final {};
+
 struct Interceptor final {
   double navigation_gain = 4.0;
   Speed speed = 0.0 * model::meter_per_second;
@@ -124,7 +128,8 @@ struct Radar final                                                   //
                 Requires<Kinematics, missile::Radar>> {};            //
 struct Launcher final                                                //
     : Archetype<"launcher",                                          //
-                Requires<Kinematics, missile::Launcher>> {};         //
+                Requires<Kinematics, missile::Launcher>,             //
+                Allows<WeaponsHold>> {};                             //
 struct RedDrone final                                                //
     : Archetype<"red drone",                                         //
                 Requires<Kinematics,                                 //
@@ -154,7 +159,7 @@ using World = framework::World<
     Kinematics,
     framework::TypeList<Control, Health, Warhead, Blast, Target, RedDrone,
                         Tracked, Asset, Radar, Track, Estimate, Engagement,
-                        Launcher, Interceptor>,
+                        Launcher, WeaponsHold, Interceptor>,
     framework::TypeList<archetype::Asset, archetype::Radar, archetype::Launcher,
                         archetype::RedDrone, archetype::Interceptor,
                         archetype::Track, archetype::Blast>>;

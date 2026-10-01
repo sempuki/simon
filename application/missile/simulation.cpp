@@ -155,6 +155,49 @@ engine::PhaseResult Simulation::step(const framework::Step& step) {
                                         : engine::Flow::STOP;
 }
 
+std::expected<std::size_t, framework::Status> hold_weapons(
+    const Sector& sector, lib::InOut<World> world) {
+  return world->change()
+      .each<archetype::Launcher>()
+      .within(Kinematics{.position = sector.center}, sector.radius)
+      .lacking<WeaponsHold>()
+      .attach(WeaponsHold{})
+      .build();
+}
+
+std::expected<std::size_t, framework::Status> free_weapons(
+    const Sector& sector, lib::InOut<World> world) {
+  return world->change()
+      .each<archetype::Launcher>()
+      .within(Kinematics{.position = sector.center}, sector.radius)
+      .having<WeaponsHold>()
+      .detach<WeaponsHold>()
+      .build();
+}
+
+std::expected<std::size_t, framework::Status> destruct_interceptors(
+    const Sector& sector, lib::InOut<World> world) {
+  return world->destroy()
+      .each<archetype::Interceptor>()
+      .within(Kinematics{.position = sector.center}, sector.radius)
+      .build();
+}
+
+std::expected<std::size_t, framework::Status> Simulation::hold_weapons(
+    const Sector& sector) {
+  return missile::hold_weapons(sector, lib::InOut(world_));
+}
+
+std::expected<std::size_t, framework::Status> Simulation::free_weapons(
+    const Sector& sector) {
+  return missile::free_weapons(sector, lib::InOut(world_));
+}
+
+std::expected<std::size_t, framework::Status> Simulation::destruct_interceptors(
+    const Sector& sector) {
+  return missile::destruct_interceptors(sector, lib::InOut(world_));
+}
+
 std::uint32_t Simulation::interceptors_fired() const {
   return stock_ - remaining_interceptors();
 }

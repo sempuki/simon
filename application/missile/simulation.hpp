@@ -147,6 +147,33 @@ SiteBuilder create_site(Position origin, lib::Depend<World> world);
 std::expected<Entity, framework::Status> build_scenario(
     const Scenario& scenario, lib::InOut<World> world);
 
+//-- Operator commands
+//----------------------------------------------------------
+
+// A circle an operator command applies to.
+struct Sector final {
+  Position center = model::meters(0.0, 0.0, 0.0);
+  Length radius = 0.0 * model::meter;
+};
+
+// Operator commands. Each is one query form: it selects what it applies to,
+// changes all of it or none, applies at the next sync, and returns how many
+// entities it affected.
+
+// Holds every launcher in `sector`, so none engages until freed. Launchers
+// already held, or held by a command still pending, are skipped.
+std::expected<std::size_t, framework::Status> hold_weapons(
+    const Sector& sector, lib::InOut<World> world);
+
+// Frees every held launcher in `sector` to engage again.
+std::expected<std::size_t, framework::Status> free_weapons(
+    const Sector& sector, lib::InOut<World> world);
+
+// Destroys every interceptor in flight in `sector`. The tracks they were
+// engaging stay engaged until their engagements lapse.
+std::expected<std::size_t, framework::Status> destruct_interceptors(
+    const Sector& sector, lib::InOut<World> world);
+
 // The missile simulation: builds the scenario when configured, and stops when
 // red is defeated or the asset is destroyed. Any driver can run it.
 class Simulation final {
@@ -166,6 +193,15 @@ class Simulation final {
 
   // Interceptors fired so far, from what the launchers have left.
   std::uint32_t interceptors_fired() const;
+
+  // Operator commands on the simulation's world; see hold_weapons,
+  // free_weapons and destruct_interceptors.
+  std::expected<std::size_t, framework::Status> hold_weapons(
+      const Sector& sector);
+  std::expected<std::size_t, framework::Status> free_weapons(
+      const Sector& sector);
+  std::expected<std::size_t, framework::Status> destruct_interceptors(
+      const Sector& sector);
 
  private:
   std::uint32_t remaining_interceptors() const;

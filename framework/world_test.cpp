@@ -343,6 +343,29 @@ TEST_CASE("ChangeQueryBuilder") {
     CHECK(changed == 2u);
   }
 
+  SECTION("ShouldChangeOnlyHoldersGivenHaving") {
+    auto changed =
+        world.change().each<Body>().having<Health>().detach<Health>().build();
+    world.sync();
+
+    CHECK(changed == 1u);
+    CHECK(world.store_of<Health>().size() == 0u);
+  }
+
+  SECTION("ShouldSkipPlannedAttachGivenLacking") {
+    REQUIRE(world.change(wounded).attach(Velocity{}).build());
+
+    auto changed = world.change()
+                       .each<Body>()
+                       .lacking<Velocity>()
+                       .attach(Velocity{})
+                       .build();
+    world.sync();
+
+    CHECK(changed == 2u);  // Without lacking, wounded would refuse it all.
+    CHECK(world.store_of<Velocity>().size() == 3u);
+  }
+
   SECTION("ShouldAliasEveryMatchGivenAlias") {
     auto changed = world.change()
                        .each<Body>()

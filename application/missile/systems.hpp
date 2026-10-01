@@ -196,7 +196,8 @@ using Sensing =
 
 //-- Engagement ---------------------------------------------------------------
 
-// Each ready launcher proposes the nearest unengaged track in range.
+// Each ready launcher proposes the nearest unengaged track in range, unless
+// it is under a weapons hold.
 //
 // Tracks are not in the world's spatial index: a track's position is blue's
 // estimate, and UpdateTracks could not write a track Kinematics while reading
@@ -204,7 +205,8 @@ using Sensing =
 // query in a step: most steps no launcher is ready, and building it in
 // prepare every step costs four times as much. This relies on the
 // per-entity loop running on one thread.
-struct ProposeEngagements final : System<Launcher, const Kinematics> {
+struct ProposeEngagements final
+    : System<Launcher, const Kinematics, const WeaponsHold> {
   using LocalWorld = WorldAccess<ProposeEngagements>;
   using SequenceAfterSystemList = SystemList<DropStaleTracks>;
   using AllowComponentList = TypeList<Estimate, Engagement>;
@@ -212,10 +214,12 @@ struct ProposeEngagements final : System<Launcher, const Kinematics> {
   void prepare(LocalWorld&) { indexed_ = false; }
 
   void operator()(LocalWorld& world, Entity, Launcher& launcher,
-                  const Kinematics* kinematics, Step step) {
+                  const Kinematics* kinematics, const WeaponsHold* hold,
+                  Step step) {
     launcher.proposal = Entity{};
     TimePoint now = step.time;
-    if (!kinematics || launcher.inventory == 0 || now < launcher.ready_at) {
+    if (!kinematics || hold || launcher.inventory == 0 ||
+        now < launcher.ready_at) {
       return;
     }
     const auto& estimates = world.store_of<Estimate>();

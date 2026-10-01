@@ -1,6 +1,6 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
-#include "framework/builder.hpp"
+#include "framework/build_error.hpp"
 
 template <>
 const std::array<lib::StatusConditionEntry, simon::framework::BUILD_ERROR_COUNT>

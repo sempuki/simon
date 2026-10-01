@@ -3,6 +3,7 @@
 #include "framework/system.hpp"
 
 #include <chrono>
+#include <expected>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -104,6 +105,21 @@ struct Count final : System<const Health> {
   void resolve(auto&) { resolved = true; }
   int count = 0;
   bool resolved = false;
+};
+
+// Destroys every body near the origin through a query form, once per step,
+// and skips the per-entity loop.
+struct ClearOrigin final : System<const Health> {
+  using AllowComponentList = TypeList<Position>;
+  bool prepare(auto& world) {
+    destroyed = world.destroy()
+                    .template each<Body>()
+                    .within(Position{0.0}, 2.0)
+                    .build();
+    return false;
+  }
+  void operator()(auto&, Entity, const Health&) {}
+  std::expected<std::size_t, Status> destroyed;
 };
 
 }  // namespace
@@ -239,6 +255,20 @@ TEST_CASE("System") {
     CHECK(scheduler.system<Count>().count == 1);
     CHECK(scheduler.system<Count>().resolved);
     CHECK(world.size() == 1u);
+  }
+
+  SECTION("ShouldDestroySelectedGivenQueryFormInPrepare") {
+    REQUIRE(world.create<Body>().with(Position{1.0}).build());
+    REQUIRE(world.create<Body>().with(Position{1.5}).with(Health{}).build());
+    Entity distant = *world.create<Body>().with(Position{9.0}).build();
+    world.sync();
+
+    Scheduler<TestWorld, SystemList<ClearOrigin>> scheduler;
+    scheduler.step(STEP, lib::InOut(world));
+
+    CHECK(scheduler.system<ClearOrigin>().destroyed == 2u);
+    CHECK(world.size() == 1u);
+    CHECK(world.alive(distant));
   }
 
   SECTION("ShouldThrowGivenComponentOfMissingComponent") {
