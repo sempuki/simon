@@ -51,6 +51,16 @@ struct Chase final : System<Velocity, const Health> {
   Entity target;
 };
 
+// Records which entities it ran for: every Position but those with a
+// Velocity.
+struct RecordStill final : System<const Position> {
+  using ExcludeComponentList = TypeList<Velocity>;
+  auto operator()(auto&, Entity entity, const Position&) -> void {
+    seen.push_back(entity);
+  }
+  std::vector<Entity> seen;
+};
+
 // Destroys every entity whose health is gone.
 struct Cull final : System<const Health> {
   auto operator()(auto& world, Entity self, const Health& health) -> void {
@@ -154,6 +164,44 @@ TEST_CASE("System") {
     CHECK(seen[0] == std::pair{x, false});
     CHECK(seen[1] == std::pair{z, true});
     DECLARE_UNUSED(y);
+  }
+
+  SECTION("ShouldSkipOwnersOfExcludedComponentGivenEveryArchetype") {
+    // A launcher cannot have a Velocity, an interceptor always has one, and a
+    // body may.
+    Entity launcher =
+        *world.create<testing::Launcher>().with(Position{}).build();
+    Entity interceptor = *world.create<testing::Interceptor>()
+                              .with(Position{})
+                              .with(Velocity{})
+                              .build();
+    Entity still = *world.create<Body>().with(Position{}).build();
+    Entity moving =
+        *world.create<Body>().with(Position{}).with(Velocity{}).build();
+    world.sync();
+
+    Scheduler<TestWorld, SystemList<RecordStill>> scheduler;
+    scheduler.step(STEP, lib::InOut(world));
+
+    // The launcher's segment, then the segment of archetypes that only allow
+    // Position.
+    CHECK(scheduler.system<RecordStill>().seen ==
+          std::vector<Entity>{launcher, still});
+    DECLARE_UNUSED(interceptor);
+    DECLARE_UNUSED(moving);
+  }
+
+  SECTION("ShouldSkipEntityGivenExcludedComponentAttachedLater") {
+    Entity body = *world.create<Body>().with(Position{}).build();
+    world.sync();
+    Scheduler<TestWorld, SystemList<RecordStill>> scheduler;
+
+    scheduler.step(STEP, lib::InOut(world));
+    REQUIRE(world.change(body).attach(Velocity{}).build());
+    world.sync();
+    scheduler.step(STEP, lib::InOut(world));
+
+    CHECK(scheduler.system<RecordStill>().seen == std::vector<Entity>{body});
   }
 
   SECTION("ShouldWriteDrivingComponentGivenStep") {
@@ -389,6 +437,11 @@ TEST_CASE("System") {
     std::string text = Scheduler<TestWorld, SystemList<Integrate>>::describe();
     CHECK(text.contains("writes: simon::framework::testing::Position"));
     CHECK(text.contains("reads: simon::framework::testing::Velocity"));
+    CHECK(text.contains("excludes: -"));
+
+    std::string still =
+        Scheduler<TestWorld, SystemList<RecordStill>>::describe();
+    CHECK(still.contains("excludes: simon::framework::testing::Velocity"));
   }
 }
 

@@ -43,8 +43,9 @@ SystemList(SystemTypes...) -> SystemList<SystemTypes...>;
 // reference; every following component is optional, belongs to the same
 // entity, and comes in by pointer (null when absent). Declare a component
 // `const` to read it without writing it. A system may also declare an
-// AllowComponentList (components it may read, read-only, from other entities)
-// and a SequenceAfterSystemList (systems it must be scheduled after).
+// AllowComponentList (components it may read, read-only, from other entities),
+// an ExcludeComponentList (components whose owners it does not run for) and a
+// SequenceAfterSystemList (systems it must be scheduled after).
 //
 //   struct Integrate : System<Kinematics, const Control> {
 //     void operator()(auto& world, Entity, Kinematics&, const Control*, Step);
@@ -54,6 +55,7 @@ struct System {
   using DrivingComponent = DrivingComponentType;
   using OtherComponentList = TypeList<OtherComponentTypes...>;
   using AllowComponentList = TypeList<>;
+  using ExcludeComponentList = TypeList<>;
   using SequenceAfterSystemList = SystemList<>;
 };
 
@@ -121,6 +123,11 @@ using flattened_list_t = typename Flatten<ScheduleType>::type;
 // The components a system may read by entity (its AllowComponentList).
 template <typename SystemType>
 using allow_component_list_of_t = typename SystemType::AllowComponentList;
+
+// The components whose owners a system does not run for (its
+// ExcludeComponentList).
+template <typename SystemType>
+using exclude_component_list_of_t = typename SystemType::ExcludeComponentList;
 
 template <typename SystemType>
 using component_list_of_t =
@@ -379,6 +386,14 @@ struct SystemRunner final {
                   "reading an array partway through writing it depends on "
                   "iteration order.");
 
+    using ExcludeComponentList = exclude_component_list_of_t<SystemType>;
+    static_assert(
+        is_subset_v<ExcludeComponentList, typename WorldType::ComponentList>,
+        "A system excludes a component that is not in the world.");
+    static_assert(!intersects_v<ComponentList, ExcludeComponentList>,
+                  "A system cannot both name a component and exclude its "
+                  "owners; the component would never be there.");
+
     WorldAccess<SystemType, WorldType> access{lib::Depend(*world)};
     // A prepare stage that returns false skips the per-entity loop, for steps
     // with nothing to do.
@@ -461,6 +476,19 @@ struct SystemRunner final {
     auto&& drive = store_for<DrivingComponentType>(world);
     auto optional =
         std::forward_as_tuple(store_for<OtherComponentTypes>(world)...);
+
+    // Owners of an excluded component are skipped: a whole segment when its
+    // archetype requires one, by lookup when it only allows one.
+    using ExcludeList = exclude_component_list_of_t<SystemType>;
+    auto excluded = excluded_stores(ExcludeList{}, world);
+    auto is_excluded = [&](Entity entity) {
+      return std::apply(
+          [&](const auto&... store) {
+            return (store.contains(entity) || ... || false);
+          },
+          excluded);
+    };
+
     // Unwrapped once, outside the loop, so the hot path has no pointer checks.
     SystemType& call = *system;
     WorldAccessType& shared = *access;
@@ -480,7 +508,10 @@ struct SystemRunner final {
           // to be at the same slot of the matching chunk, absent, or allowed.
           auto walk_archetype = [&]<std::size_t ARCHETYPE>() {
             if constexpr (WorldType::template archetype_requires<Driving>(
-                              ARCHETYPE)) {
+                              ARCHETYPE) &&
+                          !excludes_all<WorldType, ARCHETYPE>(ExcludeList{})) {
+              constexpr bool MAY_EXCLUDE =
+                  excludes_some<WorldType, ARCHETYPE>(ExcludeList{});
               constexpr std::size_t SEGMENT =
                   WorldType::template segment_of<Driving>(ARCHETYPE);
               CHECK_INVARIANT(
@@ -498,6 +529,11 @@ struct SystemRunner final {
                     base_of<WorldType, OtherComponentTypes, ARCHETYPE>(
                         optional_store, ordinal)...);
                 for (std::size_t i = 0; i < chunk.size; ++i) {
+                  if constexpr (MAY_EXCLUDE) {
+                    if (is_excluded(chunk.owners[i])) {
+                      continue;
+                    }
+                  }
                   std::apply(
                       [&](auto... base) {
                         invoke(chunk.owners[i], chunk.components[i],
@@ -521,12 +557,43 @@ struct SystemRunner final {
                ++ordinal) {
             auto chunk = drive.chunk(allowed, ordinal);
             for (std::size_t i = 0; i < chunk.size; ++i) {
+              if constexpr (ExcludeList::size > 0) {
+                if (is_excluded(chunk.owners[i])) {
+                  continue;
+                }
+              }
               invoke(chunk.owners[i], chunk.components[i],
                      optional_store.maybe_component_of(chunk.owners[i])...);
             }
           }
         },
         optional);
+  }
+
+  // The stores of the excluded components, read-only.
+  template <typename WorldType, typename... ExcludedTypes>
+  static auto excluded_stores(TypeList<ExcludedTypes...>,
+                              lib::InOut<WorldType> world) {
+    return std::forward_as_tuple(
+        std::as_const(*world).template store_of<ExcludedTypes>()...);
+  }
+
+  // Whether every entity of an archetype has an excluded component, because
+  // the archetype requires one.
+  template <typename WorldType, std::size_t ARCHETYPE,
+            typename... ExcludedTypes>
+  static constexpr auto excludes_all(TypeList<ExcludedTypes...>) -> bool {
+    return (WorldType::template archetype_requires<ExcludedTypes>(ARCHETYPE) ||
+            ... || false);
+  }
+
+  // Whether some entities of an archetype may have an excluded component,
+  // because the archetype allows one.
+  template <typename WorldType, std::size_t ARCHETYPE,
+            typename... ExcludedTypes>
+  static constexpr auto excludes_some(TypeList<ExcludedTypes...>) -> bool {
+    return (WorldType::template archetype_permits<ExcludedTypes>(ARCHETYPE) ||
+            ... || false);
   }
 
   // How a system reaches another component of an entity whose archetype
@@ -667,12 +734,14 @@ class Scheduler final {
   static auto describe(std::uint32_t world = 0) -> std::string {
     std::string text;
     for_each_type(FlattenedSystemList{}, [&]<typename SystemType>() {
-      text += std::format("{} {}\n  writes: {}\n  reads: {}\n  allowed: {}\n",
-                          identity_of(world, name_of<SystemType>()),
-                          lib::to_type_string<SystemType>(),
-                          names(write_list_of_t<SystemType>{}),
-                          names(read_list_of_t<SystemType>{}),
-                          names(allow_component_list_of_t<SystemType>{}));
+      text += std::format(
+          "{} {}\n  writes: {}\n  reads: {}\n  allowed: {}\n  excludes: {}\n",
+          identity_of(world, name_of<SystemType>()),
+          lib::to_type_string<SystemType>(),
+          names(write_list_of_t<SystemType>{}),
+          names(read_list_of_t<SystemType>{}),
+          names(allow_component_list_of_t<SystemType>{}),
+          names(exclude_component_list_of_t<SystemType>{}));
     });
     return text;
   }

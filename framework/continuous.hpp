@@ -240,6 +240,7 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
   using OtherComponentList =
       typename internal::Split<typename Declared::DeclaredList>::Rest;
   using AllowComponentList = typename Declared::AllowList;
+  using ExcludeComponentList = TypeList<>;
   using SequenceAfterSystemList = SystemList<>;
 
   Continuous()

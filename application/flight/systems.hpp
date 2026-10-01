@@ -156,17 +156,17 @@ inline auto rate_of(const AirState& state, const FlightControls& controls,
 }
 
 // The default: each aircraft advances in one semi-implicit pass per step.
-// Aircraft that have an AirStateRate are left to Precise; for the default
-// archetype the rate is absent, so that check compiles away.
-struct Fly final : System<AirState, const FlightControls, const Airframe,
-                          const AirStateRate> {
+// Aircraft that have an AirStateRate are Precise's, so Fly excludes them; the
+// runner skips the precise archetype's segment whole.
+struct Fly final : System<AirState, const FlightControls, const Airframe> {
   using LocalWorld = WorldAccess<Fly>;
   using SequenceAfterSystemList = SystemList<Actuate>;
+  using ExcludeComponentList = TypeList<AirStateRate>;
 
   auto operator()(LocalWorld&, Entity, AirState& state,
                   const FlightControls* controls, const Airframe* airframe,
-                  const AirStateRate* precise, Step step) const -> void {
-    if (precise || !controls || !airframe) {
+                  Step step) const -> void {
+    if (!controls || !airframe) {
       return;
     }
     state =

@@ -952,6 +952,15 @@ Rules:
   returns `const T&` with a contract check, and `world.store_of<T>()` returns
   the whole read-only store. Reads through the allow list are always
   read-only, and asking for a component not on it does not compile.
+- **Owners of some components can be left out.** `using ExcludeComponentList =
+  TypeList<...>;` keeps the system from running for any entity that has one
+  of them. The runner decides per archetype at compile time: it skips the
+  segment of an archetype that requires an excluded component, looks the
+  component up for an archetype that only allows it, and checks nothing for
+  one that cannot have it. A system that excludes nothing pays nothing, and
+  one cannot both name and exclude a component. Fidelity levels use it: the
+  flight application's single-pass `Fly` excludes the `AirStateRate` that
+  only Runge-Kutta aircraft have.
 - **The call order is `(WorldAccess& world, Entity self, driving component,
   other components..., Step step)`.** `WorldAccess<S, W>` is the system's
   opt-in access to the world: its allow list, spatial and name queries, and
@@ -2252,9 +2261,12 @@ Decisions made while building it:
 
 - **Fidelity is per archetype.** `Aircraft` and `PreciseAircraft` require
   the same components, and the precise one also requires `AirStateRate`.
-  `Continuous` integrates only archetypes that can have the rate. `Fly` names
-  the rate as an optional sibling and returns when it is present; for the
-  single-pass archetype it is absent, so that check compiles away.
+  `Continuous` integrates only archetypes that can have the rate, and `Fly`
+  excludes the rate, so the runner skips the precise segment whole. `Fly` first
+  named the rate as an optional sibling and returned when it was present.
+  Clang did not inline the call operator, so it paid a call per precise
+  aircraft to return: 0.23 ms per step at 100,000, against 0.06 ms with GCC.
+  Excluding takes both to nothing.
 - **Guidance and control run at their own rates, gated once per system** in
   `prepare`, so the steps in between skip their loops. Per-entity staggered
   gates would spread the work, at the cost of a gate in each component and a
@@ -2296,9 +2308,7 @@ and once with every aircraft on Runge-Kutta 4. GCC, ms per step:
   (within a few parts in 10^5), replaced the power and exponential of
   `standard_air`; it saved 6% of `Fly`, and 20% of Runge-Kutta 4, which
   evaluates the air four times.
-- **Clang is about 13% slower** (8.2 and 22.7 ms at 100,000). It also walks
-  `Fly` over the precise aircraft for 0.23 ms per step, against 0.06 ms with
-  GCC, although `Fly` does nothing for them.
+- **Clang is about 13% slower** (8.3 and 22.7 ms at 100,000).
 
 ## Libraries
 
