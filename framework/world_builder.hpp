@@ -10,6 +10,7 @@
 #include <expected>
 #include <format>
 #include <limits>
+#include <optional>
 #include <utility>
 
 #include "base/core.hpp"
@@ -33,7 +34,6 @@ namespace simon::framework {
 //           .numbered(1)
 //           .holding<archetype::RedDrone>(drones)
 //           .holding<archetype::Track>(drones)
-//           .cells_of(250.0 * model::meter)
 //           .build(lib::Out(world));
 template <typename WorldType>
 class [[nodiscard]] SetUpBuilder final {
@@ -59,8 +59,9 @@ class [[nodiscard]] SetUpBuilder final {
     return std::move(*this);
   }
 
-  // The edge of a spatial index cell. About the radius of a typical query
-  // works well. One coordinate unit unless given.
+  // Fixes the edge of a spatial index cell. Unless given, the index sizes its
+  // cells at every rebuild to how densely the entities lie, which suits most
+  // worlds; see SpatialIndex.
   auto cells_of(distance_of_t<SpatialType> size) && -> SetUpBuilder {
     static_assert(std::default_initializable<SpatialType>,
                   "Sizing cells needs a default spatial component to convert "
@@ -72,7 +73,7 @@ class [[nodiscard]] SetUpBuilder final {
   // Fills `world` as planned, discarding everything it held. A refused plan
   // leaves `world` as it was.
   auto build(lib::Out<WorldType> world) && -> std::expected<void, Status> {
-    if (!(cell_size_ > 0.0) || !std::isfinite(cell_size_)) {
+    if (cell_size_ && (!(*cell_size_ > 0.0) || !std::isfinite(*cell_size_))) {
       return std::unexpected(
           lib::raise(BuildError::CELL_SIZE_INVALID,
                      "A world's spatial index cells must have a positive, "
@@ -118,7 +119,7 @@ class [[nodiscard]] SetUpBuilder final {
   std::uint32_t number_ = 0;
   // How many of each archetype, by its position in ArchetypeList.
   std::array<std::size_t, ArchetypeList::size> holdings_{};
-  double cell_size_ = 1.0;
+  std::optional<double> cell_size_;  // Sized at every rebuild unless given.
 };
 
 }  // namespace simon::framework

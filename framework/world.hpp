@@ -446,8 +446,8 @@ class World<SpatialType,                  //
     // Each store's capacity, by component number.
     std::array<std::size_t, ComponentList::size> capacities{};
     // The edge of a spatial index cell, in the spatial component's coordinate
-    // unit.
-    double cell_size = 1.0;
+    // unit, or none to size cells at every rebuild.
+    std::optional<double> cell_size;
   };
 
   // Fills the world as `configuration` describes, discarding everything it
@@ -466,9 +466,11 @@ class World<SpatialType,                  //
               Plan<EntityArchetype>{configuration.entities},
               Plan<Parent>{configuration.entities},
               Plan<ComponentTypes>{configuration.entities}...};
-    spatial_index_ =
-        SpatialIndex{configuration.capacities[component_number<SpatialType>()],
-                     configuration.cell_size};
+    std::size_t points =
+        configuration.capacities[component_number<SpatialType>()];
+    spatial_index_ = configuration.cell_size
+                         ? SpatialIndex{points, *configuration.cell_size}
+                         : SpatialIndex{points};
     spatial_index_current_ = false;
     destroying_.assign(configuration.entities, false);
     destroying_list_.clear();
@@ -977,7 +979,7 @@ class World<SpatialType,                  //
              Plan<ComponentTypes>...>
       plans_;
   // Current while its slots match the spatial store. See within().
-  SpatialIndex spatial_index_{0, 1.0};
+  SpatialIndex spatial_index_{0};
   bool spatial_index_current_ = false;
   std::vector<bool> destroying_;
   std::vector<std::uint32_t> destroying_list_;

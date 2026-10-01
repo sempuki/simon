@@ -49,6 +49,14 @@ TEST_CASE("Distance") {
     b.position = meters(3.0, 4.0, 0.0);
     CHECK(distance(a, b) == 5.0 * meter);
   }
+
+  SECTION("ShouldBeWithinGivenReachAtLeastTheDistance") {
+    Kinematics a, b;
+    b.position = meters(3.0, 4.0, 0.0);
+    CHECK(within_distance(a, b, 5.0 * meter));
+    CHECK(within_distance(a, b, 6.0 * meter));
+    CHECK_FALSE(within_distance(a, b, 4.9 * meter));
+  }
 }
 
 }  // namespace simon::model

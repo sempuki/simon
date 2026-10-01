@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "base/testing.hpp"
+#include "catch2/matchers/catch_matchers_floating_point.hpp"
 
 namespace simon::framework {
 
@@ -158,6 +159,78 @@ TEST_CASE("SpatialIndex") {
     CHECK(within(index, {0.0, 0.0, 0.0}, 5.0).empty());
     CHECK(within(index, {100.0, 0.0, 0.0}, 5.0) ==
           std::vector<std::uint32_t>{0});
+  }
+}
+
+TEST_CASE("SpatialIndexSizedToPoints") {
+  using Catch::Matchers::WithinRel;
+  auto sized = [](const std::vector<Coordinates>& points) {
+    SpatialIndex index{points.size()};
+    index.rebuild(points.size(),
+                  [&](std::size_t slot) { return points[slot]; });
+    return index;
+  };
+
+  SECTION("ShouldMatchBruteForceGivenRandomPointsAndRadii") {
+    std::vector<Coordinates> points = random_points(2000, 500.0, 1);
+    SpatialIndex index = sized(points);
+    std::vector<Coordinates> centers = random_points(50, 600.0, 2);
+    auto odd = [](std::uint32_t slot) { return slot % 2 == 1; };
+
+    for (double radius : {0.0, 3.0, 10.0, 25.0, 80.0, 2000.0}) {
+      for (const Coordinates& center : centers) {
+        CHECK(within(index, center, radius) ==
+              brute_within(points, center, radius));
+        CHECK(index.nearest(center, radius, odd) ==
+              brute_nearest(points, center, radius, odd));
+      }
+    }
+  }
+
+  SECTION("ShouldSizeCellsToSpacingGivenPointsOnAPlane") {
+    // 100 by 100 points 10 apart, all at height 0: a plane, so height is
+    // ignored, and one point per cell means cells about 10 across.
+    std::vector<Coordinates> points;
+    for (int x = 0; x < 100; ++x) {
+      for (int y = 0; y < 100; ++y) {
+        points.push_back({10.0 * x, 10.0 * y, 0.0});
+      }
+    }
+
+    CHECK_THAT(sized(points).cell_size(), WithinRel(9.9, 1e-12));
+  }
+
+  SECTION("ShouldResizeCellsGivenRebuildWithSparserPoints") {
+    std::vector<Coordinates> dense = random_points(1000, 100.0, 3);
+    std::vector<Coordinates> sparse = random_points(1000, 1000.0, 4);
+    SpatialIndex index = sized(dense);
+    double dense_size = index.cell_size();
+
+    index.rebuild(sparse.size(),
+                  [&](std::size_t slot) { return sparse[slot]; });
+
+    CHECK(index.cell_size() > dense_size);
+  }
+
+  SECTION("ShouldKeepCellSizeGivenPointsThatSpanNothing") {
+    std::vector<Coordinates> same(5, Coordinates{3.0, 3.0, 3.0});
+    std::vector<Coordinates> one{{7.0, 7.0, 7.0}};
+
+    CHECK(sized(same).cell_size() == 1.0);
+    CHECK(sized(one).cell_size() == 1.0);
+  }
+
+  SECTION("ShouldIgnoreInfinitePointsGivenSizingCells") {
+    std::vector<Coordinates> points;
+    for (int x = 0; x < 10; ++x) {
+      points.push_back({10.0 * x, 0.0, 0.0});
+    }
+    points.push_back({std::numeric_limits<double>::infinity(), 0.0, 0.0});
+    SpatialIndex index = sized(points);
+
+    CHECK_THAT(index.cell_size(), WithinRel(9.0, 1e-12));
+    CHECK(within(index, {0.0, 0.0, 0.0}, 15.0) ==
+          std::vector<std::uint32_t>{0, 1});
   }
 }
 

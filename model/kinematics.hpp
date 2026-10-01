@@ -34,6 +34,14 @@ inline auto distance(const Kinematics& a, const Kinematics& b) -> Length {
   return norm(a.position - b.position);
 }
 
+// Whether `a` and `b` are at most `reach` apart. Compares squares, so it takes
+// no square root: cheaper than distance() in a check most entities fail.
+inline auto within_distance(const Kinematics& a, const Kinematics& b,
+                            Length reach) -> bool {
+  auto apart = a.position - b.position;
+  return dot(apart, apart) <= reach * reach;
+}
+
 // Coordinates for a spatial index, in meters.
 inline auto coordinates(const Position& position) -> framework::Coordinates {
   const Vector3d& meters = position.numerical_value_ref_in(meter);

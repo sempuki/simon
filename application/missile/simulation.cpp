@@ -19,7 +19,6 @@ auto build_world(const Scenario& scenario, lib::Out<World> world)
   std::size_t drones = sites * count(scenario.drones);
   std::size_t interceptors =
       sites * count(scenario.launchers) * scenario.inventory;
-  // Cells a few times smaller than the sensor and weapon ranges (1 to 4 km).
   return World::set_up()
       .numbered(1)
       .holding<archetype::Asset>(sites)
@@ -29,7 +28,6 @@ auto build_world(const Scenario& scenario, lib::Out<World> world)
       .holding<archetype::Track>(drones)
       .holding<archetype::Interceptor>(interceptors)
       .holding<archetype::Blast>(drones + interceptors)
-      .cells_of(250.0 * model::meter)
       .build(world);
 }
 

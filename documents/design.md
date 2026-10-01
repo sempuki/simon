@@ -1227,7 +1227,6 @@ using World = framework::World<
           .holding<archetype::RedDrone>(drones)
           .holding<archetype::Track>(drones)
           .holding<archetype::Blast>(drones + interceptors)
-          .cells_of(250.0 * model::meter)
           .build(lib::Out(world));
   ```
 
@@ -1237,11 +1236,12 @@ using World = framework::World<
     the component, so `Tracked` is sized for red drones and `Radar` for radars,
     instead of every store for every entity. Capacity is pooled, not reserved
     per archetype: one archetype may use another's slack.
-  - `cells_of(size)` is the spatial index's cell edge, converted with
-    `coordinate_length`. About the radius of a typical query works well.
+  - The spatial index sizes its cells at every rebuild to how densely the
+    entities lie (see below). `cells_of(size)` fixes the cell edge instead,
+    converted with `coordinate_length`.
   - `build(lib::Out(world))` fills the caller's world, discarding everything it
-    held, and returns `std::expected<void, Status>`. It refuses a cell size
-    that is not positive (`CELL_SIZE_INVALID`) and holding more than a store's
+    held, and returns `std::expected<void, Status>`. It refuses a given cell
+    size that is not positive (`CELL_SIZE_INVALID`) and holding more than a store's
     32-bit slots can index (`CAPACITY_TOO_LARGE`), and a refused plan leaves
     the world as it was.
   - **A world never moves.** Builders, `WorldAccess` and domain builders keep a
@@ -1349,6 +1349,18 @@ its target. That takes 0.018 and 0.218 ms per step, growing with the
 population. At 10,000 drones the old loop over 100 radars was cheaper; a query
 has fixed cost. With 1 km cells the query visited dozens of empty cells and
 took 0.499 ms at 100,000 drones, so cell size matters as much as the index.
+
+So the index picks it. A `SpatialIndex` built without a cell size sizes its
+cells at every rebuild for about one point per cell over the box the points
+span, counting only the axes they spread along, so points on a plane get
+square cells and height is ignored. Choosing costs one pass over the points.
+`ProposeEngagements` had hard-coded 250 m cells for its track index. A
+launcher wants the nearest track nobody has engaged, which is often near its
+3 km range, so each search crossed about 540 cells and found about 57 tracks
+in them. With cells sized to the tracks it went from 0.635 to 0.268 ms per
+step at 100,000 drones, and from 0.054 to 0.021 ms at 10,000. The radar index
+already had a good size by hand and did not change. The world's own index sizes
+itself the same way unless `cells_of` fixes it.
 
 Under contention (`missile_benchmark --contend=N`, N threads each streaming
 over 256 MB), over 200 steps including the first radar scan, ms per step and
@@ -1460,8 +1472,11 @@ the few things near it, never "for each X, visit every Y".
   of walking a store.
 - **Use the world's spatial index for the spatial component, and a system's
   own `SpatialIndex` for other positions,** as `ProposeEngagements` does for
-  track estimates. Size cells near the query radius; with cells a quarter of
-  the radius, `UpdateTracks` was more than twice as slow.
+  track estimates. Let the index size its cells: built without a cell size,
+  it sizes them to the points at every rebuild. Hand-picked sizes were wrong
+  both ways in missile: cells a quarter of the radar range made `UpdateTracks`
+  twice as slow, and `ProposeEngagements`' 250 m cells made it 2.4 times
+  slower than cells sized to its tracks.
 - **Invert a loop when the side being written is the side with sparse work.**
   A sensor that visits every target in range, to change a few of them, is the
   inverted loop: the targets that need changing should ask the sensors. In
@@ -1478,6 +1493,38 @@ not touch every entity on the steps in between. A `prepare` stage that returns
 // Steps without a scan have nothing to detect.
 auto prepare(LocalWorld& world) -> bool { return radars_.collect(world); }
 ```
+
+### Keep the per-entity call small
+
+The runner calls a system once per entity, and the compiler inlines that call
+into the loop only if it is small. A call operator that also holds rare work,
+such as builders that create or destroy, may not be inlined, and then every
+entity pays for a function call. Keep the check every entity makes in the call
+operator, and move the rare work into a function marked cold:
+
+```cpp
+auto operator()(LocalWorld& world, Entity self, const Warhead& warhead,
+                const Kinematics* kinematics, const Target* target) -> void {
+  const Kinematics* target_kinematics =
+      target ? world.maybe_component_of<Kinematics>(target->entity) : nullptr;
+  if (kinematics && target_kinematics &&
+      within_distance(*kinematics, *target_kinematics, warhead.fuse)) {
+    detonate(world, self, warhead, *kinematics);  // Rare.
+  }
+}
+
+[[gnu::cold, gnu::noinline]] static auto detonate(...) -> void;
+```
+
+A check most entities fail should be cheap: `within_distance` compares squared
+distances, so it takes no square root.
+
+`TriggerWarheads` had both problems. perf showed its call operator as a
+separate function, because the same function built the Blast. Moving the
+builders out took it from 0.548 to 0.32 ms per step at 100,000 drones, and
+comparing squares instead of calling `distance` took it to 0.23 ms, 2.4 times
+faster overall. Systems whose rare work is small, such as `DropStaleTracks`,
+were already inlined; check perf before splitting one.
 
 ### Measure each system, idle and contended
 

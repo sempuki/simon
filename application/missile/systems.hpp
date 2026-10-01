@@ -69,7 +69,7 @@ class ScanningRadars final {
       return false;
     }
     if (!index_) {
-      index_.emplace(radars.capacity(), CELL_SIZE);
+      index_.emplace(radars.capacity());
     }
     index_->rebuild(scanning_.size(), [&](std::size_t slot) {
       return model::coordinates(*scanning_[slot].radar);
@@ -94,8 +94,6 @@ class ScanningRadars final {
   }
 
  private:
-  static constexpr double CELL_SIZE = 4000.0;  // Meters, about a radar's range.
-
   struct Scanning final {
     const Kinematics* radar = nullptr;  // Valid until the next sync point.
     Length range = 0.0 * model::meter;
@@ -226,7 +224,7 @@ struct ProposeEngagements final
     const auto& estimates = world.store_of<Estimate>();
     if (!indexed_) {
       if (!tracks_) {
-        tracks_.emplace(estimates.capacity(), CELL_SIZE);
+        tracks_.emplace(estimates.capacity());
       }
       tracks_->rebuild([&](auto&& insert) {
         estimates.for_each_slot(
@@ -251,7 +249,6 @@ struct ProposeEngagements final
   }
 
  private:
-  static constexpr double CELL_SIZE = 250.0;       // Meters.
   std::optional<framework::SpatialIndex> tracks_;  // Sized on first use.
   bool indexed_ = false;
 };
@@ -463,6 +460,10 @@ struct SteerRedDrones final
 
 // A warhead within its fuse distance of its target detonates: it creates a
 // Blast and destroys itself.
+//
+// Every warhead checks its fuse every step, and few detonate, so the check is
+// all the call operator does: small enough to inline into the loop. The
+// builders that detonate are out of line and marked cold.
 struct TriggerWarheads final
     : System<const Warhead, const Kinematics, const Target> {
   using LocalWorld = WorldAccess<TriggerWarheads>;
@@ -473,13 +474,19 @@ struct TriggerWarheads final
                   const Kinematics* kinematics, const Target* target) -> void {
     const Kinematics* target_kinematics =
         target ? world.maybe_component_of<Kinematics>(target->entity) : nullptr;
-    if (!kinematics || !target_kinematics ||
-        distance(*kinematics, *target_kinematics) > warhead.fuse) {
-      return;
+    if (kinematics && target_kinematics &&
+        within_distance(*kinematics, *target_kinematics, warhead.fuse)) {
+      detonate(world, self, warhead, *kinematics);
     }
+  }
+
+ private:
+  [[gnu::cold, gnu::noinline]] static auto detonate(
+      LocalWorld& world, Entity self, const Warhead& warhead,
+      const Kinematics& kinematics) -> void {
     auto blast = world.create<archetype::Blast>()
                      .under(self)
-                     .with(Kinematics{.position = kinematics->position})
+                     .with(Kinematics{.position = kinematics.position})
                      .with(Blast{.radius = warhead.radius,
                                  .damage = warhead.damage,
                                  .source = world.name_of(self)})

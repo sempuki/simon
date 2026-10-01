@@ -30,12 +30,20 @@ using Coordinates = std::array<double, 3>;
 //
 // Queries are deterministic: they visit cells in a fixed order, and within a
 // bucket, points in the order the rebuild gave them.
+//
+// Cells cost a query time whether or not they hold points, and points cost it
+// time whether or not they match, so the best cell size depends on how densely
+// the points lie. An index built without a cell size picks one at every
+// rebuild: about one point per cell over the box the points span, counting
+// only the axes they spread along.
 class SpatialIndex final {
  public:
   DECLARE_COPY_DELETE(SpatialIndex);
   DECLARE_MOVE_DEFAULT(SpatialIndex);
 
-  // Room for `capacity` points in cells `cell_size` across.
+  // Room for `capacity` points, in cells sized at every rebuild to the points.
+  explicit SpatialIndex(std::size_t capacity);
+  // Room for `capacity` points in cells always `cell_size` across.
   SpatialIndex(std::size_t capacity, double cell_size);
   ~SpatialIndex() = default;
 
@@ -65,8 +73,14 @@ class SpatialIndex final {
     highest_ = {-1, -1, -1};
     for_each_point([&](std::uint32_t slot, const Coordinates& point) {
       CHECK_PRECONDITION(unsorted_.size() < capacity());
-      Cell cell = cell_of(point);
-      bool first = unsorted_.empty();
+      unsorted_.push_back(Entry{.point = point, .slot = slot});
+    });
+    if (adaptive_) {
+      fit_cells();
+    }
+    for (const Entry& entry : unsorted_) {
+      Cell cell = cell_of(entry.point);
+      bool first = buckets_.empty();
       for (std::size_t axis = 0; axis < 3; ++axis) {
         lowest_[axis] =
             first ? cell[axis] : std::min(lowest_[axis], cell[axis]);
@@ -74,10 +88,9 @@ class SpatialIndex final {
             first ? cell[axis] : std::max(highest_[axis], cell[axis]);
       }
       std::uint32_t bucket = bucket_of(cell);
-      unsorted_.push_back(Entry{.point = point, .slot = slot});
       buckets_.push_back(bucket);
       ++starts_[bucket + 1];
-    });
+    }
     for (std::size_t bucket = 1; bucket < starts_.size(); ++bucket) {
       starts_[bucket] += starts_[bucket - 1];
     }
@@ -188,6 +201,11 @@ class SpatialIndex final {
       return count;
     }
   };
+
+  // Sizes cells for about one of the unsorted points per cell over the box
+  // they span, counting only the axes they spread along. Keeps the current
+  // size when they span nothing. Defined in spatial_index.cpp.
+  auto fit_cells() -> void;
 
   auto cell_of(const Coordinates& point) const -> Cell {
     return Cell{cell_index(point[0]), cell_index(point[1]),
@@ -309,9 +327,10 @@ class SpatialIndex final {
     }
   }
 
-  double cell_size_;
-  double inverse_cell_size_;
-  std::size_t mask_;
+  double cell_size_ = 1.0;
+  double inverse_cell_size_ = 1.0;
+  bool adaptive_ = false;  // Whether rebuilds size the cells.
+  std::size_t mask_ = 0;
   // starts_[b] is where bucket b begins in entries_; starts_[b + 1] where it
   // ends.
   std::vector<std::uint32_t> starts_;
