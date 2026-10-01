@@ -69,11 +69,17 @@ using World = framework::World<
 //-- Systems ------------------------------------------------------------------
 
 // Sums thrust and wind drag into the commanded acceleration.
-struct ApplyForces final
-    : framework::System<Control, const Kinematics, const Thrust, const Wind,
+struct ApplyForces final                   //
+    : framework::System<Control,           //
+                        const Kinematics,  //
+                        const Thrust,      //
+                        const Wind,        //
                         const Drag> {
-  auto operator()(auto&, Entity, Control& control, const Kinematics* kinematics,
-                  const Thrust* thrust, const Wind* wind,
+  auto operator()(auto&, Entity,                 //
+                  Control& control,              //
+                  const Kinematics* kinematics,  //
+                  const Thrust* thrust,          //
+                  const Wind* wind,              //
                   const Drag* drag) const -> void {
     control.acceleration = thrust ? thrust->acceleration
                                   : meters_per_second_squared(0.0, 0.0, 0.0);
@@ -86,8 +92,10 @@ struct ApplyForces final
 
 // Each collider records its own collision: it writes only its own entity and
 // finds the others through a spatial query.
-struct DetectCollisions final
-    : framework::System<Collision, const Collider, const Kinematics> {
+struct DetectCollisions final            //
+    : framework::System<Collision,       //
+                        const Collider,  //
+                        const Kinematics> {
   using AllowComponentList = framework::TypeList<Kinematics, Collider>;
   using SequenceAfterSystemList = framework::SystemList<model::Integrate>;
 
@@ -98,9 +106,10 @@ struct DetectCollisions final
     });
   }
 
-  auto operator()(auto& world, Entity self, Collision& collision,
-                  const Collider* collider, const Kinematics* kinematics) const
-      -> void {
+  auto operator()(auto& world, Entity self,  //
+                  Collision& collision,      //
+                  const Collider* collider,  //
+                  const Kinematics* kinematics) const -> void {
     if (!collider || !kinematics) return;
     world.within(*kinematics, collider->radius + largest_radius,
                  [&](Entity other, const Kinematics& other_kinematics) {

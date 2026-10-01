@@ -97,9 +97,12 @@ inline auto integrate(Body& body) -> void {
   }
 }
 
-struct Integrate final : System<Body, const Thrust> {
-  auto operator()(auto&, Entity, Body& body, const Thrust* thrust) const
-      -> void {
+struct Integrate final  //
+    : System<Body,      //
+             const Thrust> {
+  auto operator()(auto&, Entity,  //
+                  Body& body,     //
+                  const Thrust* thrust) const -> void {
     if (thrust) {
       integrate(body, *thrust);
     }

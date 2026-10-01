@@ -89,18 +89,26 @@ auto build(lib::Out<TestWorld> world) -> void {
 }
 
 // A harmonic oscillator with unit angular frequency: x'' = -x.
-struct Spring final : System<PointRate, const Point> {
-  auto operator()(auto&, Entity, PointRate& rate, const Point* point) const
-      -> void {
+struct Spring final      //
+    : System<PointRate,  //
+             const Point> {
+  auto operator()(auto&, Entity,    //
+                  PointRate& rate,  //
+                  const Point* point) const -> void {
     rate = {.dx = point->v, .dv = -point->x};
   }
 };
 
 // A leader moves at unit speed; a follower's position grows at the leader's
 // position, so it reaches t^2 / 2.
-struct Lead final : System<PointRate, const Point, const Follow> {
+struct Lead final          //
+    : System<PointRate,    //
+             const Point,  //
+             const Follow> {
   using AllowComponentList = TypeList<Point>;
-  auto operator()(auto& world, Entity, PointRate& rate, const Point*,
+  auto operator()(auto& world, Entity,  //
+                  PointRate& rate,      //
+                  const Point*,         //
                   const Follow* follow) const -> void {
     if (!follow) {
       rate = {.dx = 1.0};
@@ -111,26 +119,35 @@ struct Lead final : System<PointRate, const Point, const Follow> {
 };
 
 // Sets a rate equal to the stage's time, so x reaches t^2 / 2.
-struct Clock final : System<PointRate, const Point> {
-  auto operator()(auto&, Entity, PointRate& rate, const Point*, Step step) const
-      -> void {
+struct Clock final       //
+    : System<PointRate,  //
+             const Point> {
+  auto operator()(auto&, Entity,    //
+                  PointRate& rate,  //
+                  const Point*,     //
+                  Step step) const -> void {
     rate = {.dx = std::chrono::duration<double>(step.time.time_since_epoch())
                       .count()};
   }
 };
 
 // Plans a structural change, which a derivative system may not.
-struct Spawn final : System<PointRate, const Point> {
+struct Spawn final       //
+    : System<PointRate,  //
+             const Point> {
   auto operator()(auto& world, Entity, PointRate&, const Point*) const -> void {
     REQUIRE(world.template create<Loose>().build());
   }
 };
 
 // Finds its own entity in the spatial index at the stage's position.
-struct Locate final : System<PointRate, const Point> {
+struct Locate final      //
+    : System<PointRate,  //
+             const Point> {
   using AllowComponentList = TypeList<Point>;
-  auto operator()(auto& world, Entity self, PointRate& rate, const Point* point)
-      -> void {
+  auto operator()(auto& world, Entity self,  //
+                  PointRate& rate,           //
+                  const Point* point) -> void {
     bool found = false;
     world.within(*point, 1e-9, [&](Entity entity, const Point&) {
       found = found || entity == self;

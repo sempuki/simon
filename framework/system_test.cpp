@@ -24,26 +24,36 @@ namespace {
 const Step STEP{.time = TimePoint{}, .dt = std::chrono::milliseconds{500}};
 
 // Records which entities it ran for, and whether each had a Velocity.
-struct Record final : System<const Position, const Velocity> {
-  auto operator()(auto&, Entity entity, const Position&,
+struct Record final           //
+    : System<const Position,  //
+             const Velocity> {
+  auto operator()(auto&, Entity entity,  //
+                  const Position&,       //
                   const Velocity* velocity) -> void {
     seen.push_back({entity, velocity != nullptr});
   }
   std::vector<std::pair<Entity, bool>> seen;
 };
 
-struct Integrate final : System<Position, const Velocity> {
-  auto operator()(auto&, Entity, Position& position, const Velocity* velocity,
+struct Integrate final  //
+    : System<Position,  //
+             const Velocity> {
+  auto operator()(auto&, Entity,             //
+                  Position& position,        //
+                  const Velocity* velocity,  //
                   Step step) -> void {
     if (!velocity) return;
     position.x += velocity->x * std::chrono::duration<double>(step.dt).count();
   }
 };
 
-struct Chase final : System<Velocity, const Health> {
+struct Chase final      //
+    : System<Velocity,  //
+             const Health> {
   using AllowComponentList = TypeList<Position>;
-  auto operator()(auto& world, Entity self, Velocity& velocity, const Health*)
-      -> void {
+  auto operator()(auto& world, Entity self,  //
+                  Velocity& velocity,        //
+                  const Health*) -> void {
     const Position* mine = maybe_component_of<Position>(world, self);
     const Position* other = maybe_component_of<Position>(world, target);
     velocity.x = (mine && other) ? other->x - mine->x : 0.0;
@@ -53,7 +63,8 @@ struct Chase final : System<Velocity, const Health> {
 
 // Records which entities it ran for: every Position but those with a
 // Velocity.
-struct RecordStill final : System<const Position> {
+struct RecordStill final  //
+    : System<const Position> {
   using ExcludeComponentList = TypeList<Velocity>;
   auto operator()(auto&, Entity entity, const Position&) -> void {
     seen.push_back(entity);
@@ -62,7 +73,8 @@ struct RecordStill final : System<const Position> {
 };
 
 // Destroys every entity whose health is gone.
-struct Cull final : System<const Health> {
+struct Cull final  //
+    : System<const Health> {
   auto operator()(auto& world, Entity self, const Health& health) -> void {
     if (health.points <= 0.0) {
       REQUIRE(world.destroy(self).build());
@@ -71,7 +83,8 @@ struct Cull final : System<const Health> {
 };
 
 // Spawns a child under every launcher, from inside a system.
-struct Spawn final : System<const Position> {
+struct Spawn final  //
+    : System<const Position> {
   auto operator()(auto& world, Entity self, const Position& position) -> void {
     REQUIRE(create<testing::Interceptor>(lib::InOut(world))
                 .under(self)
@@ -83,8 +96,11 @@ struct Spawn final : System<const Position> {
 
 // Counts, for each entity, whether it has a Velocity and whether that Velocity
 // is its own. Every entity in the test has equal Position and Velocity.
-struct CheckSiblings final : System<const Position, const Velocity> {
-  auto operator()(auto&, Entity, const Position& position,
+struct CheckSiblings final    //
+    : System<const Position,  //
+             const Velocity> {
+  auto operator()(auto&, Entity,             //
+                  const Position& position,  //
                   const Velocity* velocity) -> void {
     if (!velocity) {
       ++without;
@@ -99,7 +115,8 @@ struct CheckSiblings final : System<const Position, const Velocity> {
 };
 
 // Skips its loop when told to, and counts what ran.
-struct Skippable final : System<const Health> {
+struct Skippable final  //
+    : System<const Health> {
   auto prepare(auto&) -> bool { return run; }
   auto operator()(auto&, Entity, const Health&) -> void { ++called; }
   auto resolve(auto&) -> void { resolved = true; }
@@ -109,7 +126,8 @@ struct Skippable final : System<const Health> {
 };
 
 // Counts entities with health; runs after Cull, so it sees Cull's commands.
-struct Count final : System<const Health> {
+struct Count final  //
+    : System<const Health> {
   using SequenceAfterSystemList = SystemList<Cull>;
   auto prepare(auto&) -> void { count = 0; }
   auto operator()(auto&, Entity, const Health&) -> void { ++count; }
@@ -120,7 +138,8 @@ struct Count final : System<const Health> {
 
 // Destroys every body near the origin through a query form, once per step,
 // and skips the per-entity loop.
-struct ClearOrigin final : System<const Health> {
+struct ClearOrigin final  //
+    : System<const Health> {
   using AllowComponentList = TypeList<Position>;
   auto prepare(auto& world) -> bool {
     destroyed = world.destroy()
@@ -170,13 +189,12 @@ TEST_CASE("System") {
     // body may.
     Entity launcher =
         *world.create<testing::Launcher>().with(Position{}).build();
-    Entity interceptor = *world.create<testing::Interceptor>()
-                              .with(Position{})
-                              .with(Velocity{})
-                              .build();
+    auto _ = *world.create<testing::Interceptor>()
+                  .with(Position{})
+                  .with(Velocity{})
+                  .build();
     Entity still = *world.create<Body>().with(Position{}).build();
-    Entity moving =
-        *world.create<Body>().with(Position{}).with(Velocity{}).build();
+    auto _ = *world.create<Body>().with(Position{}).with(Velocity{}).build();
     world.sync();
 
     Scheduler<TestWorld, SystemList<RecordStill>> scheduler;
@@ -186,8 +204,6 @@ TEST_CASE("System") {
     // Position.
     CHECK(scheduler.system<RecordStill>().seen ==
           std::vector<Entity>{launcher, still});
-    DECLARE_UNUSED(interceptor);
-    DECLARE_UNUSED(moving);
   }
 
   SECTION("ShouldSkipEntityGivenExcludedComponentAttachedLater") {
