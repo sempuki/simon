@@ -893,9 +893,9 @@ struct System {
 struct GuideInterceptors : System<const Interceptor, const Kinematics, Control> {
   using SequenceAfterSystemList = SystemList<UpdateTracks>;
   using AllowComponentList = TypeList<Kinematics>;   // other entities, always read-only
-  using LocalWorld = ProjectedWorld<GuideInterceptors>;
+  using SystemWorld = ProjectedWorld<GuideInterceptors>;
 
-  auto operator()(LocalWorld& world, Entity self,
+  auto operator()(SystemWorld& world, Entity self,
                   const Interceptor& interceptor, const Kinematics* kinematics,
                   Control* control, Step step) const -> void {
     if (!kinematics || !control) return;
@@ -1511,7 +1511,7 @@ not touch every entity on the steps in between. A `prepare` stage that returns
 
 ```cpp
 // Steps without a scan have nothing to detect.
-auto prepare(LocalWorld& world) -> bool { return radars_.collect(world); }
+auto prepare(SystemWorld& world) -> bool { return radars_.collect(world); }
 ```
 
 ### Keep the per-entity call small
@@ -1523,7 +1523,7 @@ entity pays for a function call. Keep the check every entity makes in the call
 operator, and move the rare work into a function marked cold:
 
 ```cpp
-auto operator()(LocalWorld& world, Entity self, const Warhead& warhead,
+auto operator()(SystemWorld& world, Entity self, const Warhead& warhead,
                 const Kinematics* kinematics, const Target* target) -> void {
   const Kinematics* target_kinematics =
       target ? world.maybe_component_of<Kinematics>(target->entity) : nullptr;
@@ -2190,10 +2190,12 @@ Decisions made while building it:
   drone creates its track, and each site's first radar still covers most of
   them. Marking the covered tracks in `prepare`, from the scanning radars'
   side, only brought `UpdateTracks` back to 0.76 ms, so it was not kept.
-- **Systems name their concrete access type** with a member alias,
-  `using LocalWorld = ProjectedWorld<ThisSystem>;`, so builder
+- **Systems name their projected world** with a member alias,
+  `using SystemWorld = ProjectedWorld<ThisSystem>;`, so builder
   calls with explicit template arguments, such as `detach<Tracked>()`, need no
-  `template` keyword.
+  `template` keyword. It is `SystemWorld`, not `LocalWorld`, because "local"
+  already means the local Cartesian frame and, across processes, what this
+  process owns as against replicas.
 
 The test runs whole scenarios under `BatchDriver` (blue wins by default, red
 wins without launchers or with too few interceptors, and the same seed repeats

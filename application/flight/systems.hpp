@@ -28,15 +28,15 @@ using ProjectedWorld = framework::ProjectedWorld<SystemType, World>;
 // Once a second, each aircraft steers its autopilot at its route's next
 // waypoint, and moves on to the one after when it is within capture range.
 struct FollowRoute final : System<Route, const AirState, Autopilot> {
-  using LocalWorld = ProjectedWorld<FollowRoute>;
+  using SystemWorld = ProjectedWorld<FollowRoute>;
 
   static constexpr Length CAPTURE = 3000.0 * model::meter;
 
-  auto prepare(LocalWorld&, Step step) -> bool {
+  auto prepare(SystemWorld&, Step step) -> bool {
     return gate_.fire(step).has_value();
   }
 
-  auto operator()(LocalWorld&, Entity, Route& route, const AirState* state,
+  auto operator()(SystemWorld&, Entity, Route& route, const AirState* state,
                   Autopilot* autopilot) const -> void {
     if (!state || !autopilot) {
       return;
@@ -82,16 +82,16 @@ struct FlyAutopilot final : System<Commands,              //
                                    const Handling,        //
                                    const FlightControls,  //
                                    Autopilot> {
-  using LocalWorld = ProjectedWorld<FlyAutopilot>;
+  using SystemWorld = ProjectedWorld<FlyAutopilot>;
   using SequenceAfterSystemList = SystemList<FollowRoute>;
 
-  auto prepare(LocalWorld&, Step step) -> bool {
+  auto prepare(SystemWorld&, Step step) -> bool {
     auto firing = gate_.fire(step);
     elapsed_ = firing ? model::seconds(firing->elapsed) : 0.0 * model::second;
     return firing.has_value();
   }
 
-  auto operator()(LocalWorld&, Entity, Commands& commands,
+  auto operator()(SystemWorld&, Entity, Commands& commands,
                   const AirState* state, const Handling* handling,
                   const FlightControls* controls, Autopilot* autopilot) const
       -> void {
@@ -126,10 +126,10 @@ struct FlyAutopilot final : System<Commands,              //
 // Every step, each airframe follows its commands: the load factor and
 // throttle through first-order lags, the bank at no more than its roll rate.
 struct Actuate final : System<FlightControls, const Commands, const Handling> {
-  using LocalWorld = ProjectedWorld<Actuate>;
+  using SystemWorld = ProjectedWorld<Actuate>;
   using SequenceAfterSystemList = SystemList<FlyAutopilot>;
 
-  auto operator()(LocalWorld&, Entity, FlightControls& controls,
+  auto operator()(SystemWorld&, Entity, FlightControls& controls,
                   const Commands* commands, const Handling* handling,
                   Step step) const -> void {
     if (!commands || !handling) {
@@ -161,11 +161,11 @@ inline auto rate_of(const AirState& state, const FlightControls& controls,
 // Aircraft that have an AirStateRate are Precise's, so Fly excludes them; the
 // runner skips the precise archetype's segment whole.
 struct Fly final : System<AirState, const FlightControls, const Airframe> {
-  using LocalWorld = ProjectedWorld<Fly>;
+  using SystemWorld = ProjectedWorld<Fly>;
   using SequenceAfterSystemList = SystemList<Actuate>;
   using ExcludeComponentList = TypeList<AirStateRate>;
 
-  auto operator()(LocalWorld&, Entity, AirState& state,
+  auto operator()(SystemWorld&, Entity, AirState& state,
                   const FlightControls* controls, const Airframe* airframe,
                   Step step) const -> void {
     if (!controls || !airframe) {
@@ -182,9 +182,9 @@ struct Fly final : System<AirState, const FlightControls, const Airframe> {
 // The opt-in: the rate of each precise aircraft's AirState, for Continuous.
 struct PointMassRates final : System<AirStateRate, const AirState,
                                      const FlightControls, const Airframe> {
-  using LocalWorld = ProjectedWorld<PointMassRates>;
+  using SystemWorld = ProjectedWorld<PointMassRates>;
 
-  auto operator()(LocalWorld&, Entity, AirStateRate& rate,
+  auto operator()(SystemWorld&, Entity, AirStateRate& rate,
                   const AirState* state, const FlightControls* controls,
                   const Airframe* airframe) const -> void {
     if (!state || !controls || !airframe) {

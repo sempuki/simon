@@ -23,8 +23,8 @@ using framework::SystemList;
 using framework::TypeList;
 using namespace std::chrono_literals;
 
-// Each system here names its access type as a member, `using LocalWorld =
-// ProjectedWorld<ThisSystem>;`, so builder calls such as `detach<Tracked>()`
+// Each system here names its projected world as a member, `using SystemWorld
+// = ProjectedWorld<ThisSystem>;`, so builder calls such as `detach<Tracked>()`
 // need no `template` keyword.
 template <typename SystemType>
 using ProjectedWorld = framework::ProjectedWorld<SystemType, World>;
@@ -39,9 +39,9 @@ inline auto distance_between(const Position& a, const Position& b) -> Length {
 // by the drones and tracks themselves (DetectDrones, UpdateTracks), so each
 // entity writes only itself.
 struct ScanRadars final : System<Radar> {
-  using LocalWorld = ProjectedWorld<ScanRadars>;
+  using SystemWorld = ProjectedWorld<ScanRadars>;
 
-  auto operator()(LocalWorld&, Entity, Radar& radar, Step step) -> void {
+  auto operator()(SystemWorld&, Entity, Radar& radar, Step step) -> void {
     radar.scanned = radar.scan.fire(step).has_value();
   }
 };
@@ -108,14 +108,14 @@ class ScanningRadars final {
 // one track, so however many radars see it, it gets one.
 struct DetectDrones final
     : System<const RedDrone, const Kinematics, const Tracked> {
-  using LocalWorld = ProjectedWorld<DetectDrones>;
+  using SystemWorld = ProjectedWorld<DetectDrones>;
   using SequenceAfterSystemList = SystemList<ScanRadars>;
   using AllowComponentList = TypeList<Kinematics, Radar>;
 
   // Steps without a scan have nothing to detect.
-  auto prepare(LocalWorld& world) -> bool { return radars_.collect(world); }
+  auto prepare(SystemWorld& world) -> bool { return radars_.collect(world); }
 
-  auto operator()(LocalWorld& world, Entity self, const RedDrone&,
+  auto operator()(SystemWorld& world, Entity self, const RedDrone&,
                   const Kinematics* kinematics, const Tracked* tracked,
                   Step step) -> void {
     if (tracked || !kinematics || !radars_.cover(*kinematics)) {
@@ -143,14 +143,14 @@ struct DetectDrones final
 // Each track updates its estimate from any radar that scanned its target this
 // step. The radars are perfect for now: the estimate is the truth.
 struct UpdateTracks final : System<Track, Estimate> {
-  using LocalWorld = ProjectedWorld<UpdateTracks>;
+  using SystemWorld = ProjectedWorld<UpdateTracks>;
   using SequenceAfterSystemList = SystemList<DetectDrones>;
   using AllowComponentList = TypeList<Kinematics, Radar>;
 
   // Steps without a scan have nothing to update.
-  auto prepare(LocalWorld& world) -> bool { return radars_.collect(world); }
+  auto prepare(SystemWorld& world) -> bool { return radars_.collect(world); }
 
-  auto operator()(LocalWorld& world, Entity, Track& track, Estimate* estimate,
+  auto operator()(SystemWorld& world, Entity, Track& track, Estimate* estimate,
                   Step step) -> void {
     const Kinematics* target =
         world.maybe_component_of<Kinematics>(track.target);
@@ -169,11 +169,11 @@ struct UpdateTracks final : System<Track, Estimate> {
 // Destroys tracks whose target is gone or has not been seen for `timeout`, and
 // unmarks a surviving target so it can be tracked again.
 struct DropStaleTracks final : System<const Track> {
-  using LocalWorld = ProjectedWorld<DropStaleTracks>;
+  using SystemWorld = ProjectedWorld<DropStaleTracks>;
   using SequenceAfterSystemList = SystemList<UpdateTracks>;
 
-  auto operator()(LocalWorld& world, Entity self, const Track& track, Step step)
-      -> void {
+  auto operator()(SystemWorld& world, Entity self, const Track& track,
+                  Step step) -> void {
     bool gone = !world.alive(track.target);
     bool stale = step.time - track.last_seen > timeout;
     if (!gone && !stale) {
@@ -206,13 +206,13 @@ using Sensing =
 // per-entity loop running on one thread.
 struct ProposeEngagements final
     : System<Launcher, const Kinematics, const WeaponsHold> {
-  using LocalWorld = ProjectedWorld<ProposeEngagements>;
+  using SystemWorld = ProjectedWorld<ProposeEngagements>;
   using SequenceAfterSystemList = SystemList<DropStaleTracks>;
   using AllowComponentList = TypeList<Estimate, Engagement>;
 
-  auto prepare(LocalWorld&) -> void { indexed_ = false; }
+  auto prepare(SystemWorld&) -> void { indexed_ = false; }
 
-  auto operator()(LocalWorld& world, Entity, Launcher& launcher,
+  auto operator()(SystemWorld& world, Entity, Launcher& launcher,
                   const Kinematics* kinematics, const WeaponsHold* hold,
                   Step step) -> void {
     launcher.proposal = Entity{};
@@ -256,7 +256,7 @@ struct ProposeEngagements final
 // Each unengaged track accepts the nearest launcher that proposed it. Ties go
 // to the launcher that comes first in iteration order.
 struct ResolveEngagements final : System<Engagement, const Estimate> {
-  using LocalWorld = ProjectedWorld<ResolveEngagements>;
+  using SystemWorld = ProjectedWorld<ResolveEngagements>;
   using SequenceAfterSystemList = SystemList<ProposeEngagements>;
   using AllowComponentList = TypeList<Launcher, Kinematics>;
 
@@ -264,7 +264,7 @@ struct ResolveEngagements final : System<Engagement, const Estimate> {
   // proposers without scanning every launcher. Launchers are indexed in store
   // order, so ties still go to the launcher that comes first. Steps without
   // proposals have nothing to resolve.
-  auto prepare(LocalWorld& world) -> bool {
+  auto prepare(SystemWorld& world) -> bool {
     proposals_.clear();
     world.store_of<Launcher>().for_each(
         [&](Entity owner, const Launcher& launcher) {
@@ -277,7 +277,7 @@ struct ResolveEngagements final : System<Engagement, const Estimate> {
     return !proposals_.empty();
   }
 
-  auto operator()(LocalWorld& world, Entity self, Engagement& engagement,
+  auto operator()(SystemWorld& world, Entity self, Engagement& engagement,
                   const Estimate* estimate, Step step) -> void {
     TimePoint now = step.time;
     if (!estimate ||
@@ -329,11 +329,11 @@ struct InterceptorDesign final {
 // Launchers whose proposal was accepted build an interceptor aimed at the
 // track, under themselves.
 struct LaunchInterceptors final : System<Launcher, const Kinematics> {
-  using LocalWorld = ProjectedWorld<LaunchInterceptors>;
+  using SystemWorld = ProjectedWorld<LaunchInterceptors>;
   using SequenceAfterSystemList = SystemList<ResolveEngagements>;
   using AllowComponentList = TypeList<Track, Estimate, Engagement>;
 
-  auto operator()(LocalWorld& world, Entity self, Launcher& launcher,
+  auto operator()(SystemWorld& world, Entity self, Launcher& launcher,
                   const Kinematics* kinematics, Step step) -> void {
     Entity proposal = std::exchange(launcher.proposal, Entity{});
     const Track* track = world.maybe_component_of<Track>(proposal);
@@ -383,11 +383,11 @@ using Engaging =
 // self-destructs. Also self-destructs when its flight time runs out.
 struct GuideInterceptors final
     : System<const Interceptor, const Kinematics, Control, Target> {
-  using LocalWorld = ProjectedWorld<GuideInterceptors>;
+  using SystemWorld = ProjectedWorld<GuideInterceptors>;
   using SequenceAfterSystemList = SystemList<LaunchInterceptors>;
   using AllowComponentList = TypeList<Kinematics, RedDrone>;
 
-  auto operator()(LocalWorld& world, Entity self,
+  auto operator()(SystemWorld& world, Entity self,
                   const Interceptor& interceptor, const Kinematics* kinematics,
                   Control* control, Target* target_of, Step step) -> void {
     if (!kinematics || !control || !target_of) {
@@ -419,7 +419,7 @@ struct GuideInterceptors final
  private:
   static auto retarget(const Interceptor& interceptor,
                        const Kinematics& kinematics, Target& target,
-                       LocalWorld& world) -> const Kinematics* {
+                       SystemWorld& world) -> const Kinematics* {
     std::optional<Entity> nearest = world.nearest(
         kinematics, interceptor.seeker_range,
         [&](Entity candidate, const Kinematics&) {
@@ -436,10 +436,10 @@ struct GuideInterceptors final
 // Red drones steer at their target at cruise speed.
 struct SteerRedDrones final
     : System<const RedDrone, const Kinematics, Control, const Target> {
-  using LocalWorld = ProjectedWorld<SteerRedDrones>;
+  using SystemWorld = ProjectedWorld<SteerRedDrones>;
   using AllowComponentList = TypeList<Kinematics>;
 
-  auto operator()(LocalWorld& world, Entity, const RedDrone& drone,
+  auto operator()(SystemWorld& world, Entity, const RedDrone& drone,
                   const Kinematics* kinematics, Control* control,
                   const Target* target_of) -> void {
     if (!kinematics || !control || !target_of) {
@@ -466,11 +466,11 @@ struct SteerRedDrones final
 // builders that detonate are out of line and marked cold.
 struct TriggerWarheads final
     : System<const Warhead, const Kinematics, const Target> {
-  using LocalWorld = ProjectedWorld<TriggerWarheads>;
+  using SystemWorld = ProjectedWorld<TriggerWarheads>;
   using SequenceAfterSystemList = SystemList<model::Integrate>;
   using AllowComponentList = TypeList<Kinematics>;
 
-  auto operator()(LocalWorld& world, Entity self, const Warhead& warhead,
+  auto operator()(SystemWorld& world, Entity self, const Warhead& warhead,
                   const Kinematics* kinematics, const Target* target) -> void {
     const Kinematics* target_kinematics =
         target ? world.maybe_component_of<Kinematics>(target->entity) : nullptr;
@@ -482,7 +482,7 @@ struct TriggerWarheads final
 
  private:
   [[gnu::cold, gnu::noinline]] static auto detonate(
-      LocalWorld& world, Entity self, const Warhead& warhead,
+      SystemWorld& world, Entity self, const Warhead& warhead,
       const Kinematics& kinematics) -> void {
     auto blast = world.create<archetype::Blast>()
                      .under(self)
@@ -501,14 +501,14 @@ struct TriggerWarheads final
 // destroyed when its health runs out. Victims are the batch; each writes only
 // itself.
 struct ApplyBlasts final : System<Health, const Kinematics> {
-  using LocalWorld = ProjectedWorld<ApplyBlasts>;
+  using SystemWorld = ProjectedWorld<ApplyBlasts>;
   using SequenceAfterSystemList = SystemList<TriggerWarheads>;
   using AllowComponentList = TypeList<Blast, Kinematics>;
 
   // Collects this step's blasts, once, so each victim reads a short array
   // instead of walking the Blast store. Most steps have none, and then there
   // is nothing to apply.
-  auto prepare(LocalWorld& world) -> bool {
+  auto prepare(SystemWorld& world) -> bool {
     blasts_.clear();
     world.store_of<Blast>().for_each([&](Entity owner, const Blast& blast) {
       if (const Kinematics* center =
@@ -520,7 +520,7 @@ struct ApplyBlasts final : System<Health, const Kinematics> {
     return !blasts_.empty();
   }
 
-  auto operator()(LocalWorld& world, Entity self, Health& health,
+  auto operator()(SystemWorld& world, Entity self, Health& health,
                   const Kinematics* kinematics) -> void {
     if (!kinematics) {
       return;
@@ -547,10 +547,10 @@ struct ApplyBlasts final : System<Health, const Kinematics> {
 
 // Blasts live for one step.
 struct ExpireBlasts final : System<const Blast> {
-  using LocalWorld = ProjectedWorld<ExpireBlasts>;
+  using SystemWorld = ProjectedWorld<ExpireBlasts>;
   using SequenceAfterSystemList = SystemList<ApplyBlasts>;
 
-  auto operator()(LocalWorld& world, Entity self, const Blast&) -> void {
+  auto operator()(SystemWorld& world, Entity self, const Blast&) -> void {
     auto destroyed = world.destroy(self).build();
     DECLARE_UNUSED(destroyed);
   }
