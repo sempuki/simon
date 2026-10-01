@@ -47,8 +47,13 @@ SystemList(SystemTypes...) -> SystemList<SystemTypes...>;
 // an ExcludeComponentList (components whose owners it does not run for) and a
 // SequenceAfterSystemList (systems it must be scheduled after).
 //
-//   struct Integrate : System<Kinematics, const Control> {
-//     void operator()(auto& world, Entity, Kinematics&, const Control*, Step);
+//   struct Integrate final  //
+//       : System<Kinematics,  //
+//                const Control> {
+//     auto operator()(auto& world, Entity,  //
+//                     Kinematics& kinematics,  //
+//                     const Control* control,  //
+//                     Step step) -> void;
 //   };
 template <typename DrivingComponentType, typename... OtherComponentTypes>
 struct System {
