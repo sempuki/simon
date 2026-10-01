@@ -17,6 +17,17 @@ In priority order:
 
 When goals conflict, the higher one wins.
 
+**You pay only for what you use.** simon favors scale over accuracy by
+default. A feature that adds accuracy or capability, such as a multi-stage
+integrator or 6-DOF dynamics, is opted into through a type: a schedule
+element, an archetype's components or a trait. It may be slower for whoever
+uses it, but a simulation that does not use it runs no slower, holds no more
+bytes per entity and compiles no more code. Such features add their own types
+instead of fields to shared ones (`Step`, `Entity`, `Kinematics`), keep no
+world-wide bookkeeping, and live in their own Bazel targets. missile uses none
+of them, so `missile_benchmark` and `bytes_per_entity_v` check the rule: a
+feature missile does not use must not change either.
+
 ## How we work
 
 We build applications and keep the roadmap in mind. We do not build the
@@ -1561,6 +1572,24 @@ which costs it about 8%; that was accepted. With both fixes Clang runs the
 systems are bandwidth-bound: at 100,000 drones, four streaming neighbors slowed
 `ScanRadars` 2.6 times but `TriggerWarheads` 12 times.
 
+### Choose fidelity per archetype
+
+Most entities in a large scenario need little fidelity, and a few need a lot.
+Give each level its own archetype and systems, so every system walks one dense
+segment and no entity branches on how accurate it is:
+
+| Level | State | Use |
+|---|---|---|
+| Kinematic | `Kinematics` and a commanded acceleration in `Control` | Crowds, distant traffic, missile's drones |
+| Point-mass flight path | Above, plus speed, flight-path angle, heading and bank that follow commands with a lag | Most aircraft and missiles |
+| 6-DOF | Above, plus attitude, body rates and full aerodynamics, often under `Continuous` | The few entities whose handling matters |
+
+Model fast dynamics away instead of integrating them with small steps. A
+first-order lag advanced by its exact solution, `x += (u - x)(1 - e^(-dt/τ))`,
+is stable at any step, and so is a filter discretized by the bilinear
+transform. Promoting an entity to a higher level means destroying it and
+creating it again as the other archetype, so it stays in a dense segment.
+
 ### What we do not recommend
 
 Each of these trades architectural simplicity, our first goal, for gains the
@@ -1869,6 +1898,71 @@ otherwise:
 - The catch-up policy is explicit. `CatchUp::SKIP` fires once and drops missed
   periods. `CatchUp::EVERY` fires once and reports, in `Firing::periods`, how
   many periods fell in the step, so the work can run once per period.
+- **Gates can be staggered.** `RateGate{period, catch_up, first}` fires first
+  on the step that contains `first`, and on each period after it. If every
+  radar's gate fires on the same step, that step does all the scanning; giving
+  each radar a different `first` spreads the work over the period. The gate
+  already keeps its next firing time, so this adds no field.
+
+### Continuous state
+
+Most simulations at scale integrate each step once, with one evaluation of
+what drives the motion: `Integrate` turns a `Control` into `Kinematics` by the
+midpoint rule. That is the default, and it costs one pass over the state.
+
+Some users want more accuracy for some entities, such as an aircraft whose
+handling matters, and accept that it costs more. They opt in with a schedule
+element, `Continuous`, in `framework/continuous.hpp` (its own Bazel target).
+A simulation that does not list one pays nothing for it.
+
+```cpp
+using Dynamics = framework::Continuous<
+    framework::RungeKutta4,
+    TypeList<Kinematics>,                               // The continuous state.
+    SystemList<Gravity, Aerodynamics, EquationsOfMotion>>;  // Its derivatives.
+
+using AircraftSystems = SystemList<Sensors, FlightControl, Dynamics, CheckOutcome>;
+```
+
+- **A continuous component names its rate component** and can be advanced
+  along it. The `ContinuousState` concept asks for `typename T::RateComponent`,
+  `advance(state, rate, dt)`, and `rate + rate` and `weight * rate` on the
+  rate. `advance` is a free function so a state that is not a vector space,
+  such as an attitude quaternion, can use the exponential map and renormalize.
+- **Only the integrator writes continuous state.** Derivative systems are
+  ordinary systems that write rate components (or force components that
+  another derivative system sums into a rate). `Continuous` fails to compile
+  if one of them writes a component in its state list.
+- **Each method is a Butcher tableau as a type:** `Euler`, `Midpoint` and
+  `RungeKutta4`. For each stage the integrator sets every entity's state to the
+  stage's trial state, in place, runs the derivative systems at the stage's
+  time, and keeps the rates. It then advances every state from where it began
+  the step by the weighted rates. One-stage methods keep no copies.
+- **Every entity advances in lockstep.** A derivative system that reads another
+  entity's state through its allow list (a seeker reading its target) sees
+  that entity's trial state for the same stage, which is what a coupled
+  integration needs.
+- **Derivative systems run once per stage, so they must not plan structural
+  changes.** There is no sync point between stages, and a contract check fails
+  if one records a command. Stage time arrives in the usual `Step`, with
+  `time` at the stage and `dt` the whole step.
+- **Spatial queries see the stage's state.** The integrator writes the spatial
+  component, which marks the index stale, so a derivative system that queries
+  space rebuilds the index once per stage. Only simulations that query space
+  from a derivative system pay for that.
+- **An archetype that requires a state component must require its rate,** so
+  the integrator reaches the rate at the same slot. An entity whose archetype
+  only allows the state has its rate looked up, and keeps its state if it has
+  none.
+- **The integrator keeps its copies of state and rates itself,** sized to the
+  state store's capacity on its first step. A Runge-Kutta 4 integrator over a
+  48-byte state at 100,000 entities keeps about 24 MB and passes over the
+  state about five times a step. That cost is the opt-in.
+
+Multistep methods (Adams-Bashforth), which evaluate once per step but keep
+rates from earlier steps, are not built. Their history must follow an entity
+through swap-erase, so it will be a component the archetype requires
+(`RateHistory<T, N>`), not the integrator's copies.
 
 ### Events
 
@@ -2131,6 +2225,18 @@ Each step ends with a working application and passing tests.
    - Done: `bytes_per_entity_v`, reported per system by `missile_benchmark`.
    Consider struct-of-arrays layout inside hot components only if measurements
    call for it.
+6. **Flight dynamics (in progress).** Run flight control algorithms of the
+   class JSBSim runs, at scale, with fidelity as an opt-in (see
+   [Choose fidelity per archetype](#choose-fidelity-per-archetype)).
+   - Staggered rate gates.
+   - Control blocks in `model/`: exact first-order lags, rate and position
+     limits, and lookup tables with linear interpolation.
+   - `Continuous` with Euler, midpoint and Runge-Kutta 4 (see
+     [Continuous state](#continuous-state)).
+   - Later: a point-mass flight-path model, 6-DOF rigid bodies, Adams-Bashforth
+     with rate history, many replicas of a scenario in one world, world
+     snapshots, and trim tables computed offline. JSBSim, run offline, is the
+     reference each level's accuracy is measured against.
 
 Later: `LockstepDriver` and a second process, scenario files with two-phase
 loading, parent-child transforms (a radar mounted on a vehicle), and DIS or HLA
@@ -2148,6 +2254,10 @@ interop.
   spare core, close to the worst case on the development machine, and
   `--contend=N` runs N. Which N resembles a busy cloud neighbor is still to be
   decided; 4 to 8 on the development machine avoids also taking its cores.
+- **Step rates that divide a second.** Time is integer nanoseconds, so 120 Hz
+  (8,333,333.3 ns) is not exact, and rate ratios such as 120 to 40 Hz drift.
+  Rates that divide 10^9 (100, 125, 200, 250, 500 Hz) are exact. Whether to
+  support others with a rational step is undecided.
 
 ## Lessons from the older simulator
 
