@@ -654,18 +654,21 @@ class World<SpatialType,                  //
     }
     Plan<ComponentType>& planned = plan<ComponentType>();
     remember([this, index, change = planned.change[index],
-              touched = planned.touched.size(), attaching = planned.attaching] {
+              touched = planned.touched.size(), growth = planned.growth] {
       Plan<ComponentType>& restored = plan<ComponentType>();
       restored.change[index] = change;
       restored.touched.resize(touched);
-      restored.attaching = attaching;
+      restored.growth = growth;
     });
   }
 
   //-- Planned state: what the world will be once pending commands apply -------
 
-  // For one component: which entities will gain or lose it, and how many
-  // entity-components are waiting to be attached.
+  // For one component: which entities will gain or lose it, and how much the
+  // store will have grown once pending commands apply. Commands apply in the
+  // order they were recorded, so the growth after the last of them bounds
+  // the store when one more is appended: attaches add one, and detaches and
+  // destroys of an entity that will have the component take one away.
   struct PlanState {
     explicit PlanState(std::size_t entity_capacity = 0)
         : change(entity_capacity, 0) {}
@@ -673,7 +676,7 @@ class World<SpatialType,                  //
     std::vector<std::int8_t>
         change;  // +1 will be attached, -1 will be detached.
     std::vector<std::uint32_t> touched;
-    std::size_t attaching = 0;
+    std::int64_t growth = 0;
 
     void mark(std::uint32_t index, std::int8_t value) {
       if (change[index] == 0) {
@@ -686,7 +689,7 @@ class World<SpatialType,                  //
         change[index] = 0;
       }
       touched.clear();
-      attaching = 0;
+      growth = 0;
     }
   };
 
@@ -715,8 +718,9 @@ class World<SpatialType,                  //
   template <typename ComponentType>
   bool has_room() const {
     const ComponentStore<ComponentType>& components = store_of<ComponentType>();
-    return components.size() + std::get<Plan<ComponentType>>(plans_).attaching <
-           components.capacity();
+    return static_cast<std::int64_t>(components.size()) +
+               std::get<Plan<ComponentType>>(plans_).growth <
+           static_cast<std::int64_t>(components.capacity());
   }
 
   template <typename... CheckedTypes>
@@ -889,6 +893,13 @@ class World<SpatialType,                  //
       return std::unexpected(
           lib::raise(BuildError::ENTITY_NOT_ALIVE, "The entity is not alive."));
     }
+    // Every component the entity will have makes room when it is destroyed.
+    for_each_type(ComponentList{}, [&]<typename ComponentType>() {
+      if (will_have<ComponentType>(entity)) {
+        remember_plan<ComponentType>(entity.index);
+        --plan<ComponentType>().growth;
+      }
+    });
     destroying_[entity.index] = true;
     destroying_list_.push_back(entity.index);
     remember([this, index = entity.index] {
@@ -905,7 +916,7 @@ class World<SpatialType,                  //
   void record_attach(Entity entity, ComponentType component) {
     remember_plan<ComponentType>(entity.index);
     plan<ComponentType>().mark(entity.index, +1);
-    ++plan<ComponentType>().attaching;
+    ++plan<ComponentType>().growth;
     commands_.push_back(AttachCommand<ComponentType>{
         entity, std::move(component),
         segment_of<ComponentType>(archetype_of_index_[entity.index])});
@@ -915,6 +926,7 @@ class World<SpatialType,                  //
   void record_detach(Entity entity) {
     remember_plan<ComponentType>(entity.index);
     plan<ComponentType>().mark(entity.index, -1);
+    --plan<ComponentType>().growth;
     commands_.push_back(DetachCommand<ComponentType>{entity});
   }
 

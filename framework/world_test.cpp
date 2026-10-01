@@ -677,6 +677,54 @@ TEST_CASE("World") {
     CHECK(small.store_of<Health>().size() == 2u);
   }
 
+  SECTION("ShouldAttachGivenStoreFullButDetachOrDestroyPending") {
+    // Only bodies allow Health, so its store holds 2.
+    TestWorld small;
+    REQUIRE(TestWorld::set_up()
+                .numbered(1)
+                .holding<Body>(2)
+                .holding<testing::Launcher>(6)
+                .build(lib::Out(small)));
+    Entity detached = *small.create<Body>().with(Health{}).build();
+    Entity destroyed = *small.create<Body>().with(Health{}).build();
+    Entity first = *small.create<Body>().build();
+    Entity second = *small.create<Body>().build();
+    small.sync();
+
+    REQUIRE_FALSE(small.change(first).attach(Health{}).build());  // Full.
+    REQUIRE(small.change(detached).detach<Health>().build());
+    auto after_detach = small.change(first).attach(Health{}).build();
+    REQUIRE(small.destroy(destroyed).build());
+    auto after_destroy = small.change(second).attach(Health{}).build();
+    small.sync();
+
+    CHECK(after_detach.has_value());
+    CHECK(after_destroy.has_value());
+    CHECK(small.store_of<Health>().size() == 2u);
+  }
+
+  SECTION("ShouldRefuseAttachGivenRoomMadeOnlyInRolledBackTransaction") {
+    TestWorld small;
+    REQUIRE(TestWorld::set_up()
+                .numbered(1)
+                .holding<Body>(1)
+                .holding<testing::Launcher>(3)
+                .build(lib::Out(small)));
+    Entity holder = *small.create<Body>().with(Health{}).build();
+    small.sync();
+    {
+      auto transaction = small.transaction();
+      REQUIRE(small.destroy(holder).build());
+    }  // Rolled back.
+
+    Entity other = *small.create<Body>().build();
+    auto attach = small.change(other).attach(Health{}).build();
+
+    REQUIRE_FALSE(attach);
+    CHECK(attach.error() ==
+          lib::watch(BuildError::COMPONENT_CAPACITY_EXHAUSTED));
+  }
+
   SECTION("ShouldRefuseCreateGivenDeadParent") {
     Entity parent = *world.create<testing::Launcher>().with(Position{}).build();
     world.sync();

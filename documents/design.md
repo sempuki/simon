@@ -676,6 +676,14 @@ only then emits commands.
   (compare with `status == lib::watch(BuildError::ALIAS_NOT_GIVEN)`), and
   emits nothing. Because every command was validated this way, applying
   commands at a sync point cannot fail halfway through a batch.
+- **A store's room counts what is pending, in order.** Commands apply in the
+  order they were recorded, so each store's plan keeps a running growth:
+  every attach adds one, and every detach, and every destroy of an entity that
+  will have the component, takes one away. An attach fits when the store's
+  size plus that growth is below its capacity, so a detach or destroy
+  recorded earlier makes room for it, and one recorded later does not.
+  Entity capacity does not count pending destroys, since creating reserves
+  the entity at once.
 - **The terminal call is explicit and `[[nodiscard]]`.** A builder never does
   work in its destructor, and a failure is never only logged.
 - **One builder type per verb.** A builder does not switch between modes.
@@ -1966,9 +1974,8 @@ where another hold is still in force, so overlapping holds end with the last of
 them. `Simulation::step` delivers the events due by the step's time before it
 runs the schedule, and `Simulation::events()` lets anyone else subscribe.
 
-Freeing a sector and then reasserting the holds still in force would be
-simpler, but a full store refuses the reattach: capacity checks do not count
-pending detaches, and the `WeaponsHold` store holds exactly one per launcher.
+Launchers under another hold are never freed, rather than freed and held again
+in the same batch, so nothing churns through the `WeaponsHold` store.
 
 Decisions made while building it:
 

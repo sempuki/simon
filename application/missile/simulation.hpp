@@ -189,7 +189,7 @@ std::expected<std::size_t, framework::Status> hold_weapons(
     const Sector& sector, lib::InOut<World> world);
 
 // Frees every held launcher in `sector` to engage again, except those inside
-// any sector of `keeping`.
+// any sector of `keeping`, which stay held without being freed and held again.
 std::expected<std::size_t, framework::Status> free_weapons(
     const Sector& sector, std::span<const Sector> keeping,
     lib::InOut<World> world);

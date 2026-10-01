@@ -217,9 +217,7 @@ std::expected<std::size_t, framework::Status> Simulation::destruct_interceptors(
 
 // Holds and frees cannot be refused: launchers allow WeaponsHold, the store
 // holds one for every launcher, and lacking and having skip launchers already
-// held or freed. A launcher is never freed and held again in one batch, which
-// a full store would refuse, since capacity checks do not count pending
-// detaches.
+// held or freed.
 void Simulation::start_hold(TimePoint now, std::size_t hold) {
   const TimedHold& order = scenario_.holds[hold];
   auto held = missile::hold_weapons(order.sector, lib::InOut(world_));
