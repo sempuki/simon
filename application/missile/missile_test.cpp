@@ -16,7 +16,7 @@ using namespace std::chrono_literals;
 
 constexpr Duration DT = 10ms;
 // Builds a world holding 16 of each archetype, for testing systems alone.
-void build_small_world(lib::Out<World> world) {
+auto build_small_world(lib::Out<World> world) -> void {
   std::expected<void, framework::Status> built =
       World::set_up()
           .numbered(1)
@@ -38,7 +38,7 @@ struct Run final {
   double asset_health;
 };
 
-Run run(Scenario scenario) {
+auto run(Scenario scenario) -> Run {
   Simulation simulation{scenario};
   engine::BatchDriver driver{engine::Timing{.max_step = DT},
                              lib::Depend(simulation)};
@@ -54,27 +54,28 @@ Run run(Scenario scenario) {
 }
 
 // Steps `simulation` from `from` until `until`, DT at a time.
-void advance(TimePoint from, TimePoint until,
-             lib::InOut<Simulation> simulation) {
+auto advance(TimePoint from, TimePoint until, lib::InOut<Simulation> simulation)
+    -> void {
   for (TimePoint time = from; time < until; time += DT) {
     REQUIRE(simulation->step(framework::Step{.time = time, .dt = DT}));
   }
 }
 
 // Configures `simulation`, then steps it until `until`, DT at a time.
-void run_until(TimePoint until, lib::InOut<Simulation> simulation) {
+auto run_until(TimePoint until, lib::InOut<Simulation> simulation) -> void {
   REQUIRE(simulation->configure());
   advance(TimePoint{}, until, simulation);
 }
 
 template <typename ScheduleType>
-void step(TimePoint time,
+auto step(TimePoint time,
           lib::InOut<framework::Scheduler<World, ScheduleType>> scheduler,
-          lib::InOut<World> world) {
+          lib::InOut<World> world) -> void {
   scheduler->step(framework::Step{.time = time, .dt = DT}, world);
 }
 
-Entity make_drone(Position position, Entity target, lib::InOut<World> world) {
+auto make_drone(Position position, Entity target, lib::InOut<World> world)
+    -> Entity {
   return *world->create<archetype::RedDrone>()
               .with(Kinematics{.position = position})
               .with(Control{})
@@ -87,7 +88,7 @@ Entity make_drone(Position position, Entity target, lib::InOut<World> world) {
               .build();
 }
 
-Entity make_radar(Position position, lib::InOut<World> world) {
+auto make_radar(Position position, lib::InOut<World> world) -> Entity {
   return *world->create<archetype::Radar>()
               .with(Kinematics{.position = position})
               .with(Radar{.range = 1000.0 * model::meter,
@@ -95,7 +96,7 @@ Entity make_radar(Position position, lib::InOut<World> world) {
               .build();
 }
 
-Entity make_launcher(Position position, lib::InOut<World> world) {
+auto make_launcher(Position position, lib::InOut<World> world) -> Entity {
   return *world->create<archetype::Launcher>()
               .with(Kinematics{.position = position})
               .with(Launcher{
@@ -103,7 +104,8 @@ Entity make_launcher(Position position, lib::InOut<World> world) {
               .build();
 }
 
-Entity make_track(Entity target, Position position, lib::InOut<World> world) {
+auto make_track(Entity target, Position position, lib::InOut<World> world)
+    -> Entity {
   return *world->create<archetype::Track>()
               .with(Track{.target = target})
               .with(Estimate{.position = position})
@@ -111,8 +113,8 @@ Entity make_track(Entity target, Position position, lib::InOut<World> world) {
               .build();
 }
 
-Entity make_interceptor(Position position, Entity target, TimePoint expires_at,
-                        lib::InOut<World> world) {
+auto make_interceptor(Position position, Entity target, TimePoint expires_at,
+                      lib::InOut<World> world) -> Entity {
   return *world->create<archetype::Interceptor>()
               .with(Kinematics{.position = position})
               .with(Control{})
@@ -128,7 +130,7 @@ Entity make_interceptor(Position position, Entity target, TimePoint expires_at,
 
 // The owners of every `ComponentType`, in store order.
 template <typename ComponentType>
-std::vector<Entity> owners_of(const World& world) {
+auto owners_of(const World& world) -> std::vector<Entity> {
   std::vector<Entity> owners;
   world.store_of<ComponentType>().for_each(
       [&](Entity owner, const ComponentType&) { owners.push_back(owner); });

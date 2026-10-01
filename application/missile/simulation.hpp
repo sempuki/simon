@@ -85,11 +85,11 @@ enum class Outcome { UNDECIDED, BLUE_WINS, RED_WINS };
 // Builds in `world` the world a scenario needs: at every site, holding the
 // asset, radars and launchers, every drone with its track and blast, and every
 // interceptor with its blast.
-std::expected<void, framework::Status> build_world(const Scenario& scenario,
-                                                   lib::Out<World> world);
+auto build_world(const Scenario& scenario, lib::Out<World> world)
+    -> std::expected<void, framework::Status>;
 
 // A point `radius` from the origin at `bearing` radians from east.
-Position on_ring(Length radius, double bearing);
+auto on_ring(Length radius, double bearing) -> Position;
 
 // A band around a site: things fall at `radius`, give or take half of
 // `width`.
@@ -110,21 +110,22 @@ class [[nodiscard]] SiteBuilder final {
       : origin_{origin}, world_{world.get()} {}
 
   // The asset the site protects, and its health. 30 points unless given.
-  SiteBuilder protecting(Health health) && {
+  auto protecting(Health health) && -> SiteBuilder {
     asset_health_ = health;
     return std::move(*this);
   }
 
   // `count` radars like `radar`, evenly spaced at `radius` from the asset.
-  SiteBuilder watched_by(std::size_t count, Radar radar, Length radius) && {
+  auto watched_by(std::size_t count, Radar radar,
+                  Length radius) && -> SiteBuilder {
     radars_ = Placement<Radar>{.count = count, .unit = radar, .radius = radius};
     return std::move(*this);
   }
 
   // `count` launchers like `launcher`, evenly spaced at `radius` from the
   // asset, starting half a spacing from the radars.
-  SiteBuilder defended_by(std::size_t count, Launcher launcher,
-                          Length radius) && {
+  auto defended_by(std::size_t count, Launcher launcher,
+                   Length radius) && -> SiteBuilder {
     launchers_ =
         Placement<Launcher>{.count = count, .unit = launcher, .radius = radius};
     return std::move(*this);
@@ -133,8 +134,9 @@ class [[nodiscard]] SiteBuilder final {
   // `count` red drones like `drone`, carrying `warhead`, spawning at random
   // bearings within `ring` and flying at the asset at cruise speed. Draws
   // from `random`, which it keeps until the utterance is built.
-  SiteBuilder attacked_by(std::size_t count, RedDrone drone, Warhead warhead,
-                          Ring ring, lib::Depend<model::Random> random) && {
+  auto attacked_by(std::size_t count, RedDrone drone, Warhead warhead,
+                   Ring ring,
+                   lib::Depend<model::Random> random) && -> SiteBuilder {
     drones_ = count;
     drone_ = drone;
     warhead_ = warhead;
@@ -146,7 +148,7 @@ class [[nodiscard]] SiteBuilder final {
   // Creates the site and returns its asset, atomically: if the world refuses
   // any entity, nothing of the site is planned, and build() returns the
   // world's Status. Draws from the random generator are not undone.
-  std::expected<Entity, framework::Status> build() &&;
+  auto build() && -> std::expected<Entity, framework::Status>;
 
  private:
   template <typename UnitType>
@@ -169,12 +171,12 @@ class [[nodiscard]] SiteBuilder final {
 };
 
 // Starts the utterance that builds a defended site at `origin` in `world`.
-SiteBuilder create_site(Position origin, lib::Depend<World> world);
+auto create_site(Position origin, lib::Depend<World> world) -> SiteBuilder;
 
 // Builds every site of a scenario on a square grid, the first at the origin,
 // and returns the first site's asset.
-std::expected<Entity, framework::Status> build_scenario(
-    const Scenario& scenario, lib::InOut<World> world);
+auto build_scenario(const Scenario& scenario, lib::InOut<World> world)
+    -> std::expected<Entity, framework::Status>;
 
 //-- Operator commands
 //----------------------------------------------------------
@@ -185,19 +187,19 @@ std::expected<Entity, framework::Status> build_scenario(
 
 // Holds every launcher in `sector`, so none engages until freed. Launchers
 // already held, or held by a command still pending, are skipped.
-std::expected<std::size_t, framework::Status> hold_weapons(
-    const Sector& sector, lib::InOut<World> world);
+auto hold_weapons(const Sector& sector, lib::InOut<World> world)
+    -> std::expected<std::size_t, framework::Status>;
 
 // Frees every held launcher in `sector` to engage again, except those inside
 // any sector of `keeping`, which stay held without being freed and held again.
-std::expected<std::size_t, framework::Status> free_weapons(
-    const Sector& sector, std::span<const Sector> keeping,
-    lib::InOut<World> world);
+auto free_weapons(const Sector& sector, std::span<const Sector> keeping,
+                  lib::InOut<World> world)
+    -> std::expected<std::size_t, framework::Status>;
 
 // Destroys every interceptor in flight in `sector`. The tracks they were
 // engaging stay engaged until their engagements lapse.
-std::expected<std::size_t, framework::Status> destruct_interceptors(
-    const Sector& sector, lib::InOut<World> world);
+auto destruct_interceptors(const Sector& sector, lib::InOut<World> world)
+    -> std::expected<std::size_t, framework::Status>;
 
 // The missile simulation: builds the scenario when configured, and stops when
 // red is defeated or the asset is destroyed. Any driver can run it.
@@ -208,36 +210,36 @@ class Simulation final {
   // Builds the world and the scenario in it, and starts a timer for each
   // timed hold. A scenario too big for a world fails this phase with the
   // builder's Status.
-  engine::PhaseResult configure();
+  auto configure() -> engine::PhaseResult;
 
   // Delivers the events due by the step's time, then runs the schedule.
-  engine::PhaseResult step(const framework::Step& step);
+  auto step(const framework::Step& step) -> engine::PhaseResult;
 
-  Outcome outcome() const { return outcome_; }
+  auto outcome() const -> Outcome { return outcome_; }
   // The world: empty until configured.
-  const World& world() const { return world_; }
-  Entity asset() const { return asset_; }
+  auto world() const -> const World& { return world_; }
+  auto asset() const -> Entity { return asset_; }
   // What the simulation raises, such as WeaponsHoldExpired, for subscribers.
-  engine::EventQueue& events() { return events_; }
+  auto events() -> engine::EventQueue& { return events_; }
 
   // Interceptors fired so far, from what the launchers have left.
-  std::uint32_t interceptors_fired() const;
+  auto interceptors_fired() const -> std::uint32_t;
 
   // Operator commands on the simulation's world; see hold_weapons,
   // free_weapons and destruct_interceptors.
-  std::expected<std::size_t, framework::Status> hold_weapons(
-      const Sector& sector);
-  std::expected<std::size_t, framework::Status> free_weapons(
-      const Sector& sector);
-  std::expected<std::size_t, framework::Status> destruct_interceptors(
-      const Sector& sector);
+  auto hold_weapons(const Sector& sector)
+      -> std::expected<std::size_t, framework::Status>;
+  auto free_weapons(const Sector& sector)
+      -> std::expected<std::size_t, framework::Status>;
+  auto destruct_interceptors(const Sector& sector)
+      -> std::expected<std::size_t, framework::Status>;
 
  private:
-  std::uint32_t remaining_interceptors() const;
+  auto remaining_interceptors() const -> std::uint32_t;
   // Holds a timed hold's sector, and starts the timer that ends it.
-  void start_hold(TimePoint now, std::size_t hold);
+  auto start_hold(TimePoint now, std::size_t hold) -> void;
   // Frees an expired hold's sector, except where another hold is in force.
-  void end_hold(TimePoint now, const WeaponsHoldExpired& expired);
+  auto end_hold(TimePoint now, const WeaponsHoldExpired& expired) -> void;
 
   Scenario scenario_;
   World world_;  // Empty until configure builds it.

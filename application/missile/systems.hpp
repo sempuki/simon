@@ -29,7 +29,7 @@ using namespace std::chrono_literals;
 template <typename SystemType>
 using WorldAccess = framework::WorldAccess<SystemType, World>;
 
-inline Length distance_between(const Position& a, const Position& b) {
+inline auto distance_between(const Position& a, const Position& b) -> Length {
   return norm(a - b);
 }
 
@@ -41,7 +41,7 @@ inline Length distance_between(const Position& a, const Position& b) {
 struct ScanRadars final : System<Radar> {
   using LocalWorld = WorldAccess<ScanRadars>;
 
-  void operator()(LocalWorld&, Entity, Radar& radar, Step step) {
+  auto operator()(LocalWorld&, Entity, Radar& radar, Step step) -> void {
     radar.scanned = radar.scan.fire(step).has_value();
   }
 };
@@ -52,7 +52,7 @@ class ScanningRadars final {
  public:
   // Collects and indexes the radars that scanned. Returns whether any did.
   template <typename WorldAccessType>
-  bool collect(WorldAccessType& world) {
+  auto collect(WorldAccessType& world) -> bool {
     scanning_.clear();
     longest_ = 0.0 * model::meter;
     const auto& radars = world.template store_of<Radar>();
@@ -79,7 +79,7 @@ class ScanningRadars final {
 
   // Whether a radar that scanned is within its range of `target`. Looks only
   // as far as the longest range.
-  bool cover(const Kinematics& target) const {
+  auto cover(const Kinematics& target) const -> bool {
     if (scanning_.empty()) {
       return false;
     }
@@ -115,11 +115,11 @@ struct DetectDrones final
   using AllowComponentList = TypeList<Kinematics, Radar>;
 
   // Steps without a scan have nothing to detect.
-  bool prepare(LocalWorld& world) { return radars_.collect(world); }
+  auto prepare(LocalWorld& world) -> bool { return radars_.collect(world); }
 
-  void operator()(LocalWorld& world, Entity self, const RedDrone&,
+  auto operator()(LocalWorld& world, Entity self, const RedDrone&,
                   const Kinematics* kinematics, const Tracked* tracked,
-                  Step step) {
+                  Step step) -> void {
     if (tracked || !kinematics || !radars_.cover(*kinematics)) {
       return;
     }
@@ -150,10 +150,10 @@ struct UpdateTracks final : System<Track, Estimate> {
   using AllowComponentList = TypeList<Kinematics, Radar>;
 
   // Steps without a scan have nothing to update.
-  bool prepare(LocalWorld& world) { return radars_.collect(world); }
+  auto prepare(LocalWorld& world) -> bool { return radars_.collect(world); }
 
-  void operator()(LocalWorld& world, Entity, Track& track, Estimate* estimate,
-                  Step step) {
+  auto operator()(LocalWorld& world, Entity, Track& track, Estimate* estimate,
+                  Step step) -> void {
     const Kinematics* target =
         world.maybe_component_of<Kinematics>(track.target);
     if (!estimate || !target || !radars_.cover(*target)) {
@@ -174,8 +174,8 @@ struct DropStaleTracks final : System<const Track> {
   using LocalWorld = WorldAccess<DropStaleTracks>;
   using SequenceAfterSystemList = SystemList<UpdateTracks>;
 
-  void operator()(LocalWorld& world, Entity self, const Track& track,
-                  Step step) {
+  auto operator()(LocalWorld& world, Entity self, const Track& track, Step step)
+      -> void {
     bool gone = !world.alive(track.target);
     bool stale = step.time - track.last_seen > timeout;
     if (!gone && !stale) {
@@ -212,11 +212,11 @@ struct ProposeEngagements final
   using SequenceAfterSystemList = SystemList<DropStaleTracks>;
   using AllowComponentList = TypeList<Estimate, Engagement>;
 
-  void prepare(LocalWorld&) { indexed_ = false; }
+  auto prepare(LocalWorld&) -> void { indexed_ = false; }
 
-  void operator()(LocalWorld& world, Entity, Launcher& launcher,
+  auto operator()(LocalWorld& world, Entity, Launcher& launcher,
                   const Kinematics* kinematics, const WeaponsHold* hold,
-                  Step step) {
+                  Step step) -> void {
     launcher.proposal = Entity{};
     TimePoint now = step.time;
     if (!kinematics || hold || launcher.inventory == 0 ||
@@ -267,7 +267,7 @@ struct ResolveEngagements final : System<Engagement, const Estimate> {
   // proposers without scanning every launcher. Launchers are indexed in store
   // order, so ties still go to the launcher that comes first. Steps without
   // proposals have nothing to resolve.
-  bool prepare(LocalWorld& world) {
+  auto prepare(LocalWorld& world) -> bool {
     proposals_.clear();
     world.store_of<Launcher>().for_each(
         [&](Entity owner, const Launcher& launcher) {
@@ -280,8 +280,8 @@ struct ResolveEngagements final : System<Engagement, const Estimate> {
     return !proposals_.empty();
   }
 
-  void operator()(LocalWorld& world, Entity self, Engagement& engagement,
-                  const Estimate* estimate, Step step) {
+  auto operator()(LocalWorld& world, Entity self, Engagement& engagement,
+                  const Estimate* estimate, Step step) -> void {
     TimePoint now = step.time;
     if (!estimate ||
         (engagement.engaged_by != Entity{} && now < engagement.engaged_until)) {
@@ -336,8 +336,8 @@ struct LaunchInterceptors final : System<Launcher, const Kinematics> {
   using SequenceAfterSystemList = SystemList<ResolveEngagements>;
   using AllowComponentList = TypeList<Track, Estimate, Engagement>;
 
-  void operator()(LocalWorld& world, Entity self, Launcher& launcher,
-                  const Kinematics* kinematics, Step step) {
+  auto operator()(LocalWorld& world, Entity self, Launcher& launcher,
+                  const Kinematics* kinematics, Step step) -> void {
     Entity proposal = std::exchange(launcher.proposal, Entity{});
     const Track* track = world.maybe_component_of<Track>(proposal);
     const Estimate* estimate = world.maybe_component_of<Estimate>(proposal);
@@ -390,9 +390,9 @@ struct GuideInterceptors final
   using SequenceAfterSystemList = SystemList<LaunchInterceptors>;
   using AllowComponentList = TypeList<Kinematics, RedDrone>;
 
-  void operator()(LocalWorld& world, Entity self,
+  auto operator()(LocalWorld& world, Entity self,
                   const Interceptor& interceptor, const Kinematics* kinematics,
-                  Control* control, Target* target_of, Step step) {
+                  Control* control, Target* target_of, Step step) -> void {
     if (!kinematics || !control || !target_of) {
       return;
     }
@@ -420,9 +420,9 @@ struct GuideInterceptors final
   }
 
  private:
-  static const Kinematics* retarget(const Interceptor& interceptor,
-                                    const Kinematics& kinematics,
-                                    Target& target, LocalWorld& world) {
+  static auto retarget(const Interceptor& interceptor,
+                       const Kinematics& kinematics, Target& target,
+                       LocalWorld& world) -> const Kinematics* {
     std::optional<Entity> nearest = world.nearest(
         kinematics, interceptor.seeker_range,
         [&](Entity candidate, const Kinematics&) {
@@ -442,9 +442,9 @@ struct SteerRedDrones final
   using LocalWorld = WorldAccess<SteerRedDrones>;
   using AllowComponentList = TypeList<Kinematics>;
 
-  void operator()(LocalWorld& world, Entity, const RedDrone& drone,
+  auto operator()(LocalWorld& world, Entity, const RedDrone& drone,
                   const Kinematics* kinematics, Control* control,
-                  const Target* target_of) {
+                  const Target* target_of) -> void {
     if (!kinematics || !control || !target_of) {
       return;
     }
@@ -469,8 +469,8 @@ struct TriggerWarheads final
   using SequenceAfterSystemList = SystemList<model::Integrate>;
   using AllowComponentList = TypeList<Kinematics>;
 
-  void operator()(LocalWorld& world, Entity self, const Warhead& warhead,
-                  const Kinematics* kinematics, const Target* target) {
+  auto operator()(LocalWorld& world, Entity self, const Warhead& warhead,
+                  const Kinematics* kinematics, const Target* target) -> void {
     const Kinematics* target_kinematics =
         target ? world.maybe_component_of<Kinematics>(target->entity) : nullptr;
     if (!kinematics || !target_kinematics ||
@@ -501,7 +501,7 @@ struct ApplyBlasts final : System<Health, const Kinematics> {
   // Collects this step's blasts, once, so each victim reads a short array
   // instead of walking the Blast store. Most steps have none, and then there
   // is nothing to apply.
-  bool prepare(LocalWorld& world) {
+  auto prepare(LocalWorld& world) -> bool {
     blasts_.clear();
     world.store_of<Blast>().for_each([&](Entity owner, const Blast& blast) {
       if (const Kinematics* center =
@@ -513,8 +513,8 @@ struct ApplyBlasts final : System<Health, const Kinematics> {
     return !blasts_.empty();
   }
 
-  void operator()(LocalWorld& world, Entity self, Health& health,
-                  const Kinematics* kinematics) {
+  auto operator()(LocalWorld& world, Entity self, Health& health,
+                  const Kinematics* kinematics) -> void {
     if (!kinematics) {
       return;
     }
@@ -543,7 +543,7 @@ struct ExpireBlasts final : System<const Blast> {
   using LocalWorld = WorldAccess<ExpireBlasts>;
   using SequenceAfterSystemList = SystemList<ApplyBlasts>;
 
-  void operator()(LocalWorld& world, Entity self, const Blast&) {
+  auto operator()(LocalWorld& world, Entity self, const Blast&) -> void {
     auto destroyed = world.destroy(self).build();
     DECLARE_UNUSED(destroyed);
   }

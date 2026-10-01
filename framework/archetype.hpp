@@ -22,7 +22,9 @@ struct FixedString final {
   constexpr FixedString(const char (&text)[Size]) {
     std::copy_n(text, Size, value.begin());
   }
-  constexpr std::string_view view() const { return {value.data(), Size - 1}; }
+  constexpr auto view() const -> std::string_view {
+    return {value.data(), Size - 1};
+  }
 };
 
 template <typename... ComponentTypes>

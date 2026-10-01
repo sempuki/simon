@@ -4,7 +4,7 @@
 
 namespace simon::hello {
 
-Balls build_balls(lib::InOut<World> world) {
+auto build_balls(lib::InOut<World> world) -> Balls {
   auto red =
       world->create<Ball>("red")
           .with(Kinematics{.position = meters(360.0, 100.0, 0.0),
@@ -27,25 +27,25 @@ Balls build_balls(lib::InOut<World> world) {
   return Balls{.red = *red, .blue = *blue};
 }
 
-std::expected<void, framework::Status> build_world(std::size_t balls,
-                                                   lib::Out<World> world) {
+auto build_world(std::size_t balls, lib::Out<World> world)
+    -> std::expected<void, framework::Status> {
   return World::set_up().numbered(1).holding<Ball>(balls).build(world);
 }
 
-bool any_collision(const World& world) {
+auto any_collision(const World& world) -> bool {
   bool hit = false;
   world.store_of<Collision>().for_each(
       [&](Entity, const Collision& collision) { hit = hit || collision.hit; });
   return hit;
 }
 
-engine::PhaseResult Simulation::configure() {
+auto Simulation::configure() -> engine::PhaseResult {
   RETURN_IF_UNEXPECTED(build_world(2, lib::Out(world_)));
   balls_ = build_balls(lib::InOut(world_));
   return engine::Flow::CONTINUE;
 }
 
-engine::PhaseResult Simulation::step(const framework::Step& step) {
+auto Simulation::step(const framework::Step& step) -> engine::PhaseResult {
   scheduler_.step(step, lib::InOut(world_));
   return any_collision(world_) ? engine::Flow::STOP : engine::Flow::CONTINUE;
 }

@@ -18,7 +18,7 @@ EventQueue::EventQueue() {
       });
 }
 
-void EventQueue::process_until(TimePoint time) {
+auto EventQueue::process_until(TimePoint time) -> void {
   while (!events_.empty() && events_.front().event->time() <= time) {
     // Take ownership before calling handlers, since they may publish.
     std::pop_heap(events_.begin(), events_.end(), Later{});

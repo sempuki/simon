@@ -12,8 +12,8 @@
 namespace simon::model {
 
 // `acceleration`, scaled down if needed so its magnitude is at most `limit`.
-inline Acceleration limit(const Acceleration& acceleration,
-                          AccelerationMagnitude limit) {
+inline auto limit(const Acceleration& acceleration, AccelerationMagnitude limit)
+    -> Acceleration {
   AccelerationMagnitude magnitude = norm(acceleration);
   if (magnitude <= limit || magnitude == 0.0 * meter_per_second_squared) {
     return acceleration;
@@ -29,9 +29,9 @@ inline Acceleration limit(const Acceleration& acceleration,
 //
 // where r and v are the target's position and velocity relative to `self`.
 // Returns zero when the target is at `self`.
-inline Acceleration proportional_navigation(const Kinematics& self,
-                                            const Kinematics& target,
-                                            double gain) {
+inline auto proportional_navigation(const Kinematics& self,
+                                    const Kinematics& target, double gain)
+    -> Acceleration {
   Displacement relative_position = target.position - self.position;
   Velocity relative_velocity = target.velocity - self.velocity;
   auto range = norm(relative_position);
@@ -47,8 +47,8 @@ inline Acceleration proportional_navigation(const Kinematics& self,
 
 // Acceleration that turns `self` toward `goal` at `cruise` speed, correcting
 // the velocity error at `response` (per second).
-inline Acceleration steer_toward(const Kinematics& self, const Position& goal,
-                                 Speed cruise, Rate response) {
+inline auto steer_toward(const Kinematics& self, const Position& goal,
+                         Speed cruise, Rate response) -> Acceleration {
   Displacement to_goal = goal - self.position;
   auto distance = norm(to_goal);
   if (distance == 0.0 * meter) {
@@ -60,8 +60,8 @@ inline Acceleration steer_toward(const Kinematics& self, const Position& goal,
 
 // Acceleration along the velocity that brings speed toward `speed` at
 // `response` (per second). Zero when `self` is not moving.
-inline Acceleration hold_speed(const Kinematics& self, Speed speed,
-                               Rate response) {
+inline auto hold_speed(const Kinematics& self, Speed speed, Rate response)
+    -> Acceleration {
   Speed current = norm(self.velocity);
   if (current == 0.0 * meter_per_second) {
     return meters_per_second_squared(0.0, 0.0, 0.0);

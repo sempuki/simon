@@ -15,10 +15,12 @@ class Random final {
   explicit Random(std::uint64_t seed) : engine_{seed} {}
 
   // Uniform in [0, 1), with 53 random bits.
-  double unit() { return static_cast<double>(engine_() >> 11) * 0x1.0p-53; }
+  auto unit() -> double {
+    return static_cast<double>(engine_() >> 11) * 0x1.0p-53;
+  }
 
   // Uniform in [low, high).
-  double uniform(double low, double high) {
+  auto uniform(double low, double high) -> double {
     return low + (high - low) * unit();
   }
 

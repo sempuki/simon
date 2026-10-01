@@ -28,7 +28,7 @@ class Uninitialized final {
   Uninitialized(Uninitialized&& that) noexcept
       : data_{std::exchange(that.data_, nullptr)},
         size_{std::exchange(that.size_, 0)} {}
-  Uninitialized& operator=(Uninitialized&& that) noexcept {
+  auto operator=(Uninitialized&& that) noexcept -> Uninitialized& {
     if (this != &that) {
       if (data_) {
         std::allocator<Type>{}.deallocate(data_, size_);
@@ -44,7 +44,7 @@ class Uninitialized final {
     }
   }
 
-  Type* data() const { return data_; }
+  auto data() const -> Type* { return data_; }
 
  private:
   Type* data_ = nullptr;
@@ -81,7 +81,7 @@ class ComponentStore final {
   };
 
   // Chunks of at most 1024 entries, and smaller in small stores.
-  static std::size_t default_chunk_size(std::size_t capacity) {
+  static auto default_chunk_size(std::size_t capacity) -> std::size_t {
     return std::min<std::size_t>(
         1024, std::bit_ceil(std::max<std::size_t>(capacity, 1)));
   }
@@ -89,7 +89,7 @@ class ComponentStore final {
   DECLARE_COPY_DELETE(ComponentStore);
 
   ComponentStore(ComponentStore&&) noexcept = default;
-  ComponentStore& operator=(ComponentStore&& that) noexcept {
+  auto operator=(ComponentStore&& that) noexcept -> ComponentStore& {
     if (this != &that) {
       destroy_all();
       capacity_ = that.capacity_;
@@ -143,27 +143,29 @@ class ComponentStore final {
 
   ~ComponentStore() { destroy_all(); }
 
-  std::size_t size() const { return size_; }
-  std::size_t capacity() const { return capacity_; }
-  std::size_t chunk_size() const { return chunk_size_; }
+  auto size() const -> std::size_t { return size_; }
+  auto capacity() const -> std::size_t { return capacity_; }
+  auto chunk_size() const -> std::size_t { return chunk_size_; }
 
-  bool contains(Entity entity) const { return slot_of(entity) != ABSENT; }
+  auto contains(Entity entity) const -> bool {
+    return slot_of(entity) != ABSENT;
+  }
 
-  ComponentType* maybe_component_of(Entity entity) {
+  auto maybe_component_of(Entity entity) -> ComponentType* {
     Slot slot = slot_of(entity);
     return slot != ABSENT ? &data_.data()[slot] : nullptr;
   }
-  const ComponentType* maybe_component_of(Entity entity) const {
+  auto maybe_component_of(Entity entity) const -> const ComponentType* {
     Slot slot = slot_of(entity);
     return slot != ABSENT ? &data_.data()[slot] : nullptr;
   }
 
-  ComponentType& component_of(Entity entity) {
+  auto component_of(Entity entity) -> ComponentType& {
     ComponentType* component = maybe_component_of(entity);
     CHECK_PRECONDITION(component);
     return *component;
   }
-  const ComponentType& component_of(Entity entity) const {
+  auto component_of(Entity entity) const -> const ComponentType& {
     const ComponentType* component = maybe_component_of(entity);
     CHECK_PRECONDITION(component);
     return *component;
@@ -172,36 +174,36 @@ class ComponentStore final {
   // Visits every entity-component as `visit(Entity, ComponentType&)`, segment
   // by segment, each in order.
   template <typename VisitorType>
-  void for_each(VisitorType&& visit) {
+  auto for_each(VisitorType&& visit) -> void {
     walk(*this, std::forward<VisitorType>(visit));
   }
   template <typename VisitorType>
-  void for_each(VisitorType&& visit) const {
+  auto for_each(VisitorType&& visit) const -> void {
     walk(*this, std::forward<VisitorType>(visit));
   }
 
   //-- For the framework ------------------------------------------------------
 
   // Segments and their chunks, for the scheduler's loops.
-  std::size_t segments() const { return segments_.size(); }
-  std::size_t segment_size(std::size_t segment) const {
+  auto segments() const -> std::size_t { return segments_.size(); }
+  auto segment_size(std::size_t segment) const -> std::size_t {
     return segments_[segment].size;
   }
-  std::size_t chunks_in(std::size_t segment) const {
+  auto chunks_in(std::size_t segment) const -> std::size_t {
     return segments_[segment].chunks.size();
   }
-  Chunk<ComponentType> chunk(std::size_t segment, std::size_t ordinal) {
+  auto chunk(std::size_t segment, std::size_t ordinal) -> Chunk<ComponentType> {
     return chunk_of<ComponentType>(*this, segment, ordinal);
   }
-  Chunk<const ComponentType> chunk(std::size_t segment,
-                                   std::size_t ordinal) const {
+  auto chunk(std::size_t segment, std::size_t ordinal) const
+      -> Chunk<const ComponentType> {
     return chunk_of<const ComponentType>(*this, segment, ordinal);
   }
 
   // Slots, for indexes such as the spatial index. A slot names the same
   // entity-component until the next append or erase.
   template <typename VisitorType>
-  void for_each_slot(VisitorType&& visit) const {
+  auto for_each_slot(VisitorType&& visit) const -> void {
     for (std::size_t segment = 0; segment < segments(); ++segment) {
       for (std::size_t ordinal = 0; ordinal < chunks_in(segment); ++ordinal) {
         Slot first =
@@ -214,13 +216,14 @@ class ComponentStore final {
       }
     }
   }
-  Entity owner_at(Slot slot) const { return owner_[slot]; }
-  const ComponentType& component_at(Slot slot) const {
+  auto owner_at(Slot slot) const -> Entity { return owner_[slot]; }
+  auto component_at(Slot slot) const -> const ComponentType& {
     return data_.data()[slot];
   }
 
   // Appends to the end of `segment`.
-  void append(Entity entity, ComponentType component, std::size_t segment = 0) {
+  auto append(Entity entity, ComponentType component, std::size_t segment = 0)
+      -> void {
     CHECK_PRECONDITION(entity.index < index_.size());
     CHECK_PRECONDITION(!contains(entity));
     CHECK_PRECONDITION(size_ < capacity_);  // Never reallocate.
@@ -246,7 +249,7 @@ class ComponentStore final {
   }
 
   // Erases, moving the segment's last entity-component into the gap.
-  void erase(Entity entity) {
+  auto erase(Entity entity) -> void {
     Slot slot = slot_of(entity);
     CHECK_PRECONDITION(slot != ABSENT);
 
@@ -273,7 +276,7 @@ class ComponentStore final {
  private:
   static constexpr Slot ABSENT = std::numeric_limits<Slot>::max();
 
-  void destroy_all() {
+  auto destroy_all() -> void {
     for_each(
         [](Entity, ComponentType& component) { std::destroy_at(&component); });
   }
@@ -294,7 +297,7 @@ class ComponentStore final {
     std::uint32_t ordinal = 0;
   };
 
-  Slot slot_of(Entity entity) const {
+  auto slot_of(Entity entity) const -> Slot {
     if (entity.index >= index_.size()) {
       return ABSENT;
     }
@@ -302,14 +305,14 @@ class ComponentStore final {
     return entry.generation == entity.generation ? entry.slot : ABSENT;
   }
 
-  Slot slot_at(const Segment& segment, std::size_t local) const {
+  auto slot_at(const Segment& segment, std::size_t local) const -> Slot {
     return static_cast<Slot>(segment.chunks[local / chunk_size_] * chunk_size_ +
                              local % chunk_size_);
   }
 
   template <typename DataType, typename StoreType>
-  static Chunk<DataType> chunk_of(StoreType& store, std::size_t segment,
-                                  std::size_t ordinal) {
+  static auto chunk_of(StoreType& store, std::size_t segment,
+                       std::size_t ordinal) -> Chunk<DataType> {
     const Segment& in = store.segments_[segment];
     std::size_t first = in.chunks[ordinal] * store.chunk_size_;
     return Chunk<DataType>{
@@ -320,7 +323,7 @@ class ComponentStore final {
   }
 
   template <typename StoreType, typename VisitorType>
-  static void walk(StoreType& store, VisitorType&& visit) {
+  static auto walk(StoreType& store, VisitorType&& visit) -> void {
     for (std::size_t segment = 0; segment < store.segments(); ++segment) {
       for (std::size_t ordinal = 0; ordinal < store.chunks_in(segment);
            ++ordinal) {

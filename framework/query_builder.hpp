@@ -52,20 +52,20 @@ class Query final {
 
   // Keeps only entities whose spatial component is within `radius` of
   // `center`.
-  void near(const SpatialType& center, DistanceType radius) {
+  auto near(const SpatialType& center, DistanceType radius) -> void {
     near_ = Near{.center = center, .radius = radius};
   }
 
   // Keeps only entities for which `predicate(Entity)` is true.
   template <typename PredicateType>
-  void keep(PredicateType&& predicate) {
+  auto keep(PredicateType&& predicate) -> void {
     predicates_.emplace_back(std::forward<PredicateType>(predicate));
   }
 
   // Keeps only entities that will have `ComponentType` once pending commands
   // apply.
   template <typename ComponentType>
-  void having() {
+  auto having() -> void {
     conditions_.push_back([](const WorldType& world, Entity entity) {
       return world.template will_have<ComponentType>(entity);
     });
@@ -74,7 +74,7 @@ class Query final {
   // Keeps only entities that will lack `ComponentType` once pending commands
   // apply.
   template <typename ComponentType>
-  void lacking() {
+  auto lacking() -> void {
     conditions_.push_back([](const WorldType& world, Entity entity) {
       return !world.template will_have<ComponentType>(entity);
     });
@@ -83,7 +83,7 @@ class Query final {
   // The selected entities, in a deterministic order: the archetype's segment
   // or the component's store, or the spatial index's order when narrowed by
   // `near`.
-  std::vector<Entity> select(lib::InOut<WorldType> world) const {
+  auto select(lib::InOut<WorldType> world) const -> std::vector<Entity> {
     std::vector<Entity> selected;
     auto consider = [&](Entity entity) {
       if (world->will_be_alive(entity) &&
@@ -116,7 +116,7 @@ class Query final {
     DistanceType radius;
   };
 
-  static bool is_chosen(const WorldType& world, Entity entity) {
+  static auto is_chosen(const WorldType& world, Entity entity) -> bool {
     if constexpr (Archetypal<ChosenType>) {
       return world.archetype_of_index_[entity.index] ==
              index_of_v<typename WorldType::ArchetypeList, ChosenType>;
@@ -128,7 +128,8 @@ class Query final {
   // Visits every chosen entity: an archetype's segment of the EntityArchetype
   // store, or every owner in the component's store.
   template <typename VisitorType>
-  static void for_each_chosen(const WorldType& world, VisitorType&& visit) {
+  static auto for_each_chosen(const WorldType& world, VisitorType&& visit)
+      -> void {
     if constexpr (Archetypal<ChosenType>) {
       const auto& archetypes = world.template store_of<EntityArchetype>();
       constexpr std::size_t SEGMENT =
@@ -230,7 +231,7 @@ class [[nodiscard]] DestroyQueryBuilder final {
     return std::move(*this);
   }
 
-  std::expected<std::size_t, Status> build() &&
+  auto build() && -> std::expected<std::size_t, Status>
     requires(!std::is_void_v<ChosenType>)
   {
     std::vector<Entity> selected = query_.select(lib::InOut(*world_));
@@ -247,7 +248,7 @@ class [[nodiscard]] DestroyQueryBuilder final {
   friend class DestroyQueryBuilder;
 
   template <typename ComponentType>
-  static constexpr void check_readable() {
+  static constexpr auto check_readable() -> void {
     static_assert(contains_v<typename WorldType::ComponentList, ComponentType>,
                   "This component is not in the world's component list.");
     static_assert(ReadPolicyType::template can_read<ComponentType>,
@@ -409,7 +410,7 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
         std::move(aliases_)};
   }
 
-  std::expected<std::size_t, Status> build() &&
+  auto build() && -> std::expected<std::size_t, Status>
     requires(!std::is_void_v<ChosenType>)
   {
     static_assert(
@@ -433,7 +434,7 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
   friend class ChangeQueryBuilder;
 
   template <typename ComponentType>
-  static constexpr void check_readable() {
+  static constexpr auto check_readable() -> void {
     static_assert(contains_v<typename WorldType::ComponentList, ComponentType>,
                   "This component is not in the world's component list.");
     static_assert(ReadPolicyType::template can_read<ComponentType>,
@@ -455,7 +456,7 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
 
   // The same checks as ChangeBuilder's, made where the word is spoken.
   template <typename ComponentType>
-  static constexpr void check_component() {
+  static constexpr auto check_component() -> void {
     static_assert(contains_v<typename WorldType::ComponentList, ComponentType>,
                   "This component is not in the world's component list.");
     static_assert(!is_built_in_v<ComponentType>,

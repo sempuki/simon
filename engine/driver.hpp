@@ -41,12 +41,12 @@ class Driver final {
     CHECK_PRECONDITION(max_step_ > Duration::zero());
   }
 
-  TimePoint now() const { return now_; }
-  Duration max_step() const { return max_step_; }
-  Phase phase() const { return phase_; }
+  auto now() const -> TimePoint { return now_; }
+  auto max_step() const -> Duration { return max_step_; }
+  auto phase() const -> Phase { return phase_; }
 
   // Configures and initializes the simulation.
-  PhaseResult start() {
+  auto start() -> PhaseResult {
     CHECK_PRECONDITION(phase_ == Phase::NEW);
     for (auto phase : {&Driver::configure, &Driver::initialize}) {
       PhaseResult result = (this->*phase)();
@@ -61,7 +61,7 @@ class Driver final {
 
   // Steps toward `target`, at most `max_step` at a time, landing exactly on it.
   // Stops early, and for good, when a step returns Flow::STOP or an error.
-  PhaseResult advance_to(TimePoint target) {
+  auto advance_to(TimePoint target) -> PhaseResult {
     CHECK_PRECONDITION(phase_ == Phase::RUNNING);
     while (now_ < target) {
       Duration dt = std::min(max_step_, target - now_);
@@ -76,7 +76,7 @@ class Driver final {
   }
 
   // Finalizes the simulation. Allowed once, after start.
-  FinishResult finish() {
+  auto finish() -> FinishResult {
     CHECK_PRECONDITION(phase_ == Phase::RUNNING || phase_ == Phase::STOPPED);
     phase_ = Phase::FINISHED;
     if constexpr (requires { simulation_->finalize(); }) {
@@ -86,14 +86,14 @@ class Driver final {
   }
 
  private:
-  PhaseResult configure() {
+  auto configure() -> PhaseResult {
     if constexpr (requires { simulation_->configure(); }) {
       return simulation_->configure();
     }
     return Flow::CONTINUE;
   }
 
-  PhaseResult initialize() {
+  auto initialize() -> PhaseResult {
     if constexpr (requires { simulation_->initialize(); }) {
       return simulation_->initialize();
     }
@@ -116,7 +116,7 @@ class BatchDriver final {
       : driver_{timing, simulation} {}
 
   // Runs the whole lifecycle. Returns the time the simulation reached.
-  std::expected<TimePoint, Status> run(TimePoint end) {
+  auto run(TimePoint end) -> std::expected<TimePoint, Status> {
     PhaseResult started = driver_.start();
     if (started && *started == Flow::CONTINUE) {
       started = driver_.advance_to(end);
@@ -127,7 +127,7 @@ class BatchDriver final {
     return driver_.now();
   }
 
-  const Driver<SimulationType>& driver() const { return driver_; }
+  auto driver() const -> const Driver<SimulationType>& { return driver_; }
 
  private:
   Driver<SimulationType> driver_;
@@ -150,7 +150,7 @@ class RealTimeDriver final {
 
   // Advances to the step the wall clock has reached. Call it from an
   // application's frame loop. The first call starts the simulation.
-  PhaseResult tick() {
+  auto tick() -> PhaseResult {
     if (driver_.phase() == Phase::NEW) {
       wall_start_ = WallClockType::now();
       PhaseResult started = driver_.start();
@@ -169,27 +169,27 @@ class RealTimeDriver final {
 
   // Stops simulated time until `resume`. Wall time that passes while paused is
   // never caught up.
-  void pause() { paused_ = true; }
-  void resume() {
+  auto pause() -> void { paused_ = true; }
+  auto resume() -> void {
     if (paused_) {
       paused_ = false;
       rebase();
     }
   }
-  bool paused() const { return paused_; }
+  auto paused() const -> bool { return paused_; }
 
   // Changes how many simulated seconds pass per wall second, from now on.
   // Simulated time does not jump.
-  void set_speed(double speed) {
+  auto set_speed(double speed) -> void {
     CHECK_PRECONDITION(speed > 0.0);
     rebase();
     speed_ = speed;
   }
-  double speed() const { return speed_; }
+  auto speed() const -> double { return speed_; }
 
   // Ticks until the simulation stops, sleeping until each step is due. For
   // headless runs; it needs a WallClockType that sleep_until understands.
-  FinishResult run() {
+  auto run() -> FinishResult {
     for (;;) {
       PhaseResult result = tick();
       if (!result) {
@@ -206,13 +206,13 @@ class RealTimeDriver final {
     }
   }
 
-  FinishResult finish() { return driver_.finish(); }
+  auto finish() -> FinishResult { return driver_.finish(); }
 
-  const Driver<SimulationType>& driver() const { return driver_; }
+  auto driver() const -> const Driver<SimulationType>& { return driver_; }
 
  private:
   // The last whole step at or before the simulated time `wall` corresponds to.
-  TimePoint target_at(typename WallClockType::time_point wall) const {
+  auto target_at(typename WallClockType::time_point wall) const -> TimePoint {
     // Rounded, not truncated: at an exact step boundary the floating-point
     // product can fall a fraction of a nanosecond short.
     auto simulated = std::chrono::round<Duration>(
@@ -225,12 +225,13 @@ class RealTimeDriver final {
   // measured from here. The simulation's time is always a whole number of
   // steps from its start, so targets stay whole steps and runs stay
   // deterministic.
-  void rebase() {
+  auto rebase() -> void {
     start_ = driver_.now();
     wall_start_ = WallClockType::now();
   }
 
-  typename WallClockType::time_point wall_time_of(TimePoint time) const {
+  auto wall_time_of(TimePoint time) const ->
+      typename WallClockType::time_point {
     auto simulated = std::chrono::duration<double>(time - start_);
     // Rounded up, so waiting until then never wakes just before the time.
     return wall_start_ + std::chrono::ceil<typename WallClockType::duration>(

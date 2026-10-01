@@ -28,15 +28,15 @@ template <typename MessageType>
 inline constexpr char event_type_tag = 0;
 
 template <typename MessageType>
-constexpr EventType event_type_of() {
+constexpr auto event_type_of() -> EventType {
   return &event_type_tag<MessageType>;
 }
 
 class EventBase {
  public:
   virtual ~EventBase() = default;
-  virtual EventType event_type() const = 0;
-  virtual TimePoint time() const = 0;
+  virtual auto event_type() const -> EventType = 0;
+  virtual auto time() const -> TimePoint = 0;
 };
 
 template <typename MessageType>
@@ -46,9 +46,11 @@ class Event final : public EventBase {
   explicit Event(TimePoint time, ArgumentTypes&&... arguments)
       : time_{time}, message_{std::forward<ArgumentTypes>(arguments)...} {}
 
-  EventType event_type() const override { return event_type_of<MessageType>(); }
-  TimePoint time() const override { return time_; }
-  const MessageType& data() const { return message_; }
+  auto event_type() const -> EventType override {
+    return event_type_of<MessageType>();
+  }
+  auto time() const -> TimePoint override { return time_; }
+  auto data() const -> const MessageType& { return message_; }
 
  private:
   TimePoint time_{};
@@ -62,12 +64,12 @@ class EventQueue final {
   EventQueue();
 
   template <typename HandlerType>
-  void start_timer(TimePoint time, HandlerType&& handler) {
+  auto start_timer(TimePoint time, HandlerType&& handler) -> void {
     publish<Timer>(time, Timer{std::forward<HandlerType>(handler)});
   }
 
   template <typename MessageType, typename HandlerType>
-  void subscribe(HandlerType&& handler) {
+  auto subscribe(HandlerType&& handler) -> void {
     static_assert(std::is_same_v<MessageType, std::remove_cvref_t<MessageType>>,
                   "Unsupported: cv-ref qualified messages");
 
@@ -80,7 +82,7 @@ class EventQueue final {
   }
 
   template <typename MessageType, typename... DeducedMessageArgumentTypes>
-  void publish(TimePoint time, DeducedMessageArgumentTypes&&... args) {
+  auto publish(TimePoint time, DeducedMessageArgumentTypes&&... args) -> void {
     static_assert(std::is_same_v<MessageType, std::remove_cvref_t<MessageType>>,
                   "Unsupported: cv-ref qualified messages");
 
@@ -95,7 +97,7 @@ class EventQueue final {
   // Delivers every event at or before `time`, earliest first, and events with
   // equal times in the order they were published. Each handler receives the
   // event's own time. Handlers may publish or subscribe while being called.
-  void process_until(TimePoint time);
+  auto process_until(TimePoint time) -> void;
 
  private:
   struct Timer final {
@@ -109,7 +111,7 @@ class EventQueue final {
 
   // Heap order that puts the earliest event, then the first published, on top.
   struct Later final {
-    bool operator()(const Entry& a, const Entry& b) const {
+    auto operator()(const Entry& a, const Entry& b) const -> bool {
       if (a.event->time() != b.event->time()) {
         return a.event->time() > b.event->time();
       }

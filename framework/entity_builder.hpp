@@ -91,7 +91,7 @@ class [[nodiscard]] CreateBuilder final {
         lib::Depend(*world_)};
   }
 
-  std::expected<Entity, Status> build() && {
+  auto build() && -> std::expected<Entity, Status> {
     static_assert(is_subset_v<typename ArchetypeType::RequiredComponentList,
                               TypeList<InitialTypes...>>,
                   "The entity lacks a component its archetype requires.");
@@ -173,7 +173,7 @@ ChangeBuilder<WorldType, TypeList<AttachedTypes...>, TypeList<DetachedTypes...>,
         lib::Depend(*world_)};
   }
 
-  std::expected<void, Status> build() && {
+  auto build() && -> std::expected<void, Status> {
     static_assert(
         sizeof...(AttachedTypes) + sizeof...(DetachedTypes) > 0 || Aliasing,
         "A change must attach, detach, alias or unalias something.");
@@ -183,7 +183,7 @@ ChangeBuilder<WorldType, TypeList<AttachedTypes...>, TypeList<DetachedTypes...>,
 
  private:
   template <typename ComponentType>
-  static constexpr void check_component() {
+  static constexpr auto check_component() -> void {
     static_assert(contains_v<typename WorldType::ComponentList, ComponentType>,
                   "This component is not in the world's component list.");
     static_assert(!is_built_in_v<ComponentType>,
@@ -208,7 +208,7 @@ class [[nodiscard]] DestroyBuilder final {
   DestroyBuilder(Entity entity, lib::Depend<WorldType> world)
       : world_{world.get()}, entity_{entity} {}
 
-  std::expected<void, Status> build() && {
+  auto build() && -> std::expected<void, Status> {
     return world_->build_destroy(entity_);
   }
 

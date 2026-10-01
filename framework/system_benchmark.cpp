@@ -54,14 +54,14 @@ namespace {
 struct Point final {
   double x = 0.0;
 };
-[[maybe_unused]] double distance(const Point& a, const Point& b) {
+[[maybe_unused]] auto distance(const Point& a, const Point& b) -> double {
   return a.x - b.x;
 }
-[[maybe_unused]] Point pose(const Point& a) { return a; }
-[[maybe_unused]] Coordinates coordinates(const Point& a) {
+[[maybe_unused]] auto pose(const Point& a) -> Point { return a; }
+[[maybe_unused]] auto coordinates(const Point& a) -> Coordinates {
   return {a.x, 0.0, 0.0};
 }
-[[maybe_unused]] double coordinate_length(const Point&, double length) {
+[[maybe_unused]] auto coordinate_length(const Point&, double length) -> double {
   return length;
 }
 
@@ -84,21 +84,22 @@ using BenchmarkWorld =
 
 constexpr double DT = 0.01;
 
-inline void integrate(Body& body, const Thrust& thrust) {
+inline auto integrate(Body& body, const Thrust& thrust) -> void {
   for (int axis = 0; axis < 3; ++axis) {
     body.velocity[axis] += thrust.acceleration[axis] * DT;
     body.position[axis] += body.velocity[axis] * DT;
   }
 }
 
-inline void integrate(Body& body) {
+inline auto integrate(Body& body) -> void {
   for (int axis = 0; axis < 3; ++axis) {
     body.position[axis] += body.velocity[axis] * DT;
   }
 }
 
 struct Integrate final : System<Body, const Thrust> {
-  void operator()(auto&, Entity, Body& body, const Thrust* thrust) const {
+  auto operator()(auto&, Entity, Body& body, const Thrust* thrust) const
+      -> void {
     if (thrust) {
       integrate(body, *thrust);
     }
@@ -106,7 +107,7 @@ struct Integrate final : System<Body, const Thrust> {
 };
 
 template <typename FunctionType>
-double median_nanoseconds(FunctionType&& function, int repetitions) {
+auto median_nanoseconds(FunctionType&& function, int repetitions) -> double {
   std::vector<double> samples;
   for (int i = 0; i < repetitions; ++i) {
     auto start = std::chrono::steady_clock::now();
@@ -127,8 +128,8 @@ struct Result final {
   double baseline = 0.0;
 };
 
-Result measure(std::size_t count, bool shuffled,
-               lib::InOut<std::mt19937> random) {
+auto measure(std::size_t count, bool shuffled, lib::InOut<std::mt19937> random)
+    -> Result {
   std::vector<std::size_t> order(count);
   std::iota(order.begin(), order.end(), 0);
   if (shuffled) {
@@ -204,7 +205,7 @@ Result measure(std::size_t count, bool shuffled,
 }  // namespace
 }  // namespace simon::framework
 
-int main(int argc, char** argv) {
+auto main(int argc, char** argv) -> int {
   using namespace simon::framework;
   unsigned threads = 0;
   for (int i = 1; i < argc; ++i) {

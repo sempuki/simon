@@ -119,7 +119,7 @@ inline constexpr bool intersects_v = Intersects<FirstType, SecondType>::value;
 
 // Calls `visit.template operator()<Type>()` for each type, in order.
 template <typename... Types, typename VisitorType>
-constexpr void for_each_type(TypeList<Types...>, VisitorType&& visit) {
+constexpr auto for_each_type(TypeList<Types...>, VisitorType&& visit) -> void {
   (visit.template operator()<Types>(), ...);
 }
 

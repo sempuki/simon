@@ -26,15 +26,16 @@ class Contention final {
   ~Contention();
 
   // One thread per core but the benchmark's own.
-  static unsigned spare_cores();
+  static auto spare_cores() -> unsigned;
 
   // The number of contending threads an argument asks for: "--contend" for
   // one per spare core, "--contend=N" for N. Nothing for any other argument,
   // and nothing for a count that is not a number.
-  static std::optional<unsigned> threads_from(std::string_view argument);
+  static auto threads_from(std::string_view argument)
+      -> std::optional<unsigned>;
 
   // "uncontended", or how many threads contend.
-  static std::string describe(unsigned threads);
+  static auto describe(unsigned threads) -> std::string;
 
  private:
   std::atomic<bool> stop_ = false;

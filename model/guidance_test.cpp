@@ -7,7 +7,7 @@
 namespace simon::model {
 
 namespace {
-Vector3d value_of(const Acceleration& acceleration) {
+auto value_of(const Acceleration& acceleration) -> Vector3d {
   return acceleration.numerical_value_in(meter_per_second_squared);
 }
 }  // namespace

@@ -7,11 +7,11 @@
 namespace simon::model {
 
 namespace {
-bool near(const Displacement& a, const Displacement& b) {
+auto near(const Displacement& a, const Displacement& b) -> bool {
   return a.numerical_value_in(meter).is_approximately(
       b.numerical_value_in(meter));
 }
-bool near(const Velocity& a, const Velocity& b) {
+auto near(const Velocity& a, const Velocity& b) -> bool {
   return a.numerical_value_in(meter_per_second)
       .is_approximately(b.numerical_value_in(meter_per_second));
 }

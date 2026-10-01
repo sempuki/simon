@@ -47,7 +47,7 @@ struct Point final {
   double y = 0.0;
 };
 
-Point point_of(const Kinematics& kinematics) {
+auto point_of(const Kinematics& kinematics) -> Point {
   model::Vector3d position =
       kinematics.position.numerical_value_in(model::meter);
   return Point{.x = position.x(), .y = position.y()};
@@ -58,11 +58,11 @@ struct Scatter final {
   std::vector<double> x;
   std::vector<double> y;
 
-  void add(Point point) {
+  auto add(Point point) -> void {
     x.push_back(point.x);
     y.push_back(point.y);
   }
-  int size() const { return static_cast<int>(x.size()); }
+  auto size() const -> int { return static_cast<int>(x.size()); }
 };
 
 // A ring drawn where a drone or interceptor disappeared. Blasts last one step,
@@ -74,7 +74,8 @@ struct Explosion final {
   WallClock::time_point start;
 };
 
-void plot_circle(const char* label, Point center, double radius, ImVec4 color) {
+auto plot_circle(const char* label, Point center, double radius, ImVec4 color)
+    -> void {
   constexpr int SEGMENTS = 64;
   std::array<double, SEGMENTS + 1> x{};
   std::array<double, SEGMENTS + 1> y{};
@@ -104,7 +105,7 @@ class Session final {
     }
   }
 
-  void tick() {
+  auto tick() -> void {
     if (finished_) {
       return;
     }
@@ -117,10 +118,10 @@ class Session final {
     }
   }
 
-  const Scenario& scenario() const { return scenario_; }
-  const Simulation& simulation() const { return *simulation_; }
-  Driver& driver() { return *driver_; }
-  bool finished() const { return finished_; }
+  auto scenario() const -> const Scenario& { return scenario_; }
+  auto simulation() const -> const Simulation& { return *simulation_; }
+  auto driver() -> Driver& { return *driver_; }
+  auto finished() const -> bool { return finished_; }
 
  private:
   Scenario scenario_;
@@ -133,7 +134,7 @@ class Viewer final {
  public:
   explicit Viewer(std::uint64_t seed) : seed_{seed} { restart(); }
 
-  void frame() {
+  auto frame() -> void {
     if (ImGui::IsKeyPressed(ImGuiKey_Space) && !ImGui::GetIO().WantTextInput) {
       toggle_pause();
     }
@@ -157,21 +158,21 @@ class Viewer final {
   }
 
  private:
-  void restart() {
+  auto restart() -> void {
     session_.reset();  // Finish the old run before starting the new one.
     session_ = std::make_unique<Session>(Scenario{.seed = seed_}, speed_);
     last_seen_.clear();
     explosions_.clear();
   }
 
-  void toggle_pause() {
+  auto toggle_pause() -> void {
     Driver& driver = session_->driver();
     driver.paused() ? driver.resume() : driver.pause();
   }
 
   // Compares this frame's drones and interceptors with the last frame's, and
   // adds an explosion for each one that disappeared.
-  void notice_disappearances() {
+  auto notice_disappearances() -> void {
     const World& world = session_->simulation().world();
     std::unordered_map<Name, Sighting> seen;
     auto look = [&]<typename ComponentType>(double radius, ImVec4 color) {
@@ -210,7 +211,7 @@ class Viewer final {
     });
   }
 
-  void draw_controls() {
+  auto draw_controls() -> void {
     const Simulation& simulation = session_->simulation();
     const World& world = simulation.world();
     Driver& driver = session_->driver();
@@ -266,7 +267,7 @@ class Viewer final {
     }
   }
 
-  void draw_map() {
+  auto draw_map() -> void {
     const World& world = session_->simulation().world();
     if (!ImPlot::BeginPlot("##map", ImVec2(-1.0f, -1.0f),
                            ImPlotFlags_Equal | ImPlotFlags_NoMenus)) {
@@ -336,7 +337,7 @@ class Viewer final {
     ImPlot::EndPlot();
   }
 
-  void draw_explosions() {
+  auto draw_explosions() -> void {
     ImPlot::PushPlotClipRect();
     ImDrawList* draw = ImPlot::GetPlotDrawList();
     auto now = WallClock::now();
@@ -372,7 +373,7 @@ class Viewer final {
 }  // namespace
 }  // namespace simon::missile
 
-int main(int argc, char** argv) {
+auto main(int argc, char** argv) -> int {
   using namespace simon;
   std::uint64_t seed = argc > 1 ? std::strtoull(argv[1], nullptr, 10) : 1;
 

@@ -10,8 +10,8 @@
 
 namespace simon::missile {
 
-std::expected<void, framework::Status> build_world(const Scenario& scenario,
-                                                   lib::Out<World> world) {
+auto build_world(const Scenario& scenario, lib::Out<World> world)
+    -> std::expected<void, framework::Status> {
   auto count = [](int value) {
     return static_cast<std::size_t>(std::max(value, 0));
   };
@@ -33,13 +33,13 @@ std::expected<void, framework::Status> build_world(const Scenario& scenario,
       .build(world);
 }
 
-Position on_ring(Length radius, double bearing) {
+auto on_ring(Length radius, double bearing) -> Position {
   double length = radius.numerical_value_in(model::meter);
   return model::meters(length * std::cos(bearing), length * std::sin(bearing),
                        0.0);
 }
 
-std::expected<Entity, framework::Status> SiteBuilder::build() && {
+auto SiteBuilder::build() && -> std::expected<Entity, framework::Status> {
   constexpr double TURN = 2.0 * std::numbers::pi;
   // Any early return rolls back the entities created so far.
   auto transaction = world_->transaction();
@@ -87,12 +87,12 @@ std::expected<Entity, framework::Status> SiteBuilder::build() && {
   return asset;
 }
 
-SiteBuilder create_site(Position origin, lib::Depend<World> world) {
+auto create_site(Position origin, lib::Depend<World> world) -> SiteBuilder {
   return SiteBuilder{origin, world};
 }
 
-std::expected<Entity, framework::Status> build_scenario(
-    const Scenario& scenario, lib::InOut<World> world) {
+auto build_scenario(const Scenario& scenario, lib::InOut<World> world)
+    -> std::expected<Entity, framework::Status> {
   if (scenario.sites < 1) {
     return std::unexpected(lib::raise(framework::BuildError::ENTITY_NOT_ALIVE,
                                       "A scenario needs at least one site."));
@@ -137,7 +137,7 @@ std::expected<Entity, framework::Status> build_scenario(
   return *first;
 }
 
-engine::PhaseResult Simulation::configure() {
+auto Simulation::configure() -> engine::PhaseResult {
   RETURN_IF_UNEXPECTED(build_world(scenario_, lib::Out(world_)));
   ASSIGN_OR_RETURN(asset_, build_scenario(scenario_, lib::InOut(world_)));
   stock_ = remaining_interceptors();
@@ -152,7 +152,7 @@ engine::PhaseResult Simulation::configure() {
   return engine::Flow::CONTINUE;
 }
 
-engine::PhaseResult Simulation::step(const framework::Step& step) {
+auto Simulation::step(const framework::Step& step) -> engine::PhaseResult {
   events_.process_until(step.time);
   scheduler_.step(step, lib::InOut(world_));
   if (!world_.alive(asset_)) {
@@ -164,8 +164,8 @@ engine::PhaseResult Simulation::step(const framework::Step& step) {
                                         : engine::Flow::STOP;
 }
 
-std::expected<std::size_t, framework::Status> hold_weapons(
-    const Sector& sector, lib::InOut<World> world) {
+auto hold_weapons(const Sector& sector, lib::InOut<World> world)
+    -> std::expected<std::size_t, framework::Status> {
   return world->change()
       .each<archetype::Launcher>()
       .within(Kinematics{.position = sector.center}, sector.radius)
@@ -174,9 +174,9 @@ std::expected<std::size_t, framework::Status> hold_weapons(
       .build();
 }
 
-std::expected<std::size_t, framework::Status> free_weapons(
-    const Sector& sector, std::span<const Sector> keeping,
-    lib::InOut<World> world) {
+auto free_weapons(const Sector& sector, std::span<const Sector> keeping,
+                  lib::InOut<World> world)
+    -> std::expected<std::size_t, framework::Status> {
   const auto& kinematics = world->store_of<Kinematics>();
   return world->change()
       .each<archetype::Launcher>()
@@ -192,33 +192,33 @@ std::expected<std::size_t, framework::Status> free_weapons(
       .build();
 }
 
-std::expected<std::size_t, framework::Status> destruct_interceptors(
-    const Sector& sector, lib::InOut<World> world) {
+auto destruct_interceptors(const Sector& sector, lib::InOut<World> world)
+    -> std::expected<std::size_t, framework::Status> {
   return world->destroy()
       .each<archetype::Interceptor>()
       .within(Kinematics{.position = sector.center}, sector.radius)
       .build();
 }
 
-std::expected<std::size_t, framework::Status> Simulation::hold_weapons(
-    const Sector& sector) {
+auto Simulation::hold_weapons(const Sector& sector)
+    -> std::expected<std::size_t, framework::Status> {
   return missile::hold_weapons(sector, lib::InOut(world_));
 }
 
-std::expected<std::size_t, framework::Status> Simulation::free_weapons(
-    const Sector& sector) {
+auto Simulation::free_weapons(const Sector& sector)
+    -> std::expected<std::size_t, framework::Status> {
   return missile::free_weapons(sector, {}, lib::InOut(world_));
 }
 
-std::expected<std::size_t, framework::Status> Simulation::destruct_interceptors(
-    const Sector& sector) {
+auto Simulation::destruct_interceptors(const Sector& sector)
+    -> std::expected<std::size_t, framework::Status> {
   return missile::destruct_interceptors(sector, lib::InOut(world_));
 }
 
 // Holds and frees cannot be refused: launchers allow WeaponsHold, the store
 // holds one for every launcher, and lacking and having skip launchers already
 // held or freed.
-void Simulation::start_hold(TimePoint now, std::size_t hold) {
+auto Simulation::start_hold(TimePoint now, std::size_t hold) -> void {
   const TimedHold& order = scenario_.holds[hold];
   auto held = missile::hold_weapons(order.sector, lib::InOut(world_));
   CHECK_INVARIANT(held.has_value());
@@ -228,7 +228,8 @@ void Simulation::start_hold(TimePoint now, std::size_t hold) {
   });
 }
 
-void Simulation::end_hold(TimePoint now, const WeaponsHoldExpired& expired) {
+auto Simulation::end_hold(TimePoint now, const WeaponsHoldExpired& expired)
+    -> void {
   std::vector<Sector> in_force;
   for (const TimedHold& order : scenario_.holds) {
     if (order.from <= now && now < order.from + order.lasting) {
@@ -240,11 +241,11 @@ void Simulation::end_hold(TimePoint now, const WeaponsHoldExpired& expired) {
   CHECK_INVARIANT(freed.has_value());
 }
 
-std::uint32_t Simulation::interceptors_fired() const {
+auto Simulation::interceptors_fired() const -> std::uint32_t {
   return stock_ - remaining_interceptors();
 }
 
-std::uint32_t Simulation::remaining_interceptors() const {
+auto Simulation::remaining_interceptors() const -> std::uint32_t {
   std::uint32_t remaining = 0;
   world_.store_of<Launcher>().for_each([&](Entity, const Launcher& launcher) {
     remaining += launcher.inventory;

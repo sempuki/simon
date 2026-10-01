@@ -15,7 +15,7 @@ namespace simon::framework {
 
 namespace {
 
-double squared_distance(const Coordinates& a, const Coordinates& b) {
+auto squared_distance(const Coordinates& a, const Coordinates& b) -> double {
   double x = a[0] - b[0];
   double y = a[1] - b[1];
   double z = a[2] - b[2];
@@ -23,8 +23,8 @@ double squared_distance(const Coordinates& a, const Coordinates& b) {
 }
 
 // Points spread over [-extent, extent) in x and y, and a thin band in z.
-std::vector<Coordinates> random_points(std::size_t count, double extent,
-                                       std::uint64_t seed) {
+auto random_points(std::size_t count, double extent, std::uint64_t seed)
+    -> std::vector<Coordinates> {
   std::mt19937_64 engine{seed};
   auto uniform = [&](double low, double high) {
     return low + (high - low) * static_cast<double>(engine() >> 11) * 0x1.0p-53;
@@ -37,15 +37,15 @@ std::vector<Coordinates> random_points(std::size_t count, double extent,
   return points;
 }
 
-SpatialIndex index_of(const std::vector<Coordinates>& points,
-                      std::size_t capacity, double cell_size) {
+auto index_of(const std::vector<Coordinates>& points, std::size_t capacity,
+              double cell_size) -> SpatialIndex {
   SpatialIndex index{capacity, cell_size};
   index.rebuild(points.size(), [&](std::size_t slot) { return points[slot]; });
   return index;
 }
 
-std::vector<std::uint32_t> within(const SpatialIndex& index,
-                                  const Coordinates& center, double radius) {
+auto within(const SpatialIndex& index, const Coordinates& center, double radius)
+    -> std::vector<std::uint32_t> {
   std::vector<std::uint32_t> slots;
   index.within(center, radius,
                [&](std::uint32_t slot) { slots.push_back(slot); });
@@ -53,9 +53,9 @@ std::vector<std::uint32_t> within(const SpatialIndex& index,
   return slots;
 }
 
-std::vector<std::uint32_t> brute_within(const std::vector<Coordinates>& points,
-                                        const Coordinates& center,
-                                        double radius) {
+auto brute_within(const std::vector<Coordinates>& points,
+                  const Coordinates& center, double radius)
+    -> std::vector<std::uint32_t> {
   std::vector<std::uint32_t> slots;
   for (std::uint32_t slot = 0; slot < points.size(); ++slot) {
     if (squared_distance(points[slot], center) <= radius * radius) {
@@ -66,9 +66,9 @@ std::vector<std::uint32_t> brute_within(const std::vector<Coordinates>& points,
 }
 
 template <typename AcceptType>
-std::optional<std::uint32_t> brute_nearest(
-    const std::vector<Coordinates>& points, const Coordinates& center,
-    double radius, AcceptType accept) {
+auto brute_nearest(const std::vector<Coordinates>& points,
+                   const Coordinates& center, double radius, AcceptType accept)
+    -> std::optional<std::uint32_t> {
   std::optional<std::uint32_t> best;
   double best_distance = radius * radius;
   for (std::uint32_t slot = 0; slot < points.size(); ++slot) {

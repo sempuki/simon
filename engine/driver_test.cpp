@@ -29,22 +29,22 @@ using namespace std::chrono_literals;
 
 // Records every phase and step, and stops or fails when told to.
 struct Recorder final {
-  PhaseResult configure() {
+  auto configure() -> PhaseResult {
     phases.push_back("configure");
     return configure_result;
   }
-  PhaseResult initialize() {
+  auto initialize() -> PhaseResult {
     phases.push_back("initialize");
     return Flow::CONTINUE;
   }
-  PhaseResult step(const Step& step) {
+  auto step(const Step& step) -> PhaseResult {
     steps.push_back(step);
     if (fail_at && step.time >= *fail_at) {
       return std::unexpected(lib::raise(TestCondition::FAILED, "step failed"));
     }
     return stop_at && step.time >= *stop_at ? Flow::STOP : Flow::CONTINUE;
   }
-  FinishResult finalize() {
+  auto finalize() -> FinishResult {
     phases.push_back("finalize");
     return {};
   }
@@ -63,11 +63,11 @@ struct FakeClock final {
   using period = duration::period;
   using time_point = std::chrono::time_point<FakeClock>;
 
-  static time_point now() { return current; }
+  static auto now() -> time_point { return current; }
   static inline time_point current{};
 };
 
-std::vector<Duration> step_lengths(const Recorder& recorder) {
+auto step_lengths(const Recorder& recorder) -> std::vector<Duration> {
   std::vector<Duration> lengths;
   for (const Step& step : recorder.steps) {
     lengths.push_back(step.dt);

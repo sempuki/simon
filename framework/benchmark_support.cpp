@@ -33,11 +33,12 @@ Contention::~Contention() {
   }
 }
 
-unsigned Contention::spare_cores() {
+auto Contention::spare_cores() -> unsigned {
   return std::max(1u, std::thread::hardware_concurrency()) - 1;
 }
 
-std::optional<unsigned> Contention::threads_from(std::string_view argument) {
+auto Contention::threads_from(std::string_view argument)
+    -> std::optional<unsigned> {
   constexpr std::string_view FLAG = "--contend";
   if (argument == FLAG) {
     return spare_cores();
@@ -56,7 +57,7 @@ std::optional<unsigned> Contention::threads_from(std::string_view argument) {
   return threads;
 }
 
-std::string Contention::describe(unsigned threads) {
+auto Contention::describe(unsigned threads) -> std::string {
   return threads == 0 ? std::string{"uncontended"}
                       : std::format("contended by {} thread{}", threads,
                                     threads == 1 ? "" : "s");

@@ -15,12 +15,14 @@ namespace simon::framework::testing {
 struct Position final {
   double x = 0.0;
 };
-inline double distance(const Position& a, const Position& b) {
+inline auto distance(const Position& a, const Position& b) -> double {
   return std::abs(a.x - b.x);
 }
-inline Position pose(const Position& a) { return a; }
-inline Coordinates coordinates(const Position& a) { return {a.x, 0.0, 0.0}; }
-inline double coordinate_length(const Position&, double length) {
+inline auto pose(const Position& a) -> Position { return a; }
+inline auto coordinates(const Position& a) -> Coordinates {
+  return {a.x, 0.0, 0.0};
+}
+inline auto coordinate_length(const Position&, double length) -> double {
   return length;
 }
 
@@ -45,7 +47,7 @@ using TestWorld = World<Position, TypeList<Velocity, Health>,
 
 // Builds a world holding 16 entities: 8 bodies, 4 launchers and 4
 // interceptors.
-inline void build_small_world(lib::Out<TestWorld> world) {
+inline auto build_small_world(lib::Out<TestWorld> world) -> void {
   std::expected<void, Status> built = TestWorld::set_up()
                                           .numbered(1)
                                           .holding<Body>(8)

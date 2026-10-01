@@ -50,7 +50,7 @@ constexpr auto WALL_BUDGET = 30s;   // Per population, unless --steps is given.
 // benchmark: 10 radars, 50 launchers and 1,000 drones spawning 3 to 4 km from
 // its asset. The area grows with the population, so each radar and launcher
 // sees about as many drones at any size.
-Scenario scenario_of(int drones) {
+auto scenario_of(int drones) -> Scenario {
   constexpr int DRONES_PER_SITE = 1000;
   int sites = std::max(1, drones / DRONES_PER_SITE);
   int per_site = drones / sites;
@@ -69,8 +69,8 @@ auto schedulers_of(framework::TypeList<SystemTypes...>) {
 }
 
 template <typename... SystemTypes>
-std::array<std::string, sizeof...(SystemTypes)> names_of(
-    framework::TypeList<SystemTypes...>) {
+auto names_of(framework::TypeList<SystemTypes...>)
+    -> std::array<std::string, sizeof...(SystemTypes)> {
   auto short_name = [](std::string name) {
     std::size_t colons = name.rfind("::");
     return colons == std::string::npos ? name : name.substr(colons + 2);
@@ -81,12 +81,12 @@ std::array<std::string, sizeof...(SystemTypes)> names_of(
 // What each system's per-entity loop can read for each entity; see
 // framework::bytes_per_entity_v.
 template <typename... SystemTypes>
-std::array<std::size_t, sizeof...(SystemTypes)> bytes_of(
-    framework::TypeList<SystemTypes...>) {
+auto bytes_of(framework::TypeList<SystemTypes...>)
+    -> std::array<std::size_t, sizeof...(SystemTypes)> {
   return {framework::bytes_per_entity_v<SystemTypes>...};
 }
 
-void measure(int drones, int maximum_steps, bool budgeted) {
+auto measure(int drones, int maximum_steps, bool budgeted) -> void {
   using List = Scheduler::FlattenedSystemList;
   constexpr std::size_t SYSTEM_COUNT = List::size;
 
@@ -153,7 +153,7 @@ void measure(int drones, int maximum_steps, bool budgeted) {
 namespace {
 
 // A whole positive number, or nothing.
-std::optional<int> count_of(std::string_view text) {
+auto count_of(std::string_view text) -> std::optional<int> {
   int count = 0;
   auto [end, error] =
       std::from_chars(text.data(), text.data() + text.size(), count);
@@ -170,7 +170,7 @@ std::optional<int> count_of(std::string_view text) {
 // Without --steps, each population runs up to 500 steps or 30 s of wall time,
 // whichever comes first. Radars scan once a second, so compare runs only over
 // the same number of steps.
-int main(int argc, char** argv) {
+auto main(int argc, char** argv) -> int {
   using simon::framework::benchmark::Contention;
   int steps = simon::missile::DEFAULT_STEPS;
   bool budgeted = true;

@@ -39,15 +39,15 @@ class EntityTable final {
     free_count_ = capacity;
   }
 
-  std::size_t capacity() const { return generations_.size(); }
-  std::size_t size() const { return capacity() - free_count_; }
+  auto capacity() const -> std::size_t { return generations_.size(); }
+  auto size() const -> std::size_t { return capacity() - free_count_; }
 
-  bool alive(Entity entity) const {
+  auto alive(Entity entity) const -> bool {
     return entity.index < capacity() && alive_[entity.index] &&
            generations_[entity.index] == entity.generation;
   }
 
-  Entity create() {
+  auto create() -> Entity {
     CHECK_PRECONDITION(free_count_ > 0);
     std::uint32_t index = free_[free_head_];
     free_head_ = (free_head_ + 1) % capacity();
@@ -56,7 +56,7 @@ class EntityTable final {
     return Entity{.index = index, .generation = generations_[index]};
   }
 
-  void destroy(Entity entity) {
+  auto destroy(Entity entity) -> void {
     CHECK_PRECONDITION(alive(entity));
     alive_[entity.index] = false;
     ++generations_[entity.index];

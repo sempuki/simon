@@ -40,9 +40,9 @@ class RateGate final {
     CHECK_PRECONDITION(period_ > Duration::zero());
   }
 
-  Duration period() const { return period_; }
+  auto period() const -> Duration { return period_; }
 
-  std::optional<Firing> fire(const Step& step) {
+  auto fire(const Step& step) -> std::optional<Firing> {
     CHECK_PRECONDITION(period_ > Duration::zero());
     if (!next_) {
       next_ = step.time;

@@ -39,14 +39,14 @@ class SpatialIndex final {
   SpatialIndex(std::size_t capacity, double cell_size);
   ~SpatialIndex() = default;
 
-  std::size_t size() const { return entries_.size(); }
-  std::size_t capacity() const { return entries_.capacity(); }
-  double cell_size() const { return cell_size_; }
+  auto size() const -> std::size_t { return entries_.size(); }
+  auto capacity() const -> std::size_t { return entries_.capacity(); }
+  auto cell_size() const -> double { return cell_size_; }
 
   // Replaces the contents with `count` points, where `coordinates_of(slot)`
   // gives the point in each slot.
   template <typename CoordinatesOfType>
-  void rebuild(std::size_t count, CoordinatesOfType&& coordinates_of) {
+  auto rebuild(std::size_t count, CoordinatesOfType&& coordinates_of) -> void {
     rebuild([&](auto&& insert) {
       for (std::size_t slot = 0; slot < count; ++slot) {
         insert(static_cast<std::uint32_t>(slot), coordinates_of(slot));
@@ -57,7 +57,7 @@ class SpatialIndex final {
   // Replaces the contents with the points `for_each_point(insert)` gives, by
   // calling `insert(slot, coordinates)` once for each, with distinct slots.
   template <typename ForEachPointType>
-  void rebuild(ForEachPointType&& for_each_point) {
+  auto rebuild(ForEachPointType&& for_each_point) -> void {
     unsorted_.clear();
     buckets_.clear();
     std::ranges::fill(starts_, 0);
@@ -97,8 +97,8 @@ class SpatialIndex final {
   // Visits the slot of every point within `radius` of `center`, as
   // `visit(slot)`.
   template <typename VisitorType>
-  void within(const Coordinates& center, double radius,
-              VisitorType&& visit) const {
+  auto within(const Coordinates& center, double radius,
+              VisitorType&& visit) const -> void {
     std::optional<Box> box = box_of(center, radius);
     if (!box) {
       return;
@@ -127,8 +127,8 @@ class SpatialIndex final {
   // `accept(slot)` is true. Ties go to the lowest slot. `accept` is only asked
   // about points nearer than the best so far.
   template <typename AcceptType>
-  std::optional<std::uint32_t> nearest(const Coordinates& center, double radius,
-                                       AcceptType&& accept) const {
+  auto nearest(const Coordinates& center, double radius,
+               AcceptType&& accept) const -> std::optional<std::uint32_t> {
     std::optional<Box> box = box_of(center, radius);
     if (!box) {
       return std::nullopt;
@@ -180,7 +180,7 @@ class SpatialIndex final {
     Cell high{};
 
     // In floating point, since a box can span more cells than fit in 64 bits.
-    double cells() const {
+    auto cells() const -> double {
       double count = 1.0;
       for (std::size_t axis = 0; axis < 3; ++axis) {
         count *= static_cast<double>(high[axis] - low[axis] + 1);
@@ -189,7 +189,7 @@ class SpatialIndex final {
     }
   };
 
-  Cell cell_of(const Coordinates& point) const {
+  auto cell_of(const Coordinates& point) const -> Cell {
     return Cell{cell_index(point[0]), cell_index(point[1]),
                 cell_index(point[2])};
   }
@@ -197,7 +197,7 @@ class SpatialIndex final {
   // The cell along one axis, clamped well inside int64, so an infinite or
   // huge coordinate (such as the edge of an infinite radius) still converts
   // and stays clear of overflow in ring arithmetic.
-  std::int64_t cell_index(double coordinate) const {
+  auto cell_index(double coordinate) const -> std::int64_t {
     constexpr double LIMIT = 4.0e18;
     double scaled = std::floor(coordinate * inverse_cell_size_);
     if (std::isnan(scaled)) {
@@ -206,7 +206,7 @@ class SpatialIndex final {
     return static_cast<std::int64_t>(std::clamp(scaled, -LIMIT, LIMIT));
   }
 
-  std::uint32_t bucket_of(const Cell& cell) const {
+  auto bucket_of(const Cell& cell) const -> std::uint32_t {
     std::uint64_t hash =
         static_cast<std::uint64_t>(cell[0]) * 0x9E3779B97F4A7C15ULL ^
         static_cast<std::uint64_t>(cell[1]) * 0xC2B2AE3D27D4EB4FULL ^
@@ -215,14 +215,16 @@ class SpatialIndex final {
     return static_cast<std::uint32_t>(hash & mask_);
   }
 
-  static double squared_distance(const Coordinates& a, const Coordinates& b) {
+  static auto squared_distance(const Coordinates& a, const Coordinates& b)
+      -> double {
     double x = a[0] - b[0];
     double y = a[1] - b[1];
     double z = a[2] - b[2];
     return x * x + y * y + z * z;
   }
 
-  std::optional<Box> box_of(const Coordinates& center, double radius) const {
+  auto box_of(const Coordinates& center, double radius) const
+      -> std::optional<Box> {
     if (entries_.empty() || !(radius >= 0.0)) {  // Also refuses NaN.
       return std::nullopt;
     }
@@ -243,7 +245,8 @@ class SpatialIndex final {
 
   // A lower bound on the squared distance from `point` to any point in
   // `cell`. The slack keeps it a lower bound despite rounding in cell_of.
-  double squared_distance_to(const Cell& cell, const Coordinates& point) const {
+  auto squared_distance_to(const Cell& cell, const Coordinates& point) const
+      -> double {
     double slack = cell_size_ * 1e-9;
     double total = 0.0;
     for (std::size_t axis = 0; axis < 3; ++axis) {
@@ -259,10 +262,10 @@ class SpatialIndex final {
   // unless every point in it is farther than `limit` (squared) from `center`.
   // `limit` is a reference, so a nearest search prunes by its best so far.
   template <typename ConsiderType>
-  [[gnu::always_inline]] void visit_cell(const Cell& cell,
+  [[gnu::always_inline]] auto visit_cell(const Cell& cell,
                                          const Coordinates& center,
                                          const double& limit,
-                                         ConsiderType& consider) const {
+                                         ConsiderType& consider) const -> void {
     if (squared_distance_to(cell, center) > limit) {
       return;
     }
@@ -277,9 +280,9 @@ class SpatialIndex final {
   // Considers the cells exactly `ring` cells from `middle` (in the largest
   // axis) that lie in `box`.
   template <typename ConsiderType>
-  void visit_ring(const Box& box, const Cell& middle, std::int64_t ring,
+  auto visit_ring(const Box& box, const Cell& middle, std::int64_t ring,
                   const Coordinates& center, const double& limit,
-                  ConsiderType& consider) const {
+                  ConsiderType& consider) const -> void {
     std::int64_t x_low = std::max(box.low[0], middle[0] - ring);
     std::int64_t x_high = std::min(box.high[0], middle[0] + ring);
     std::int64_t y_low = std::max(box.low[1], middle[1] - ring);

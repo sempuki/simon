@@ -100,14 +100,14 @@ struct Sibling final {
 };
 
 template <typename SiblingType>
-void integrate(Body& body, const SiblingType& sibling) {
+auto integrate(Body& body, const SiblingType& sibling) -> void {
   for (int axis = 0; axis < 3; ++axis) {
     body.velocity[axis] += sibling.values[axis] * DT;
     body.position[axis] += body.velocity[axis] * DT;
   }
 }
 
-void integrate(Body& body) {
+auto integrate(Body& body) -> void {
   for (int axis = 0; axis < 3; ++axis) {
     body.position[axis] += body.velocity[axis] * DT;
   }
@@ -120,8 +120,8 @@ struct Visits final {
   std::uint64_t without_sibling = 0;
   std::uint64_t with_second = 0;  // For the second system, if any.
   std::uint64_t without_second = 0;
-  bool operator==(const Visits&) const = default;
-  Visits& operator+=(const Visits& that) {
+  auto operator==(const Visits&) const -> bool = default;
+  auto operator+=(const Visits& that) -> Visits& {
     with_sibling += that.with_sibling;
     without_sibling += that.without_sibling;
     with_second += that.with_second;
@@ -157,7 +157,7 @@ struct Operation final {
 // Every step's operations, in order. Step 0 creates the population.
 using Schedule = std::vector<std::vector<Operation>>;
 
-Schedule schedule_of(const Workload& workload) {
+auto schedule_of(const Workload& workload) -> Schedule {
   std::mt19937_64 engine{7};
   auto unit = [&] { return static_cast<double>(engine() >> 11) * 0x1.0p-53; };
   int steps = 1 + workload.warm_up + workload.measured;
@@ -244,16 +244,18 @@ class DenseStore final {
     data_.reserve(capacity);
   }
 
-  std::size_t size() const { return data_.size(); }
-  bool contains(Entity entity) const { return position_of(entity) != ABSENT; }
-  ComponentType* maybe_component_of(Entity entity) {
+  auto size() const -> std::size_t { return data_.size(); }
+  auto contains(Entity entity) const -> bool {
+    return position_of(entity) != ABSENT;
+  }
+  auto maybe_component_of(Entity entity) -> ComponentType* {
     std::uint32_t position = position_of(entity);
     return position != ABSENT ? &data_[position] : nullptr;
   }
-  Entity owner(std::size_t position) const { return owner_[position]; }
-  std::span<ComponentType> values() { return data_; }
+  auto owner(std::size_t position) const -> Entity { return owner_[position]; }
+  auto values() -> std::span<ComponentType> { return data_; }
 
-  void append(Entity entity, ComponentType component) {
+  auto append(Entity entity, ComponentType component) -> void {
     if (!owner_.empty() && entity.index < owner_.back().index) {
       ++disorder_;
     }
@@ -264,7 +266,7 @@ class DenseStore final {
     data_.push_back(std::move(component));
   }
 
-  void erase(Entity entity) {
+  auto erase(Entity entity) -> void {
     std::uint32_t position = position_of(entity);
     std::uint32_t last = static_cast<std::uint32_t>(data_.size() - 1);
     if (position != last) {
@@ -278,16 +280,16 @@ class DenseStore final {
     index_[entity.index] = Slot{};
   }
 
-  std::size_t disorder() const { return disorder_; }
+  auto disorder() const -> std::size_t { return disorder_; }
 
-  void sort_by_entity() {
+  auto sort_by_entity() -> void {
     sort_by([](Entity entity) { return entity.index; });
   }
 
   // Sorts by `key_of(Entity)`, which must give distinct keys, moving each
   // entity-component as the comparison sort requires.
   template <typename KeyOfType>
-  void sort_by(KeyOfType&& key_of) {
+  auto sort_by(KeyOfType&& key_of) -> void {
     std::ranges::sort(
         std::views::zip(owner_, data_), std::less<>{},
         [&](const auto& pair) { return key_of(std::get<0>(pair)); });
@@ -304,7 +306,7 @@ class DenseStore final {
     std::uint32_t generation = 0;
   };
 
-  std::uint32_t position_of(Entity entity) const {
+  auto position_of(Entity entity) const -> std::uint32_t {
     const Slot& slot = index_[entity.index];
     return slot.generation == entity.generation ? slot.position : ABSENT;
   }
@@ -326,22 +328,24 @@ class StoreLayout final {
   explicit StoreLayout(std::size_t capacity)
       : bodies_{capacity, capacity}, siblings_{capacity, capacity} {}
 
-  void create(Entity entity, bool sibling) {
+  auto create(Entity entity, bool sibling) -> void {
     bodies_.append(entity, Body{});
     if (sibling) {
       siblings_.append(entity, SiblingType{});
     }
   }
-  void destroy(Entity entity) {
+  auto destroy(Entity entity) -> void {
     bodies_.erase(entity);
     if (siblings_.contains(entity)) {
       siblings_.erase(entity);
     }
   }
-  void attach(Entity entity) { siblings_.append(entity, SiblingType{}); }
-  void detach(Entity entity) { siblings_.erase(entity); }
+  auto attach(Entity entity) -> void {
+    siblings_.append(entity, SiblingType{});
+  }
+  auto detach(Entity entity) -> void { siblings_.erase(entity); }
 
-  void maintain(int) {
+  auto maintain(int) -> void {
     if constexpr (SORTED) {
       constexpr std::size_t DISORDER_SHARE = 8;
       if (bodies_.disorder() * DISORDER_SHARE > bodies_.size()) {
@@ -353,7 +357,7 @@ class StoreLayout final {
     }
   }
 
-  Visits iterate() {
+  auto iterate() -> Visits {
     Visits visits;
     auto bodies = bodies_.values();
     for (std::size_t i = 0; i < bodies.size(); ++i) {
@@ -370,7 +374,7 @@ class StoreLayout final {
   }
 
   // An entity index slot, an owner and a value per entity, in each store.
-  static constexpr std::size_t bytes_per_entity() {
+  static constexpr auto bytes_per_entity() -> std::size_t {
     return 2 * 8 + sizeof(Entity) + sizeof(Body) + sizeof(Entity) +
            sizeof(SiblingType);
   }
@@ -391,7 +395,7 @@ class GroupLayout final {
     siblings_.reserve(capacity);
   }
 
-  void create(Entity entity, bool sibling) {
+  auto create(Entity entity, bool sibling) -> void {
     position_[entity.index] = static_cast<std::uint32_t>(bodies_.size());
     owners_.push_back(entity);
     bodies_.push_back(Body{});
@@ -399,7 +403,7 @@ class GroupLayout final {
       attach(entity);
     }
   }
-  void destroy(Entity entity) {
+  auto destroy(Entity entity) -> void {
     if (position_[entity.index] < group_) {
       detach(entity);
     }
@@ -410,14 +414,14 @@ class GroupLayout final {
     position_[entity.index] = ABSENT;
   }
   // Moves the body to the group's end, and appends the sibling beside it.
-  void attach(Entity entity) {
+  auto attach(Entity entity) -> void {
     swap_bodies(position_[entity.index], group_);
     siblings_.push_back(SiblingType{});
     ++group_;
   }
   // Moves the body and sibling to the group's last position, then shrinks the
   // group past them.
-  void detach(Entity entity) {
+  auto detach(Entity entity) -> void {
     std::uint32_t position = position_[entity.index];
     std::uint32_t last = group_ - 1;
     if (position != last) {
@@ -428,9 +432,9 @@ class GroupLayout final {
     --group_;
   }
 
-  void maintain(int) {}
+  auto maintain(int) -> void {}
 
-  Visits iterate() {
+  auto iterate() -> Visits {
     Visits visits;
     for (std::uint32_t i = 0; i < group_; ++i) {
       integrate(bodies_[i], siblings_[i]);
@@ -443,22 +447,22 @@ class GroupLayout final {
     return visits;
   }
 
-  static constexpr std::size_t bytes_per_entity() {
+  static constexpr auto bytes_per_entity() -> std::size_t {
     return 4 + sizeof(Entity) + sizeof(Body) + sizeof(SiblingType);
   }
 
   // Every body, group first, for another system to walk.
-  std::size_t size() const { return bodies_.size(); }
-  std::uint32_t position_of(Entity entity) const {
+  auto size() const -> std::size_t { return bodies_.size(); }
+  auto position_of(Entity entity) const -> std::uint32_t {
     return position_[entity.index];
   }
   // How many bodies swaps have moved, ever.
-  std::uint64_t moves() const { return moves_; }
-  Entity owner(std::size_t position) const { return owners_[position]; }
-  Body& body(std::size_t position) { return bodies_[position]; }
+  auto moves() const -> std::uint64_t { return moves_; }
+  auto owner(std::size_t position) const -> Entity { return owners_[position]; }
+  auto body(std::size_t position) -> Body& { return bodies_[position]; }
 
  private:
-  void swap_bodies(std::uint32_t a, std::uint32_t b) {
+  auto swap_bodies(std::uint32_t a, std::uint32_t b) -> void {
     if (a == b) {
       return;
     }
@@ -492,20 +496,26 @@ class GenerationalStore final {
     candidates_.reserve(capacity);
   }
 
-  std::size_t size() const { return main_.data.size(); }
-  bool live(std::size_t position) const { return main_.live[position]; }
-  Entity owner(std::size_t position) const { return main_.owner[position]; }
-  ComponentType& data(std::size_t position) { return main_.data[position]; }
+  auto size() const -> std::size_t { return main_.data.size(); }
+  auto live(std::size_t position) const -> bool { return main_.live[position]; }
+  auto owner(std::size_t position) const -> Entity {
+    return main_.owner[position];
+  }
+  auto data(std::size_t position) -> ComponentType& {
+    return main_.data[position];
+  }
 
-  ComponentType* maybe_component_of(Entity entity) {
+  auto maybe_component_of(Entity entity) -> ComponentType* {
     std::uint32_t position = index_[entity.index];
     return position != ABSENT && main_.owner[position] == entity
                ? &main_.data[position]
                : nullptr;
   }
-  bool contains(Entity entity) { return maybe_component_of(entity) != nullptr; }
+  auto contains(Entity entity) -> bool {
+    return maybe_component_of(entity) != nullptr;
+  }
 
-  void append(Entity entity, ComponentType component, int step) {
+  auto append(Entity entity, ComponentType component, int step) -> void {
     index_[entity.index] = static_cast<std::uint32_t>(size());
     main_.owner.push_back(entity);
     main_.data.push_back(std::move(component));
@@ -514,7 +524,7 @@ class GenerationalStore final {
   }
 
   // Swap-erases within the nursery; leaves a tombstone in the settled region.
-  void erase(Entity entity) {
+  auto erase(Entity entity) -> void {
     std::uint32_t position = index_[entity.index];
     index_[entity.index] = ABSENT;
     if (position < settled_) {
@@ -537,7 +547,7 @@ class GenerationalStore final {
 
   // Merges nursery survivors at least `minimum_age` steps old into the settled
   // region, removing tombstones, once they amount to 1 in 8 of it.
-  void maintain(int step, int minimum_age) {
+  auto maintain(int step, int minimum_age) -> void {
     constexpr std::size_t DISORDER_SHARE = 8;
     candidates_.clear();
     for (std::size_t i = settled_; i < size(); ++i) {
@@ -590,7 +600,7 @@ class GenerationalStore final {
   }
 
   // Both copies of the arrays, and an index slot.
-  static constexpr std::size_t bytes_per_entity() {
+  static constexpr auto bytes_per_entity() -> std::size_t {
     return 4 + 2 * (sizeof(Entity) + sizeof(ComponentType) + 4 + 1);
   }
 
@@ -600,7 +610,7 @@ class GenerationalStore final {
     std::vector<ComponentType> data;
     std::vector<int> born;
     std::vector<bool> live;
-    void clear() {
+    auto clear() -> void {
       owner.clear();
       data.clear();
       born.clear();
@@ -628,29 +638,31 @@ class GenerationalLayout final {
   explicit GenerationalLayout(std::size_t capacity)
       : bodies_{capacity, capacity}, siblings_{capacity, capacity} {}
 
-  void set_step(int step) { step_ = step; }
+  auto set_step(int step) -> void { step_ = step; }
 
-  void create(Entity entity, bool sibling) {
+  auto create(Entity entity, bool sibling) -> void {
     bodies_.append(entity, Body{}, step_);
     if (sibling) {
       siblings_.append(entity, SiblingType{}, step_);
     }
   }
-  void destroy(Entity entity) {
+  auto destroy(Entity entity) -> void {
     bodies_.erase(entity);
     if (siblings_.contains(entity)) {
       siblings_.erase(entity);
     }
   }
-  void attach(Entity entity) { siblings_.append(entity, SiblingType{}, step_); }
-  void detach(Entity entity) { siblings_.erase(entity); }
+  auto attach(Entity entity) -> void {
+    siblings_.append(entity, SiblingType{}, step_);
+  }
+  auto detach(Entity entity) -> void { siblings_.erase(entity); }
 
-  void maintain(int step) {
+  auto maintain(int step) -> void {
     bodies_.maintain(step, MINIMUM_AGE);
     siblings_.maintain(step, MINIMUM_AGE);
   }
 
-  Visits iterate() {
+  auto iterate() -> Visits {
     Visits visits;
     for (std::size_t i = 0; i < bodies_.size(); ++i) {
       if (!bodies_.live(i)) {
@@ -668,7 +680,7 @@ class GenerationalLayout final {
     return visits;
   }
 
-  static constexpr std::size_t bytes_per_entity() {
+  static constexpr auto bytes_per_entity() -> std::size_t {
     return GenerationalStore<Body>::bytes_per_entity() +
            GenerationalStore<SiblingType>::bytes_per_entity();
   }
@@ -683,9 +695,9 @@ class GenerationalLayout final {
 
 // Walks `size` bodies and looks each one's sibling up in `siblings`.
 template <typename StoreType, typename BodyOfType, typename OwnerOfType>
-void walk(std::size_t size, BodyOfType&& body_of, OwnerOfType&& owner_of,
+auto walk(std::size_t size, BodyOfType&& body_of, OwnerOfType&& owner_of,
           StoreType& siblings, lib::Out<std::uint64_t> with,
-          lib::Out<std::uint64_t> without) {
+          lib::Out<std::uint64_t> without) -> void {
   for (std::size_t i = 0; i < size; ++i) {
     if (const auto* sibling = siblings.maybe_component_of(owner_of(i))) {
       integrate(body_of(i), *sibling);
@@ -707,25 +719,25 @@ class CompetingStoreLayout final {
         first_{capacity, capacity},
         second_{capacity, capacity} {}
 
-  void create(Entity entity, std::uint8_t siblings) {
+  auto create(Entity entity, std::uint8_t siblings) -> void {
     bodies_.append(entity, Body{});
     if (siblings & FIRST) first_.append(entity, FirstType{});
     if (siblings & SECOND) second_.append(entity, SecondType{});
   }
-  void destroy(Entity entity) {
+  auto destroy(Entity entity) -> void {
     bodies_.erase(entity);
     if (first_.contains(entity)) first_.erase(entity);
     if (second_.contains(entity)) second_.erase(entity);
   }
-  void attach(Entity entity, std::uint8_t which) {
+  auto attach(Entity entity, std::uint8_t which) -> void {
     which == FIRST ? first_.append(entity, FirstType{})
                    : second_.append(entity, SecondType{});
   }
-  void detach(Entity entity, std::uint8_t which) {
+  auto detach(Entity entity, std::uint8_t which) -> void {
     which == FIRST ? first_.erase(entity) : second_.erase(entity);
   }
 
-  void maintain(int) {
+  auto maintain(int) -> void {
     if constexpr (SORTED) {
       sort_if_disordered(lib::InOut(bodies_));
       sort_if_disordered(lib::InOut(first_));
@@ -733,17 +745,19 @@ class CompetingStoreLayout final {
     }
   }
 
-  Visits iterate_first() { return iterate(true, lib::InOut(first_)); }
-  Visits iterate_second() { return iterate(false, lib::InOut(second_)); }
+  auto iterate_first() -> Visits { return iterate(true, lib::InOut(first_)); }
+  auto iterate_second() -> Visits {
+    return iterate(false, lib::InOut(second_));
+  }
 
-  static constexpr std::size_t bytes_per_entity() {
+  static constexpr auto bytes_per_entity() -> std::size_t {
     return 3 * (8 + sizeof(Entity)) + sizeof(Body) + sizeof(FirstType) +
            sizeof(SecondType);
   }
 
  private:
   template <typename StoreType>
-  static void sort_if_disordered(lib::InOut<StoreType> store) {
+  static auto sort_if_disordered(lib::InOut<StoreType> store) -> void {
     constexpr std::size_t DISORDER_SHARE = 8;
     if (store->disorder() * DISORDER_SHARE > store->size()) {
       store->sort_by_entity();
@@ -751,7 +765,7 @@ class CompetingStoreLayout final {
   }
 
   template <typename StoreType>
-  Visits iterate(bool first, lib::InOut<StoreType> siblings) {
+  auto iterate(bool first, lib::InOut<StoreType> siblings) -> Visits {
     Visits visits;
     auto bodies = bodies_.values();
     walk(
@@ -776,33 +790,33 @@ class CompetingGroupLayout final {
   explicit CompetingGroupLayout(std::size_t capacity)
       : group_{capacity}, second_{capacity, capacity} {}
 
-  void create(Entity entity, std::uint8_t siblings) {
+  auto create(Entity entity, std::uint8_t siblings) -> void {
     group_.create(entity, (siblings & FIRST) != 0);
     if (siblings & SECOND) {
       second_.append(entity, SecondType{});
       ++churn_;
     }
   }
-  void destroy(Entity entity) {
+  auto destroy(Entity entity) -> void {
     group_.destroy(entity);
     if (second_.contains(entity)) {
       second_.erase(entity);
       ++churn_;
     }
   }
-  void attach(Entity entity, std::uint8_t which) {
+  auto attach(Entity entity, std::uint8_t which) -> void {
     which == FIRST ? group_.attach(entity)
                    : second_.append(entity, SecondType{});
     churn_ += which == SECOND;
   }
-  void detach(Entity entity, std::uint8_t which) {
+  auto detach(Entity entity, std::uint8_t which) -> void {
     which == FIRST ? group_.detach(entity) : second_.erase(entity);
     churn_ += which == SECOND;
   }
 
   // Counts both the second store's own churn and bodies moved by the group,
   // since either puts the store out of the order the second system walks.
-  void maintain(int) {
+  auto maintain(int) -> void {
     if constexpr (HYBRID) {
       constexpr std::size_t DISORDER_SHARE = 8;
       std::uint64_t disorder = churn_ + group_.moves() - moves_at_sort_;
@@ -815,8 +829,8 @@ class CompetingGroupLayout final {
     }
   }
 
-  Visits iterate_first() { return group_.iterate(); }
-  Visits iterate_second() {
+  auto iterate_first() -> Visits { return group_.iterate(); }
+  auto iterate_second() -> Visits {
     Visits visits;
     walk(
         group_.size(), [&](std::size_t i) -> Body& { return group_.body(i); },
@@ -825,7 +839,7 @@ class CompetingGroupLayout final {
     return visits;
   }
 
-  static constexpr std::size_t bytes_per_entity() {
+  static constexpr auto bytes_per_entity() -> std::size_t {
     return GroupLayout<FirstType>::bytes_per_entity() + 8 + sizeof(Entity) +
            sizeof(SecondType);
   }
@@ -852,14 +866,14 @@ class ChunkPool final {
     }
   }
 
-  std::uint32_t take() {
+  auto take() -> std::uint32_t {
     CHECK_PRECONDITION(!free_.empty());
     std::uint32_t chunk = free_.back();
     free_.pop_back();
     return chunk;
   }
-  void give(std::uint32_t chunk) { free_.push_back(chunk); }
-  ComponentType* chunk(std::uint32_t chunk) {
+  auto give(std::uint32_t chunk) -> void { free_.push_back(chunk); }
+  auto chunk(std::uint32_t chunk) -> ComponentType* {
     return data_.data() + std::size_t{chunk} * CHUNK;
   }
 
@@ -874,25 +888,27 @@ class Segment final {
  public:
   explicit Segment(std::size_t chunks) { chunks_.reserve(chunks); }
 
-  ComponentType& at(std::uint32_t local,
-                    lib::InOut<ChunkPool<ComponentType>> pool) {
+  auto at(std::uint32_t local, lib::InOut<ChunkPool<ComponentType>> pool)
+      -> ComponentType& {
     return pool->chunk(chunks_[local / CHUNK])[local % CHUNK];
   }
   // Makes room for local index `count` before it is used.
-  void grow(std::uint32_t count, lib::InOut<ChunkPool<ComponentType>> pool) {
+  auto grow(std::uint32_t count, lib::InOut<ChunkPool<ComponentType>> pool)
+      -> void {
     if (count % CHUNK == 0) {
       chunks_.push_back(pool->take());
     }
   }
   // Returns the last chunk once `count` entries no longer reach it.
-  void shrink(std::uint32_t count, lib::InOut<ChunkPool<ComponentType>> pool) {
+  auto shrink(std::uint32_t count, lib::InOut<ChunkPool<ComponentType>> pool)
+      -> void {
     if (count % CHUNK == 0) {
       pool->give(chunks_.back());
       chunks_.pop_back();
     }
   }
-  std::uint32_t chunk(std::size_t i) const { return chunks_[i]; }
-  std::size_t chunks() const { return chunks_.size(); }
+  auto chunk(std::size_t i) const -> std::uint32_t { return chunks_[i]; }
+  auto chunks() const -> std::size_t { return chunks_.size(); }
 
  private:
   std::vector<std::uint32_t> chunks_;
@@ -919,14 +935,14 @@ class SegmentedLayout final {
   }
 
   // The single-sibling interface.
-  void create(Entity entity, bool sibling) {
+  auto create(Entity entity, bool sibling) -> void {
     create(entity, static_cast<std::uint8_t>(sibling ? FIRST : 0));
   }
-  void attach(Entity entity) { attach(entity, FIRST); }
-  void detach(Entity entity) { detach(entity, FIRST); }
-  Visits iterate() { return iterate_first(); }
+  auto attach(Entity entity) -> void { attach(entity, FIRST); }
+  auto detach(Entity entity) -> void { detach(entity, FIRST); }
+  auto iterate() -> Visits { return iterate_first(); }
 
-  void create(Entity entity, std::uint8_t siblings) {
+  auto create(Entity entity, std::uint8_t siblings) -> void {
     Archetype& archetype = archetypes_[siblings];
     std::uint32_t local = archetype.count;
     archetype.body.grow(local, lib::InOut(bodies_));
@@ -946,7 +962,7 @@ class SegmentedLayout final {
   }
 
   // Moves the segment's last entity into the gap, in every column.
-  void destroy(Entity entity) {
+  auto destroy(Entity entity) -> void {
     Location location = location_[entity.index];
     Archetype& archetype = archetypes_[location.archetype];
     std::uint32_t last = --archetype.count;
@@ -974,25 +990,25 @@ class SegmentedLayout final {
     if (allowed_second_.contains(entity)) allowed_second_.erase(entity);
   }
 
-  void attach(Entity entity, std::uint8_t which) {
+  auto attach(Entity entity, std::uint8_t which) -> void {
     which == FIRST ? allowed_first_.append(entity, FirstType{})
                    : allowed_second_.append(entity, SecondType{});
   }
-  void detach(Entity entity, std::uint8_t which) {
+  auto detach(Entity entity, std::uint8_t which) -> void {
     which == FIRST ? allowed_first_.erase(entity)
                    : allowed_second_.erase(entity);
   }
 
-  void maintain(int) {}
+  auto maintain(int) -> void {}
 
-  Visits iterate_first() {
+  auto iterate_first() -> Visits {
     Visits visits;
     walk<FIRST>(&Archetype::first, allowed_first_, lib::InOut(firsts_),
                 lib::Out(visits.with_sibling),
                 lib::Out(visits.without_sibling));
     return visits;
   }
-  Visits iterate_second()
+  auto iterate_second() -> Visits
     requires COMPETING
   {
     Visits visits;
@@ -1003,7 +1019,7 @@ class SegmentedLayout final {
 
   // Columns, owners and a location per entity, plus the sparse stores for
   // Allowed siblings.
-  static constexpr std::size_t bytes_per_entity() {
+  static constexpr auto bytes_per_entity() -> std::size_t {
     return 8 + sizeof(Entity) + sizeof(Body) + sizeof(FirstType) +
            (8 + sizeof(Entity) + sizeof(FirstType)) +
            (COMPETING
@@ -1028,7 +1044,7 @@ class SegmentedLayout final {
   };
 
   // Enough chunks for every entity, plus a partly filled one per archetype.
-  static std::size_t chunks_for(std::size_t capacity) {
+  static auto chunks_for(std::size_t capacity) -> std::size_t {
     return (capacity + CHUNK - 1) / CHUNK + ARCHETYPES;
   }
 
@@ -1036,10 +1052,11 @@ class SegmentedLayout final {
   // Requires the sibling, it sits at the same slot of the matching chunk;
   // otherwise it is Allowed, and looked up in the sparse store.
   template <std::uint8_t WHICH, typename SiblingType>
-  void walk(Segment<SiblingType> Archetype::* sibling_segment,
+  auto walk(Segment<SiblingType> Archetype::* sibling_segment,
             const ComponentStore<SiblingType>& allowed,
             lib::InOut<ChunkPool<SiblingType>> pool,
-            lib::Out<std::uint64_t> with, lib::Out<std::uint64_t> without) {
+            lib::Out<std::uint64_t> with, lib::Out<std::uint64_t> without)
+      -> void {
     for (std::uint8_t id = 0; id < ARCHETYPES; ++id) {
       Archetype& archetype = archetypes_[id];
       for (std::size_t chunk = 0; chunk < archetype.body.chunks(); ++chunk) {
@@ -1094,7 +1111,7 @@ struct Result final {
 };
 
 template <typename LayoutType>
-Result measure(const Workload& workload, const Schedule& schedule) {
+auto measure(const Workload& workload, const Schedule& schedule) -> Result {
   LayoutType layout{workload.population};
   Result result;
   result.bytes_per_entity = LayoutType::bytes_per_entity();
@@ -1172,7 +1189,7 @@ Result measure(const Workload& workload, const Schedule& schedule) {
 }
 
 template <std::size_t BYTES>
-void compare(const Workload& workload) {
+auto compare(const Workload& workload) -> void {
   using SiblingType = Sibling<BYTES>;
   Schedule schedule = schedule_of(workload);
   std::size_t operations = 0;
@@ -1212,7 +1229,7 @@ void compare(const Workload& workload) {
 }
 
 template <std::size_t BYTES>
-void compare_competing(Workload workload) {
+auto compare_competing(Workload workload) -> void {
   using FirstType = Sibling<BYTES>;
   using SecondType = Sibling<BYTES>;
   workload.second_share = 0.5;
@@ -1254,7 +1271,7 @@ void compare_competing(Workload workload) {
 }  // namespace
 }  // namespace simon::framework
 
-int main(int argc, char** argv) {
+auto main(int argc, char** argv) -> int {
   using namespace simon::framework;
   unsigned threads = 0;
   bool competing_only = false;

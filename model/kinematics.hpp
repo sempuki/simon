@@ -30,28 +30,30 @@ struct Orientation final {
   Quaternion orientation = Quaternion::Identity();
 };
 
-inline Length distance(const Kinematics& a, const Kinematics& b) {
+inline auto distance(const Kinematics& a, const Kinematics& b) -> Length {
   return norm(a.position - b.position);
 }
 
 // Coordinates for a spatial index, in meters.
-inline framework::Coordinates coordinates(const Position& position) {
+inline auto coordinates(const Position& position) -> framework::Coordinates {
   const Vector3d& meters = position.numerical_value_ref_in(meter);
   return {meters.x(), meters.y(), meters.z()};
 }
-inline framework::Coordinates coordinates(const Kinematics& kinematics) {
+inline auto coordinates(const Kinematics& kinematics)
+    -> framework::Coordinates {
   return coordinates(kinematics.position);
 }
-inline double coordinate_length(const Kinematics&, Length length) {
+inline auto coordinate_length(const Kinematics&, Length length) -> double {
   return length.numerical_value_in(meter);
 }
 
 // A point mass has no attitude of its own, so its orientation is the
 // identity.
-inline Pose pose(const Kinematics& kinematics) {
+inline auto pose(const Kinematics& kinematics) -> Pose {
   return Pose{.position = kinematics.position};
 }
-inline Pose pose(const Kinematics& kinematics, const Orientation& orientation) {
+inline auto pose(const Kinematics& kinematics, const Orientation& orientation)
+    -> Pose {
   return Pose{.position = kinematics.position,
               .orientation = orientation.orientation};
 }
@@ -64,8 +66,8 @@ struct Control final {
 
 // Advances `kinematics` by `dt` under constant `acceleration`, using the
 // midpoint method (exact for constant acceleration).
-inline void integrate_midpoint(const Acceleration& acceleration, Time dt,
-                               lib::InOut<Kinematics> kinematics) {
+inline auto integrate_midpoint(const Acceleration& acceleration, Time dt,
+                               lib::InOut<Kinematics> kinematics) -> void {
   Velocity mid_velocity = kinematics->velocity + acceleration * (dt * 0.5);
   kinematics->position += mid_velocity * dt;
   kinematics->velocity += acceleration * dt;

@@ -33,61 +33,64 @@ class Vector3d final {
   explicit Vector3d(const Eigen::MatrixBase<DerivedType>& value)
       : value_{value} {}
 
-  const Eigen::Vector3d& eigen() const { return value_; }
+  auto eigen() const -> const Eigen::Vector3d& { return value_; }
 
-  double x() const { return value_.x(); }
-  double y() const { return value_.y(); }
-  double z() const { return value_.z(); }
+  auto x() const -> double { return value_.x(); }
+  auto y() const -> double { return value_.y(); }
+  auto z() const -> double { return value_.z(); }
 
-  bool is_approximately(const Vector3d& that, double precision = 1e-12) const {
+  auto is_approximately(const Vector3d& that, double precision = 1e-12) const
+      -> bool {
     return value_.isApprox(that.value_, precision) ||
            (value_ - that.value_).norm() <= precision;
   }
 
-  friend Vector3d operator-(const Vector3d& a) { return Vector3d{-a.value_}; }
-  friend Vector3d operator+(const Vector3d& a, const Vector3d& b) {
+  friend auto operator-(const Vector3d& a) -> Vector3d {
+    return Vector3d{-a.value_};
+  }
+  friend auto operator+(const Vector3d& a, const Vector3d& b) -> Vector3d {
     return Vector3d{a.value_ + b.value_};
   }
-  friend Vector3d operator-(const Vector3d& a, const Vector3d& b) {
+  friend auto operator-(const Vector3d& a, const Vector3d& b) -> Vector3d {
     return Vector3d{a.value_ - b.value_};
   }
-  friend Vector3d operator*(const Vector3d& a, double scale) {
+  friend auto operator*(const Vector3d& a, double scale) -> Vector3d {
     return Vector3d{a.value_ * scale};
   }
-  friend Vector3d operator*(double scale, const Vector3d& a) {
+  friend auto operator*(double scale, const Vector3d& a) -> Vector3d {
     return Vector3d{scale * a.value_};
   }
-  friend Vector3d operator/(const Vector3d& a, double scale) {
+  friend auto operator/(const Vector3d& a, double scale) -> Vector3d {
     return Vector3d{a.value_ / scale};
   }
 
-  Vector3d& operator+=(const Vector3d& that) {
+  auto operator+=(const Vector3d& that) -> Vector3d& {
     value_ += that.value_;
     return *this;
   }
-  Vector3d& operator-=(const Vector3d& that) {
+  auto operator-=(const Vector3d& that) -> Vector3d& {
     value_ -= that.value_;
     return *this;
   }
-  Vector3d& operator*=(double scale) {
+  auto operator*=(double scale) -> Vector3d& {
     value_ *= scale;
     return *this;
   }
-  Vector3d& operator/=(double scale) {
+  auto operator/=(double scale) -> Vector3d& {
     value_ /= scale;
     return *this;
   }
 
-  friend bool operator==(const Vector3d& a, const Vector3d& b) {
+  friend auto operator==(const Vector3d& a, const Vector3d& b) -> bool {
     return a.value_ == b.value_;
   }
 
   // Found by mp_units::magnitude through argument-dependent lookup.
-  friend double magnitude(const Vector3d& a) { return a.value_.norm(); }
-  friend double dot(const Vector3d& a, const Vector3d& b) {
+  friend auto magnitude(const Vector3d& a) -> double { return a.value_.norm(); }
+  friend auto dot(const Vector3d& a, const Vector3d& b) -> double {
     return a.value_.dot(b.value_);
   }
-  friend Vector3d cross(const Vector3d& a, const Vector3d& b) {
+  friend auto cross(const Vector3d& a, const Vector3d& b) -> Vector3d {
     return Vector3d{a.value_.cross(b.value_)};
   }
 
@@ -117,19 +120,21 @@ using Acceleration = units::quantity<meter_per_second_squared, Vector3d>;
 // Cartesian frame.
 using Position = Displacement;
 
-inline Displacement meters(double x, double y, double z) {
+inline auto meters(double x, double y, double z) -> Displacement {
   return Vector3d{x, y, z} * meter;
 }
-inline Velocity meters_per_second(double x, double y, double z) {
+inline auto meters_per_second(double x, double y, double z) -> Velocity {
   return Vector3d{x, y, z} * meter_per_second;
 }
-inline Acceleration meters_per_second_squared(double x, double y, double z) {
+inline auto meters_per_second_squared(double x, double y, double z)
+    -> Acceleration {
   return Vector3d{x, y, z} * meter_per_second_squared;
 }
 
 // A std::chrono duration as seconds.
 template <typename RepresentationType, typename PeriodType>
-Time seconds(std::chrono::duration<RepresentationType, PeriodType> duration) {
+auto seconds(std::chrono::duration<RepresentationType, PeriodType> duration)
+    -> Time {
   return std::chrono::duration<double>(duration).count() * second;
 }
 

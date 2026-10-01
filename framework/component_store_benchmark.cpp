@@ -32,25 +32,25 @@ class StableSlotStore final {
   explicit StableSlotStore(std::size_t entity_capacity)
       : slots_(entity_capacity) {}
 
-  ComponentType* maybe_component_of(Entity entity) {
+  auto maybe_component_of(Entity entity) -> ComponentType* {
     Slot& slot = slots_[entity.index];
     return slot.generation == entity.generation ? &slot.value : nullptr;
   }
 
-  void append(Entity entity, ComponentType component) {
+  auto append(Entity entity, ComponentType component) -> void {
     Slot& slot = slots_[entity.index];
     CHECK_PRECONDITION(slot.generation == 0);
     slot = Slot{.value = std::move(component), .generation = entity.generation};
   }
 
-  void erase(Entity entity) {
+  auto erase(Entity entity) -> void {
     Slot& slot = slots_[entity.index];
     CHECK_PRECONDITION(slot.generation == entity.generation);
     slot.generation = 0;
   }
 
   template <typename VisitorType>
-  void for_each(VisitorType&& visit) {
+  auto for_each(VisitorType&& visit) -> void {
     for (Slot& slot : slots_) {
       if (slot.generation != 0) {
         visit(slot.value);
@@ -75,12 +75,12 @@ struct Body final {
 };
 
 template <typename Type>
-void keep(const Type& value) {
+auto keep(const Type& value) -> void {
   asm volatile("" : : "g"(&value) : "memory");
 }
 
 template <typename FunctionType>
-double median_nanoseconds(FunctionType&& function, int repetitions) {
+auto median_nanoseconds(FunctionType&& function, int repetitions) -> double {
   std::vector<double> samples;
   for (int i = 0; i < repetitions; ++i) {
     auto start = std::chrono::steady_clock::now();
@@ -103,9 +103,9 @@ struct Population final {
   std::vector<Entity> destroyed;
 };
 
-Population make_population(std::size_t count, double churn,
-                           lib::InOut<EntityTable> table,
-                           lib::InOut<std::mt19937> random) {
+auto make_population(std::size_t count, double churn,
+                     lib::InOut<EntityTable> table,
+                     lib::InOut<std::mt19937> random) -> Population {
   Population population;
   for (std::size_t i = 0; i < count; ++i) {
     population.live.push_back(table->create());
@@ -119,8 +119,9 @@ Population make_population(std::size_t count, double churn,
 }
 
 template <typename StoreType, typename IterateType>
-Result measure(const Population& population, IterateType&& iterate,
-               lib::InOut<StoreType> store, lib::InOut<std::mt19937> random) {
+auto measure(const Population& population, IterateType&& iterate,
+             lib::InOut<StoreType> store, lib::InOut<std::mt19937> random)
+    -> Result {
   constexpr double DT = 0.01;
   int repetitions = population.live.size() < 50'000 ? 200 : 40;
 
@@ -153,7 +154,8 @@ Result measure(const Population& population, IterateType&& iterate,
 
 // Appends every entity in creation order, then erases the destroyed ones.
 template <typename StoreType>
-void populate(const Population& population, lib::InOut<StoreType> store) {
+auto populate(const Population& population, lib::InOut<StoreType> store)
+    -> void {
   std::vector<Entity> all = population.live;
   all.insert(all.end(), population.destroyed.begin(),
              population.destroyed.end());
@@ -166,8 +168,8 @@ void populate(const Population& population, lib::InOut<StoreType> store) {
   }
 }
 
-Result measure_dense(std::size_t count, double churn,
-                     lib::InOut<std::mt19937> random) {
+auto measure_dense(std::size_t count, double churn,
+                   lib::InOut<std::mt19937> random) -> Result {
   EntityTable table{count};
   Population population =
       make_population(count, churn, lib::InOut(table), random);
@@ -181,8 +183,8 @@ Result measure_dense(std::size_t count, double churn,
       lib::InOut(store), random);
 }
 
-Result measure_stable(std::size_t count, double churn,
-                      lib::InOut<std::mt19937> random) {
+auto measure_stable(std::size_t count, double churn,
+                    lib::InOut<std::mt19937> random) -> Result {
   EntityTable table{count};
   Population population =
       make_population(count, churn, lib::InOut(table), random);
@@ -196,7 +198,7 @@ Result measure_stable(std::size_t count, double churn,
 }  // namespace
 }  // namespace simon::framework
 
-int main() {
+auto main() -> int {
   using namespace simon::framework;
   std::mt19937 random{42};
   std::println("{:>8} {:>6} | {:>14} {:>14} | {:>14} {:>14}", "entities",

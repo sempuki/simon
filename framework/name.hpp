@@ -46,12 +46,13 @@ class TaggedString final {
   TaggedString(const SourceType& text)  // NOLINT(google-explicit-constructor)
       : value_{std::string_view{text}} {}
 
-  std::string_view view() const { return value_; }
-  const std::string& string() const { return value_; }
-  bool empty() const { return value_.empty(); }
+  auto view() const -> std::string_view { return value_; }
+  auto string() const -> const std::string& { return value_; }
+  auto empty() const -> bool { return value_.empty(); }
 
   friend auto operator<=>(const TaggedString&, const TaggedString&) = default;
-  friend bool operator==(const TaggedString&, const TaggedString&) = default;
+  friend auto operator==(const TaggedString&, const TaggedString&)
+      -> bool = default;
 
  private:
   std::string value_;
@@ -77,24 +78,24 @@ struct Name final {
   friend constexpr auto operator<=>(const Name&, const Name&) = default;
 };
 
-constexpr Name entity_component_name(std::uint32_t component,
-                                     std::uint32_t entity) {
+constexpr auto entity_component_name(std::uint32_t component,
+                                     std::uint32_t entity) -> Name {
   Name name{Kind::ENTITY_COMPONENT, entity};
   name.kind += component;
   return name;
 }
 
-constexpr bool is_entity_component(Name name) {
+constexpr auto is_entity_component(Name name) -> bool {
   return name.kind >= static_cast<std::uint32_t>(Kind::ENTITY_COMPONENT);
 }
 
 // The world's component number of an entity-component name.
-constexpr std::uint32_t component_of(Name name) {
+constexpr auto component_of(Name name) -> std::uint32_t {
   return name.kind - static_cast<std::uint32_t>(Kind::ENTITY_COMPONENT);
 }
 
 // The canonical identity of `name` in world number `world`.
-Identity identity_of(std::uint32_t world, Name name);
+auto identity_of(std::uint32_t world, Name name) -> Identity;
 
 struct ParsedIdentity final {
   std::uint32_t world = 0;
@@ -102,13 +103,13 @@ struct ParsedIdentity final {
 };
 
 // Parses an identity made by identity_of. Returns nothing for anything else.
-std::optional<ParsedIdentity> parse_identity(const Identity& given);
+auto parse_identity(const Identity& given) -> std::optional<ParsedIdentity>;
 
 }  // namespace simon::framework
 
 template <>
 struct std::hash<simon::framework::Name> final {
-  std::size_t operator()(simon::framework::Name name) const noexcept {
+  auto operator()(simon::framework::Name name) const noexcept -> std::size_t {
     return (static_cast<std::size_t>(name.kind) << 32) ^ name.instance;
   }
 };

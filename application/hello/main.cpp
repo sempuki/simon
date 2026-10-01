@@ -13,7 +13,7 @@
 
 using namespace simon;
 
-int main(int, char**) {
+auto main(int, char**) -> int {
   // Setup SDL. Prefer Wayland: SDL2 defaults to X11, where this SDL build has
   // no GPU renderer (it ships GLES2 over EGL, not GLX).
   SDL_SetHint(SDL_HINT_VIDEODRIVER, "wayland,x11,windows,cocoa");

@@ -12,7 +12,7 @@
 #include "application/missile/simulation.hpp"
 #include "engine/driver.hpp"
 
-int main(int argc, char** argv) {
+auto main(int argc, char** argv) -> int {
   using namespace simon;
   using namespace std::chrono_literals;
 

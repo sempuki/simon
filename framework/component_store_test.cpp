@@ -20,13 +20,14 @@ struct Counted final {
   Counted() { ++alive; }
   Counted(const Counted&) { ++alive; }
   Counted(Counted&&) noexcept { ++alive; }
-  Counted& operator=(const Counted&) = default;
-  Counted& operator=(Counted&&) noexcept = default;
+  auto operator=(const Counted&) -> Counted& = default;
+  auto operator=(Counted&&) noexcept -> Counted& = default;
   ~Counted() { --alive; }
 };
 
 template <typename ComponentType>
-std::vector<Entity> owners_of(const ComponentStore<ComponentType>& store) {
+auto owners_of(const ComponentStore<ComponentType>& store)
+    -> std::vector<Entity> {
   std::vector<Entity> owners;
   store.for_each(
       [&](Entity owner, const ComponentType&) { owners.push_back(owner); });

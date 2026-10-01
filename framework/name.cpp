@@ -13,7 +13,7 @@
 
 namespace simon::framework {
 
-Identity identity_of(std::uint32_t world, Name name) {
+auto identity_of(std::uint32_t world, Name name) -> Identity {
   if (is_entity_component(name)) {
     return std::format("/world/{}/entity/{}/component/{}", world, name.instance,
                        component_of(name));
@@ -36,7 +36,7 @@ Identity identity_of(std::uint32_t world, Name name) {
   return {};
 }
 
-std::optional<ParsedIdentity> parse_identity(const Identity& given) {
+auto parse_identity(const Identity& given) -> std::optional<ParsedIdentity> {
   std::string_view identity = given.view();
   // Exactly what identity_of makes, so a parsed identity formats back to the
   // same string: no trailing slash.

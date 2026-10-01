@@ -149,7 +149,7 @@ class World<SpatialType,                  //
   // Applies every pending command, in the order it was recorded. Builders
   // validated each command against the state the world would be in, so this
   // cannot fail.
-  void sync() {
+  auto sync() -> void {
     CHECK_PRECONDITION(transaction_depth_ == 0);  // Commit or roll back first.
     std::vector<Command> commands = std::exchange(commands_, {});
     for (Command& command : commands) {
@@ -163,7 +163,7 @@ class World<SpatialType,                  //
     destroying_list_.clear();
   }
 
-  std::size_t pending() const { return commands_.size(); }
+  auto pending() const -> std::size_t { return commands_.size(); }
 
   // Groups utterances so they take effect together or not at all. Until it
   // commits, everything they planned can be rolled back: entities reserved and
@@ -191,14 +191,14 @@ class World<SpatialType,                  //
     }
 
     // Keeps what the transaction planned.
-    void commit() {
+    auto commit() -> void {
       CHECK_PRECONDITION(open_);
       open_ = false;
       world_->end_transaction();
     }
 
     // Undoes what the transaction planned, newest first.
-    void roll_back() {
+    auto roll_back() -> void {
       CHECK_PRECONDITION(open_);
       open_ = false;
       world_->roll_back_to(mark_);
@@ -224,28 +224,28 @@ class World<SpatialType,                  //
   };
 
   // Opens a transaction. See Transaction.
-  Transaction transaction() { return Transaction{*this}; }
+  auto transaction() -> Transaction { return Transaction{*this}; }
 
   //-- Read: entities and components -----------------------------------------
 
-  bool alive(Entity entity) const { return entities_.alive(entity); }
-  std::size_t size() const { return entities_.size(); }
+  auto alive(Entity entity) const -> bool { return entities_.alive(entity); }
+  auto size() const -> std::size_t { return entities_.size(); }
 
   template <typename ComponentType>
-  const ComponentStore<ComponentType>& store_of() const {
+  auto store_of() const -> const ComponentStore<ComponentType>& {
     static_assert(contains_v<ComponentList, ComponentType>,
                   "This component is not in the world's component list.");
     return std::get<ComponentStore<ComponentType>>(stores_);
   }
 
   // Known as soon as the entity is created, before sync.
-  Name archetype_of(Entity entity) const {
+  auto archetype_of(Entity entity) const -> Name {
     CHECK_PRECONDITION(alive(entity));
     return archetype_names_[archetype_of_index_[entity.index]];
   }
 
   // The entity `entity` was created under, if any. It may no longer be alive.
-  std::optional<Entity> parent_of(Entity entity) const {
+  auto parent_of(Entity entity) const -> std::optional<Entity> {
     const Parent* parent = store_of<Parent>().maybe_component_of(entity);
     return parent ? std::optional{parent->entity} : std::nullopt;
   }
@@ -256,8 +256,8 @@ class World<SpatialType,                  //
   // Spatial queries go through an index, rebuilt on the first query after the
   // spatial store changes, which is why they are not const.
   template <typename VisitorType>
-  void within(const SpatialType& center, distance_of_t<SpatialType> radius,
-              VisitorType&& visit) {
+  auto within(const SpatialType& center, distance_of_t<SpatialType> radius,
+              VisitorType&& visit) -> void {
     const ComponentStore<SpatialType>& spatial = refresh_spatial_index();
     spatial_index_.within(
         coordinates(center), coordinate_length(center, radius),
@@ -270,9 +270,8 @@ class World<SpatialType,                  //
   // `accept(Entity, const SpatialType&)` is true. Ties go to the entity in the
   // lowest store slot.
   template <typename AcceptType>
-  std::optional<Entity> nearest(const SpatialType& center,
-                                distance_of_t<SpatialType> radius,
-                                AcceptType&& accept) {
+  auto nearest(const SpatialType& center, distance_of_t<SpatialType> radius,
+               AcceptType&& accept) -> std::optional<Entity> {
     const ComponentStore<SpatialType>& spatial = refresh_spatial_index();
     std::optional<std::uint32_t> slot = spatial_index_.nearest(
         coordinates(center), coordinate_length(center, radius),
@@ -285,29 +284,29 @@ class World<SpatialType,                  //
 
   //-- Read: names, identities and aliases -----------------------------------
 
-  std::uint32_t number() const { return number_; }
-  Name name() const { return Name{Kind::WORLD, number_}; }
+  auto number() const -> std::uint32_t { return number_; }
+  auto name() const -> Name { return Name{Kind::WORLD, number_}; }
 
   // An entity's name. Known as soon as the entity is created, before sync.
-  Name name_of(Entity entity) const {
+  auto name_of(Entity entity) const -> Name {
     CHECK_PRECONDITION(alive(entity));
     return Name{Kind::ENTITY, instance_of_index_[entity.index]};
   }
 
   template <typename ComponentType>
-  static constexpr Name name_of() {
+  static constexpr auto name_of() -> Name {
     return Name{Kind::COMPONENT, component_number<ComponentType>()};
   }
 
   // The name of `entity`'s `ComponentType`, which it need not have yet.
   template <typename ComponentType>
-  Name name_of(Entity entity) const {
+  auto name_of(Entity entity) const -> Name {
     return entity_component_name(component_number<ComponentType>(),
                                  name_of(entity).instance);
   }
 
   // The live entity an entity or entity-component name refers to.
-  std::optional<Entity> entity_of(Name name) const {
+  auto entity_of(Name name) const -> std::optional<Entity> {
     if (name.kind != static_cast<std::uint32_t>(Kind::ENTITY) &&
         !is_entity_component(name)) {
       return std::nullopt;
@@ -317,12 +316,12 @@ class World<SpatialType,                  //
                                              : std::nullopt;
   }
 
-  Identity identity_of(Name name) const {
+  auto identity_of(Name name) const -> Identity {
     return framework::identity_of(number_, name);
   }
 
   // The name an identity refers to, if it names something in this world.
-  std::optional<Name> find_name_of(const Identity& identity) const {
+  auto find_name_of(const Identity& identity) const -> std::optional<Name> {
     std::optional<ParsedIdentity> parsed = parse_identity(identity);
     if (!parsed || parsed->world != number_ || !exists(parsed->name)) {
       return std::nullopt;
@@ -331,7 +330,7 @@ class World<SpatialType,                  //
   }
 
   // Every name with `alias`, in the order the aliases were given.
-  std::vector<Name> find_name_of(const Alias& alias) const {
+  auto find_name_of(const Alias& alias) const -> std::vector<Name> {
     std::vector<Name> names;
     auto [begin, end] = aliases_.equal_range(alias);
     for (auto iter = begin; iter != end; ++iter) {
@@ -341,14 +340,14 @@ class World<SpatialType,                  //
   }
 
   // Every alias `name` has, in the order they were given.
-  std::vector<Alias> aliases_of(Name name) const {
+  auto aliases_of(Name name) const -> std::vector<Alias> {
     auto iter = aliases_of_name_.find(name);
     return iter != aliases_of_name_.end() ? iter->second : std::vector<Alias>{};
   }
 
   // A one-line description for a console, e.g.
   // "/world/1/entity/2 (red) archetype ball: Kinematics, Collider".
-  std::string describe(Name name) const {
+  auto describe(Name name) const -> std::string {
     std::string text = identity_of(name).string();
     std::vector<Alias> aliases = aliases_of(name);
     for (std::size_t i = 0; i < aliases.size(); ++i) {
@@ -379,7 +378,7 @@ class World<SpatialType,                  //
   // requires, or requires or allows, `ComponentType`. Every archetype
   // requires EntityArchetype and allows Parent.
   template <typename ComponentType>
-  static constexpr bool archetype_requires(std::size_t archetype) {
+  static constexpr auto archetype_requires(std::size_t archetype) -> bool {
     constexpr std::array<bool, sizeof...(ArchetypeTypes)> TABLE{
         (contains_v<typename ArchetypeTypes::RequiredComponentList,
                     ComponentType> ||
@@ -387,7 +386,7 @@ class World<SpatialType,                  //
     return TABLE[archetype];
   }
   template <typename ComponentType>
-  static constexpr bool archetype_permits(std::size_t archetype) {
+  static constexpr auto archetype_permits(std::size_t archetype) -> bool {
     constexpr std::array<bool, sizeof...(ArchetypeTypes)> TABLE{
         (contains_v<typename ArchetypeTypes::PermittedComponentList,
                     ComponentType> ||
@@ -399,7 +398,7 @@ class World<SpatialType,                  //
   // archetype order, then one for entities whose archetype only allows it.
 
   template <typename ComponentType>
-  static constexpr std::size_t segments_of() {
+  static constexpr auto segments_of() -> std::size_t {
     std::size_t required = 0;
     for (std::size_t archetype = 0; archetype < sizeof...(ArchetypeTypes);
          ++archetype) {
@@ -411,7 +410,7 @@ class World<SpatialType,                  //
   // The segment an entity of archetype number `archetype` uses in the store
   // of `ComponentType`.
   template <typename ComponentType>
-  static constexpr std::size_t segment_of(std::size_t archetype) {
+  static constexpr auto segment_of(std::size_t archetype) -> std::size_t {
     if (!archetype_requires<ComponentType>(archetype)) {
       return segments_of<ComponentType>() - 1;
     }
@@ -427,7 +426,7 @@ class World<SpatialType,                  //
   // A store a system writes. Handing out the spatial store marks the spatial
   // index stale, since the system may move things.
   template <typename ComponentType>
-  ComponentStore<ComponentType>& mutable_store_of(SchedulerKey) {
+  auto mutable_store_of(SchedulerKey) -> ComponentStore<ComponentType>& {
     static_assert(contains_v<ComponentList, ComponentType>,
                   "This component is not in the world's component list.");
     if constexpr (std::is_same_v<ComponentType, SpatialType>) {
@@ -454,7 +453,7 @@ class World<SpatialType,                  //
   // Fills the world as `configuration` describes, discarding everything it
   // held: entities, names, aliases and pending commands. Pointers into its
   // stores no longer refer to anything.
-  void initialize(const Configuration& configuration) {
+  auto initialize(const Configuration& configuration) -> void {
     CHECK_PRECONDITION(transaction_depth_ == 0);
     number_ = configuration.number;
     entities_ = EntityTable{configuration.entities};
@@ -504,13 +503,13 @@ class World<SpatialType,                  //
   friend class Query;
 
   template <typename ComponentType>
-  static constexpr std::uint32_t component_number() {
+  static constexpr auto component_number() -> std::uint32_t {
     static_assert(contains_v<ComponentList, ComponentType>,
                   "This component is not in the world's component list.");
     return static_cast<std::uint32_t>(index_of_v<ComponentList, ComponentType>);
   }
 
-  bool exists(Name name) const {
+  auto exists(Name name) const -> bool {
     switch (static_cast<Kind>(std::min(
         name.kind, static_cast<std::uint32_t>(Kind::ENTITY_COMPONENT)))) {
       case Kind::WORLD:
@@ -536,7 +535,7 @@ class World<SpatialType,                  //
 
   // The spatial store, after bringing the index up to date with it. The
   // index's slots are positions in this store.
-  const ComponentStore<SpatialType>& refresh_spatial_index() {
+  auto refresh_spatial_index() -> const ComponentStore<SpatialType>& {
     const ComponentStore<SpatialType>& spatial = store_of<SpatialType>();
     if (!spatial_index_current_) {
       spatial_index_.rebuild([&](auto&& insert) {
@@ -552,21 +551,21 @@ class World<SpatialType,                  //
 
   // Every store of a world uses the same chunk size, so an archetype's
   // segments line up chunk for chunk.
-  static std::size_t chunk_size_of(const Configuration& configuration) {
+  static auto chunk_size_of(const Configuration& configuration) -> std::size_t {
     return ComponentStore<EntityArchetype>::default_chunk_size(
         configuration.entities);
   }
 
   template <typename ComponentType>
-  static ComponentStore<ComponentType> store_for(
-      const Configuration& configuration) {
+  static auto store_for(const Configuration& configuration)
+      -> ComponentStore<ComponentType> {
     return ComponentStore<ComponentType>{
         configuration.capacities[component_number<ComponentType>()],
         configuration.entities, segments_of<ComponentType>(),
         chunk_size_of(configuration)};
   }
 
-  bool has_component_number(Entity entity, std::uint32_t number) const {
+  auto has_component_number(Entity entity, std::uint32_t number) const -> bool {
     bool found = false;
     for_each_type(ComponentList{}, [&]<typename ComponentType>() {
       found = found || (component_number<ComponentType>() == number &&
@@ -576,7 +575,7 @@ class World<SpatialType,                  //
   }
 
   template <Archetypal ArchetypeType>
-  Name archetype_name() {
+  auto archetype_name() -> Name {
     auto [iter, inserted] =
         archetypes_.try_emplace(std::string{ArchetypeType::name});
     if (inserted) {
@@ -587,12 +586,12 @@ class World<SpatialType,                  //
     return iter->second;
   }
 
-  void give_alias(Name name, const Alias& alias) {
+  auto give_alias(Name name, const Alias& alias) -> void {
     aliases_.emplace(alias, name);
     aliases_of_name_[name].push_back(alias);
   }
 
-  void take_alias(Name name, const Alias& alias) {
+  auto take_alias(Name name, const Alias& alias) -> void {
     auto [begin, end] = aliases_.equal_range(alias);
     for (auto iter = begin; iter != end; ++iter) {
       if (iter->second == name) {
@@ -607,7 +606,7 @@ class World<SpatialType,                  //
     }
   }
 
-  bool has_alias(Name name, const Alias& alias) const {
+  auto has_alias(Name name, const Alias& alias) const -> bool {
     auto iter = aliases_of_name_.find(name);
     return iter != aliases_of_name_.end() &&
            std::ranges::contains(iter->second, alias);
@@ -615,12 +614,12 @@ class World<SpatialType,                  //
 
   //-- Transactions ------------------------------------------------------------
 
-  typename Transaction::Mark begin_transaction() {
+  auto begin_transaction() -> typename Transaction::Mark {
     ++transaction_depth_;
     return {.commands = commands_.size(), .undo = undo_.size()};
   }
 
-  void roll_back_to(const typename Transaction::Mark& mark) {
+  auto roll_back_to(const typename Transaction::Mark& mark) -> void {
     while (undo_.size() > mark.undo) {
       undo_.back()();
       undo_.pop_back();
@@ -631,7 +630,7 @@ class World<SpatialType,                  //
   }
 
   // Forgets the undo steps once the outermost transaction ends.
-  void end_transaction() {
+  auto end_transaction() -> void {
     CHECK_PRECONDITION(transaction_depth_ > 0);
     if (--transaction_depth_ == 0) {
       undo_.clear();
@@ -640,7 +639,7 @@ class World<SpatialType,                  //
 
   // Records how to undo a planned change, while a transaction is open.
   template <typename UndoType>
-  void remember(UndoType&& undo) {
+  auto remember(UndoType&& undo) -> void {
     if (transaction_depth_ > 0) {
       undo_.emplace_back(std::forward<UndoType>(undo));
     }
@@ -648,7 +647,7 @@ class World<SpatialType,                  //
 
   // Records the plan for `ComponentType` at `index` before it changes.
   template <typename ComponentType>
-  void remember_plan(std::uint32_t index) {
+  auto remember_plan(std::uint32_t index) -> void {
     if (transaction_depth_ == 0) {
       return;
     }
@@ -678,13 +677,13 @@ class World<SpatialType,                  //
     std::vector<std::uint32_t> touched;
     std::int64_t growth = 0;
 
-    void mark(std::uint32_t index, std::int8_t value) {
+    auto mark(std::uint32_t index, std::int8_t value) -> void {
       if (change[index] == 0) {
         touched.push_back(index);
       }
       change[index] = value;
     }
-    void clear() {
+    auto clear() -> void {
       for (std::uint32_t index : touched) {
         change[index] = 0;
       }
@@ -699,16 +698,16 @@ class World<SpatialType,                  //
   };
 
   template <typename ComponentType>
-  Plan<ComponentType>& plan() {
+  auto plan() -> Plan<ComponentType>& {
     return std::get<Plan<ComponentType>>(plans_);
   }
 
-  bool will_be_alive(Entity entity) const {
+  auto will_be_alive(Entity entity) const -> bool {
     return alive(entity) && !destroying_[entity.index];
   }
 
   template <typename ComponentType>
-  bool will_have(Entity entity) const {
+  auto will_have(Entity entity) const -> bool {
     std::int8_t change =
         std::get<Plan<ComponentType>>(plans_).change[entity.index];
     return change != 0 ? change > 0
@@ -716,7 +715,7 @@ class World<SpatialType,                  //
   }
 
   template <typename ComponentType>
-  bool has_room() const {
+  auto has_room() const -> bool {
     const ComponentStore<ComponentType>& components = store_of<ComponentType>();
     return static_cast<std::int64_t>(components.size()) +
                std::get<Plan<ComponentType>>(plans_).growth <
@@ -724,7 +723,7 @@ class World<SpatialType,                  //
   }
 
   template <typename... CheckedTypes>
-  std::optional<Status> check_room() const {
+  auto check_room() const -> std::optional<Status> {
     std::optional<Status> failure;
     [[maybe_unused]] auto check = [&]<typename ComponentType>() {
       if (!failure && !has_room<ComponentType>()) {
@@ -737,7 +736,7 @@ class World<SpatialType,                  //
     return failure;
   }
 
-  static std::optional<Status> check_alias(const Alias& alias) {
+  static auto check_alias(const Alias& alias) -> std::optional<Status> {
     if (alias.empty()) {
       return lib::raise(BuildError::ALIAS_INVALID, "An alias cannot be empty.");
     }
@@ -747,9 +746,9 @@ class World<SpatialType,                  //
   //-- Builders ----------------------------------------------------------------
 
   template <Archetypal ArchetypeType, typename... InitialTypes>
-  std::expected<Entity, Status> build_create(
-      const Alias& alias, std::optional<Entity> parent,
-      std::tuple<InitialTypes...> components) {
+  auto build_create(const Alias& alias, std::optional<Entity> parent,
+                    std::tuple<InitialTypes...> components)
+      -> std::expected<Entity, Status> {
     if (entities_.size() == entities_.capacity()) {
       return std::unexpected(
           lib::raise(BuildError::ENTITY_CAPACITY_EXHAUSTED,
@@ -796,9 +795,9 @@ class World<SpatialType,                  //
   }
 
   template <typename... AttachedTypes, typename... DetachedTypes>
-  std::expected<void, Status> build_change(
-      Entity entity, std::tuple<AttachedTypes...> components,
-      TypeList<DetachedTypes...>, const AliasChanges& aliases) {
+  auto build_change(Entity entity, std::tuple<AttachedTypes...> components,
+                    TypeList<DetachedTypes...>, const AliasChanges& aliases)
+      -> std::expected<void, Status> {
     if (!will_be_alive(entity)) {
       return std::unexpected(
           lib::raise(BuildError::ENTITY_NOT_ALIVE, "The entity is not alive."));
@@ -888,7 +887,7 @@ class World<SpatialType,                  //
     return {};
   }
 
-  std::expected<void, Status> build_destroy(Entity entity) {
+  auto build_destroy(Entity entity) -> std::expected<void, Status> {
     if (!will_be_alive(entity)) {
       return std::unexpected(
           lib::raise(BuildError::ENTITY_NOT_ALIVE, "The entity is not alive."));
@@ -913,7 +912,7 @@ class World<SpatialType,                  //
   // The entity's archetype must already be recorded, since it picks the
   // segment.
   template <typename ComponentType>
-  void record_attach(Entity entity, ComponentType component) {
+  auto record_attach(Entity entity, ComponentType component) -> void {
     remember_plan<ComponentType>(entity.index);
     plan<ComponentType>().mark(entity.index, +1);
     ++plan<ComponentType>().growth;
@@ -923,7 +922,7 @@ class World<SpatialType,                  //
   }
 
   template <typename ComponentType>
-  void record_detach(Entity entity) {
+  auto record_detach(Entity entity) -> void {
     remember_plan<ComponentType>(entity.index);
     plan<ComponentType>().mark(entity.index, -1);
     --plan<ComponentType>().growth;
@@ -933,7 +932,7 @@ class World<SpatialType,                  //
   //-- Applying commands -------------------------------------------------------
 
   template <typename ComponentType>
-  void apply(lib::InOut<AttachCommand<ComponentType>> command) {
+  auto apply(lib::InOut<AttachCommand<ComponentType>> command) -> void {
     CHECK_INVARIANT(alive(command->entity));
     spatial_index_current_ =
         spatial_index_current_ && !std::is_same_v<ComponentType, SpatialType>;
@@ -942,14 +941,14 @@ class World<SpatialType,                  //
   }
 
   template <typename ComponentType>
-  void apply(lib::InOut<DetachCommand<ComponentType>> command) {
+  auto apply(lib::InOut<DetachCommand<ComponentType>> command) -> void {
     CHECK_INVARIANT(alive(command->entity));
     spatial_index_current_ =
         spatial_index_current_ && !std::is_same_v<ComponentType, SpatialType>;
     std::get<ComponentStore<ComponentType>>(stores_).erase(command->entity);
   }
 
-  void apply(lib::InOut<DestroyCommand> command) {
+  auto apply(lib::InOut<DestroyCommand> command) -> void {
     Entity entity = command->entity;
     CHECK_INVARIANT(alive(entity));
     Name name = name_of(entity);

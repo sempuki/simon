@@ -63,6 +63,12 @@ ASSIGN_OR_RETURN(asset_, build_scenario(scenario_, lib::InOut(world_)));
 `ASSIGN_OR_RETURN` does the same and otherwise moves the value into an existing
 variable or a new declaration (`Entity asset`).
 
+**Functions declare a trailing return type:** `auto f(X) -> Y`, `void` ones
+included (`auto step(const Step& step) -> void`). Constructors, destructors and
+conversion operators cannot, and lambdas keep their deduced returns. lib's
+`.clang-tidy`, which simon and volcano link to, checks it with
+`modernize-use-trailing-return-type`; that check skips `void` functions.
+
 **A getter that may return null is named `maybe_*`:**
 `maybe_component_of<Health>(entity)` returns a pointer, null if the entity has
 no Health. Its non-null counterpart drops the prefix, `component_of`, and
@@ -844,7 +850,7 @@ per-entity call:
 ```cpp
 struct ClearOrigin final : System<const Health> {
   using AllowComponentList = TypeList<Position>;  // within reads Position.
-  bool prepare(auto& world) {
+  auto prepare(auto& world) -> bool {
     destroyed = world.destroy()
                     .template each<Body>()
                     .within(Position{0.0}, 2.0)
@@ -878,9 +884,9 @@ struct GuideInterceptors : System<const Interceptor, const Kinematics, Control> 
   using AllowComponentList = TypeList<Kinematics>;   // other entities, always read-only
   using LocalWorld = WorldAccess<GuideInterceptors>;
 
-  void operator()(LocalWorld& world, Entity self,
+  auto operator()(LocalWorld& world, Entity self,
                   const Interceptor& interceptor, const Kinematics* kinematics,
-                  Control* control, Step step) const {
+                  Control* control, Step step) const -> void {
     if (!kinematics || !control) return;
     const Kinematics* target = world.maybe_component_of<Kinematics>(interceptor.target);
     if (!target) { ... }
@@ -1089,7 +1095,7 @@ erasure and no virtual call:
 
 ```cpp
 template <typename... Ss>
-void run(SystemList<Ss...>, World& world, Step step) {
+auto run(SystemList<Ss...>, World& world, Step step) -> void {
   (run_system<Ss>(world, step), ...);   // each call is a direct, inlinable instantiation
 }
 ```
@@ -1470,7 +1476,7 @@ not touch every entity on the steps in between. A `prepare` stage that returns
 
 ```cpp
 // Steps without a scan have nothing to detect.
-bool prepare(LocalWorld& world) { return radars_.collect(world); }
+auto prepare(LocalWorld& world) -> bool { return radars_.collect(world); }
 ```
 
 ### Measure each system, idle and contended

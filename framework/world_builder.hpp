@@ -43,7 +43,7 @@ class [[nodiscard]] SetUpBuilder final {
   using ComponentList = typename WorldType::ComponentList;
 
   // The world's instance in its Name and Identity. Zero unless given.
-  SetUpBuilder numbered(std::uint32_t number) && {
+  auto numbered(std::uint32_t number) && -> SetUpBuilder {
     number_ = number;
     return std::move(*this);
   }
@@ -51,7 +51,7 @@ class [[nodiscard]] SetUpBuilder final {
   // Holds `count` more entities of `ArchetypeType` alive at once. Holdings add
   // up, so a scenario can count each thing that creates the archetype.
   template <Archetypal ArchetypeType>
-  SetUpBuilder holding(std::size_t count) && {
+  auto holding(std::size_t count) && -> SetUpBuilder {
     static_assert(contains_v<ArchetypeList, ArchetypeType>,
                   "This archetype is not in the world's archetype list.");
     std::size_t& holding = holdings_[index_of_v<ArchetypeList, ArchetypeType>];
@@ -61,7 +61,7 @@ class [[nodiscard]] SetUpBuilder final {
 
   // The edge of a spatial index cell. About the radius of a typical query
   // works well. One coordinate unit unless given.
-  SetUpBuilder cells_of(distance_of_t<SpatialType> size) && {
+  auto cells_of(distance_of_t<SpatialType> size) && -> SetUpBuilder {
     static_assert(std::default_initializable<SpatialType>,
                   "Sizing cells needs a default spatial component to convert "
                   "the distance with.");
@@ -71,7 +71,7 @@ class [[nodiscard]] SetUpBuilder final {
 
   // Fills `world` as planned, discarding everything it held. A refused plan
   // leaves `world` as it was.
-  std::expected<void, Status> build(lib::Out<WorldType> world) && {
+  auto build(lib::Out<WorldType> world) && -> std::expected<void, Status> {
     if (!(cell_size_ > 0.0) || !std::isfinite(cell_size_)) {
       return std::unexpected(
           lib::raise(BuildError::CELL_SIZE_INVALID,
@@ -109,7 +109,7 @@ class [[nodiscard]] SetUpBuilder final {
 
  private:
   // Sums that would wrap stay at the largest size, so build() refuses them.
-  static std::size_t add_saturating(std::size_t a, std::size_t b) {
+  static auto add_saturating(std::size_t a, std::size_t b) -> std::size_t {
     return b > std::numeric_limits<std::size_t>::max() - a
                ? std::numeric_limits<std::size_t>::max()
                : a + b;

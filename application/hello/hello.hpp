@@ -72,9 +72,9 @@ using World = framework::World<
 struct ApplyForces final
     : framework::System<Control, const Kinematics, const Thrust, const Wind,
                         const Drag> {
-  void operator()(auto&, Entity, Control& control, const Kinematics* kinematics,
+  auto operator()(auto&, Entity, Control& control, const Kinematics* kinematics,
                   const Thrust* thrust, const Wind* wind,
-                  const Drag* drag) const {
+                  const Drag* drag) const -> void {
     control.acceleration = thrust ? thrust->acceleration
                                   : meters_per_second_squared(0.0, 0.0, 0.0);
     if (kinematics && drag) {
@@ -91,16 +91,16 @@ struct DetectCollisions final
   using AllowComponentList = framework::TypeList<Kinematics, Collider>;
   using SequenceAfterSystemList = framework::SystemList<model::Integrate>;
 
-  void prepare(auto& world) {
+  auto prepare(auto& world) -> void {
     largest_radius = 0.0 * meter;
     store_of<Collider>(world).for_each([&](Entity, const Collider& collider) {
       largest_radius = std::max(largest_radius, collider.radius);
     });
   }
 
-  void operator()(auto& world, Entity self, Collision& collision,
-                  const Collider* collider,
-                  const Kinematics* kinematics) const {
+  auto operator()(auto& world, Entity self, Collision& collision,
+                  const Collider* collider, const Kinematics* kinematics) const
+      -> void {
     if (!collider || !kinematics) return;
     world.within(*kinematics, collider->radius + largest_radius,
                  [&](Entity other, const Kinematics& other_kinematics) {
@@ -129,26 +129,26 @@ struct Balls final {
 };
 
 // Builds the two balls. One meter is drawn as one screen pixel.
-Balls build_balls(lib::InOut<World> world);
+auto build_balls(lib::InOut<World> world) -> Balls;
 
 // Builds in `world` a world holding `balls` balls.
-std::expected<void, framework::Status> build_world(std::size_t balls,
-                                                   lib::Out<World> world);
+auto build_world(std::size_t balls, lib::Out<World> world)
+    -> std::expected<void, framework::Status>;
 
 // Whether any ball has collided.
-bool any_collision(const World& world);
+auto any_collision(const World& world) -> bool;
 
 // The hello simulation: builds the balls when configured, and stops at the
 // first collision. Any driver can run it.
 class Simulation final {
  public:
   // Builds the world and the two balls in it.
-  engine::PhaseResult configure();
-  engine::PhaseResult step(const framework::Step& step);
+  auto configure() -> engine::PhaseResult;
+  auto step(const framework::Step& step) -> engine::PhaseResult;
 
   // The world: empty until configured.
-  const World& world() const { return world_; }
-  const Balls& balls() const { return balls_; }
+  auto world() const -> const World& { return world_; }
+  auto balls() const -> const Balls& { return balls_; }
 
  private:
   World world_;  // Empty until configure builds it.
