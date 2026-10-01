@@ -27,7 +27,10 @@ using ProjectedWorld = framework::ProjectedWorld<SystemType, World>;
 
 // Once a second, each aircraft steers its autopilot at its route's next
 // waypoint, and moves on to the one after when it is within capture range.
-struct FollowRoute final : System<Route, const AirState, Autopilot> {
+struct FollowRoute final      //
+    : System<Route,           //
+             const AirState,  //
+             Autopilot> {
   using SystemWorld = ProjectedWorld<FollowRoute>;
 
   static constexpr Length CAPTURE = 3000.0 * model::meter;
@@ -77,11 +80,12 @@ struct AutopilotGains final {
 // Ten times a second, each aircraft's autopilot turns its targets into
 // commands: a bank for the heading, a load factor for the altitude, and a
 // throttle for the speed.
-struct FlyAutopilot final : System<Commands,              //
-                                   const AirState,        //
-                                   const Handling,        //
-                                   const FlightControls,  //
-                                   Autopilot> {
+struct FlyAutopilot final           //
+    : System<Commands,              //
+             const AirState,        //
+             const Handling,        //
+             const FlightControls,  //
+             Autopilot> {
   using SystemWorld = ProjectedWorld<FlyAutopilot>;
   using SequenceAfterSystemList = SystemList<FollowRoute>;
 
@@ -125,7 +129,10 @@ struct FlyAutopilot final : System<Commands,              //
 
 // Every step, each airframe follows its commands: the load factor and
 // throttle through first-order lags, the bank at no more than its roll rate.
-struct Actuate final : System<FlightControls, const Commands, const Handling> {
+struct Actuate final          //
+    : System<FlightControls,  //
+             const Commands,  //
+             const Handling> {
   using SystemWorld = ProjectedWorld<Actuate>;
   using SequenceAfterSystemList = SystemList<FlyAutopilot>;
 
@@ -160,7 +167,10 @@ inline auto rate_of(const AirState& state, const FlightControls& controls,
 // The default: each aircraft advances in one semi-implicit pass per step.
 // Aircraft that have an AirStateRate are Precise's, so Fly excludes them; the
 // runner skips the precise archetype's segment whole.
-struct Fly final : System<AirState, const FlightControls, const Airframe> {
+struct Fly final                    //
+    : System<AirState,              //
+             const FlightControls,  //
+             const Airframe> {
   using SystemWorld = ProjectedWorld<Fly>;
   using SequenceAfterSystemList = SystemList<Actuate>;
   using ExcludeComponentList = TypeList<AirStateRate>;
@@ -180,8 +190,11 @@ struct Fly final : System<AirState, const FlightControls, const Airframe> {
 };
 
 // The opt-in: the rate of each precise aircraft's AirState, for Continuous.
-struct PointMassRates final : System<AirStateRate, const AirState,
-                                     const FlightControls, const Airframe> {
+struct PointMassRates final         //
+    : System<AirStateRate,          //
+             const AirState,        //
+             const FlightControls,  //
+             const Airframe> {
   using SystemWorld = ProjectedWorld<PointMassRates>;
 
   auto operator()(SystemWorld&, Entity, AirStateRate& rate,

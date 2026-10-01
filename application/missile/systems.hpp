@@ -38,7 +38,8 @@ inline auto distance_between(const Position& a, const Position& b) -> Length {
 // Each radar decides whether it scans this step. What a scan finds is decided
 // by the drones and tracks themselves (DetectDrones, UpdateTracks), so each
 // entity writes only itself.
-struct ScanRadars final : System<Radar> {
+struct ScanRadars final  //
+    : System<Radar> {
   using SystemWorld = ProjectedWorld<ScanRadars>;
 
   auto operator()(SystemWorld&, Entity, Radar& radar, Step step) -> void {
@@ -106,8 +107,10 @@ class ScanningRadars final {
 // Each untracked red drone that a scanning radar covers creates its own track
 // and marks itself Tracked. The drone writes only itself and creates at most
 // one track, so however many radars see it, it gets one.
-struct DetectDrones final
-    : System<const RedDrone, const Kinematics, const Tracked> {
+struct DetectDrones final       //
+    : System<const RedDrone,    //
+             const Kinematics,  //
+             const Tracked> {
   using SystemWorld = ProjectedWorld<DetectDrones>;
   using SequenceAfterSystemList = SystemList<ScanRadars>;
   using AllowComponentList = TypeList<Kinematics, Radar>;
@@ -142,7 +145,9 @@ struct DetectDrones final
 
 // Each track updates its estimate from any radar that scanned its target this
 // step. The radars are perfect for now: the estimate is the truth.
-struct UpdateTracks final : System<Track, Estimate> {
+struct UpdateTracks final  //
+    : System<Track,        //
+             Estimate> {
   using SystemWorld = ProjectedWorld<UpdateTracks>;
   using SequenceAfterSystemList = SystemList<DetectDrones>;
   using AllowComponentList = TypeList<Kinematics, Radar>;
@@ -168,7 +173,8 @@ struct UpdateTracks final : System<Track, Estimate> {
 
 // Destroys tracks whose target is gone or has not been seen for `timeout`, and
 // unmarks a surviving target so it can be tracked again.
-struct DropStaleTracks final : System<const Track> {
+struct DropStaleTracks final  //
+    : System<const Track> {
   using SystemWorld = ProjectedWorld<DropStaleTracks>;
   using SequenceAfterSystemList = SystemList<UpdateTracks>;
 
@@ -204,8 +210,10 @@ using Sensing =
 // query in a step: most steps no launcher is ready, and building it in
 // prepare every step costs four times as much. This relies on the
 // per-entity loop running on one thread.
-struct ProposeEngagements final
-    : System<Launcher, const Kinematics, const WeaponsHold> {
+struct ProposeEngagements final  //
+    : System<Launcher,           //
+             const Kinematics,   //
+             const WeaponsHold> {
   using SystemWorld = ProjectedWorld<ProposeEngagements>;
   using SequenceAfterSystemList = SystemList<DropStaleTracks>;
   using AllowComponentList = TypeList<Estimate, Engagement>;
@@ -255,7 +263,9 @@ struct ProposeEngagements final
 
 // Each unengaged track accepts the nearest launcher that proposed it. Ties go
 // to the launcher that comes first in iteration order.
-struct ResolveEngagements final : System<Engagement, const Estimate> {
+struct ResolveEngagements final  //
+    : System<Engagement,         //
+             const Estimate> {
   using SystemWorld = ProjectedWorld<ResolveEngagements>;
   using SequenceAfterSystemList = SystemList<ProposeEngagements>;
   using AllowComponentList = TypeList<Launcher, Kinematics>;
@@ -328,7 +338,9 @@ struct InterceptorDesign final {
 
 // Launchers whose proposal was accepted build an interceptor aimed at the
 // track, under themselves.
-struct LaunchInterceptors final : System<Launcher, const Kinematics> {
+struct LaunchInterceptors final  //
+    : System<Launcher,           //
+             const Kinematics> {
   using SystemWorld = ProjectedWorld<LaunchInterceptors>;
   using SequenceAfterSystemList = SystemList<ResolveEngagements>;
   using AllowComponentList = TypeList<Track, Estimate, Engagement>;
@@ -381,8 +393,11 @@ using Engaging =
 // Proportional navigation toward the target, holding speed. When the target
 // is gone, retargets the nearest red drone within seeker range, or
 // self-destructs. Also self-destructs when its flight time runs out.
-struct GuideInterceptors final
-    : System<const Interceptor, const Kinematics, Control, Target> {
+struct GuideInterceptors final   //
+    : System<const Interceptor,  //
+             const Kinematics,   //
+             Control,            //
+             Target> {
   using SystemWorld = ProjectedWorld<GuideInterceptors>;
   using SequenceAfterSystemList = SystemList<LaunchInterceptors>;
   using AllowComponentList = TypeList<Kinematics, RedDrone>;
@@ -434,8 +449,11 @@ struct GuideInterceptors final
 };
 
 // Red drones steer at their target at cruise speed.
-struct SteerRedDrones final
-    : System<const RedDrone, const Kinematics, Control, const Target> {
+struct SteerRedDrones final     //
+    : System<const RedDrone,    //
+             const Kinematics,  //
+             Control,           //
+             const Target> {
   using SystemWorld = ProjectedWorld<SteerRedDrones>;
   using AllowComponentList = TypeList<Kinematics>;
 
@@ -464,8 +482,10 @@ struct SteerRedDrones final
 // Every warhead checks its fuse every step, and few detonate, so the check is
 // all the call operator does: small enough to inline into the loop. The
 // builders that detonate are out of line and marked cold.
-struct TriggerWarheads final
-    : System<const Warhead, const Kinematics, const Target> {
+struct TriggerWarheads final    //
+    : System<const Warhead,     //
+             const Kinematics,  //
+             const Target> {
   using SystemWorld = ProjectedWorld<TriggerWarheads>;
   using SequenceAfterSystemList = SystemList<model::Integrate>;
   using AllowComponentList = TypeList<Kinematics>;
@@ -500,7 +520,9 @@ struct TriggerWarheads final
 // Every entity with Health takes damage from each blast it is inside, and is
 // destroyed when its health runs out. Victims are the batch; each writes only
 // itself.
-struct ApplyBlasts final : System<Health, const Kinematics> {
+struct ApplyBlasts final  //
+    : System<Health,      //
+             const Kinematics> {
   using SystemWorld = ProjectedWorld<ApplyBlasts>;
   using SequenceAfterSystemList = SystemList<TriggerWarheads>;
   using AllowComponentList = TypeList<Blast, Kinematics>;
@@ -546,7 +568,8 @@ struct ApplyBlasts final : System<Health, const Kinematics> {
 };
 
 // Blasts live for one step.
-struct ExpireBlasts final : System<const Blast> {
+struct ExpireBlasts final  //
+    : System<const Blast> {
   using SystemWorld = ProjectedWorld<ExpireBlasts>;
   using SequenceAfterSystemList = SystemList<ApplyBlasts>;
 
