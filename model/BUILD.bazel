@@ -71,6 +71,16 @@ cc_library(
 )
 
 cc_library(
+    name = "control",
+    hdrs = ["control.hpp"],
+    copts = COPTS,
+    deps = [
+        ":units",
+        "@lib//base:core",
+    ],
+)
+
+cc_library(
     name = "random",
     hdrs = ["random.hpp"],
     copts = COPTS,
@@ -86,6 +96,7 @@ cc_library(
         "@lib//base:testing",
     ],
 ) for test in [
+    "control",
     "guidance",
     "random",
 ]]
