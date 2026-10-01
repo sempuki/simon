@@ -1,0 +1,69 @@
+# Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+
+load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "flight_library",
+    srcs = ["simulation.cpp"],
+    hdrs = [
+        "components.hpp",
+        "simulation.hpp",
+        "systems.hpp",
+    ],
+    copts = COPTS,
+    deps = [
+        "//engine:lifecycle",
+        "//engine:rate_gate",
+        "//framework",
+        "//framework:continuous",
+        "//model:atmosphere",
+        "//model:control",
+        "//model:flight_path",
+        "//model:random",
+        "//model:units",
+        "@lib//base:core",
+    ],
+)
+
+cc_test(
+    name = "flight_test",
+    size = "small",
+    srcs = ["flight_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":flight_library",
+        "//engine:driver",
+        "@lib//base:testing",
+    ],
+)
+
+# Flies one scenario as fast as possible and prints what it did.
+cc_binary(
+    name = "flight",
+    srcs = ["main.cpp"],
+    copts = COPTS,
+    deps = [
+        ":flight_library",
+        "//engine:driver",
+    ],
+)
+
+# Times the simulation at growing populations, system by system, for the
+# single-pass model and for Runge-Kutta 4. Run with
+# bazel run -c opt //application/flight:flight_benchmark
+cc_binary(
+    name = "flight_benchmark",
+    srcs = ["flight_benchmark.cpp"],
+    copts = COPTS,
+    deps = [
+        ":flight_library",
+        "//framework",
+        "//framework:benchmark_support",
+        "@lib//base:core",
+    ],
+)

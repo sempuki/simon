@@ -2015,10 +2015,11 @@ Portico for HLA.
 simon/
   framework/     Entity, ComponentStore, World, Spatial, names, builders, commands, Step, System, schedules
   engine/        Lifecycle, drivers, RateGate, EventQueue
-  model/         Reusable physics: kinematics, sensing, guidance (free functions)
+  model/         Reusable physics: kinematics, guidance, flight paths, atmosphere, control blocks (free functions)
   application/
     hello/       Two bouncing balls, the first application
     missile/     Red drones against blue radars, launchers and interceptors
+    flight/      Aircraft flying routes under an autopilot, at two fidelity levels
   documents/     This document
   2nd_party/lib  Shared core libraries (submodule)
 ```
@@ -2178,6 +2179,105 @@ Blasts last a single step, so the viewer never sees one; it draws an
 explosion wherever a drone or interceptor disappears. That is presentation
 only and changes nothing in the simulation.
 
+### flight
+
+Aircraft fly closed routes of waypoints under an autopilot, spread over an
+area that grows with their number so traffic density stays the same. It is
+the application for flight control algorithms of the class JSBSim runs, and
+it shows fidelity as an opt-in: most aircraft fly a single-pass model, and
+those whose archetype opts in are integrated with Runge-Kutta 4.
+`bazel run //application/flight -- <aircraft> <precise> <seed>` flies one
+scenario headless and prints how many waypoints were reached.
+
+The code is in three layers:
+
+| Layer | Holds |
+|---|---|
+| `framework/continuous.hpp` | `Continuous`, generic over any `ContinuousState` |
+| `model/` | `flight_path.hpp` (the point-mass state, its rate equations, a single-pass integrator and autopilot laws), `atmosphere.hpp`, `control.hpp` (lags, rate limits, PI control, tables) |
+| `application/flight/` | The aircraft components and archetypes, the systems, the scenario and the simulation |
+
+The model is point-mass flight path: an `AirState` of position, speed,
+flight-path angle and heading, flown by commanding load factor, bank and
+throttle. Lift is a load factor times weight, drag comes from a drag polar,
+and thrust falls with the standard atmosphere's density. `AirState` is the
+world's spatial component, so no copy of the position is kept anywhere else.
+
+Components (`application/flight/components.hpp`):
+
+| Component | Holds |
+|---|---|
+| `AirState` | From `model/`: position, speed, flight-path angle, heading |
+| `AirStateRate` | Its rate; only precise aircraft have it |
+| `FlightControls` | The load factor, bank and throttle the airframe has actually reached |
+| `Commands` | What the autopilot commands |
+| `Airframe` | What the dynamics read: mass, wing area, drag polar, thrust |
+| `Handling` | What the autopilot and actuators read: limits, roll rate, lags |
+| `Autopilot` | The altitude, heading and speed it holds, and its throttle integral |
+| `Route` | Four waypoints, the speed to fly them, the next one and how many were reached |
+
+Schedule (`application/flight/systems.hpp`):
+
+| System | Does |
+|---|---|
+| `FollowRoute` | Once a second, aims each autopilot at its route's next waypoint, and moves on within 3 km of it |
+| `FlyAutopilot` | Ten times a second, turns targets into commands: bank for heading, load factor for altitude through a commanded flight-path angle, throttle for speed by PI control |
+| `Actuate` | Every step, moves the controls toward the commands through exact lags and a roll-rate limit |
+| `Fly` | Every step, advances each single-pass aircraft in one semi-implicit pass |
+| `Precise` | `Continuous<RungeKutta4, TypeList<AirState>, SystemList<PointMassRates>>` for precise aircraft |
+
+Decisions made while building it:
+
+- **Fidelity is per archetype.** `Aircraft` and `PreciseAircraft` require
+  the same components, and the precise one also requires `AirStateRate`.
+  `Continuous` integrates only archetypes that can have the rate. `Fly` names
+  the rate as an optional sibling and returns when it is present; for the
+  single-pass archetype it is absent, so that check compiles away.
+- **Guidance and control run at their own rates, gated once per system** in
+  `prepare`, so the steps in between skip their loops. Per-entity staggered
+  gates would spread the work, at the cost of a gate in each component and a
+  check per entity per step.
+- **Speed comes first.** The steepest climb the autopilot commands shrinks as
+  the aircraft falls below its target speed, and is zero 20 m/s below it, so
+  a long climb at altitude never trades away more speed than that.
+- **No ground, no wind, no stall.** Routes stay between 3 and 9 km.
+
+The test checks the autopilot (holding altitude, speed and heading, and
+turning the short way to a waypoint behind), that a closed route is flown,
+that a single-pass and a Runge-Kutta aircraft flying the same route end within
+100 m of each other after five minutes, and that a scenario repeats exactly
+from its seed.
+
+`bazel run -c opt //application/flight:flight_benchmark` flies 500 steps of
+20 ms at each population, once with every aircraft on the single-pass model
+and once with every aircraft on Runge-Kutta 4. GCC, ms per step:
+
+| Aircraft | Single pass | ns per entity-step | Runge-Kutta 4 | ns per entity-step |
+|---:|---:|---:|---:|---:|
+| 1,000 | 0.07 | 68 | 0.17 | 167 |
+| 10,000 | 0.72 | 72 | 1.87 | 187 |
+| 100,000 | 7.25 | 73 | 19.1 | 191 |
+| 100,000, 4 contending threads | 8.00 | 80 | 29.9 | 299 |
+
+- **The single-pass model is bound by computation.** Cost per aircraft is
+  nearly flat from 1,000 to 100,000, and four contending threads slow it only
+  1.1 times. `Fly` is three quarters of the step, and three `sincos` calls are
+  most of `Fly`.
+- **Runge-Kutta 4 costs 2.6 times as much,** and is bound by memory under
+  contention (1.6 times slower), because its copies of the start state and
+  four stages' rates stream through memory every step.
+- **Two changes took the single-pass step from 8.34 to 7.25 ms,** and the
+  Runge-Kutta 4 step from 29.8 to 19.1 ms. The rates take each sine and
+  cosine once, and `fly` gets the new velocity from the rate's derivative,
+  not more trigonometry. `wrap` calls `std::remainder` only when a heading
+  leaves [-π, π]. `StandardAirTable`, the atmosphere tabulated every 100 m
+  (within a few parts in 10^5), replaced the power and exponential of
+  `standard_air`; it saved 6% of `Fly`, and 20% of Runge-Kutta 4, which
+  evaluates the air four times.
+- **Clang is about 13% slower** (8.2 and 22.7 ms at 100,000). It also walks
+  `Fly` over the precise aircraft for 0.23 ms per step, against 0.06 ms with
+  GCC, although `Fly` does nothing for them.
+
 ## Libraries
 
 | Need | Library |
@@ -2231,12 +2331,17 @@ Each step ends with a working application and passing tests.
 6. **Flight dynamics (in progress).** Run flight control algorithms of the
    class JSBSim runs, at scale, with fidelity as an opt-in (see
    [Choose fidelity per archetype](#choose-fidelity-per-archetype)).
-   - Staggered rate gates.
-   - Control blocks in `model/`: exact first-order lags, rate and position
-     limits, and lookup tables with linear interpolation.
-   - `Continuous` with Euler, midpoint and Runge-Kutta 4 (see
-     [Continuous state](#continuous-state)).
-   - Later: a point-mass flight-path model, 6-DOF rigid bodies, Adams-Bashforth
+   - Done: staggered rate gates.
+   - Done: control blocks in `model/`: exact first-order lags, rate limits,
+     PI control, and lookup tables with linear interpolation.
+   - Done: `Continuous` with Euler, midpoint and Runge-Kutta 4 (see
+     [Continuous state](#continuous-state)). missile, which does not use it,
+     runs as before: 2.31 against 2.32 ms per step at 100,000 drones.
+   - Done: the standard atmosphere, a point-mass flight-path model, and the
+     [flight](#flight) application flying it at two fidelity levels.
+   - Done: `flight_benchmark`, idle and contended, for both levels (see
+     [flight](#flight)).
+   - Later: 6-DOF rigid bodies, Adams-Bashforth
      with rate history, many replicas of a scenario in one world, world
      snapshots, and trim tables computed offline. JSBSim, run offline, is the
      reference each level's accuracy is measured against.

@@ -19,6 +19,8 @@ bazel test //...
 bazel run //application/hello
 bazel run //application/missile:viewer   # watch a missile scenario
 bazel run //application/missile -- 7    # run seed 7 headless
+bazel run //application/flight -- 1000 100   # 1,000 aircraft, 100 on RK4
+bazel run -c opt //application/flight:flight_benchmark
 ```
 
 Code targets C++26; flags come from `@lib//bazel:copts.bzl`.
