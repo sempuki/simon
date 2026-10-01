@@ -40,5 +40,8 @@ user.bazelrc
 # Claude Code worktrees
 .claude/worktrees/
 
-# Generated for clangd by bazel/compile_commands.py in lib
+# Generated for clangd by tools/lsp/mirror.py
 compile_commands.json
+
+# The clangd mirror: tools/lsp/mirror.py
+.lsp/
