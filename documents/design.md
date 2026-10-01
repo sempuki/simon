@@ -1572,6 +1572,17 @@ which costs it about 8%; that was accepted. With both fixes Clang runs the
 systems are bandwidth-bound: at 100,000 drones, four streaming neighbors slowed
 `ScanRadars` 2.6 times but `TriggerWarheads` 12 times.
 
+**Use `model::max`, `min` and `clamp` on quantities in hot code.**
+`std::max` and its relatives compare through mp-units' `<=>`, and GCC 16
+compiles that to branches and stack spills instead of one `maxsd`. When the
+flight model moved from raw `double`s to quantities, one `std::max` on a speed
+made `Fly` 8% slower, and forcing functions inline did not recover it.
+`model::max`, `min` and `clamp` (in `model/units.hpp`) take quantities and
+compare their numbers, so the code keeps its units. With them, the typed
+flight model runs as fast as the `double` one did under GCC (7.24 against 7.25
+ms per step at 100,000 aircraft), and within 2% under Clang. `Actuate` and
+`FlyAutopilot`, which already clamped quantities, got 6% and 3% faster.
+
 ### Choose fidelity per archetype
 
 Most entities in a large scenario need little fidelity, and a few need a lot.

@@ -56,27 +56,57 @@ TEST_CASE("Approach") {
 }
 
 TEST_CASE("PiControl") {
-  PiGains gains{.proportional = 0.5, .integral = 0.1, .low = 0.0, .high = 1.0};
+  // A throttle, a plain number, for a speed error.
+  PiGains<Speed> gains{.proportional = 0.5 * second / meter,
+                       .integral = 0.1 / meter,
+                       .low = 0.0,
+                       .high = 1.0};
+  auto speed = [](double value) { return value * meter_per_second; };
 
   SECTION("ShouldAddProportionalAndIntegralGivenSmallError") {
     double integral = 0.2;
-    double output = pi_control(0.4, gains, 1.0 * second, lib::InOut(integral));
+    double output =
+        pi_control(speed(0.4), gains, 1.0 * second, lib::InOut(integral));
     CHECK_THAT(integral, WithinAbs(0.24, 1e-12));
     CHECK_THAT(output, WithinAbs(0.44, 1e-12));
   }
 
   SECTION("ShouldHoldIntegralGivenOutputAtLimit") {
     double integral = 0.9;
-    double output = pi_control(2.0, gains, 1.0 * second, lib::InOut(integral));
+    double output =
+        pi_control(speed(2.0), gains, 1.0 * second, lib::InOut(integral));
     CHECK(output == 1.0);
     CHECK(integral == 0.9);
   }
 
   SECTION("ShouldUnwindGivenErrorAwayFromLimit") {
     double integral = 0.9;
-    pi_control(-1.0, gains, 1.0 * second, lib::InOut(integral));
+    pi_control(speed(-1.0), gains, 1.0 * second, lib::InOut(integral));
     CHECK_THAT(integral, WithinAbs(0.8, 1e-12));
   }
+
+  SECTION("ShouldCarryUnitsGivenQuantityOutput") {
+    // An acceleration for a speed error.
+    PiGains<Speed, AccelerationMagnitude> accelerate{
+        .proportional = 2.0 * per_second,
+        .integral = 0.5 * per_second / second,
+        .low = -10.0 * meter_per_second_squared,
+        .high = 10.0 * meter_per_second_squared};
+    AccelerationMagnitude integral = 0.0 * meter_per_second_squared;
+
+    AccelerationMagnitude output = pi_control(
+        speed(1.0), accelerate, 2.0 * second, lib::InOut(integral));
+
+    CHECK(integral == 1.0 * meter_per_second_squared);
+    CHECK(output == 3.0 * meter_per_second_squared);
+  }
+}
+
+TEST_CASE("Table1WithQuantities") {
+  // Drag coefficient, a plain number, by speed.
+  Table1<Speed> table{{100.0 * meter_per_second, 200.0 * meter_per_second},
+                      {0.02, 0.04}};
+  CHECK_THAT(table(150.0 * meter_per_second), WithinAbs(0.03, 1e-12));
 }
 
 TEST_CASE("Table1") {

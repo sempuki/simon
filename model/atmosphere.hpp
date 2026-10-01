@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "model/units.hpp"
+#include "mp-units/math.h"
 
 // The International Standard Atmosphere, from sea level to 20 km: a
 // troposphere whose temperature falls linearly to 11 km, then an isothermal
@@ -19,50 +20,63 @@ struct Air final {
   Speed speed_of_sound = 0.0 * meter_per_second;
 };
 
-namespace internal {
-inline constexpr double GAS_CONSTANT = 287.052874;  // J / (kg K), dry air.
-inline constexpr double GRAVITY = 9.80665;          // m / s^2.
-inline constexpr double HEAT_RATIO = 1.4;
-inline constexpr double SEA_LEVEL_TEMPERATURE = 288.15;  // K.
-inline constexpr double SEA_LEVEL_PRESSURE = 101325.0;   // Pa.
-inline constexpr double LAPSE_RATE = 0.0065;             // K / m.
-inline constexpr double TROPOPAUSE = 11000.0;            // m.
-inline constexpr double TROPOPAUSE_TEMPERATURE =
-    SEA_LEVEL_TEMPERATURE - LAPSE_RATE * TROPOPAUSE;
-inline constexpr double CEILING = 20000.0;  // m.
-}  // namespace internal
-
 // Standard gravity.
 inline constexpr AccelerationMagnitude STANDARD_GRAVITY =
-    internal::GRAVITY * meter_per_second_squared;
+    9.80665 * meter_per_second_squared;
+
+namespace internal {
+
+// Dry air.
+inline constexpr auto GAS_CONSTANT = 287.052874 * joule_per_kilogram_kelvin;
+inline constexpr double HEAT_RATIO = 1.4;
+
+// Temperatures are from absolute zero, so they divide and scale as plain
+// quantities. mp-units asks for kelvins to be made with `delta`.
+inline constexpr Temperature SEA_LEVEL_TEMPERATURE =
+    units::delta<kelvin>(288.15);
+inline constexpr Pressure SEA_LEVEL_PRESSURE = 101325.0 * pascal;
+inline constexpr auto LAPSE_RATE = units::delta<kelvin>(0.0065) / meter;
+
+inline constexpr Length TROPOPAUSE = 11000.0 * meter;
+inline constexpr Temperature TROPOPAUSE_TEMPERATURE =
+    SEA_LEVEL_TEMPERATURE - LAPSE_RATE * TROPOPAUSE;
+inline constexpr Length CEILING = 20000.0 * meter;
+
+// The exponent of pressure in temperature through the troposphere.
+inline auto pressure_exponent() -> double {
+  return number_of(STANDARD_GRAVITY / (LAPSE_RATE * GAS_CONSTANT));
+}
+
+}  // namespace internal
 
 // The air at `altitude` above sea level. Altitudes above 20 km get the air at
 // 20 km.
 inline auto standard_air(Length altitude) -> Air {
   using namespace internal;
-  double h = std::min(altitude.numerical_value_in(meter), CEILING);
-  double temperature = 0.0;
-  double pressure = 0.0;
+  Length h = std::min(altitude, CEILING);
+
+  Temperature temperature = TROPOPAUSE_TEMPERATURE;
+  Pressure pressure = 0.0 * pascal;
   if (h <= TROPOPAUSE) {
     temperature = SEA_LEVEL_TEMPERATURE - LAPSE_RATE * h;
     pressure = SEA_LEVEL_PRESSURE *
-               std::pow(temperature / SEA_LEVEL_TEMPERATURE,
-                        GRAVITY / (LAPSE_RATE * GAS_CONSTANT));
+               std::pow(number_of(temperature / SEA_LEVEL_TEMPERATURE),
+                        pressure_exponent());
   } else {
-    temperature = TROPOPAUSE_TEMPERATURE;
-    double tropopause_pressure =
+    Pressure tropopause_pressure =
         SEA_LEVEL_PRESSURE *
-        std::pow(TROPOPAUSE_TEMPERATURE / SEA_LEVEL_TEMPERATURE,
-                 GRAVITY / (LAPSE_RATE * GAS_CONSTANT));
+        std::pow(number_of(TROPOPAUSE_TEMPERATURE / SEA_LEVEL_TEMPERATURE),
+                 pressure_exponent());
     pressure = tropopause_pressure *
-               std::exp(-GRAVITY / (GAS_CONSTANT * temperature) *
-                        (h - TROPOPAUSE));
+               std::exp(-number_of(STANDARD_GRAVITY * (h - TROPOPAUSE) /
+                                   (GAS_CONSTANT * temperature)));
   }
+
+  Speed speed_of_sound{
+      units::sqrt(HEAT_RATIO * GAS_CONSTANT * temperature)};
   return Air{
-      .density = pressure / (GAS_CONSTANT * temperature) *
-                 kilogram_per_cubic_meter,
-      .speed_of_sound = std::sqrt(HEAT_RATIO * GAS_CONSTANT * temperature) *
-                        meter_per_second,
+      .density = pressure / (GAS_CONSTANT * temperature),
+      .speed_of_sound = speed_of_sound,
   };
 }
 
@@ -73,38 +87,35 @@ inline auto standard_air(Length altitude) -> Air {
 class StandardAirTable final {
  public:
   explicit StandardAirTable(Length spacing = 100.0 * meter)
-      : spacing_{spacing.numerical_value_in(meter)} {
+      : spacing_{spacing} {
     auto points = static_cast<std::size_t>(
-                      std::ceil(internal::CEILING / spacing_)) +
+                      std::ceil(number_of(internal::CEILING / spacing_))) +
                   1;
-    density_.reserve(points);
-    sound_.reserve(points);
+    air_.reserve(points);
     for (std::size_t i = 0; i < points; ++i) {
-      Air air = standard_air(static_cast<double>(i) * spacing_ * meter);
-      density_.push_back(
-          air.density.numerical_value_in(kilogram_per_cubic_meter));
-      sound_.push_back(air.speed_of_sound.numerical_value_in(meter_per_second));
+      air_.push_back(standard_air(static_cast<double>(i) * spacing_));
     }
   }
 
   auto operator()(Length altitude) const -> Air {
-    double position = std::clamp(altitude.numerical_value_in(meter) / spacing_,
-                                 0.0, static_cast<double>(density_.size() - 1));
-    auto i = std::min(static_cast<std::size_t>(position), density_.size() - 2);
+    double position = std::clamp(number_of(altitude / spacing_), 0.0,
+                                 static_cast<double>(air_.size() - 1));
+    auto i = std::min(static_cast<std::size_t>(position), air_.size() - 2);
     double weight = position - static_cast<double>(i);
+
+    const Air& low = air_[i];
+    const Air& high = air_[i + 1];
     return Air{
-        .density = (density_[i] + (density_[i + 1] - density_[i]) * weight) *
-                   kilogram_per_cubic_meter,
+        .density = low.density + (high.density - low.density) * weight,
         .speed_of_sound =
-            (sound_[i] + (sound_[i + 1] - sound_[i]) * weight) *
-            meter_per_second,
+            low.speed_of_sound +
+            (high.speed_of_sound - low.speed_of_sound) * weight,
     };
   }
 
  private:
-  double spacing_;
-  std::vector<double> density_;
-  std::vector<double> sound_;
+  Length spacing_;
+  std::vector<Air> air_;
 };
 
 }  // namespace simon::model

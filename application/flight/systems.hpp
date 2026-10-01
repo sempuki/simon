@@ -48,8 +48,7 @@ struct FollowRoute final : System<Route, const AirState, Autopilot> {
     }
     const Position& waypoint = route.waypoints[route.next];
     autopilot->heading = model::bearing(state->position, waypoint);
-    autopilot->altitude = waypoint.numerical_value_in(model::meter).z() *
-                          model::meter;
+    autopilot->altitude = model::altitude_of(waypoint);
     autopilot->speed = route.speed;
   }
 
@@ -67,7 +66,11 @@ struct AutopilotGains final {
   Speed speed_margin = 20.0 * model::meter_per_second;
   Rate climb = 1.0 * model::per_second;  // Of the flight-path angle error.
   Rate heading = 0.5 * model::per_second;
-  model::PiGains speed{.proportional = 0.05, .integral = 0.02};  // Per m/s.
+  // Throttle, from none to full, for the speed error.
+  model::PiGains<Speed> speed{.proportional = 0.05 * model::second / model::meter,
+                              .integral = 0.02 / model::meter,
+                              .low = 0.0,
+                              .high = 1.0};
 };
 
 // Ten times a second, each aircraft's autopilot turns its targets into
@@ -91,19 +94,17 @@ struct FlyAutopilot final : System<Commands, const AirState, const Handling,
     if (!state || !handling || !controls || !autopilot) {
       return;
     }
-    double speed_error =
-        (autopilot->speed - state->speed).numerical_value_in(
-            model::meter_per_second);
+    Speed speed_error = autopilot->speed - state->speed;
     commands.bank = model::bank_command(*state, autopilot->heading,
                                         gains_.heading, handling->max_bank);
+
+    // Speed comes first: a slow aircraft climbs less steeply, or not at all.
     Angle climb = model::climb_command(*state, autopilot->altitude,
                                        gains_.altitude, gains_.steepest_climb);
-    // Speed comes first: a slow aircraft climbs less steeply, or not at all.
     double slow = std::clamp(
-        1.0 - speed_error / gains_.speed_margin.numerical_value_in(
-                                model::meter_per_second),
-        0.0, 1.0);
-    climb = std::min(climb, gains_.steepest_climb * slow);
+        1.0 - model::number_of(speed_error / gains_.speed_margin), 0.0, 1.0);
+    climb = model::min(climb, gains_.steepest_climb * slow);
+
     commands.load_factor =
         std::clamp(model::load_factor_command(*state, climb, controls->bank,
                                               gains_.climb),

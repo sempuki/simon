@@ -2,7 +2,9 @@
 
 #pragma once
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 
 #include "Eigen/Dense"
 #include "mp-units/framework.h"
@@ -110,6 +112,10 @@ inline constexpr auto newton = units::si::newton;
 inline constexpr auto square_meter = units::square(meter);
 inline constexpr auto kilogram_per_cubic_meter =
     kilogram / units::cubic(meter);
+inline constexpr auto kelvin = units::si::kelvin;
+inline constexpr auto pascal = units::si::pascal;
+inline constexpr auto joule_per_kilogram_kelvin =
+    units::si::joule / (kilogram * kelvin);
 
 // Scalars.
 using Length = units::quantity<meter, double>;
@@ -123,6 +129,8 @@ using Mass = units::quantity<kilogram, double>;
 using Force = units::quantity<newton, double>;
 using Area = units::quantity<square_meter, double>;
 using Density = units::quantity<kilogram_per_cubic_meter, double>;
+using Temperature = units::quantity<kelvin, double>;
+using Pressure = units::quantity<pascal, double>;
 
 // Vectors.
 using Displacement = units::quantity<meter, Vector3d>;
@@ -148,6 +156,47 @@ inline auto meters_per_second_squared(double x, double y, double z)
 inline auto radians(Angle angle) -> double {
   return angle.numerical_value_in(radian);
 }
+
+// A dimensionless quantity, such as a ratio of two forces, as a plain number:
+// the one place a quantity may leave its units behind, because it has none.
+template <auto UNIT, typename RepresentationType>
+auto number_of(const units::quantity<UNIT, RepresentationType>& quantity)
+    -> RepresentationType {
+  return quantity.numerical_value_in(units::one);
+}
+
+// The larger, the smaller, or the clamp of quantities of one type. Use these
+// instead of std::max, std::min and std::clamp on hot paths: those compare
+// through mp-units' <=>, which GCC 16 compiles to branches and spills instead
+// of maxsd and minsd. std::max on a speed cost the flight model's Fly 8%.
+template <auto UNIT>
+auto max(const units::quantity<UNIT, double>& a,
+         const units::quantity<UNIT, double>& b)
+    -> units::quantity<UNIT, double> {
+  return std::max(a.numerical_value_in(UNIT), b.numerical_value_in(UNIT)) *
+         UNIT;
+}
+template <auto UNIT>
+auto min(const units::quantity<UNIT, double>& a,
+         const units::quantity<UNIT, double>& b)
+    -> units::quantity<UNIT, double> {
+  return std::min(a.numerical_value_in(UNIT), b.numerical_value_in(UNIT)) *
+         UNIT;
+}
+template <auto UNIT>
+auto clamp(const units::quantity<UNIT, double>& value,
+           const units::quantity<UNIT, double>& low,
+           const units::quantity<UNIT, double>& high)
+    -> units::quantity<UNIT, double> {
+  return min(max(value, low), high);
+}
+
+// Trigonometry on angles. mp-units' own functions need ISQ quantity kinds,
+// which Clang 22 cannot compile (see the top of this file).
+inline auto sin(Angle angle) -> double { return std::sin(radians(angle)); }
+inline auto cos(Angle angle) -> double { return std::cos(radians(angle)); }
+inline auto arcsin(double ratio) -> Angle { return std::asin(ratio) * radian; }
+inline auto arctan(double ratio) -> Angle { return std::atan(ratio) * radian; }
 
 // A std::chrono duration as seconds.
 template <typename RepresentationType, typename PeriodType>

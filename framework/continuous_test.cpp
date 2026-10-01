@@ -46,10 +46,11 @@ auto advance(const Point& point, const PointRate& rate, Duration dt) -> Point {
   return {.x = point.x + rate.dx * seconds, .v = point.v + rate.dv * seconds};
 }
 
-auto distance(const Point& a, const Point& b) -> double {
+// Only the Spatial concept uses these, so Clang finds them unused.
+[[maybe_unused]] auto distance(const Point& a, const Point& b) -> double {
   return std::abs(a.x - b.x);
 }
-auto pose(const Point& a) -> Point { return a; }
+[[maybe_unused]] auto pose(const Point& a) -> Point { return a; }
 auto coordinates(const Point& a) -> Coordinates { return {a.x, 0.0, 0.0}; }
 auto coordinate_length(const Point&, double length) -> double {
   return length;
