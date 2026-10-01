@@ -3,6 +3,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <string_view>
 
@@ -15,12 +16,13 @@ namespace simon::framework {
 // A string usable as a template argument: Archetype<"ball", ...>.
 template <std::size_t Size>
 struct FixedString final {
-  char value[Size] = {};
+  std::array<char, Size> value{};
 
+  // A C-array reference, so a string literal binds and deduces Size.
   constexpr FixedString(const char (&text)[Size]) {
-    std::copy_n(text, Size, value);
+    std::copy_n(text, Size, value.begin());
   }
-  constexpr std::string_view view() const { return {value, Size - 1}; }
+  constexpr std::string_view view() const { return {value.data(), Size - 1}; }
 };
 
 template <typename... ComponentTypes>
@@ -36,13 +38,16 @@ struct Allows final {};
 //   struct Ball : Archetype<"ball", Requires<Kinematics, Collider>,
 //                           Allows<Thrust, Drag>> {};
 //   world.create<Ball>("my-fav-ball").with(Kinematics{}).with(Collider{}).build();
-template <FixedString ArchetypeName, typename RequiresType = Requires<>,
+template <FixedString ArchetypeName,           //
+          typename RequiresType = Requires<>,  //
           typename AllowsType = Allows<>>
 struct Archetype;
 
-template <FixedString ArchetypeName, typename... RequiredTypes,
-          typename... AllowedTypes>
-struct Archetype<ArchetypeName, Requires<RequiredTypes...>,
+template <FixedString ArchetypeName,          //
+          typename... RequiredTypes,          //
+          typename... AllowedTypes>           //
+struct Archetype<ArchetypeName,               //
+                 Requires<RequiredTypes...>,  //
                  Allows<AllowedTypes...>> {
   static constexpr std::string_view name = ArchetypeName.view();
   using RequiredComponentList = TypeList<RequiredTypes...>;

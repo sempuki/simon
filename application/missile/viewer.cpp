@@ -76,15 +76,15 @@ struct Explosion final {
 
 void plot_circle(const char* label, Point center, double radius, ImVec4 color) {
   constexpr int SEGMENTS = 64;
-  double x[SEGMENTS + 1];
-  double y[SEGMENTS + 1];
+  std::array<double, SEGMENTS + 1> x{};
+  std::array<double, SEGMENTS + 1> y{};
   for (int i = 0; i <= SEGMENTS; ++i) {
     double angle = 2.0 * std::numbers::pi * i / SEGMENTS;
     x[i] = center.x + radius * std::cos(angle);
     y[i] = center.y + radius * std::sin(angle);
   }
   ImPlot::SetNextLineStyle(color, 1.0f);
-  ImPlot::PlotLine(label, x, y, SEGMENTS + 1);
+  ImPlot::PlotLine(label, x.data(), y.data(), SEGMENTS + 1);
 }
 
 // One run of a scenario, paced to the wall clock.

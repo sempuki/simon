@@ -1,6 +1,6 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
-#include "framework/store.hpp"
+#include "framework/component_store.hpp"
 
 #include <stdexcept>
 #include <vector>
@@ -26,7 +26,7 @@ struct Counted final {
 };
 
 template <typename ComponentType>
-std::vector<Entity> owners_of(const Store<ComponentType>& store) {
+std::vector<Entity> owners_of(const ComponentStore<ComponentType>& store) {
   std::vector<Entity> owners;
   store.for_each(
       [&](Entity owner, const ComponentType&) { owners.push_back(owner); });
@@ -34,9 +34,9 @@ std::vector<Entity> owners_of(const Store<ComponentType>& store) {
 }
 }  // namespace
 
-TEST_CASE("Store") {
+TEST_CASE("ComponentStore") {
   EntityTable entities{8};
-  Store<Mass> store{4, 8};
+  ComponentStore<Mass> store{4, 8};
   Entity a = entities.create();
   Entity b = entities.create();
   Entity c = entities.create();
@@ -103,7 +103,7 @@ TEST_CASE("Store") {
   }
 
   SECTION("ShouldVisitSegmentsInOrderGivenAppendsToEach") {
-    Store<Mass> segmented{4, 8, 2, 2};
+    ComponentStore<Mass> segmented{4, 8, 2, 2};
     segmented.append(a, Mass{1.0}, 1);
     segmented.append(b, Mass{2.0}, 0);
     segmented.append(c, Mass{3.0}, 1);
@@ -115,7 +115,7 @@ TEST_CASE("Store") {
   }
 
   SECTION("ShouldTakeAndReturnChunksGivenAppendsAndErasesAcrossChunks") {
-    Store<Mass> chunked{8, 8, 1, 2};
+    ComponentStore<Mass> chunked{8, 8, 1, 2};
     std::vector<Entity> more{a, b, c, entities.create(), entities.create()};
     for (std::size_t i = 0; i < more.size(); ++i) {
       chunked.append(more[i], Mass{static_cast<double>(i)});
@@ -132,13 +132,13 @@ TEST_CASE("Store") {
   }
 
   SECTION("ShouldNameSameComponentGivenSlotBeforeNextChange") {
-    Store<Mass> segmented{4, 8, 2, 2};
+    ComponentStore<Mass> segmented{4, 8, 2, 2};
     segmented.append(a, Mass{1.0}, 1);
     segmented.append(b, Mass{2.0}, 0);
 
     int visited = 0;
     segmented.for_each_slot(
-        [&](Store<Mass>::Slot slot, Entity owner, const Mass& mass) {
+        [&](ComponentStore<Mass>::Slot slot, Entity owner, const Mass& mass) {
           CHECK(segmented.owner_at(slot) == owner);
           CHECK(&segmented.component_at(slot) == &mass);
           CHECK(&segmented.component_of(owner) == &mass);
@@ -150,7 +150,7 @@ TEST_CASE("Store") {
   SECTION("ShouldDestroyEveryComponentGivenEraseOrDestruction") {
     Counted::alive = 0;
     {
-      Store<Counted> counted{4, 8};
+      ComponentStore<Counted> counted{4, 8};
       counted.append(a, Counted{});
       counted.append(b, Counted{});
       counted.append(c, Counted{});

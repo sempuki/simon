@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <random>
 #include <vector>
@@ -112,6 +113,19 @@ TEST_CASE("SpatialIndex") {
       CHECK(within(index, center, 20.0) == brute_within(points, center, 20.0));
       CHECK(index.nearest(center, 20.0, any) ==
             brute_nearest(points, center, 20.0, any));
+    }
+  }
+
+  SECTION("ShouldVisitEveryPointGivenInfiniteOrHugeRadius") {
+    std::vector<Coordinates> points = random_points(50, 100.0, 5);
+    SpatialIndex index = index_of(points, points.size(), 10.0);
+    auto any = [](std::uint32_t) { return true; };
+    Coordinates center{0.0, 0.0, 0.0};
+
+    for (double radius : {std::numeric_limits<double>::infinity(), 1e30}) {
+      CHECK(within(index, center, radius).size() == points.size());
+      CHECK(index.nearest(center, radius, any) ==
+            brute_nearest(points, center, radius, any));
     }
   }
 

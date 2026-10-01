@@ -154,6 +154,22 @@ TEST_CASE("MissileSimulation") {
     CHECK(result.fired == 9u);  // Every interceptor was used.
   }
 
+  SECTION("ShouldCountNoneFiredGivenSeveralSitesBeforeAnyLaunch") {
+    Simulation simulation{Scenario{.drones = 10, .sites = 4}};
+    CHECK(simulation.interceptors_fired() == 0u);  // Before configure.
+
+    REQUIRE(simulation.configure());
+
+    CHECK(simulation.interceptors_fired() == 0u);
+  }
+
+  SECTION("ShouldFailConfigureGivenNoSites") {
+    for (int sites : {0, -1}) {
+      Simulation simulation{Scenario{.sites = sites}};
+      CHECK_FALSE(simulation.configure().has_value());
+    }
+  }
+
   SECTION("ShouldLeaveNothingOfSiteGivenWorldRefusesADrone") {
     Scenario scenario{.radars = 3, .launchers = 3, .drones = 10};
     World world;

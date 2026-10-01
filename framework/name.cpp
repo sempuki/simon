@@ -4,6 +4,7 @@
 
 #include <charconv>
 #include <format>
+#include <limits>
 #include <optional>
 #include <string_view>
 #include <system_error>
@@ -37,7 +38,9 @@ Identity identity_of(std::uint32_t world, Name name) {
 
 std::optional<ParsedIdentity> parse_identity(const Identity& given) {
   std::string_view identity = given.view();
-  if (!identity.starts_with('/')) {
+  // Exactly what identity_of makes, so a parsed identity formats back to the
+  // same string: no trailing slash.
+  if (!identity.starts_with('/') || identity.ends_with('/')) {
     return std::nullopt;
   }
   std::vector<std::string_view> segments;
@@ -49,6 +52,9 @@ std::optional<ParsedIdentity> parse_identity(const Identity& given) {
   }
 
   auto number = [](std::string_view text) -> std::optional<std::uint32_t> {
+    if (text.size() > 1 && text.front() == '0') {
+      return std::nullopt;  // No leading zeros.
+    }
     std::uint32_t value = 0;
     auto [end, error] =
         std::from_chars(text.data(), text.data() + text.size(), value);
@@ -87,7 +93,11 @@ std::optional<ParsedIdentity> parse_identity(const Identity& given) {
   if (segments.size() == 6) {
     std::optional<std::uint32_t> entity = pair(2, "entity");
     std::optional<std::uint32_t> component = pair(4, "component");
-    if (entity && component) {
+    // The entity-component kind is ENTITY_COMPONENT + component.
+    constexpr std::uint32_t MOST_COMPONENT =
+        std::numeric_limits<std::uint32_t>::max() -
+        static_cast<std::uint32_t>(Kind::ENTITY_COMPONENT);
+    if (entity && component && *component <= MOST_COMPONENT) {
       return ParsedIdentity{*world, entity_component_name(*component, *entity)};
     }
   }

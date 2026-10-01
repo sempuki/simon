@@ -45,8 +45,8 @@ struct Scenario final {
 
   // Copies of the site on a square grid `site_spacing` apart, the first at the
   // origin, so a larger population covers a larger area at the same density.
-  // Each site's drones fly at their own asset, and the outcome follows the
-  // first site's.
+  // Each site's drones fly at their own asset. Red wins when the first site's
+  // asset is destroyed; blue wins when no red drones remain at any site.
   int sites = 1;
   Length site_spacing = 20000.0 * model::meter;
 };
@@ -168,11 +168,14 @@ class Simulation final {
   std::uint32_t interceptors_fired() const;
 
  private:
+  std::uint32_t remaining_interceptors() const;
+
   Scenario scenario_;
   World world_;  // Empty until configure builds it.
   Scheduler scheduler_;
   Entity asset_;
   Outcome outcome_ = Outcome::UNDECIDED;
+  std::uint32_t stock_ = 0;  // Interceptors the launchers held when built.
 };
 
 }  // namespace simon::missile

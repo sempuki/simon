@@ -62,6 +62,19 @@ TEST_CASE("Identity") {
       CHECK_FALSE(parse_identity(text));
     }
   }
+
+  SECTION("ShouldRejectGivenComponentNumberBeyondKindRange") {
+    // ENTITY_COMPONENT + component must fit in 32 bits.
+    CHECK_FALSE(
+        parse_identity(Identity{"/world/1/entity/0/component/4294967295"}));
+  }
+
+  SECTION("ShouldRejectGivenTrailingSlashOrLeadingZero") {
+    CHECK_FALSE(parse_identity(Identity{"/world/1/"}));
+    CHECK_FALSE(parse_identity(Identity{"/world/007"}));
+    CHECK_FALSE(parse_identity(Identity{"/world/1/entity/02"}));
+    CHECK(parse_identity(Identity{"/world/0/entity/0"}));
+  }
 }
 
 TEST_CASE("TaggedString") {

@@ -121,7 +121,7 @@ The architecture is idiomatic ECS with no exceptions:
 |---|---|
 | Entity | An identity and nothing else: `{index, generation}`. It holds no data and no pointers. |
 | Component | Plain data. No behaviour, no virtual functions, no base class required. Each component type has a debug name. |
-| Store | Exactly one per component. It is the array of that component's entity-components. |
+| ComponentStore | Exactly one per component. It is the array of that component's entity-components. |
 | System | Every non-trivial function is a system. A system iterates component arrays through stores. |
 | Builder | The user-facing language for asking the simulator to do something specific. A builder turns a request into commands. |
 | Command | A typed, low-level structural change: create, attach, detach, destroy. Commands are applied to stores. |
@@ -132,7 +132,7 @@ The architecture is idiomatic ECS with no exceptions:
 Two pairs factor the details out of the parts people write:
 
 ```
-System  ──uses──▶  Store     Store hides indices, layout and lookup from systems.
+System  ──uses──▶  ComponentStore     ComponentStore hides indices, layout and lookup from systems.
 Builder ──emits──▶ Command   Command hides store mutation and ordering from builders.
 ```
 
@@ -146,7 +146,7 @@ here before it goes in.
                                   Schedule<SystemA, SystemB, ...>
                                             │  each system iterates
                                             ▼
-     World ── entity table ── Store<Kinematics> ── Store<Radar> ── ...
+     World ── entity table ── ComponentStore<Kinematics> ── ComponentStore<Radar> ── ...
        │                             ▲
        └── command buffer ───────────┘  applied at sync points
 ```
@@ -214,7 +214,7 @@ struct Interceptor {
 
 ### Stores
 
-Each component has one `Store<T>`, which holds all of its entity-components.
+Each component has one `ComponentStore<T>`, which holds all of its entity-components.
 Stores keep that array dense so that large simulations fit in cache. On the development machine (Zen
 3, 512 KiB L2 per core, 32 MiB L3 per chiplet), 5,000 agents with a 72-byte
 `Kinematics` take 360 KiB. That fits in one core's L2. With 50% holes the same
@@ -225,7 +225,7 @@ divides the data into segments, one per archetype that requires the component
 (see [Archetype segments](#archetype-segments)):
 
 ```
-Store<Kinematics>
+ComponentStore<Kinematics>
   index[entity.index] ─▶ {slot, generation}    8 bytes per entity slot
   segments            ─▶ [ drone chunks | interceptor chunks | ... | allowed chunks ]
   owner[slot]         ─▶ Entity                dense within each segment
@@ -251,7 +251,7 @@ A hole costs 8 bytes in the index, instead of a whole component in the array.
 
 **Decided by measurement: dense.** The alternative was a stable-slot store,
 where each entity index has a fixed slot, nothing moves, and a lookup is one
-load, but destroyed entities leave holes. `framework/store_benchmark.cpp`
+load, but destroyed entities leave holes. `framework/component_store_benchmark.cpp`
 compares the two with a 72-byte component, destroying a random fraction of the
 population (as when drones are shot down). On the development machine, with
 `-c opt`:
@@ -274,7 +274,7 @@ Times are nanoseconds per live entity (iterate) or per random lookup.
 
 Systems iterate far more than they look up, and a missile run is mostly agents
 dying, so the dense store wins. Run the benchmark with
-`bazel run -c opt //framework:store_benchmark`.
+`bazel run -c opt //framework:component_store_benchmark`.
 
 #### Sibling components
 
@@ -384,9 +384,9 @@ handles modeled the same dependency at creation. Segments use the archetype
 directly:
 
 ```
-Store<Kinematics>: [ drone 0..n      | interceptor 0..m | radar | launcher | blast ]
-Store<Control>:    [ drone 0..n      | interceptor 0..m ]
-Store<Health>:     [ drone 0..n      | asset ]
+ComponentStore<Kinematics>: [ drone 0..n      | interceptor 0..m | radar | launcher | blast ]
+ComponentStore<Control>:    [ drone 0..n      | interceptor 0..m ]
+ComponentStore<Health>:     [ drone 0..n      | asset ]
 ```
 
 - **Each store is divided into one segment per archetype that has the
@@ -466,7 +466,7 @@ const Kinematics& target = world.component_of<Kinematics>(interceptor.target);  
 
 `try_component_of` is the explicit path for "this may have disappeared".
 `component_of` fails a contract check on a stale entity, so misuse stops
-loudly. `Store` has the same pair. Neither can read
+loudly. `ComponentStore` has the same pair. Neither can read
 freed memory, because store memory lives as long as the world.
 
 Raw pointers or references returned by `try_component_of` or
@@ -825,7 +825,7 @@ store and passes each entity's optional entity-components. In outline, for the
 entities whose archetype only allows the driving component:
 
 ```cpp
-auto& drive = world.store_of<typename S::DrivingComponent>();   // const Store<Interceptor>& when const
+auto& drive = world.store_of<typename S::DrivingComponent>();   // const ComponentStore<Interceptor>& when const
 for (each chunk in the last segment of drive)
   for (std::size_t i = 0; i < chunk.size; ++i) {
     Entity e = chunk.owners[i];
@@ -857,7 +857,7 @@ Rules:
 - **Constness is declared in the `System` type, nowhere else.** Components are
   written plainly (`System<Interceptor, Control>`). To read a component without
   writing it, declare it `const` (`System<const Interceptor, Control>`). The
-  framework then takes a `const Store<T>*` for it, and a const store only hands
+  framework then takes a `const ComponentStore<T>*` for it, and a const store only hands
   out `const T&` and `const T*`. The call operator must accept what the
   declaration implies; a mismatch is a compile error.
 - **Other entities are reached through an allow list.** `using AllowComponentList =
@@ -942,7 +942,7 @@ design that makes misuse hard.
 
 **The rule: write only your own entity.** A system writes only the
 entity-components of the entity it is running for: the driving one and the
-optional ones. Everything it reaches through a `Store` lookup is read-only. To affect another entity, a system either uses a builder (create,
+optional ones. Everything it reaches through a `ComponentStore` lookup is read-only. To affect another entity, a system either uses a builder (create,
 edit, destroy) or leaves data that the other entity's own system reads.
 
 When the natural loop runs the wrong way, invert it. Make the side being
@@ -980,7 +980,7 @@ ExpireBlasts      driven by Blast                        destroys blasts older t
 
 | Relation | Pattern | Example |
 |---|---|---|
-| One-to-one reference | Store an `Entity`; look it up read-only | An interceptor reads its target's `Kinematics` |
+| One-to-one reference | ComponentStore an `Entity`; look it up read-only | An interceptor reads its target's `Kinematics` |
 | One-to-many by space or predicate | A shared per-step index or a query, read-only | Blast radius, radar coverage |
 | Affecting another entity | Emit an entity or command; the target's own system applies it | Blasts, new tracks |
 | Conflicting claims | Propose, then resolve | Each launcher writes a proposal on itself; `ResolveEngagements` iterates tracks and picks one |
@@ -1215,7 +1215,8 @@ The spatial index is a uniform grid, in `framework/spatial_index.hpp`:
   Each cell is skipped when its nearest face is farther than the best match so
   far, and the search stops when a whole ring is. Ties go to the lowest slot.
 - **Queries are deterministic:** cells are visited in a fixed order, and a
-  bucket's entries in slot order.
+  bucket's entries in the order the rebuild gave them, which for the world's
+  index is its walk of the spatial store, segment by segment.
 
 The world rebuilds the index lazily, on the first query after anything could
 have moved:
@@ -1787,7 +1788,7 @@ Portico for HLA.
 
 ```
 simon/
-  framework/     Entity, Store, World, Spatial, names, builders, commands, Step, System, schedules
+  framework/     Entity, ComponentStore, World, Spatial, names, builders, commands, Step, System, schedules
   engine/        Lifecycle, drivers, RateGate, EventQueue
   model/         Reusable physics: kinematics, sensing, guidance (free functions)
   application/
@@ -1880,8 +1881,9 @@ Decisions made while building it:
 - **Randomness is `model::Random`,** which converts `std::mt19937_64`'s raw
   bits itself: the engine's output is fixed by the standard, but the standard
   distributions are not, so this is the same on every platform.
-- **Spatial queries use the world's index.** `ScanRadars` uses `within()`, and
-  `GuideInterceptors` retargets with `nearest()`.
+- **Spatial queries use the world's index.** `GuideInterceptors` retargets with
+  `nearest()`. Detection and track updates ask an index of the radars that
+  scanned this step (`ScanningRadars`).
 - **Tracks are not in the world's spatial index.** A track's position is blue's
   estimate. Giving tracks a `Kinematics` would have them coast between radar
   updates, but `UpdateTracks` would then write track `Kinematics` while reading
@@ -1929,7 +1931,7 @@ Clang 22 does not. We will revisit it when both compilers do.
 
 Each step ends with a working application and passing tests.
 
-1. **Framework (done).** `Entity`, `Store`, `World`, systems, schedules, builders and
+1. **Framework (done).** `Entity`, `ComponentStore`, `World`, systems, schedules, builders and
    commands, with tests. Benchmark the dense store against the stable-slot
    store at 1k, 10k and 100k entities with 0–75% churn, for iteration and
    random lookup, and record the choice here. Run the units spike (mp-units

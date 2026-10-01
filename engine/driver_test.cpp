@@ -171,6 +171,21 @@ TEST_CASE("RealTimeDriver") {
     CHECK(driver.driver().now() == TimePoint{60ms});
   }
 
+  SECTION("ShouldTakeStepGivenWallClockExactlyAtStepBoundary") {
+    // 22 ms at speed 5 is exactly 110 ms, eleven 10 ms steps. Truncating the
+    // floating-point product lands at 109.999999 ms, one step short.
+    Recorder fast_recorder;
+    RealTimeDriver<Recorder, FakeClock> fast{Timing{.max_step = 10ms}, 5.0,
+                                             lib::Depend(fast_recorder)};
+    REQUIRE(fast.tick() == Flow::CONTINUE);
+
+    FakeClock::current += 22ms;
+    REQUIRE(fast.tick() == Flow::CONTINUE);
+
+    CHECK(fast_recorder.steps.size() == 11u);
+    CHECK(fast.driver().now() == TimePoint{110ms});
+  }
+
   SECTION("ShouldTakeSameStepsAsBatchGivenIrregularWallTicks") {
     for (auto wall : {3ms, 17ms, 18ms, 41ms, 100ms, 101ms, 150ms}) {
       FakeClock::current = FakeClock::time_point{wall};

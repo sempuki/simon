@@ -1,13 +1,14 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
-// Compares framework::Store (dense arrays with an entity index) against a
-// stable-slot store at several populations and churn levels. Churn destroys a
-// random fraction of the population, as when drones are shot down, so the
-// stable-slot store is left with holes.
+// Compares framework::ComponentStore (dense arrays with an entity index)
+// against a stable-slot store at several populations and churn levels. Churn
+// destroys a random fraction of the population, as when drones are shot down,
+// so the stable-slot store is left with holes.
 //
-//   bazel run -c opt //framework:store_benchmark
+//   bazel run -c opt //framework:component_store_benchmark
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -16,15 +17,15 @@
 #include <vector>
 
 #include "base/core.hpp"
+#include "framework/component_store.hpp"
 #include "framework/entity.hpp"
-#include "framework/store.hpp"
 
 namespace simon::framework {
 namespace {
 
-// The stable-slot alternative to Store, for comparison only. Each entity index
-// has a fixed slot, so a lookup is one load and nothing ever moves, but
-// destroyed entities leave holes that iteration must skip.
+// The stable-slot alternative to ComponentStore, for comparison only. Each
+// entity index has a fixed slot, so a lookup is one load and nothing ever
+// moves, but destroyed entities leave holes that iteration must skip.
 template <typename ComponentType>
 class StableSlotStore final {
  public:
@@ -68,9 +69,9 @@ class StableSlotStore final {
 
 // About the size of Kinematics: nine doubles, 72 bytes.
 struct Body final {
-  double position[3] = {};
-  double velocity[3] = {1.0, 2.0, 3.0};
-  double acceleration[3] = {};
+  std::array<double, 3> position{};
+  std::array<double, 3> velocity{1.0, 2.0, 3.0};
+  std::array<double, 3> acceleration{};
 };
 
 template <typename Type>
@@ -170,7 +171,7 @@ Result measure_dense(std::size_t count, double churn,
   EntityTable table{count};
   Population population =
       make_population(count, churn, lib::InOut(table), random);
-  Store<Body> store{count, count};
+  ComponentStore<Body> store{count, count};
   populate(population, lib::InOut(store));
   return measure(
       population,

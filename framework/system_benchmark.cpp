@@ -29,6 +29,7 @@
 //   bazel run -c opt //framework:system_benchmark [-- --contend[=N]]
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -66,14 +67,14 @@ struct Point final {
 
 // About the size of Kinematics: nine doubles, 72 bytes.
 struct Body final {
-  double position[3] = {};
-  double velocity[3] = {1.0, 2.0, 3.0};
-  double acceleration[3] = {};
+  std::array<double, 3> position{};
+  std::array<double, 3> velocity{1.0, 2.0, 3.0};
+  std::array<double, 3> acceleration{};
 };
 
 // About the size of Control: three doubles, 24 bytes.
 struct Thrust final {
-  double acceleration[3] = {0.1, 0.2, 0.3};
+  std::array<double, 3> acceleration{0.1, 0.2, 0.3};
 };
 
 struct Craft final : Archetype<"craft", Requires<Body>, Allows<Thrust>> {};

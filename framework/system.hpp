@@ -248,7 +248,7 @@ class WorldAccess final {
 
   // A store in the system's AllowComponentList, for whole-store reads.
   template <typename ComponentType>
-  const Store<ComponentType>& store_of() const {
+  const ComponentStore<ComponentType>& store_of() const {
     static_assert(
         contains_v<allow_component_list_of_t<SystemType>, ComponentType>,
         "Declare this component in the system's AllowComponentList to read its "
@@ -323,7 +323,7 @@ const ComponentType& component_of(
 }
 
 template <typename ComponentType, typename SystemType, typename WorldType>
-const Store<ComponentType>& store_of(
+const ComponentStore<ComponentType>& store_of(
     const WorldAccess<SystemType, WorldType>& access) {
   return access.template store_of<ComponentType>();
 }

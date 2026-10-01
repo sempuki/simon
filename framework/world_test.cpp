@@ -3,6 +3,7 @@
 #include "framework/world.hpp"
 
 #include <expected>
+#include <limits>
 #include <stdexcept>
 #include <type_traits>
 #include <vector>
@@ -55,6 +56,17 @@ TEST_CASE("SetUpBuilder") {
     TestWorld world;
     auto built = TestWorld::set_up()
                      .holding<Body>(std::size_t{1} << 40)
+                     .build(lib::Out(world));
+
+    REQUIRE_FALSE(built.has_value());
+    CHECK(built.error() == lib::watch(BuildError::CAPACITY_TOO_LARGE));
+  }
+
+  SECTION("ShouldRefuseGivenHoldingsThatWrapWhenAdded") {
+    TestWorld world;
+    auto built = TestWorld::set_up()
+                     .holding<Body>(std::numeric_limits<std::size_t>::max())
+                     .holding<testing::Launcher>(2)
                      .build(lib::Out(world));
 
     REQUIRE_FALSE(built.has_value());
@@ -655,6 +667,16 @@ TEST_CASE("World") {
     REQUIRE_FALSE(attached);
     CHECK(attached.error() == lib::watch(BuildError::COMPONENT_NOT_PERMITTED));
     CHECK(world.pending() == 0u);
+  }
+
+  SECTION("ShouldDescribeEntityGivenCreatedBeforeSync") {
+    Entity launcher =
+        *world.create<testing::Launcher>("lookout").with(Position{}).build();
+
+    CHECK(world.aliases_of(world.archetype_of(launcher)) ==
+          std::vector<Alias>{Alias{"launcher"}});
+    CHECK(world.describe(world.name_of(launcher)).contains("lookout"));
+    CHECK(world.describe(world.name_of(launcher)).contains("launcher"));
   }
 
   SECTION("ShouldReturnErrorGivenEntityCapacityExhausted") {

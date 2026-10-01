@@ -201,7 +201,9 @@ using Sensing =
 // Tracks are not in the world's spatial index: a track's position is blue's
 // estimate, and UpdateTracks could not write a track Kinematics while reading
 // its target's. So this system indexes the estimates itself, on the first
-// query in a step.
+// query in a step: most steps no launcher is ready, and building it in
+// prepare every step costs four times as much. This relies on the
+// per-entity loop running on one thread.
 struct ProposeEngagements final : System<Launcher, const Kinematics> {
   using LocalWorld = WorldAccess<ProposeEngagements>;
   using SequenceAfterSystemList = SystemList<DropStaleTracks>;

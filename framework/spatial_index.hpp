@@ -190,10 +190,20 @@ class SpatialIndex final {
   };
 
   Cell cell_of(const Coordinates& point) const {
-    return Cell{
-        static_cast<std::int64_t>(std::floor(point[0] * inverse_cell_size_)),
-        static_cast<std::int64_t>(std::floor(point[1] * inverse_cell_size_)),
-        static_cast<std::int64_t>(std::floor(point[2] * inverse_cell_size_))};
+    return Cell{cell_index(point[0]), cell_index(point[1]),
+                cell_index(point[2])};
+  }
+
+  // The cell along one axis, clamped well inside int64, so an infinite or
+  // huge coordinate (such as the edge of an infinite radius) still converts
+  // and stays clear of overflow in ring arithmetic.
+  std::int64_t cell_index(double coordinate) const {
+    constexpr double LIMIT = 4.0e18;
+    double scaled = std::floor(coordinate * inverse_cell_size_);
+    if (std::isnan(scaled)) {
+      return 0;
+    }
+    return static_cast<std::int64_t>(std::clamp(scaled, -LIMIT, LIMIT));
   }
 
   std::uint32_t bucket_of(const Cell& cell) const {
@@ -213,7 +223,7 @@ class SpatialIndex final {
   }
 
   std::optional<Box> box_of(const Coordinates& center, double radius) const {
-    if (entries_.empty() || radius < 0.0) {
+    if (entries_.empty() || !(radius >= 0.0)) {  // Also refuses NaN.
       return std::nullopt;
     }
     Cell low =

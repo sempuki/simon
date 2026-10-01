@@ -21,7 +21,7 @@ cc_library(
         "name.hpp",
         "spatial_index.hpp",
         "step.hpp",
-        "store.hpp",
+        "component_store.hpp",
         "system.hpp",
         "type_list.hpp",
         "world.hpp",
@@ -50,18 +50,19 @@ cc_library(
     "entity",
     "name",
     "spatial_index",
-    "store",
+    "component_store",
     "system",
     "world",
 ]]
 
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 
-# Dense store against a stable-slot store; backs the store layout decision in
-# documents/design.md. Run with: bazel run -c opt //framework:store_benchmark
+# The dense component store against a stable-slot store; backs the store
+# layout decision in documents/design.md. Run with:
+# bazel run -c opt //framework:component_store_benchmark
 cc_binary(
-    name = "store_benchmark",
-    srcs = ["store_benchmark.cpp"],
+    name = "component_store_benchmark",
+    srcs = ["component_store_benchmark.cpp"],
     copts = COPTS,
     deps = [":framework"],
 )
@@ -79,8 +80,9 @@ cc_binary(
     ],
 )
 
-# Store layouts under churn: dense, sorted, owning group, hybrid, generational
-# and archetype segments; backs the layout decision in documents/design.md.
+# Component store layouts under churn: dense, sorted, owning group, hybrid,
+# generational and archetype segments; backs the layout decision in
+# documents/design.md.
 # Run with: bazel run -c opt //framework:churn_benchmark [-- --contend[=N]]
 cc_binary(
     name = "churn_benchmark",

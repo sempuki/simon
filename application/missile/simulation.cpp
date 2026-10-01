@@ -93,6 +93,10 @@ SiteBuilder create_site(Position origin, lib::Depend<World> world) {
 
 std::expected<Entity, framework::Status> build_scenario(
     const Scenario& scenario, lib::InOut<World> world) {
+  if (scenario.sites < 1) {
+    return std::unexpected(lib::raise(framework::BuildError::ENTITY_NOT_ALIVE,
+                                      "A scenario needs at least one site."));
+  }
   auto count = [](int value) {
     return static_cast<std::size_t>(std::max(value, 0));
   };
@@ -129,16 +133,14 @@ std::expected<Entity, framework::Status> build_scenario(
     }
   }
   world->sync();
-  if (!first) {
-    return std::unexpected(lib::raise(framework::BuildError::ENTITY_NOT_ALIVE,
-                                      "A scenario needs at least one site."));
-  }
+  CHECK_INVARIANT(first.has_value());
   return *first;
 }
 
 engine::PhaseResult Simulation::configure() {
   RETURN_IF_UNEXPECTED(build_world(scenario_, lib::Out(world_)));
   ASSIGN_OR_RETURN(asset_, build_scenario(scenario_, lib::InOut(world_)));
+  stock_ = remaining_interceptors();
   return engine::Flow::CONTINUE;
 }
 
@@ -154,12 +156,15 @@ engine::PhaseResult Simulation::step(const framework::Step& step) {
 }
 
 std::uint32_t Simulation::interceptors_fired() const {
+  return stock_ - remaining_interceptors();
+}
+
+std::uint32_t Simulation::remaining_interceptors() const {
   std::uint32_t remaining = 0;
-  world().store_of<Launcher>().for_each([&](Entity, const Launcher& launcher) {
+  world_.store_of<Launcher>().for_each([&](Entity, const Launcher& launcher) {
     remaining += launcher.inventory;
   });
-  return static_cast<std::uint32_t>(scenario_.launchers) * scenario_.inventory -
-         remaining;
+  return remaining;
 }
 
 }  // namespace simon::missile

@@ -49,8 +49,7 @@ enum class BuildError {
   ENTITY_NOT_ALIVE,
   COMPONENT_ALREADY_ATTACHED,
   COMPONENT_NOT_ATTACHED,
-  COMPONENT_NOT_PERMITTED,  // The entity's archetype neither requires nor
-                            // allows it.
+  COMPONENT_NOT_PERMITTED,  // Archetype neither requires nor allows it.
   COMPONENT_REQUIRED,       // The entity's archetype requires it.
   ALIAS_INVALID,
   ALIAS_ALREADY_GIVEN,

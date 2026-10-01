@@ -73,8 +73,8 @@
 
 #include "base/core.hpp"
 #include "framework/benchmark_support.hpp"
+#include "framework/component_store.hpp"
 #include "framework/entity.hpp"
-#include "framework/store.hpp"
 
 namespace simon::framework {
 namespace {
@@ -86,9 +86,9 @@ constexpr std::uint32_t ABSENT = std::numeric_limits<std::uint32_t>::max();
 
 // About the size of Kinematics: nine doubles, 72 bytes.
 struct Body final {
-  double position[3] = {};
-  double velocity[3] = {1.0, 2.0, 3.0};
-  double acceleration[3] = {};
+  std::array<double, 3> position{};
+  std::array<double, 3> velocity{1.0, 2.0, 3.0};
+  std::array<double, 3> acceleration{};
 };
 
 // A sibling of `BYTES` bytes, of which the system reads the first three
@@ -1037,7 +1037,7 @@ class SegmentedLayout final {
   // otherwise it is Allowed, and looked up in the sparse store.
   template <std::uint8_t WHICH, typename SiblingType>
   void walk(Segment<SiblingType> Archetype::* sibling_segment,
-            const Store<SiblingType>& allowed,
+            const ComponentStore<SiblingType>& allowed,
             lib::InOut<ChunkPool<SiblingType>> pool,
             lib::Out<std::uint64_t> with, lib::Out<std::uint64_t> without) {
     for (std::uint8_t id = 0; id < ARCHETYPES; ++id) {
@@ -1075,8 +1075,8 @@ class SegmentedLayout final {
   ChunkPool<Entity> owners_;
   ChunkPool<FirstType> firsts_;
   ChunkPool<SecondType> seconds_;
-  Store<FirstType> allowed_first_;
-  Store<SecondType> allowed_second_;
+  ComponentStore<FirstType> allowed_first_;
+  ComponentStore<SecondType> allowed_second_;
   std::vector<Archetype> archetypes_;
 };
 
@@ -1099,7 +1099,7 @@ Result measure(const Workload& workload, const Schedule& schedule) {
   Result result;
   result.bytes_per_entity = LayoutType::bytes_per_entity();
   constexpr bool COMPETING = requires { layout.iterate_second(); };
-  double seconds[4] = {};
+  std::array<double, 4> seconds{};
   for (std::size_t step = 0; step < schedule.size(); ++step) {
     if constexpr (requires { layout.set_step(0); }) {
       layout.set_step(static_cast<int>(step));

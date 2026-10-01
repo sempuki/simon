@@ -68,7 +68,7 @@ class Uninitialized final {
 // `index` maps an entity index to a slot, a position in the pool, and holds the
 // generation of the entity that owns it, so a stale entity never matches.
 template <typename ComponentType>
-class Store final {
+class ComponentStore final {
  public:
   using Slot = std::uint32_t;
 
@@ -86,12 +86,10 @@ class Store final {
         1024, std::bit_ceil(std::max<std::size_t>(capacity, 1)));
   }
 
-  DECLARE_COPY_DELETE(Store);
-  // An empty store, with room for nothing.
-  Store() : Store{0, 0} {}
-  Store(Store&&) noexcept = default;
-  // Destroys what this store holds, then takes `that`'s, leaving it empty.
-  Store& operator=(Store&& that) noexcept {
+  DECLARE_COPY_DELETE(ComponentStore);
+
+  ComponentStore(ComponentStore&&) noexcept = default;
+  ComponentStore& operator=(ComponentStore&& that) noexcept {
     if (this != &that) {
       destroy_all();
       capacity_ = that.capacity_;
@@ -109,12 +107,16 @@ class Store final {
     return *this;
   }
 
+  ComponentStore() : ComponentStore{0, 0} {}
+
   // Room for `capacity` entity-components among `segments` segments, for
   // entities whose indices are below `entity_capacity`. `chunk_size` must be a
   // power of two, and the same in every store of a world; zero picks
   // default_chunk_size.
-  Store(std::size_t capacity, std::size_t entity_capacity,
-        std::size_t segments = 1, std::size_t chunk_size = 0)
+  ComponentStore(std::size_t capacity,         //
+                 std::size_t entity_capacity,  //
+                 std::size_t segments = 1,     //
+                 std::size_t chunk_size = 0)
       : capacity_{capacity},
         chunk_size_{chunk_size ? chunk_size : default_chunk_size(capacity)},
         // Enough chunks for every entry, plus a partly filled one per segment.
@@ -128,16 +130,18 @@ class Store final {
     CHECK_PRECONDITION(segments >= 1);
     CHECK_PRECONDITION(chunks_ * chunk_size_ <
                        std::numeric_limits<Slot>::max());
+
     for (Segment& segment : segments_) {
       segment.chunks.reserve(chunks_);
     }
     free_.reserve(chunks_);
+
     for (std::size_t chunk = chunks_; chunk > 0; --chunk) {
       free_.push_back(static_cast<std::uint32_t>(chunk - 1));
     }
   }
 
-  ~Store() { destroy_all(); }
+  ~ComponentStore() { destroy_all(); }
 
   std::size_t size() const { return size_; }
   std::size_t capacity() const { return capacity_; }
@@ -221,6 +225,7 @@ class Store final {
     CHECK_PRECONDITION(!contains(entity));
     CHECK_PRECONDITION(size_ < capacity_);  // Never reallocate.
     CHECK_PRECONDITION(segment < segments_.size());
+
     Segment& into = segments_[segment];
     if (into.size % chunk_size_ == 0) {
       std::uint32_t taken = free_.back();
@@ -230,6 +235,7 @@ class Store final {
                 .ordinal = static_cast<std::uint32_t>(into.chunks.size())};
       into.chunks.push_back(taken);
     }
+
     Slot slot = slot_at(into, into.size);
     std::construct_at(&data_.data()[slot], std::move(component));
     owner_[slot] = entity;
@@ -243,6 +249,7 @@ class Store final {
   void erase(Entity entity) {
     Slot slot = slot_of(entity);
     CHECK_PRECONDITION(slot != ABSENT);
+
     Segment& from = segments_[place_[slot / chunk_size_].segment];
     Slot last = slot_at(from, from.size - 1);
     ComponentType* data = data_.data();
@@ -251,6 +258,7 @@ class Store final {
       owner_[slot] = owner_[last];
       index_[owner_[slot].index].slot = slot;
     }
+
     std::destroy_at(&data[last]);
     owner_[last] = Entity{};
     index_[entity.index] = IndexEntry{};

@@ -213,7 +213,9 @@ class RealTimeDriver final {
  private:
   // The last whole step at or before the simulated time `wall` corresponds to.
   TimePoint target_at(typename WallClockType::time_point wall) const {
-    auto simulated = std::chrono::duration_cast<Duration>(
+    // Rounded, not truncated: at an exact step boundary the floating-point
+    // product can fall a fraction of a nanosecond short.
+    auto simulated = std::chrono::round<Duration>(
         std::chrono::duration<double>(wall - wall_start_) * speed_);
     Duration step = driver_.max_step();
     return start_ + (simulated / step) * step;
@@ -230,9 +232,9 @@ class RealTimeDriver final {
 
   typename WallClockType::time_point wall_time_of(TimePoint time) const {
     auto simulated = std::chrono::duration<double>(time - start_);
-    return wall_start_ +
-           std::chrono::duration_cast<typename WallClockType::duration>(
-               simulated / speed_);
+    // Rounded up, so waiting until then never wakes just before the time.
+    return wall_start_ + std::chrono::ceil<typename WallClockType::duration>(
+                             simulated / speed_);
   }
 
   Driver<SimulationType> driver_;
