@@ -2,13 +2,15 @@
 
 // Watches a missile scenario in real time:
 //
-//   bazel run //application/missile:viewer -- [seed]
+//   bazel run //application/missile:viewer -- [seed] [--scale=N]
 //
-// Space pauses and resumes. The map pans with the left mouse button and zooms
-// with the wheel.
+// Space pauses and resumes; Esc or Ctrl+Q quits. The map pans with the left
+// mouse button and zooms with the wheel. The interface scales with the
+// display, 2x on a 4K screen at 100%; --scale overrides it.
 
 #include <SDL2/SDL.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -16,6 +18,7 @@
 #include <iostream>
 #include <memory>
 #include <numbers>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -74,8 +77,8 @@ struct Explosion final {
   WallClock::time_point start;
 };
 
-auto plot_circle(const char* label, Point center, double radius, ImVec4 color)
-    -> void {
+auto plot_circle(const char* label, Point center, double radius, ImVec4 color,
+                 float weight) -> void {
   constexpr int SEGMENTS = 64;
   std::array<double, SEGMENTS + 1> x{};
   std::array<double, SEGMENTS + 1> y{};
@@ -84,8 +87,44 @@ auto plot_circle(const char* label, Point center, double radius, ImVec4 color)
     x[i] = center.x + radius * std::cos(angle);
     y[i] = center.y + radius * std::sin(angle);
   }
-  ImPlot::SetNextLineStyle(color, 1.0f);
+  ImPlot::SetNextLineStyle(color, weight);
   ImPlot::PlotLine(label, x.data(), y.data(), SEGMENTS + 1);
+}
+
+// How much to enlarge the interface on `display`: its height in screen
+// coordinates over 1080, to the nearest quarter, so a 4K display at 100% gives
+// 2 and a 2880x1800 one gives 1.75. Screen coordinates already include the
+// compositor's scale, so a 4K display set to 200% gives 1.
+auto ui_scale(int display) -> float {
+  SDL_Rect bounds{};
+  if (SDL_GetDisplayBounds(display, &bounds) != 0 || bounds.h <= 0) {
+    return 1.0f;
+  }
+  return std::clamp(std::round(bounds.h / 1080.0f * 4.0f) / 4.0f, 1.0f, 4.0f);
+}
+
+// Enlarges ImGui's and ImPlot's fonts, spacing and lines by `scale`. Fonts are
+// rasterized at the scaled size, so text stays sharp.
+auto scale_styles(float scale) -> void {
+  ImGuiStyle& style = ImGui::GetStyle();
+  style.ScaleAllSizes(scale);
+  style.FontScaleDpi = scale;
+  ImPlotStyle& plot = ImPlot::GetStyle();
+  for (float* size :
+       {&plot.LineWeight, &plot.MarkerSize, &plot.MarkerWeight,
+        &plot.ErrorBarSize, &plot.ErrorBarWeight, &plot.DigitalBitHeight,
+        &plot.DigitalBitGap, &plot.PlotBorderSize}) {
+    *size *= scale;
+  }
+  for (ImVec2* size :
+       {&plot.MajorTickLen, &plot.MinorTickLen, &plot.MajorTickSize,
+        &plot.MinorTickSize, &plot.MajorGridSize, &plot.MinorGridSize,
+        &plot.PlotPadding, &plot.LabelPadding, &plot.LegendPadding,
+        &plot.LegendInnerPadding, &plot.LegendSpacing, &plot.MousePosPadding,
+        &plot.AnnotationPadding, &plot.PlotDefaultSize, &plot.PlotMinSize}) {
+    size->x *= scale;
+    size->y *= scale;
+  }
 }
 
 // One run of a scenario, paced to the wall clock.
@@ -132,7 +171,10 @@ class Session final {
 
 class Viewer final {
  public:
-  explicit Viewer(std::uint64_t seed) : seed_{seed} { restart(); }
+  // Draws everything `scale` times its base size.
+  Viewer(std::uint64_t seed, float scale) : seed_{seed}, scale_{scale} {
+    restart();
+  }
 
   auto frame() -> void {
     if (ImGui::IsKeyPressed(ImGuiKey_Space) && !ImGui::GetIO().WantTextInput) {
@@ -148,7 +190,7 @@ class Viewer final {
                  ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
                      ImGuiWindowFlags_NoSavedSettings |
                      ImGuiWindowFlags_NoBringToFrontOnFocus);
-    ImGui::BeginChild("Controls", ImVec2(280.0f, 0.0f),
+    ImGui::BeginChild("Controls", ImVec2(280.0f * scale_, 0.0f),
                       ImGuiChildFlags_Borders);
     draw_controls();
     ImGui::EndChild();
@@ -156,6 +198,9 @@ class Viewer final {
     draw_map();
     ImGui::End();
   }
+
+  // Whether the Quit button was pressed.
+  auto quitting() const -> bool { return quitting_; }
 
  private:
   auto restart() -> void {
@@ -221,6 +266,9 @@ class Viewer final {
     if (ImGui::Button("Restart", ImVec2(-1.0f, 0.0f))) {
       restart();
       return;
+    }
+    if (ImGui::Button("Quit (esc)", ImVec2(-1.0f, 0.0f))) {
+      quitting_ = true;
     }
 
     ImGui::SeparatorText("Time");
@@ -294,7 +342,8 @@ class Viewer final {
       if (const Kinematics* kinematics =
               world.store_of<Kinematics>().maybe_component_of(owner)) {
         plot_circle("Radar coverage", point_of(*kinematics),
-                    radar.range.numerical_value_in(model::meter), FAINT_GREEN);
+                    radar.range.numerical_value_in(model::meter), FAINT_GREEN,
+                    scale_);
       }
     });
     world.store_of<Launcher>().for_each(
@@ -303,7 +352,7 @@ class Viewer final {
                   world.store_of<Kinematics>().maybe_component_of(owner)) {
             plot_circle("Launcher range", point_of(*kinematics),
                         launcher.range.numerical_value_in(model::meter),
-                        FAINT_BLUE);
+                        FAINT_BLUE, scale_);
           }
         });
 
@@ -314,10 +363,10 @@ class Viewer final {
       tracks.add(Point{.x = position.x(), .y = position.y()});
     });
 
-    auto plot = [](const char* label, const Scatter& scatter,
-                   ImPlotMarker marker, float size, ImVec4 fill,
-                   ImVec4 outline) {
-      ImPlot::SetNextMarkerStyle(marker, size, fill, 1.0f, outline);
+    auto plot = [this](const char* label, const Scatter& scatter,
+                       ImPlotMarker marker, float size, ImVec4 fill,
+                       ImVec4 outline) {
+      ImPlot::SetNextMarkerStyle(marker, size * scale_, fill, scale_, outline);
       ImPlot::PlotScatter(label, scatter.x.data(), scatter.y.data(),
                           scatter.size());
     };
@@ -351,8 +400,8 @@ class Viewer final {
           explosion.center.x + explosion.radius * progress, explosion.center.y);
       ImVec4 color = explosion.color;
       color.w = 1.0f - progress;
-      draw->AddCircle(center, std::max(2.0f, edge.x - center.x),
-                      ImGui::GetColorU32(color), 32, 2.0f);
+      draw->AddCircle(center, std::max(2.0f * scale_, edge.x - center.x),
+                      ImGui::GetColorU32(color), 32, 2.0f * scale_);
     }
     ImPlot::PopPlotClipRect();
   }
@@ -364,6 +413,8 @@ class Viewer final {
   };
 
   std::uint64_t seed_;
+  float scale_ = 1.0f;
+  bool quitting_ = false;
   float speed_ = 4.0f;
   std::unique_ptr<Session> session_;
   std::unordered_map<Name, Sighting> last_seen_;
@@ -375,7 +426,16 @@ class Viewer final {
 
 auto main(int argc, char** argv) -> int {
   using namespace simon;
-  std::uint64_t seed = argc > 1 ? std::strtoull(argv[1], nullptr, 10) : 1;
+  std::uint64_t seed = 1;
+  float scale = 0.0f;  // Chosen from the display unless given.
+  for (int i = 1; i < argc; ++i) {
+    std::string_view argument = argv[i];
+    if (argument.starts_with("--scale=")) {
+      scale = std::strtof(argv[i] + 8, nullptr);
+    } else {
+      seed = std::strtoull(argv[i], nullptr, 10);
+    }
+  }
 
   // Prefer Wayland: SDL2 defaults to X11, where this SDL build has no GPU
   // renderer (it ships GLES2 over EGL, not GLX).
@@ -384,8 +444,16 @@ auto main(int argc, char** argv) -> int {
     std::cerr << "Error: " << SDL_GetError() << "\n";
     return EXIT_FAILURE;
   }
+  if (!(scale > 0.0f)) {
+    scale = missile::ui_scale(0);
+  }
+  // 1280 by 900 at scale 1, and never more than most of the display.
+  SDL_Rect usable{.x = 0, .y = 0, .w = 1280, .h = 900};
+  SDL_GetDisplayUsableBounds(0, &usable);
+  int width = std::min(static_cast<int>(1280 * scale), usable.w * 9 / 10);
+  int height = std::min(static_cast<int>(900 * scale), usable.h * 9 / 10);
   SDL_Window* window = SDL_CreateWindow(
-      "Missile", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 900,
+      "Missile", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height,
       static_cast<SDL_WindowFlags>(SDL_WINDOW_RESIZABLE |
                                    SDL_WINDOW_ALLOW_HIGHDPI));
   SDL_Renderer* renderer = SDL_CreateRenderer(
@@ -405,11 +473,12 @@ auto main(int argc, char** argv) -> int {
   ImPlot::CreateContext();
   ImGui::GetIO().IniFilename = nullptr;  // Nothing to save between runs.
   ImGui::StyleColorsDark();
+  missile::scale_styles(scale);
   ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
   ImGui_ImplSDLRenderer2_Init(renderer);
 
   {
-    missile::Viewer viewer{seed};
+    missile::Viewer viewer{seed, scale};
     bool done = false;
     while (!done) {
       SDL_Event event;
@@ -419,6 +488,13 @@ auto main(int argc, char** argv) -> int {
             (event.type == SDL_WINDOWEVENT &&
              event.window.event == SDL_WINDOWEVENT_CLOSE &&
              event.window.windowID == SDL_GetWindowID(window))) {
+          done = true;
+        }
+        // Esc or Ctrl+Q quits, unless a text field has the keyboard.
+        if (event.type == SDL_KEYDOWN && !ImGui::GetIO().WantTextInput &&
+            (event.key.keysym.sym == SDLK_ESCAPE ||
+             (event.key.keysym.sym == SDLK_q &&
+              (event.key.keysym.mod & KMOD_CTRL) != 0))) {
           done = true;
         }
       }
@@ -431,6 +507,7 @@ auto main(int argc, char** argv) -> int {
       SDL_RenderClear(renderer);
       ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
       SDL_RenderPresent(renderer);
+      done = done || viewer.quitting();
     }
   }
 
