@@ -308,9 +308,9 @@ class Viewer final {
         });
 
     Scatter tracks;
-    world.store_of<Track>().for_each([&](Entity, const Track& track) {
+    world.store_of<Estimate>().for_each([&](Entity, const Estimate& estimate) {
       model::Vector3d position =
-          track.position.numerical_value_in(model::meter);
+          estimate.position.numerical_value_in(model::meter);
       tracks.add(Point{.x = position.x(), .y = position.y()});
     });
 

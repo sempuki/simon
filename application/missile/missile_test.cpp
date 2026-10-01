@@ -75,7 +75,9 @@ Entity make_launcher(lib::InOut<World> world, Position position) {
 
 Entity make_track(lib::InOut<World> world, Entity target, Position position) {
   return *world->create<archetype::Track>()
-              .with(Track{.target = target, .position = position})
+              .with(Track{.target = target})
+              .with(Estimate{.position = position})
+              .with(Engagement{})
               .build();
 }
 
@@ -165,9 +167,9 @@ TEST_CASE("MissileSimulation") {
   }
 }
 
-TEST_CASE("ScanRadars") {
+TEST_CASE("DetectDrones") {
   World world{SMALL};
-  framework::Scheduler<World, SystemList<ScanRadars>> scheduler;
+  framework::Scheduler<World, SystemList<ScanRadars, DetectDrones>> scheduler;
 
   SECTION("ShouldCreateOneTrackGivenTwoRadarsSeeingOneDrone") {
     make_radar(lib::InOut(world), model::meters(0.0, 0.0, 0.0));
@@ -193,6 +195,53 @@ TEST_CASE("ScanRadars") {
 
     CHECK(world.store_of<Track>().size() == 0u);
   }
+
+  SECTION("ShouldNotTrackAgainGivenDroneAlreadyTracked") {
+    make_radar(lib::InOut(world), model::meters(0.0, 0.0, 0.0));
+    make_drone(lib::InOut(world), model::meters(500.0, 0.0, 0.0));
+    world.sync();
+
+    step(scheduler, lib::InOut(world), TimePoint{});
+    step(scheduler, lib::InOut(world), TimePoint{1s});  // The next scan.
+
+    CHECK(world.store_of<Track>().size() == 1u);
+  }
+}
+
+TEST_CASE("UpdateTracks") {
+  World world{SMALL};
+  framework::Scheduler<World, SystemList<ScanRadars, UpdateTracks>> scheduler;
+
+  SECTION("ShouldUpdateEstimateGivenScanningRadarCoversTarget") {
+    make_radar(lib::InOut(world), model::meters(0.0, 0.0, 0.0));
+    Entity drone =
+        make_drone(lib::InOut(world), model::meters(500.0, 0.0, 0.0));
+    Entity track =
+        make_track(lib::InOut(world), drone, model::meters(0.0, 0.0, 0.0));
+    world.sync();
+
+    step(scheduler, lib::InOut(world), TimePoint{2s});
+
+    CHECK(world.store_of<Estimate>().component_of(track).position ==
+          model::meters(500.0, 0.0, 0.0));
+    CHECK(world.store_of<Track>().component_of(track).last_seen ==
+          TimePoint{2s});
+  }
+
+  SECTION("ShouldKeepEstimateGivenTargetOutOfRange") {
+    make_radar(lib::InOut(world), model::meters(0.0, 0.0, 0.0));
+    Entity drone =
+        make_drone(lib::InOut(world), model::meters(5000.0, 0.0, 0.0));
+    Entity track =
+        make_track(lib::InOut(world), drone, model::meters(4500.0, 0.0, 0.0));
+    world.sync();
+
+    step(scheduler, lib::InOut(world), TimePoint{2s});
+
+    CHECK(world.store_of<Estimate>().component_of(track).position ==
+          model::meters(4500.0, 0.0, 0.0));
+    CHECK(world.store_of<Track>().component_of(track).last_seen == TimePoint{});
+  }
 }
 
 TEST_CASE("DropStaleTracks") {
@@ -214,9 +263,9 @@ TEST_CASE("DropStaleTracks") {
   }
 }
 
-TEST_CASE("Engagement") {
+TEST_CASE("Engaging") {
   World world{SMALL};
-  framework::Scheduler<World, Engagement> scheduler;
+  framework::Scheduler<World, Engaging> scheduler;
 
   SECTION("ShouldLaunchOneInterceptorGivenTwoLaunchersProposingOneTrack") {
     make_launcher(lib::InOut(world), model::meters(0.0, 0.0, 0.0));

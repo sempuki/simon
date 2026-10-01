@@ -339,13 +339,18 @@ struct SystemRunner final {
                   "iteration order.");
 
     WorldAccess<SystemType, WorldType> access{lib::Depend<WorldType>{*world}};
-    stage(system, access, step,
-          [](auto& target,
-             auto&... arguments) -> decltype(target.prepare(arguments...)) {
-            return target.prepare(arguments...);
-          });
-    loop(system, world, lib::InOut(access), step,
-         typename SystemType::OtherComponentList{});
+    // A prepare stage that returns false skips the per-entity loop, for steps
+    // with nothing to do.
+    bool proceed =
+        stage(system, access, step,
+              [](auto& target,
+                 auto&... arguments) -> decltype(target.prepare(arguments...)) {
+                return target.prepare(arguments...);
+              });
+    if (proceed) {
+      loop(system, world, lib::InOut(access), step,
+           typename SystemType::OtherComponentList{});
+    }
     stage(system, access, step,
           [](auto& target,
              auto&... arguments) -> decltype(target.resolve(arguments...)) {
@@ -365,17 +370,28 @@ struct SystemRunner final {
   }
 
   // Calls an optional stage (prepare or resolve) as stage(world, step) or
-  // stage(world), whichever the system declares.
+  // stage(world), whichever the system declares. Returns what a stage that
+  // returns bool returned, and true otherwise.
   template <typename SystemType, typename WorldAccessType, typename CallType>
-  static void stage(lib::InOut<SystemType> system, WorldAccessType& access,
+  static bool stage(lib::InOut<SystemType> system, WorldAccessType& access,
                     const Step& step, CallType call) {
     Step copy = step;
+    auto outcome = [](auto&& invoke) {
+      if constexpr (std::is_same_v<decltype(invoke()), bool>) {
+        return invoke();
+      } else {
+        invoke();
+        return true;
+      }
+    };
     if constexpr (std::is_invocable_v<CallType, SystemType&, WorldAccessType&,
                                       Step&>) {
-      call(*system, access, copy);
+      return outcome([&] { return call(*system, access, copy); });
     } else if constexpr (std::is_invocable_v<CallType, SystemType&,
                                              WorldAccessType&>) {
-      call(*system, access);
+      return outcome([&] { return call(*system, access); });
+    } else {
+      return true;
     }
   }
 

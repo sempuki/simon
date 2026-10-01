@@ -16,12 +16,18 @@ struct Pose final {
   Quaternion orientation = Quaternion::Identity();
 };
 
-// The toolkit's default spatial model: local Cartesian 3D, SI units.
+// The toolkit's default spatial model: a point mass in local Cartesian 3D, SI
+// units. It holds only what motion and spatial queries read every step (48
+// bytes). An entity that needs an attitude also has an Orientation; the
+// commanded acceleration is in Control.
 struct Kinematics final {
   Position position = meters(0.0, 0.0, 0.0);
-  Quaternion orientation = Quaternion::Identity();
   Velocity velocity = meters_per_second(0.0, 0.0, 0.0);
-  Acceleration acceleration = meters_per_second_squared(0.0, 0.0, 0.0);
+};
+
+// The attitude of an entity that has one, such as a sensor that points.
+struct Orientation final {
+  Quaternion orientation = Quaternion::Identity();
 };
 
 inline Length distance(const Kinematics& a, const Kinematics& b) {
@@ -40,9 +46,14 @@ inline double coordinate_length(const Kinematics&, Length length) {
   return length.numerical_value_in(meter);
 }
 
+// A point mass has no attitude of its own, so its orientation is the
+// identity.
 inline Pose pose(const Kinematics& kinematics) {
+  return Pose{.position = kinematics.position};
+}
+inline Pose pose(const Kinematics& kinematics, const Orientation& orientation) {
   return Pose{.position = kinematics.position,
-              .orientation = kinematics.orientation};
+              .orientation = orientation.orientation};
 }
 
 // The commanded acceleration. Guidance and steering write it; Integrate reads
@@ -58,7 +69,6 @@ inline void integrate_midpoint(lib::InOut<Kinematics> kinematics,
   Velocity mid_velocity = kinematics->velocity + acceleration * (dt * 0.5);
   kinematics->position += mid_velocity * dt;
   kinematics->velocity += acceleration * dt;
-  kinematics->acceleration = acceleration;
 }
 
 }  // namespace simon::model

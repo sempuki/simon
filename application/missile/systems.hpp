@@ -35,61 +35,30 @@ inline Length distance_between(const Position& a, const Position& b) {
 
 //-- Sensing ------------------------------------------------------------------
 
-// Each radar that scans this step creates a track for every red drone in range
-// that has none. The drone is marked Tracked first; if another radar marked it
-// earlier in this step, the builder refuses and the new track is dropped.
-struct ScanRadars final : System<Radar, const Kinematics> {
+// Each radar decides whether it scans this step. What a scan finds is decided
+// by the drones and tracks themselves (DetectDrones, UpdateTracks), so each
+// entity writes only itself.
+struct ScanRadars final : System<Radar> {
   using LocalWorld = WorldAccess<ScanRadars>;
-  using AllowComponentList = TypeList<Kinematics, RedDrone, Tracked>;
 
-  void operator()(LocalWorld& world, Entity, Radar& radar,
-                  const Kinematics* kinematics, Step step) {
-    radar.scanned = false;
-    if (!kinematics || !radar.scan.fire(step)) {
-      return;
-    }
-    radar.scanned = true;
-    world.within(
-        *kinematics, radar.range,
-        [&](Entity drone, const Kinematics& drone_kinematics) {
-          if (!world.try_component_of<RedDrone>(drone) ||
-              world.try_component_of<Tracked>(drone)) {
-            return;
-          }
-          auto track = world.create<archetype::Track>()
-                           .with(Track{.target = drone,
-                                       .position = drone_kinematics.position,
-                                       .velocity = drone_kinematics.velocity,
-                                       .last_seen = step.time})
-                           .build();
-          if (!track) {
-            return;
-          }
-          if (!world.change(drone).attach(Tracked{.track = *track}).build()) {
-            // Another radar got there first.
-            auto dropped = world.destroy(*track).build();
-            DECLARE_UNUSED(dropped);
-          }
-        });
+  void operator()(LocalWorld&, Entity, Radar& radar, Step step) {
+    radar.scanned = radar.scan.fire(step).has_value();
   }
 };
 
-// Each track updates itself from any radar that scanned its target this step.
-// The radars are perfect for now: the estimate is the truth.
-struct UpdateTracks final : System<Track> {
-  using LocalWorld = WorldAccess<UpdateTracks>;
-  using SequenceAfterSystemList = SystemList<ScanRadars>;
-  using AllowComponentList = TypeList<Kinematics, Radar>;
-
-  // Collects the radars that scanned this step, once, and indexes them, so
-  // each track checks only the radars near it. Radars scan a few times a
-  // second, so most steps there are none.
-  void prepare(LocalWorld& world) {
+// The radars that scanned this step, indexed so a query looks only at radars
+// near it. Systems build one in `prepare`.
+class ScanningRadars final {
+ public:
+  // Collects and indexes the radars that scanned. Returns whether any did.
+  template <typename WorldAccessType>
+  bool collect(WorldAccessType& world) {
     scanning_.clear();
     longest_ = 0.0 * model::meter;
-    const auto& radars = world.store_of<Radar>();
+    const auto& radars = world.template store_of<Radar>();
     radars.for_each([&](Entity owner, const Radar& radar) {
-      const Kinematics* kinematics = world.try_component_of<Kinematics>(owner);
+      const Kinematics* kinematics =
+          world.template try_component_of<Kinematics>(owner);
       if (radar.scanned && kinematics) {
         scanning_.push_back(
             Scanning{.radar = kinematics, .range = radar.range});
@@ -97,7 +66,7 @@ struct UpdateTracks final : System<Track> {
       }
     });
     if (scanning_.empty()) {
-      return;
+      return false;
     }
     if (!index_) {
       index_.emplace(radars.capacity(), CELL_SIZE);
@@ -105,29 +74,23 @@ struct UpdateTracks final : System<Track> {
     index_->rebuild(scanning_.size(), [&](std::size_t slot) {
       return model::coordinates(*scanning_[slot].radar);
     });
+    return true;
   }
 
-  void operator()(LocalWorld& world, Entity, Track& track, Step step) {
+  // Whether a radar that scanned is within its range of `target`. Looks only
+  // as far as the longest range.
+  bool cover(const Kinematics& target) const {
     if (scanning_.empty()) {
-      return;
+      return false;
     }
-    const Kinematics* target = world.try_component_of<Kinematics>(track.target);
-    if (!target) {
-      return;
-    }
-    // Any scanning radar whose range covers the target will do; the nearest
-    // such radar is found by looking only as far as the longest range.
-    std::optional<std::uint32_t> seen_by = index_->nearest(
-        model::coordinates(*target), longest_.numerical_value_in(model::meter),
-        [&](std::uint32_t slot) {
-          const Scanning& scanning = scanning_[slot];
-          return distance(*scanning.radar, *target) <= scanning.range;
-        });
-    if (seen_by) {
-      track.position = target->position;
-      track.velocity = target->velocity;
-      track.last_seen = step.time;
-    }
+    return index_
+        ->nearest(model::coordinates(target),
+                  longest_.numerical_value_in(model::meter),
+                  [&](std::uint32_t slot) {
+                    const Scanning& scanning = scanning_[slot];
+                    return distance(*scanning.radar, target) <= scanning.range;
+                  })
+        .has_value();
   }
 
  private:
@@ -140,6 +103,68 @@ struct UpdateTracks final : System<Track> {
   std::vector<Scanning> scanning_;
   Length longest_ = 0.0 * model::meter;
   std::optional<framework::SpatialIndex> index_;  // Sized on first use.
+};
+
+// Each untracked red drone that a scanning radar covers creates its own track
+// and marks itself Tracked. The drone writes only itself and creates at most
+// one track, so however many radars see it, it gets one.
+struct DetectDrones final
+    : System<const RedDrone, const Kinematics, const Tracked> {
+  using LocalWorld = WorldAccess<DetectDrones>;
+  using SequenceAfterSystemList = SystemList<ScanRadars>;
+  using AllowComponentList = TypeList<Kinematics, Radar>;
+
+  // Steps without a scan have nothing to detect.
+  bool prepare(LocalWorld& world) { return radars_.collect(world); }
+
+  void operator()(LocalWorld& world, Entity self, const RedDrone&,
+                  const Kinematics* kinematics, const Tracked* tracked,
+                  Step step) {
+    if (tracked || !kinematics || !radars_.cover(*kinematics)) {
+      return;
+    }
+    auto track = world.create<archetype::Track>()
+                     .with(Track{.target = self, .last_seen = step.time})
+                     .with(Estimate{.position = kinematics->position,
+                                    .velocity = kinematics->velocity})
+                     .with(Engagement{})
+                     .build();
+    if (!track) {
+      return;
+    }
+    if (!world.change(self).attach(Tracked{.track = *track}).build()) {
+      auto dropped = world.destroy(*track).build();
+      DECLARE_UNUSED(dropped);
+    }
+  }
+
+ private:
+  ScanningRadars radars_;
+};
+
+// Each track updates its estimate from any radar that scanned its target this
+// step. The radars are perfect for now: the estimate is the truth.
+struct UpdateTracks final : System<Track, Estimate> {
+  using LocalWorld = WorldAccess<UpdateTracks>;
+  using SequenceAfterSystemList = SystemList<DetectDrones>;
+  using AllowComponentList = TypeList<Kinematics, Radar>;
+
+  // Steps without a scan have nothing to update.
+  bool prepare(LocalWorld& world) { return radars_.collect(world); }
+
+  void operator()(LocalWorld& world, Entity, Track& track, Estimate* estimate,
+                  Step step) {
+    const Kinematics* target = world.try_component_of<Kinematics>(track.target);
+    if (!estimate || !target || !radars_.cover(*target)) {
+      return;
+    }
+    estimate->position = target->position;
+    estimate->velocity = target->velocity;
+    track.last_seen = step.time;
+  }
+
+ private:
+  ScanningRadars radars_;
 };
 
 // Destroys tracks whose target is gone or has not been seen for `timeout`, and
@@ -166,7 +191,8 @@ struct DropStaleTracks final : System<const Track> {
   Duration timeout = 5s;
 };
 
-using Sensing = SystemList<ScanRadars, UpdateTracks, DropStaleTracks>;
+using Sensing =
+    SystemList<ScanRadars, DetectDrones, UpdateTracks, DropStaleTracks>;
 
 //-- Engagement ---------------------------------------------------------------
 
@@ -179,7 +205,7 @@ using Sensing = SystemList<ScanRadars, UpdateTracks, DropStaleTracks>;
 struct ProposeEngagements final : System<Launcher, const Kinematics> {
   using LocalWorld = WorldAccess<ProposeEngagements>;
   using SequenceAfterSystemList = SystemList<DropStaleTracks>;
-  using AllowComponentList = TypeList<Track>;
+  using AllowComponentList = TypeList<Estimate, Engagement>;
 
   void prepare(LocalWorld&) { indexed_ = false; }
 
@@ -190,15 +216,15 @@ struct ProposeEngagements final : System<Launcher, const Kinematics> {
     if (!kinematics || launcher.inventory == 0 || now < launcher.ready_at) {
       return;
     }
-    const auto& tracks = world.store_of<Track>();
+    const auto& estimates = world.store_of<Estimate>();
     if (!indexed_) {
       if (!tracks_) {
-        tracks_.emplace(tracks.capacity(), CELL_SIZE);
+        tracks_.emplace(estimates.capacity(), CELL_SIZE);
       }
       tracks_->rebuild([&](auto&& insert) {
-        tracks.for_each_slot(
-            [&](std::uint32_t slot, Entity, const Track& track) {
-              insert(slot, model::coordinates(track.position));
+        estimates.for_each_slot(
+            [&](std::uint32_t slot, Entity, const Estimate& estimate) {
+              insert(slot, model::coordinates(estimate.position));
             });
       });
       indexed_ = true;
@@ -207,11 +233,13 @@ struct ProposeEngagements final : System<Launcher, const Kinematics> {
         model::coordinates(kinematics->position),
         launcher.range.numerical_value_in(model::meter),
         [&](std::uint32_t slot) {
-          const Track& track = tracks.component_at(slot);
-          return track.engaged_by == Entity{} || now >= track.engaged_until;
+          const Engagement* engagement =
+              world.try_component_of<Engagement>(estimates.owner_at(slot));
+          return engagement && (engagement->engaged_by == Entity{} ||
+                                now >= engagement->engaged_until);
         });
     if (nearest) {
-      launcher.proposal = tracks.owner_at(*nearest);
+      launcher.proposal = estimates.owner_at(*nearest);
     }
   }
 
@@ -223,15 +251,16 @@ struct ProposeEngagements final : System<Launcher, const Kinematics> {
 
 // Each unengaged track accepts the nearest launcher that proposed it. Ties go
 // to the launcher that comes first in iteration order.
-struct ResolveEngagements final : System<Track> {
+struct ResolveEngagements final : System<Engagement, const Estimate> {
   using LocalWorld = WorldAccess<ResolveEngagements>;
   using SequenceAfterSystemList = SystemList<ProposeEngagements>;
   using AllowComponentList = TypeList<Launcher, Kinematics>;
 
   // Indexes this step's proposals by track, once, so each track finds its
   // proposers without scanning every launcher. Launchers are indexed in store
-  // order, so ties still go to the launcher that comes first.
-  void prepare(LocalWorld& world) {
+  // order, so ties still go to the launcher that comes first. Steps without
+  // proposals have nothing to resolve.
+  bool prepare(LocalWorld& world) {
     proposals_.clear();
     world.store_of<Launcher>().for_each(
         [&](Entity owner, const Launcher& launcher) {
@@ -241,11 +270,14 @@ struct ResolveEngagements final : System<Track> {
           }
         });
     std::ranges::stable_sort(proposals_, {}, &Proposal::track);
+    return !proposals_.empty();
   }
 
-  void operator()(LocalWorld& world, Entity self, Track& track, Step step) {
+  void operator()(LocalWorld& world, Entity self, Engagement& engagement,
+                  const Estimate* estimate, Step step) {
     TimePoint now = step.time;
-    if (track.engaged_by != Entity{} && now < track.engaged_until) {
+    if (!estimate ||
+        (engagement.engaged_by != Entity{} && now < engagement.engaged_until)) {
       return;
     }
     auto [begin, end] =
@@ -259,16 +291,16 @@ struct ResolveEngagements final : System<Track> {
                                .proposal != self) {
         continue;  // A stale index entry for a reused entity index.
       }
-      Length range = distance_between(track.position, launcher->position);
+      Length range = distance_between(estimate->position, launcher->position);
       if (!nearest || range < *nearest) {
         nearest = range;
-        track.engaged_by = proposal->launcher;
-        track.engaged_until = now + engagement;
+        engagement.engaged_by = proposal->launcher;
+        engagement.engaged_until = now + duration;
       }
     }
   }
 
-  Duration engagement = 30s;  // About an interceptor's flight time.
+  Duration duration = 30s;  // About an interceptor's flight time.
 
  private:
   struct Proposal final {
@@ -295,17 +327,20 @@ struct InterceptorDesign final {
 struct LaunchInterceptors final : System<Launcher, const Kinematics> {
   using LocalWorld = WorldAccess<LaunchInterceptors>;
   using SequenceAfterSystemList = SystemList<ResolveEngagements>;
-  using AllowComponentList = TypeList<Track>;
+  using AllowComponentList = TypeList<Track, Estimate, Engagement>;
 
   void operator()(LocalWorld& world, Entity self, Launcher& launcher,
                   const Kinematics* kinematics, Step step) {
     Entity proposal = std::exchange(launcher.proposal, Entity{});
     const Track* track = world.try_component_of<Track>(proposal);
-    if (!kinematics || !track || track->engaged_by != self) {
+    const Estimate* estimate = world.try_component_of<Estimate>(proposal);
+    const Engagement* engagement = world.try_component_of<Engagement>(proposal);
+    if (!kinematics || !track || !estimate || !engagement ||
+        engagement->engaged_by != self) {
       return;
     }
     TimePoint now = step.time;
-    model::Displacement aim = track->position - kinematics->position;
+    model::Displacement aim = estimate->position - kinematics->position;
     Length range = norm(aim);
     Velocity velocity = range > 0.0 * model::meter
                             ? aim * (design.speed / range)
@@ -333,7 +368,7 @@ struct LaunchInterceptors final : System<Launcher, const Kinematics> {
   InterceptorDesign design;
 };
 
-using Engagement =
+using Engaging =
     SystemList<ProposeEngagements, ResolveEngagements, LaunchInterceptors>;
 
 //-- Guidance -----------------------------------------------------------------
@@ -457,8 +492,9 @@ struct ApplyBlasts final : System<Health, const Kinematics> {
   using AllowComponentList = TypeList<Blast, Kinematics>;
 
   // Collects this step's blasts, once, so each victim reads a short array
-  // instead of walking the Blast store. Most steps have none.
-  void prepare(LocalWorld& world) {
+  // instead of walking the Blast store. Most steps have none, and then there
+  // is nothing to apply.
+  bool prepare(LocalWorld& world) {
     blasts_.clear();
     world.store_of<Blast>().for_each([&](Entity owner, const Blast& blast) {
       if (const Kinematics* center =
@@ -467,6 +503,7 @@ struct ApplyBlasts final : System<Health, const Kinematics> {
             .center = center, .radius = blast.radius, .damage = blast.damage});
       }
     });
+    return !blasts_.empty();
   }
 
   void operator()(LocalWorld& world, Entity self, Health& health,
@@ -509,7 +546,7 @@ using Blasts = SystemList<TriggerWarheads, ApplyBlasts, ExpireBlasts>;
 
 //-- Schedule -----------------------------------------------------------------
 
-using Schedule = SystemList<Sensing, Engagement, GuideInterceptors,
+using Schedule = SystemList<Sensing, Engaging, GuideInterceptors,
                             SteerRedDrones, model::Motion, Blasts>;
 using Scheduler = framework::Scheduler<World, Schedule>;
 

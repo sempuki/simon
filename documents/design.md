@@ -138,11 +138,9 @@ as possible before a new entity takes it.
 A component is a plain struct:
 
 ```cpp
-struct Kinematics {
-  Vec3 position = Vec3::Zero();
-  Quat orientation = Quat::Identity();
-  Vec3 velocity = Vec3::Zero();
-  Vec3 acceleration = Vec3::Zero();
+struct Kinematics final {
+  Position position = meters(0.0, 0.0, 0.0);
+  Velocity velocity = meters_per_second(0.0, 0.0, 0.0);
 };
 ```
 
@@ -1242,13 +1240,20 @@ the few things near it, never "for each X, visit every Y".
   the radius, `UpdateTracks` was more than twice as slow.
 - **Invert a loop when the side being written is the side with sparse work.**
   A sensor that visits every target in range, to change a few of them, is the
-  inverted loop: the targets that need changing should ask the sensors.
+  inverted loop: the targets that need changing should ask the sensors. In
+  missile, `DetectDrones` lets each untracked drone ask an index of the radars
+  that scanned, then create its own track.
 
 ### Do nothing on steps with nothing to do
 
 A system whose work is rate-gated (radar scans) or event-driven (blasts) should
-not touch every entity on the steps in between. Today a system can only return
-early from its call operator, which still walks the driving store.
+not touch every entity on the steps in between. A `prepare` stage that returns
+`bool` skips the per-entity loop when it returns false; `resolve` still runs.
+
+```cpp
+// Steps without a scan have nothing to detect.
+bool prepare(LocalWorld& world) { return radars_.collect(world); }
+```
 
 ### Measure each system, idle and contended
 
@@ -1267,19 +1272,48 @@ practices above already give:
 - Packing several components into one struct to keep them together.
 - Giving up units or `double` for speed.
 
-### Where the applications and framework stand
+### Bringing missile in line
 
-- **The missile simulation does not follow all of these yet.** `Kinematics`
-  carries an orientation and a stored acceleration that it does not read (112
-  bytes, of which `position` and `velocity` are 48). `Track` keeps its target,
-  estimate and engagement in one 80-byte component, although
-  `DropStaleTracks` and `ResolveEngagements` each read 16 bytes of it every
-  step. `ScanRadars` visits every entity within 4 km of every scanning radar
-  and looks up two components for each, instead of untracked drones asking an
-  index of the radars that scanned.
-- **Framework support to add:** a `prepare` stage that can skip the loop on
-  steps with nothing to do, and a report in the benchmarks of the bytes each
-  system touches per entity, from the sizes of the components it names.
+The missile simulation followed these practices only partly, and changing it
+to follow them is the measurement of what they are worth:
+
+- **`Kinematics` is position and velocity (48 bytes, was 112).** Its
+  orientation moved to a separate `Orientation` component, which nothing in
+  missile needs, and the acceleration it stored, which nothing read, is gone;
+  the commanded acceleration is in `Control`.
+- **`Track` is three components its archetype requires:** `Track` (target and
+  when it was last seen, 16 bytes), `Estimate` (position and velocity, 48) and
+  `Engagement` (launcher and until when, 16). `DropStaleTracks` reads only
+  `Track`, `ResolveEngagements` only `Engagement` and, for proposed tracks,
+  `Estimate`.
+- **Drones detect themselves.** `ScanRadars` only decides which radars scan.
+  `DetectDrones` lets each untracked drone ask an index of the radars that
+  scanned, and create its own track; `UpdateTracks` uses the same index.
+- **Idle steps do nothing.** `DetectDrones`, `UpdateTracks`,
+  `ResolveEngagements` and `ApplyBlasts` skip their loops when no radar scanned,
+  no launcher proposed or nothing exploded.
+
+At 100,000 drones (ms per step):
+
+| | Before | After |
+|---|---:|---:|
+| Idle, 500 steps | 6.33 | 2.87 |
+| Idle, 200 steps | 9.49 | 3.01 |
+| 4 contending threads, 200 steps | 42.4 | 5.53 |
+
+The step is 2.2 times faster idle and 7.7 times faster under contention, where
+it now slows 1.8 times instead of 4.5. The cost per entity is flat from 1,000
+to 100,000 drones (12.9 to 13.4 ns per entity-step). Outcomes are unchanged.
+
+The change also fixed a bug the old layout hid. When ten radars covered a drone
+on the first scan, each created a track for it before trying to mark it
+`Tracked`; the nine that lost destroyed theirs, but a destroyed entity's slot
+is freed only at the next sync. At ten sites the first scan ran out of entity
+capacity and silently tracked 5,000 of 10,000 drones. Each drone now creates at
+most one track.
+
+Still to add to the framework: a report in the benchmarks of the bytes each
+system touches per entity, from the sizes of the components it names.
 
 ## Extensible edges
 
@@ -1594,7 +1628,7 @@ Components (`application/missile/components.hpp`):
 
 | Component | Holds |
 |---|---|
-| `Kinematics`, `Control` | From `model/` |
+| `Kinematics`, `Control` | From `model/`: position and velocity, and the commanded acceleration |
 | `Health` | Hit points |
 | `Warhead` | Fuse distance, blast radius, damage |
 | `Blast` | Radius, damage, the warhead's Name; lives for one step |
@@ -1602,16 +1636,19 @@ Components (`application/missile/components.hpp`):
 | `Tracked` | Marks a red drone that has a track, and names the track |
 | `Asset` | Marks the protected asset |
 | `Radar` | Range, a `RateGate` for the scan, whether it scanned this step |
-| `Track` | Target entity, estimated position and velocity, last seen, engaging launcher and until when |
+| `Track` | Target entity and when a radar last saw it |
+| `Estimate` | A track's estimated position and velocity |
+| `Engagement` | The launcher engaging a track, if any, and until when |
 | `Launcher` | Range, inventory, reload time, ready time, this step's proposal |
 | `Interceptor` | Target entity, navigation gain, speed, agility, seeker range, flight time |
 
 Each component has an archetype in `missile::archetype` (asset, radar,
 launcher, red drone, interceptor, track, blast).
 
-Tracks are entities. Radars create them, tracks update themselves from the
-radars that scanned their target, launchers engage them, and later they are
-what an interop layer would publish.
+Tracks are entities, with `Track`, `Estimate` and `Engagement` required by
+their archetype. A drone creates its own track when a scanning radar covers it,
+tracks update themselves from the radars that scanned their target, launchers
+engage them, and later they are what an interop layer would publish.
 
 Interceptors and red drones both carry a `Warhead`. An interceptor reaching its
 target and a drone reaching the asset are the same event: a blast, applied to
@@ -1621,8 +1658,9 @@ Schedule (`application/missile/systems.hpp`):
 
 | System | Does |
 |---|---|
-| `ScanRadars` | Each radar whose scan fires marks every untracked red drone in range `Tracked` and creates its track. If another radar marked the drone earlier in the step, the builder refuses the mark and the new track is destroyed. |
-| `UpdateTracks` | Each track updates its own estimate from a radar that scanned its target. Radars are perfect for now. |
+| `ScanRadars` | Each radar decides whether its scan fires this step |
+| `DetectDrones` | Each untracked red drone that a scanning radar covers creates its track and marks itself `Tracked`. Skips steps without a scan. |
+| `UpdateTracks` | Each track updates its own estimate from a radar that scanned its target. Radars are perfect for now. Skips steps without a scan. |
 | `DropStaleTracks` | Destroys tracks whose target is gone or unseen for 5 s, and unmarks a surviving target |
 | `ProposeEngagements` | Each ready launcher with inventory proposes the nearest unengaged track in range |
 | `ResolveEngagements` | Each unengaged track accepts the nearest launcher that proposed it, for 30 s |
@@ -1724,7 +1762,10 @@ Each step ends with a working application and passing tests.
    - Done: the missile simulation measured idle and contended (see
      [Indexes](#indexes)). At 100,000 drones, 4 contending threads slow it
      4.3 times.
-   - Next: reduce the bytes each entity touches per step.
+   - Done: missile follows the practices in
+     [Using the framework well](#using-the-framework-well): 2.2 times faster
+     idle and 7.7 times faster under contention at 100,000 drones.
+   - Next: report the bytes each system touches per entity.
    Consider struct-of-arrays layout inside hot components only if measurements
    call for it.
 

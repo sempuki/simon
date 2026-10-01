@@ -68,13 +68,23 @@ struct Radar final {
   bool scanned = false;  // Whether it scanned this step.
 };
 
-// What blue believes about a red drone.
+// What blue believes about a red drone: which drone, and when a radar last
+// saw it. A track's estimate and engagement are siblings its archetype
+// requires, so systems that need one of them read only that.
 struct Track final {
   Entity target;
+  TimePoint last_seen{};
+};
+
+// Blue's estimate of a tracked drone's motion.
+struct Estimate final {
   Position position = model::meters(0.0, 0.0, 0.0);
   Velocity velocity = model::meters_per_second(0.0, 0.0, 0.0);
-  TimePoint last_seen{};
-  Entity engaged_by;          // The launcher engaging it, if any.
+};
+
+// Which launcher is engaging a track, if any, and until when.
+struct Engagement final {
+  Entity engaged_by;
   TimePoint engaged_until{};  // When the engagement lapses if it has not ended.
 };
 
@@ -116,7 +126,8 @@ struct Interceptor final
     : Archetype<"interceptor",
                 Requires<Kinematics, Control, Warhead, missile::Interceptor>> {
 };
-struct Track final : Archetype<"track", Requires<missile::Track>> {};
+struct Track final
+    : Archetype<"track", Requires<missile::Track, Estimate, Engagement>> {};
 struct Blast final : Archetype<"blast", Requires<Kinematics, missile::Blast>> {
 };
 
@@ -125,7 +136,8 @@ struct Blast final : Archetype<"blast", Requires<Kinematics, missile::Blast>> {
 using World = framework::World<
     Kinematics,
     framework::TypeList<Control, Health, Warhead, Blast, RedDrone, Tracked,
-                        Asset, Radar, Track, Launcher, Interceptor>,
+                        Asset, Radar, Track, Estimate, Engagement, Launcher,
+                        Interceptor>,
     framework::TypeList<archetype::Asset, archetype::Radar, archetype::Launcher,
                         archetype::RedDrone, archetype::Interceptor,
                         archetype::Track, archetype::Blast>>;

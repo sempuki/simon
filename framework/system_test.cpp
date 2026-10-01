@@ -86,6 +86,16 @@ struct CheckSiblings final : System<const Position, const Velocity> {
   int matched = 0;
 };
 
+// Skips its loop when told to, and counts what ran.
+struct Skippable final : System<const Health> {
+  bool prepare(auto&) { return run; }
+  void operator()(auto&, Entity, const Health&) { ++called; }
+  void resolve(auto&) { resolved = true; }
+  bool run = true;
+  int called = 0;
+  bool resolved = false;
+};
+
 // Counts entities with health; runs after Cull, so it sees Cull's commands.
 struct Count final : System<const Health> {
   using SequenceAfterSystemList = SystemList<Cull>;
@@ -177,6 +187,21 @@ TEST_CASE("System") {
     CHECK(check.with == 5);
     CHECK(check.matched == 5);
     CHECK(check.without == 2);
+  }
+
+  SECTION("ShouldSkipLoopButResolveGivenPrepareReturnsFalse") {
+    REQUIRE(world.create<Body>().with(Health{1.0}).build());
+    world.sync();
+    Scheduler<TestWorld, SystemList<Skippable>> scheduler;
+
+    scheduler.system<Skippable>().run = false;
+    scheduler.step(lib::InOut(world), STEP);
+    CHECK(scheduler.system<Skippable>().called == 0);
+    CHECK(scheduler.system<Skippable>().resolved);
+
+    scheduler.system<Skippable>().run = true;
+    scheduler.step(lib::InOut(world), STEP);
+    CHECK(scheduler.system<Skippable>().called == 1);
   }
 
   SECTION("ShouldReadOtherEntitiesGivenDeclaredLookup") {
