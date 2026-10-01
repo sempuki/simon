@@ -139,8 +139,7 @@ class Session final {
   ~Session() {
     engine::Phase phase = driver_->driver().phase();
     if (phase == engine::Phase::RUNNING || phase == engine::Phase::STOPPED) {
-      engine::FinishResult finished = driver_->finish();
-      DECLARE_UNUSED(finished);
+      engine::FinishResult _ = driver_->finish();
     }
   }
 

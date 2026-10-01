@@ -438,7 +438,7 @@ TEST_CASE("World") {
   }
 
   SECTION("ShouldNotFindGivenIdentityOfSomethingAbsent") {
-    Entity entity = *world.create<Body>().build();
+    auto _ = *world.create<Body>().build();  // Entity 0, without a Position.
     world.sync();
 
     CHECK_FALSE(
@@ -452,7 +452,6 @@ TEST_CASE("World") {
     CHECK_FALSE(world.find_name_of(Identity{"world/1"}));  // Not an identity.
     CHECK(world.find_name_of(Identity{"/world/1/component/0"}) ==
           TestWorld::name_of<Position>());
-    DECLARE_UNUSED(entity);
   }
 
   SECTION("ShouldFindComponentByTypeNameGivenBuiltInAliases") {

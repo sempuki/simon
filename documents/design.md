@@ -100,6 +100,15 @@ constructor always sets it.
 
 **Implementation details live in a namespace named `internal`.**
 
+**Unused names say so without comments.** Leave a parameter unnamed when its
+type says what it is, as a system's `(SystemWorld&, Entity, ...)` does; no
+compiler warns about an unnamed parameter. Name it with `[[maybe_unused]]`
+when the name carries meaning the type does not, or when only some
+instantiations use it. Never write `/*name*/`. Bind a result kept only to be
+ignored, such as a builder's refusal, to C++26's `_`, which may be declared
+again in the same scope: `auto _ = world.destroy(self).build();`. `_` does not
+apply to parameters, which C++26 leaves out because they can be unnamed.
+
 A plain `T&` parameter is only for what the language or the framework decides:
 operators, and a system's call operator, whose entity-components arrive by
 reference with constness declared in `System<...>`. Computing wrappers from

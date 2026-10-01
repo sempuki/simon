@@ -39,7 +39,9 @@ struct FollowRoute final      //
     return gate_.fire(step).has_value();
   }
 
-  auto operator()(SystemWorld&, Entity, Route& route, const AirState* state,
+  auto operator()(SystemWorld&, Entity,   //
+                  Route& route,           //
+                  const AirState* state,  //
                   Autopilot* autopilot) const -> void {
     if (!state || !autopilot) {
       return;
@@ -95,10 +97,12 @@ struct FlyAutopilot final           //
     return firing.has_value();
   }
 
-  auto operator()(SystemWorld&, Entity, Commands& commands,
-                  const AirState* state, const Handling* handling,
-                  const FlightControls* controls, Autopilot* autopilot) const
-      -> void {
+  auto operator()(SystemWorld&, Entity,            //
+                  Commands& commands,              //
+                  const AirState* state,           //
+                  const Handling* handling,        //
+                  const FlightControls* controls,  //
+                  Autopilot* autopilot) const -> void {
     if (!state || !handling || !controls || !autopilot) {
       return;
     }
@@ -136,8 +140,10 @@ struct Actuate final          //
   using SystemWorld = ProjectedWorld<Actuate>;
   using SequenceAfterSystemList = SystemList<FlyAutopilot>;
 
-  auto operator()(SystemWorld&, Entity, FlightControls& controls,
-                  const Commands* commands, const Handling* handling,
+  auto operator()(SystemWorld&, Entity,      //
+                  FlightControls& controls,  //
+                  const Commands* commands,  //
+                  const Handling* handling,  //
                   Step step) const -> void {
     if (!commands || !handling) {
       return;
@@ -175,8 +181,10 @@ struct Fly final                    //
   using SequenceAfterSystemList = SystemList<Actuate>;
   using ExcludeComponentList = TypeList<AirStateRate>;
 
-  auto operator()(SystemWorld&, Entity, AirState& state,
-                  const FlightControls* controls, const Airframe* airframe,
+  auto operator()(SystemWorld&, Entity,            //
+                  AirState& state,                 //
+                  const FlightControls* controls,  //
+                  const Airframe* airframe,        //
                   Step step) const -> void {
     if (!controls || !airframe) {
       return;
@@ -197,8 +205,10 @@ struct PointMassRates final         //
              const Airframe> {
   using SystemWorld = ProjectedWorld<PointMassRates>;
 
-  auto operator()(SystemWorld&, Entity, AirStateRate& rate,
-                  const AirState* state, const FlightControls* controls,
+  auto operator()(SystemWorld&, Entity,            //
+                  AirStateRate& rate,              //
+                  const AirState* state,           //
+                  const FlightControls* controls,  //
                   const Airframe* airframe) const -> void {
     if (!state || !controls || !airframe) {
       return;

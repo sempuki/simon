@@ -571,10 +571,11 @@ struct SystemRunner final {
         optional);
   }
 
-  // The stores of the excluded components, read-only.
+  // The stores of the excluded components, read-only. A system that excludes
+  // nothing reads none of the world.
   template <typename WorldType, typename... ExcludedTypes>
   static auto excluded_stores(TypeList<ExcludedTypes...>,
-                              lib::InOut<WorldType> world) {
+                              [[maybe_unused]] lib::InOut<WorldType> world) {
     return std::forward_as_tuple(
         std::as_const(*world).template store_of<ExcludedTypes>()...);
   }

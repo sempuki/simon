@@ -99,6 +99,7 @@ class ScanningRadars final {
     const Kinematics* radar = nullptr;  // Valid until the next sync point.
     Length range = 0.0 * model::meter;
   };
+
   std::vector<Scanning> scanning_;
   Length longest_ = 0.0 * model::meter;
   std::optional<framework::SpatialIndex> index_;  // Sized on first use.
@@ -118,8 +119,10 @@ struct DetectDrones final       //
   // Steps without a scan have nothing to detect.
   auto prepare(SystemWorld& world) -> bool { return radars_.collect(world); }
 
-  auto operator()(SystemWorld& world, Entity self, const RedDrone&,
-                  const Kinematics* kinematics, const Tracked* tracked,
+  auto operator()(SystemWorld& world, Entity self,  //
+                  const RedDrone&,                  //
+                  const Kinematics* kinematics,     //
+                  const Tracked* tracked,           //
                   Step step) -> void {
     if (tracked || !kinematics || !radars_.cover(*kinematics)) {
       return;
@@ -134,8 +137,7 @@ struct DetectDrones final       //
       return;
     }
     if (!world.change(self).attach(Tracked{.track = *track}).build()) {
-      auto dropped = world.destroy(*track).build();
-      DECLARE_UNUSED(dropped);
+      auto _ = world.destroy(*track).build();
     }
   }
 
@@ -155,7 +157,9 @@ struct UpdateTracks final  //
   // Steps without a scan have nothing to update.
   auto prepare(SystemWorld& world) -> bool { return radars_.collect(world); }
 
-  auto operator()(SystemWorld& world, Entity, Track& track, Estimate* estimate,
+  auto operator()(SystemWorld& world, Entity,  //
+                  Track& track,                //
+                  Estimate* estimate,          //
                   Step step) -> void {
     const Kinematics* target =
         world.maybe_component_of<Kinematics>(track.target);
@@ -178,18 +182,17 @@ struct DropStaleTracks final  //
   using SystemWorld = ProjectedWorld<DropStaleTracks>;
   using SequenceAfterSystemList = SystemList<UpdateTracks>;
 
-  auto operator()(SystemWorld& world, Entity self, const Track& track,
+  auto operator()(SystemWorld& world, Entity self,  //
+                  const Track& track,               //
                   Step step) -> void {
     bool gone = !world.alive(track.target);
     bool stale = step.time - track.last_seen > timeout;
     if (!gone && !stale) {
       return;
     }
-    auto destroyed = world.destroy(self).build();
-    DECLARE_UNUSED(destroyed);
+    auto _ = world.destroy(self).build();
     if (!gone) {
-      auto unmarked = world.change(track.target).detach<Tracked>().build();
-      DECLARE_UNUSED(unmarked);
+      auto _ = world.change(track.target).detach<Tracked>().build();
     }
   }
 
@@ -220,8 +223,10 @@ struct ProposeEngagements final  //
 
   auto prepare(SystemWorld&) -> void { indexed_ = false; }
 
-  auto operator()(SystemWorld& world, Entity, Launcher& launcher,
-                  const Kinematics* kinematics, const WeaponsHold* hold,
+  auto operator()(SystemWorld& world, Entity,    //
+                  Launcher& launcher,            //
+                  const Kinematics* kinematics,  //
+                  const WeaponsHold* hold,       //
                   Step step) -> void {
     launcher.proposal = Entity{};
     TimePoint now = step.time;
@@ -287,8 +292,10 @@ struct ResolveEngagements final  //
     return !proposals_.empty();
   }
 
-  auto operator()(SystemWorld& world, Entity self, Engagement& engagement,
-                  const Estimate* estimate, Step step) -> void {
+  auto operator()(SystemWorld& world, Entity self,  //
+                  Engagement& engagement,           //
+                  const Estimate* estimate,         //
+                  Step step) -> void {
     TimePoint now = step.time;
     if (!estimate ||
         (engagement.engaged_by != Entity{} && now < engagement.engaged_until)) {
@@ -321,6 +328,7 @@ struct ResolveEngagements final  //
     std::uint32_t track = 0;  // The proposed track's entity index.
     Entity launcher;
   };
+
   std::vector<Proposal> proposals_;
 };
 
@@ -345,8 +353,10 @@ struct LaunchInterceptors final  //
   using SequenceAfterSystemList = SystemList<ResolveEngagements>;
   using AllowComponentList = TypeList<Track, Estimate, Engagement>;
 
-  auto operator()(SystemWorld& world, Entity self, Launcher& launcher,
-                  const Kinematics* kinematics, Step step) -> void {
+  auto operator()(SystemWorld& world, Entity self,  //
+                  Launcher& launcher,               //
+                  const Kinematics* kinematics,     //
+                  Step step) -> void {
     Entity proposal = std::exchange(launcher.proposal, Entity{});
     const Track* track = world.maybe_component_of<Track>(proposal);
     const Estimate* estimate = world.maybe_component_of<Estimate>(proposal);
@@ -402,15 +412,17 @@ struct GuideInterceptors final   //
   using SequenceAfterSystemList = SystemList<LaunchInterceptors>;
   using AllowComponentList = TypeList<Kinematics, RedDrone>;
 
-  auto operator()(SystemWorld& world, Entity self,
-                  const Interceptor& interceptor, const Kinematics* kinematics,
-                  Control* control, Target* target_of, Step step) -> void {
+  auto operator()(SystemWorld& world, Entity self,  //
+                  const Interceptor& interceptor,   //
+                  const Kinematics* kinematics,     //
+                  Control* control,                 //
+                  Target* target_of,                //
+                  Step step) -> void {
     if (!kinematics || !control || !target_of) {
       return;
     }
     if (step.time >= interceptor.expires_at) {
-      auto destroyed = world.destroy(self).build();
-      DECLARE_UNUSED(destroyed);
+      auto _ = world.destroy(self).build();
       return;
     }
     const Kinematics* target =
@@ -419,8 +431,7 @@ struct GuideInterceptors final   //
       target = retarget(interceptor, *kinematics, *target_of, world);
     }
     if (!target) {
-      auto destroyed = world.destroy(self).build();
-      DECLARE_UNUSED(destroyed);
+      auto _ = world.destroy(self).build();
       return;
     }
     constexpr Rate SPEED_RESPONSE = 2.0 * model::per_second;
@@ -457,8 +468,10 @@ struct SteerRedDrones final     //
   using SystemWorld = ProjectedWorld<SteerRedDrones>;
   using AllowComponentList = TypeList<Kinematics>;
 
-  auto operator()(SystemWorld& world, Entity, const RedDrone& drone,
-                  const Kinematics* kinematics, Control* control,
+  auto operator()(SystemWorld& world, Entity,    //
+                  const RedDrone& drone,         //
+                  const Kinematics* kinematics,  //
+                  Control* control,              //
                   const Target* target_of) -> void {
     if (!kinematics || !control || !target_of) {
       return;
@@ -490,8 +503,10 @@ struct TriggerWarheads final    //
   using SequenceAfterSystemList = SystemList<model::Integrate>;
   using AllowComponentList = TypeList<Kinematics>;
 
-  auto operator()(SystemWorld& world, Entity self, const Warhead& warhead,
-                  const Kinematics* kinematics, const Target* target) -> void {
+  auto operator()(SystemWorld& world, Entity self,  //
+                  const Warhead& warhead,           //
+                  const Kinematics* kinematics,     //
+                  const Target* target) -> void {
     const Kinematics* target_kinematics =
         target ? world.maybe_component_of<Kinematics>(target->entity) : nullptr;
     if (kinematics && target_kinematics &&
@@ -504,16 +519,14 @@ struct TriggerWarheads final    //
   [[gnu::cold, gnu::noinline]] static auto detonate(
       SystemWorld& world, Entity self, const Warhead& warhead,
       const Kinematics& kinematics) -> void {
-    auto blast = world.create<archetype::Blast>()
-                     .under(self)
-                     .with(Kinematics{.position = kinematics.position})
-                     .with(Blast{.radius = warhead.radius,
-                                 .damage = warhead.damage,
-                                 .source = world.name_of(self)})
-                     .build();
-    DECLARE_UNUSED(blast);
-    auto destroyed = world.destroy(self).build();
-    DECLARE_UNUSED(destroyed);
+    auto _ = world.create<archetype::Blast>()
+                 .under(self)
+                 .with(Kinematics{.position = kinematics.position})
+                 .with(Blast{.radius = warhead.radius,
+                             .damage = warhead.damage,
+                             .source = world.name_of(self)})
+                 .build();
+    auto _ = world.destroy(self).build();
   }
 };
 
@@ -542,7 +555,8 @@ struct ApplyBlasts final  //
     return !blasts_.empty();
   }
 
-  auto operator()(SystemWorld& world, Entity self, Health& health,
+  auto operator()(SystemWorld& world, Entity self,  //
+                  Health& health,                   //
                   const Kinematics* kinematics) -> void {
     if (!kinematics) {
       return;
@@ -553,8 +567,7 @@ struct ApplyBlasts final  //
       }
     }
     if (health.points <= 0.0) {
-      auto destroyed = world.destroy(self).build();
-      DECLARE_UNUSED(destroyed);
+      auto _ = world.destroy(self).build();
     }
   }
 
@@ -574,8 +587,7 @@ struct ExpireBlasts final  //
   using SequenceAfterSystemList = SystemList<ApplyBlasts>;
 
   auto operator()(SystemWorld& world, Entity self, const Blast&) -> void {
-    auto destroyed = world.destroy(self).build();
-    DECLARE_UNUSED(destroyed);
+    auto _ = world.destroy(self).build();
   }
 };
 

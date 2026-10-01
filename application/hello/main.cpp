@@ -50,8 +50,7 @@ auto main(int, char**) -> int {
   // Setup Dear ImGui context
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO();
-  DECLARE_UNUSED(io);
+  ImGuiIO& _ = ImGui::GetIO();
 
   // Setup Dear ImGui style
   ImGui::StyleColorsDark();

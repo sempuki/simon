@@ -152,7 +152,7 @@ TEST_CASE("System") {
   SECTION("ShouldRunForDriverWithOptionalPointerGivenMixedComponents") {
     // x holds (a), y holds (b), z holds (a, b).
     Entity x = *world.create<Body>().with(Position{}).build();
-    Entity y = *world.create<Body>().with(Velocity{}).build();
+    [[maybe_unused]] Entity y = *world.create<Body>().with(Velocity{}).build();
     Entity z = *world.create<Body>().with(Position{}).with(Velocity{}).build();
     world.sync();
 
@@ -163,7 +163,6 @@ TEST_CASE("System") {
     REQUIRE(seen.size() == 2u);
     CHECK(seen[0] == std::pair{x, false});
     CHECK(seen[1] == std::pair{z, true});
-    DECLARE_UNUSED(y);
   }
 
   SECTION("ShouldSkipOwnersOfExcludedComponentGivenEveryArchetype") {

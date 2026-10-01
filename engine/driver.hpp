@@ -194,8 +194,7 @@ class RealTimeDriver final {
       PhaseResult result = tick();
       if (!result) {
         // The step's error is the one to report; finishing is best effort.
-        FinishResult finished = driver_.finish();
-        DECLARE_UNUSED(finished);
+        FinishResult _ = driver_.finish();
         return std::unexpected(result.error());
       }
       if (*result == Flow::STOP) {
