@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <expected>
 #include <format>
+#include <functional>
 #include <limits>
 #include <map>
 #include <optional>
@@ -52,6 +53,9 @@ using distance_of_t = decltype(distance(std::declval<const Type&>(),
 
 template <typename WorldType>
 class SetUpBuilder;
+
+template <typename WorldType, typename SelectionType>
+class DestroyQueryBuilder;
 
 // Unlocks mutable store access. Only the scheduler, which runs systems, can
 // construct one.
@@ -143,11 +147,16 @@ class World<SpatialType,                  //
   auto destroy(Entity entity) {
     return DestroyBuilder<World>{entity, lib::Depend(*this)};
   }
+  // Destroys every entity a query selects. See DestroyQueryBuilder.
+  auto destroy() {
+    return DestroyQueryBuilder<World, void>{lib::Depend(*this)};
+  }
 
   // Applies every pending command, in the order it was recorded. Builders
   // validated each command against the state the world would be in, so this
   // cannot fail.
   void sync() {
+    CHECK_PRECONDITION(transaction_depth_ == 0);  // Commit or roll back first.
     std::vector<Command> commands = std::exchange(commands_, {});
     for (Command& command : commands) {
       std::visit([&](auto& operation) { this->apply(lib::InOut(operation)); },
@@ -161,6 +170,67 @@ class World<SpatialType,                  //
   }
 
   std::size_t pending() const { return commands_.size(); }
+
+  // Groups utterances so they take effect together or not at all. Until it
+  // commits, everything they planned can be rolled back: entities reserved and
+  // their names, aliases given and taken, planned attachments, detachments
+  // and destructions, and their commands. A transaction that ends without
+  // commit() rolls back, so an early return undoes the group:
+  //
+  //   auto transaction = world.transaction();
+  //   ASSIGN_OR_RETURN(Entity asset, world.create<Asset>().build());
+  //   RETURN_IF_UNEXPECTED(world.create<Radar>().under(asset).build());
+  //   transaction.commit();
+  //
+  // Transactions nest: an inner commit keeps its work only if every
+  // enclosing transaction commits too. End every transaction before sync().
+  // Entity names are never reused, so a rolled-back entity leaves a gap in
+  // them, and an alias taken and then restored goes to the end of its lists.
+  class Transaction final {
+   public:
+    DECLARE_COPY_DELETE(Transaction);
+    DECLARE_MOVE_DELETE(Transaction);
+    ~Transaction() {
+      if (open_) {
+        roll_back();
+      }
+    }
+
+    // Keeps what the transaction planned.
+    void commit() {
+      CHECK_PRECONDITION(open_);
+      open_ = false;
+      world_->end_transaction();
+    }
+
+    // Undoes what the transaction planned, newest first.
+    void roll_back() {
+      CHECK_PRECONDITION(open_);
+      open_ = false;
+      world_->roll_back_to(mark_);
+      world_->end_transaction();
+    }
+
+   private:
+    friend class World;
+
+    // Where the transaction began: how many commands and undo steps there
+    // were.
+    struct Mark final {
+      std::size_t commands = 0;
+      std::size_t undo = 0;
+    };
+
+    explicit Transaction(World& world)
+        : world_{&world}, mark_{world.begin_transaction()} {}
+
+    World* world_ = nullptr;
+    Mark mark_;
+    bool open_ = true;
+  };
+
+  // Opens a transaction. See Transaction.
+  Transaction transaction() { return Transaction{*this}; }
 
   //-- Read: entities and components -----------------------------------------
 
@@ -389,6 +459,7 @@ class World<SpatialType,                  //
   // held: entities, names, aliases and pending commands. Pointers into its
   // stores no longer refer to anything.
   void initialize(const Configuration& configuration) {
+    CHECK_PRECONDITION(transaction_depth_ == 0);
     number_ = configuration.number;
     entities_ = EntityTable{configuration.entities};
     stores_ = {store_for<SpatialType>(configuration),
@@ -432,6 +503,8 @@ class World<SpatialType,                  //
   friend class ChangeBuilder;
   template <typename>
   friend class DestroyBuilder;
+  template <typename, typename>
+  friend class DestroyQueryBuilder;
 
   template <typename ComponentType>
   static constexpr std::uint32_t component_number() {
@@ -540,6 +613,55 @@ class World<SpatialType,                  //
            std::ranges::contains(iter->second, alias);
   }
 
+  //-- Transactions ------------------------------------------------------------
+
+  typename Transaction::Mark begin_transaction() {
+    ++transaction_depth_;
+    return {.commands = commands_.size(), .undo = undo_.size()};
+  }
+
+  void roll_back_to(const typename Transaction::Mark& mark) {
+    while (undo_.size() > mark.undo) {
+      undo_.back()();
+      undo_.pop_back();
+    }
+    commands_.erase(
+        commands_.begin() + static_cast<std::ptrdiff_t>(mark.commands),
+        commands_.end());
+  }
+
+  // Forgets the undo steps once the outermost transaction ends.
+  void end_transaction() {
+    CHECK_PRECONDITION(transaction_depth_ > 0);
+    if (--transaction_depth_ == 0) {
+      undo_.clear();
+    }
+  }
+
+  // Records how to undo a planned change, while a transaction is open.
+  template <typename UndoType>
+  void remember(UndoType&& undo) {
+    if (transaction_depth_ > 0) {
+      undo_.emplace_back(std::forward<UndoType>(undo));
+    }
+  }
+
+  // Records the plan for `ComponentType` at `index` before it changes.
+  template <typename ComponentType>
+  void remember_plan(std::uint32_t index) {
+    if (transaction_depth_ == 0) {
+      return;
+    }
+    Plan<ComponentType>& planned = plan<ComponentType>();
+    remember([this, index, change = planned.change[index],
+              touched = planned.touched.size(), attaching = planned.attaching] {
+      Plan<ComponentType>& restored = plan<ComponentType>();
+      restored.change[index] = change;
+      restored.touched.resize(touched);
+      restored.attaching = attaching;
+    });
+  }
+
   //-- Planned state: what the world will be once pending commands apply -------
 
   // For one component: which entities will gain or lose it, and how many
@@ -645,8 +767,15 @@ class World<SpatialType,                  //
     archetype_of_index_[entity.index] =
         static_cast<std::uint8_t>(index_of_v<ArchetypeList, ArchetypeType>);
     entity_of_instance_.emplace(instance, entity);
+    remember([this, entity, instance] {
+      entity_of_instance_.erase(instance);
+      entities_.destroy(entity);
+    });
     if (!alias.empty()) {
       give_alias(Name{Kind::ENTITY, instance}, alias);
+      remember([this, instance, alias] {
+        take_alias(Name{Kind::ENTITY, instance}, alias);
+      });
     }
 
     record_attach(
@@ -746,9 +875,11 @@ class World<SpatialType,                  //
     // immediately.
     for (const Alias& alias : aliases.taken) {
       take_alias(name, alias);
+      remember([this, name, alias] { give_alias(name, alias); });
     }
     for (const Alias& alias : aliases.given) {
       give_alias(name, alias);
+      remember([this, name, alias] { take_alias(name, alias); });
     }
     return {};
   }
@@ -760,6 +891,10 @@ class World<SpatialType,                  //
     }
     destroying_[entity.index] = true;
     destroying_list_.push_back(entity.index);
+    remember([this, index = entity.index] {
+      destroying_[index] = false;
+      destroying_list_.pop_back();
+    });
     commands_.push_back(DestroyCommand{entity});
     return {};
   }
@@ -768,6 +903,7 @@ class World<SpatialType,                  //
   // segment.
   template <typename ComponentType>
   void record_attach(Entity entity, ComponentType component) {
+    remember_plan<ComponentType>(entity.index);
     plan<ComponentType>().mark(entity.index, +1);
     ++plan<ComponentType>().attaching;
     commands_.push_back(AttachCommand<ComponentType>{
@@ -777,6 +913,7 @@ class World<SpatialType,                  //
 
   template <typename ComponentType>
   void record_detach(Entity entity) {
+    remember_plan<ComponentType>(entity.index);
     plan<ComponentType>().mark(entity.index, -1);
     commands_.push_back(DetachCommand<ComponentType>{entity});
   }
@@ -833,6 +970,10 @@ class World<SpatialType,                  //
   bool spatial_index_current_ = false;
   std::vector<bool> destroying_;
   std::vector<std::uint32_t> destroying_list_;
+
+  // How to undo what open transactions planned, oldest first.
+  std::vector<std::function<void()>> undo_;
+  std::size_t transaction_depth_ = 0;
 
   // Names. Entity instances are never reused; Entity indices are.
   std::uint32_t next_entity_instance_ = 0;
@@ -938,6 +1079,138 @@ class [[nodiscard]] SetUpBuilder final {
   // How many of each archetype, by its position in ArchetypeList.
   std::array<std::size_t, ArchetypeList::size> holdings_{};
   double cell_size_ = 1.0;
+};
+
+// Destroys every entity a query selects, atomically, and returns how many:
+//
+//   world.destroy()
+//       .each<archetype::RedDrone>()            // or a component:
+//       each<Health>() .within(asset_kinematics, 500.0 * meter)
+//       .where([&](Entity drone) { return drone != spared; })
+//       .build();
+//
+// `each` comes first and selects by archetype, if its type is one, or else by
+// component. `within` keeps entities whose spatial component is within a
+// radius, and each `where` keeps those its predicate accepts. `build()`
+// plans every destruction in one transaction, skipping entities already
+// planned for destruction, so it destroys all of them or none.
+template <typename WorldType, typename SelectionType>
+class [[nodiscard]] DestroyQueryBuilder final {
+ public:
+  using SpatialType = typename WorldType::SpatialComponent;
+  using DistanceType = distance_of_t<SpatialType>;
+
+  // Keeps a reference to `world` until the utterance is built.
+  explicit DestroyQueryBuilder(lib::Depend<WorldType> world)
+      : world_{world.get()} {}
+
+  // Selects every entity of archetype `ChosenType`, or every entity with
+  // component `ChosenType`.
+  template <typename ChosenType>
+    requires std::is_void_v<SelectionType>
+  auto each() && {
+    if constexpr (Archetypal<ChosenType>) {
+      static_assert(contains_v<typename WorldType::ArchetypeList, ChosenType>,
+                    "This archetype is not in the world's archetype list.");
+    } else {
+      static_assert(contains_v<typename WorldType::ComponentList, ChosenType>,
+                    "This component is not in the world's component list.");
+    }
+    return DestroyQueryBuilder<WorldType, ChosenType>{lib::Depend(*world_)};
+  }
+
+  // Keeps only entities whose spatial component is within `radius` of
+  // `center`.
+  auto within(const SpatialType& center, DistanceType radius) &&
+    requires(!std::is_void_v<SelectionType>)
+  {
+    near_ = Near{.center = center, .radius = radius};
+    return std::move(*this);
+  }
+
+  // Keeps only entities for which `predicate(Entity)` is true. Predicates add
+  // up.
+  template <typename PredicateType>
+  auto where(PredicateType&& predicate) &&
+    requires(!std::is_void_v<SelectionType>)
+  {
+    predicates_.emplace_back(std::forward<PredicateType>(predicate));
+    return std::move(*this);
+  }
+
+  std::expected<std::size_t, Status> build() &&
+    requires(!std::is_void_v<SelectionType>)
+  {
+    std::vector<Entity> selected;
+    auto consider = [&](Entity entity) {
+      if (world_->will_be_alive(entity) &&
+          std::ranges::all_of(predicates_, [&](const auto& predicate) {
+            return predicate(entity);
+          })) {
+        selected.push_back(entity);
+      }
+    };
+    if (near_) {
+      world_->within(near_->center, near_->radius,
+                     [&](Entity entity, const SpatialType&) {
+                       if (is_selected(entity)) {
+                         consider(entity);
+                       }
+                     });
+    } else {
+      for_each_selected(consider);
+    }
+
+    auto transaction = world_->transaction();
+    for (Entity entity : selected) {
+      RETURN_IF_UNEXPECTED(world_->destroy(entity).build());
+    }
+    transaction.commit();
+    return selected.size();
+  }
+
+ private:
+  struct Near final {
+    SpatialType center;
+    DistanceType radius;
+  };
+
+  // Whether `entity` is of the chosen archetype, or has the chosen component.
+  bool is_selected(Entity entity) const {
+    if constexpr (Archetypal<SelectionType>) {
+      return world_->archetype_of_index_[entity.index] ==
+             index_of_v<typename WorldType::ArchetypeList, SelectionType>;
+    } else {
+      return world_->template store_of<SelectionType>().contains(entity);
+    }
+  }
+
+  // Visits every selected entity: an archetype's segment of the
+  // EntityArchetype store, or every owner in the component's store.
+  template <typename VisitorType>
+  void for_each_selected(VisitorType&& visit) const {
+    if constexpr (Archetypal<SelectionType>) {
+      const auto& archetypes = world_->template store_of<EntityArchetype>();
+      constexpr std::size_t SEGMENT =
+          WorldType::template segment_of<EntityArchetype>(
+              index_of_v<typename WorldType::ArchetypeList, SelectionType>);
+      for (std::size_t ordinal = 0; ordinal < archetypes.chunks_in(SEGMENT);
+           ++ordinal) {
+        auto chunk = archetypes.chunk(SEGMENT, ordinal);
+        for (std::size_t i = 0; i < chunk.size; ++i) {
+          visit(chunk.owners[i]);
+        }
+      }
+    } else {
+      world_->template store_of<SelectionType>().for_each(
+          [&](Entity owner, const SelectionType&) { visit(owner); });
+    }
+  }
+
+  // Never null once constructed; Depend checks it.
+  WorldType* world_ = nullptr;
+  std::optional<Near> near_;
+  std::vector<std::function<bool(Entity)>> predicates_;
 };
 
 }  // namespace simon::framework

@@ -154,6 +154,31 @@ TEST_CASE("MissileSimulation") {
     CHECK(result.fired == 9u);  // Every interceptor was used.
   }
 
+  SECTION("ShouldLeaveNothingOfSiteGivenWorldRefusesADrone") {
+    Scenario scenario{.radars = 3, .launchers = 3, .drones = 10};
+    World world;
+    // Room for the asset, radars and launchers, but only half the drones.
+    REQUIRE(World::set_up()
+                .holding<archetype::Asset>(1)
+                .holding<archetype::Radar>(3)
+                .holding<archetype::Launcher>(3)
+                .holding<archetype::RedDrone>(5)
+                .build(lib::Out(world)));
+
+    std::expected<Entity, framework::Status> asset =
+        build_scenario(scenario, lib::InOut(world));
+    world.sync();
+
+    REQUIRE_FALSE(asset.has_value());
+    CHECK(asset.error() ==
+          lib::watch(framework::BuildError::ENTITY_CAPACITY_EXHAUSTED));
+    CHECK(world.size() == 0u);
+    // "asset" still names the archetype, but no entity.
+    for (framework::Name name : world.find_name_of(framework::Alias{"asset"})) {
+      CHECK(name.kind != static_cast<std::uint32_t>(framework::Kind::ENTITY));
+    }
+  }
+
   SECTION("ShouldAimEachSitesDronesAtItsOwnAssetGivenSeveralSites") {
     Scenario scenario{.drones = 10, .sites = 4};
     World world;

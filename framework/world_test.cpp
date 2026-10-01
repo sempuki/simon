@@ -102,6 +102,180 @@ TEST_CASE("SetUpBuilder") {
   }
 }
 
+TEST_CASE("Transaction") {
+  TestWorld world;
+  testing::build_small_world(lib::Out(world));
+  Entity kept = *world.create<Body>("kept").with(Position{1.0}).build();
+  world.sync();
+
+  SECTION("ShouldUndoEverythingPlannedGivenRollBack") {
+    // Planned before the transaction, so it stays.
+    REQUIRE(world.create<Body>().build());
+    std::size_t pending = world.pending();
+    Entity created;
+    {
+      auto transaction = world.transaction();
+      created = *world.create<Body>("ghost").with(Position{2.0}).build();
+      REQUIRE(world.change(kept).attach(Velocity{}).alias("renamed").build());
+      REQUIRE(world.destroy(kept).build());
+      transaction.roll_back();
+    }
+
+    CHECK(world.pending() == pending);
+    CHECK_FALSE(world.alive(created));
+    CHECK(world.find_name_of(Alias{"ghost"}).empty());
+    CHECK(world.find_name_of(Alias{"renamed"}).empty());
+    // The plan is as it was: kept can gain Velocity and be destroyed again.
+    REQUIRE(world.change(kept).attach(Velocity{}).build());
+    REQUIRE(world.destroy(kept).build());
+    world.sync();
+    CHECK_FALSE(world.alive(kept));
+  }
+
+  SECTION("ShouldRollBackGivenTransactionEndsWithoutCommit") {
+    Entity created;
+    {
+      auto transaction = world.transaction();
+      created = *world.create<Body>().build();
+    }
+
+    CHECK_FALSE(world.alive(created));
+    CHECK(world.pending() == 0u);
+  }
+
+  SECTION("ShouldApplyAtSyncGivenCommit") {
+    Entity created;
+    {
+      auto transaction = world.transaction();
+      created = *world.create<Body>().with(Position{3.0}).build();
+      REQUIRE(world.change(kept).detach<Position>().build());
+      transaction.commit();
+    }
+    world.sync();
+
+    CHECK(world.store_of<Position>().component_of(created).x == 3.0);
+    CHECK_FALSE(world.store_of<Position>().contains(kept));
+  }
+
+  SECTION("ShouldUndoInnerCommitGivenOuterRollsBack") {
+    Entity inner;
+    {
+      auto outer = world.transaction();
+      {
+        auto nested = world.transaction();
+        inner = *world.create<Body>().build();
+        nested.commit();
+      }
+      outer.roll_back();
+    }
+
+    CHECK_FALSE(world.alive(inner));
+  }
+
+  SECTION("ShouldKeepOuterWorkGivenInnerRollsBack") {
+    Entity outer_entity;
+    Entity inner_entity;
+    {
+      auto outer = world.transaction();
+      outer_entity = *world.create<Body>().build();
+      {
+        auto nested = world.transaction();
+        inner_entity = *world.create<Body>().build();
+      }
+      outer.commit();
+    }
+    world.sync();
+
+    CHECK(world.alive(outer_entity));
+    CHECK_FALSE(world.alive(inner_entity));
+  }
+
+  SECTION("ShouldReturnCapacityGivenRolledBackCreations") {
+    {
+      auto transaction = world.transaction();
+      while (world.create<Body>().build()) {
+      }
+    }
+
+    // Everything the transaction reserved is free again.
+    CHECK(world.create<Body>().build().has_value());
+  }
+
+  SECTION("ShouldRefuseSyncGivenOpenTransaction") {
+    auto transaction = world.transaction();
+
+    CHECK_THROWS_AS(world.sync(), std::logic_error);
+  }
+}
+
+TEST_CASE("DestroyQueryBuilder") {
+  TestWorld world;
+  testing::build_small_world(lib::Out(world));
+  Entity near = *world.create<testing::Launcher>().with(Position{1.0}).build();
+  Entity far = *world.create<testing::Launcher>().with(Position{9.0}).build();
+  Entity body =
+      *world.create<Body>().with(Position{1.5}).with(Health{1.0}).build();
+  world.sync();
+
+  SECTION("ShouldDestroyEveryEntityOfArchetypeGivenEachArchetype") {
+    auto destroyed = world.destroy().each<testing::Launcher>().build();
+    world.sync();
+
+    REQUIRE(destroyed.has_value());
+    CHECK(*destroyed == 2u);
+    CHECK_FALSE(world.alive(near));
+    CHECK_FALSE(world.alive(far));
+    CHECK(world.alive(body));
+  }
+
+  SECTION("ShouldDestroyEveryEntityWithComponentGivenEachComponent") {
+    auto destroyed = world.destroy().each<Health>().build();
+    world.sync();
+
+    CHECK(destroyed == 1u);
+    CHECK_FALSE(world.alive(body));
+    CHECK(world.alive(near));
+  }
+
+  SECTION("ShouldDestroyOnlyNearbyGivenWithin") {
+    auto destroyed = world.destroy()
+                         .each<testing::Launcher>()
+                         .within(Position{0.0}, 2.0)
+                         .build();
+    world.sync();
+
+    CHECK(destroyed == 1u);
+    CHECK_FALSE(world.alive(near));
+    CHECK(world.alive(far));
+    CHECK(world.alive(body));  // Nearby, but not a launcher.
+  }
+
+  SECTION("ShouldDestroyOnlyAcceptedGivenWhere") {
+    auto destroyed = world.destroy()
+                         .each<Position>()
+                         .where([&](Entity entity) { return entity != far; })
+                         .where([&](Entity entity) { return entity != body; })
+                         .build();
+    world.sync();
+
+    CHECK(destroyed == 1u);
+    CHECK_FALSE(world.alive(near));
+    CHECK(world.alive(far));
+    CHECK(world.alive(body));
+  }
+
+  SECTION("ShouldSkipEntitiesGivenDestructionAlreadyPlanned") {
+    REQUIRE(world.destroy(near).build());
+
+    auto destroyed = world.destroy().each<testing::Launcher>().build();
+
+    REQUIRE(destroyed.has_value());
+    CHECK(*destroyed == 1u);
+    world.sync();
+    CHECK_FALSE(world.alive(far));
+  }
+}
+
 TEST_CASE("World") {
   TestWorld world;
   testing::build_small_world(lib::Out(world));

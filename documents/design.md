@@ -708,11 +708,46 @@ std::expected<Entity, Status> asset =
 `create_site` returns a builder whose type the caller never names, and
 `build()` becomes an entity utterance for each asset, radar, launcher and
 drone. Builders and commands are not isomorphic: one utterance emits many
-commands. If the world refuses one entity, the builder destroys those it
-already created, so nothing of the site is left after the next sync, and
-returns the world's Status. Other domain verbs, such as a query form of
-destroy (`world.destroy().each<Team>(Team::Red).within(500 * m, of(asset))
-.build()`), arrive when an application needs them.
+commands.
+
+**Domain builders are atomic, through transactions.** `world.transaction()`
+opens one. While it is open, every planned change records how to undo itself:
+entities reserved and their names, aliases, planned attachments, detachments
+and destructions, and their commands. `commit()` keeps them; a transaction that
+ends without committing rolls them back, newest first, so an early return
+undoes the whole utterance and leaves no capacity reserved:
+
+```cpp
+auto transaction = world_->transaction();
+ASSIGN_OR_RETURN(Entity asset, world_->create<archetype::Asset>("asset")...build());
+RETURN_IF_UNEXPECTED(world_->create<archetype::Radar>()...build());
+transaction.commit();
+```
+
+Transactions nest, and an inner commit keeps its work only if every enclosing
+transaction commits. Every transaction must end before `sync()`. Undo steps are
+recorded only while a transaction is open, so ordinary builders pay nothing.
+Registering an archetype on its first creation is not undone; it describes what
+the world can hold, not what the utterance planned.
+
+**Query forms** select entities and apply one verb to all of them, atomically.
+The first is destroy:
+
+```cpp
+std::expected<std::size_t, Status> destroyed =
+    world.destroy()
+        .each<archetype::RedDrone>()  // An archetype, or a component.
+        .within(asset_kinematics, 500.0 * meter)
+        .where([&](Entity drone) { return drone != spared; })
+        .build();
+```
+
+`each` comes first, selecting by archetype (walking that archetype's segment)
+or by component (walking its store). `within` narrows through the spatial
+index, and each `where` narrows by a predicate. `build()` plans every
+destruction in one transaction, skips entities already planned for
+destruction, and returns how many it destroyed. Query forms of `change`
+(attach or detach on every match) are next.
 
 #### IO is not a builder verb
 
@@ -730,6 +765,26 @@ they were recorded. The stores never change shape while a system iterates them.
 
 Sync points sit between systems. A system's commands are applied before the
 next system runs, so later systems in the same step see the change.
+
+Builders validate an utterance against the planned state: what the world will
+be once pending commands apply. Each component keeps a plan of which entities
+will gain or lose it and how many entity-components are waiting to be attached,
+and the world tracks which entities will be destroyed. So a second radar trying
+to mark a drone `Tracked` in the same step is refused, although the first mark
+is not applied yet, and applying a batch at `sync()` cannot fail.
+
+Two things happen when `build()` succeeds rather than at sync:
+
+- **Creation reserves the entity and its Name,** so the returned `Entity` can be
+  stored, and children created under it, before the commands apply. Its
+  capacity is in use until then, even if the entity is destroyed in the same
+  batch.
+- **Aliases change immediately.** They are an index beside the stores, not
+  store shape.
+
+Commands are an in-process type, a `std::variant` generated from the world's
+component list. Logging, replaying or sending them to another process (the DIS
+and HLA direction) would build on them, and is not built.
 
 Systems use builders too, through their `WorldAccess`:
 `world.create<Interceptor>().under(self).with(...).build()`. Inside a system

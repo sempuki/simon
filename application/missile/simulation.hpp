@@ -114,9 +114,9 @@ class [[nodiscard]] SiteBuilder final {
     return std::move(*this);
   }
 
-  // Creates the site and returns its asset. If the world refuses any entity,
-  // destroys those already created by this utterance, so nothing of the site
-  // is left after the next sync, and returns the world's framework::Status.
+  // Creates the site and returns its asset, atomically: if the world refuses
+  // any entity, nothing of the site is planned, and build() returns the
+  // world's Status. Draws from the random generator are not undone.
   std::expected<Entity, framework::Status> build() &&;
 
  private:

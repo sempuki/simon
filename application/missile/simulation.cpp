@@ -7,7 +7,6 @@
 #include <cstddef>
 #include <numbers>
 #include <optional>
-#include <vector>
 
 namespace simon::missile {
 
@@ -42,55 +41,32 @@ Position on_ring(Length radius, double bearing) {
 
 std::expected<Entity, framework::Status> SiteBuilder::build() && {
   constexpr double TURN = 2.0 * std::numbers::pi;
-  std::vector<Entity> created;
-  auto refuse = [&](framework::Status status)
-      -> std::expected<Entity, framework::Status> {
-    for (Entity entity : created) {
-      auto destroyed = world_->destroy(entity).build();
-      DECLARE_UNUSED(destroyed);
-    }
-    return std::unexpected(status);
-  };
-  auto keep = [&](std::expected<Entity, framework::Status> entity) {
-    if (entity) {
-      created.push_back(*entity);
-    }
-    return entity.has_value();
-  };
-
-  auto asset = world_->create<archetype::Asset>("asset")
-                   .with(Kinematics{.position = origin_})
-                   .with(asset_health_)
-                   .with(Asset{})
-                   .build();
-  if (!keep(asset)) {
-    return refuse(asset.error());
-  }
+  // Any early return rolls back the entities created so far.
+  auto transaction = world_->transaction();
+  ASSIGN_OR_RETURN(Entity asset, world_->create<archetype::Asset>("asset")
+                                     .with(Kinematics{.position = origin_})
+                                     .with(asset_health_)
+                                     .with(Asset{})
+                                     .build());
   for (std::size_t i = 0; i < radars_.count; ++i) {
     double bearing =
         TURN * static_cast<double>(i) / static_cast<double>(radars_.count);
-    auto radar =
+    RETURN_IF_UNEXPECTED(
         world_->create<archetype::Radar>()
             .with(Kinematics{.position =
                                  origin_ + on_ring(radars_.radius, bearing)})
             .with(radars_.unit)
-            .build();
-    if (!keep(radar)) {
-      return refuse(radar.error());
-    }
+            .build());
   }
   for (std::size_t i = 0; i < launchers_.count; ++i) {
     double bearing = TURN * (static_cast<double>(i) + 0.5) /
                      static_cast<double>(launchers_.count);
-    auto launcher =
+    RETURN_IF_UNEXPECTED(
         world_->create<archetype::Launcher>()
             .with(Kinematics{.position =
                                  origin_ + on_ring(launchers_.radius, bearing)})
             .with(launchers_.unit)
-            .build();
-    if (!keep(launcher)) {
-      return refuse(launcher.error());
-    }
+            .build());
   }
   for (std::size_t i = 0; i < drones_; ++i) {
     double bearing = random_->uniform(0.0, TURN);
@@ -98,19 +74,17 @@ std::expected<Entity, framework::Status> SiteBuilder::build() && {
     Kinematics kinematics{.position = origin_ + on_ring(radius, bearing)};
     kinematics.velocity = (origin_ - kinematics.position) *
                           (drone_.cruise / norm(origin_ - kinematics.position));
-    auto drone = world_->create<archetype::RedDrone>()
-                     .with(kinematics)
-                     .with(Control{})
-                     .with(Health{.points = 1.0})
-                     .with(warhead_)
-                     .with(Target{.entity = *asset})
-                     .with(drone_)
-                     .build();
-    if (!keep(drone)) {
-      return refuse(drone.error());
-    }
+    RETURN_IF_UNEXPECTED(world_->create<archetype::RedDrone>()
+                             .with(kinematics)
+                             .with(Control{})
+                             .with(Health{.points = 1.0})
+                             .with(warhead_)
+                             .with(Target{.entity = asset})
+                             .with(drone_)
+                             .build());
   }
-  return *asset;
+  transaction.commit();
+  return asset;
 }
 
 SiteBuilder create_site(Position origin, lib::Depend<World> world) {
