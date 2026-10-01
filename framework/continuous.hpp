@@ -34,16 +34,13 @@ namespace simon::framework {
 // combines linearly; `advance` moves a state along a rate for a duration, and
 // may renormalize a state that is not a vector space, such as an attitude.
 template <typename StateType>
-concept ContinuousState =
-    requires(const StateType& state,
-             const typename StateType::RateComponent& rate, double weight,
-             Duration dt) {
-      { advance(state, rate, dt) } -> std::same_as<StateType>;
-      { rate + rate } -> std::convertible_to<typename StateType::RateComponent>;
-      {
-        weight * rate
-      } -> std::convertible_to<typename StateType::RateComponent>;
-    };
+concept ContinuousState = requires(
+    const StateType& state, const typename StateType::RateComponent& rate,
+    double weight, Duration dt) {
+  { advance(state, rate, dt) } -> std::same_as<StateType>;
+  { rate + rate } -> std::convertible_to<typename StateType::RateComponent>;
+  { weight * rate } -> std::convertible_to<typename StateType::RateComponent>;
+};
 
 template <typename StateType>
 using rate_of_t = typename StateType::RateComponent;
@@ -95,8 +92,7 @@ struct ContinuousRunner final {
   template <typename StateType, typename WorldType, typename VisitorType>
   static auto walk(lib::InOut<WorldType> world, VisitorType&& visit) -> void {
     using RateType = rate_of_t<StateType>;
-    auto& states =
-        world->template mutable_store_of<StateType>(SchedulerKey{});
+    auto& states = world->template mutable_store_of<StateType>(SchedulerKey{});
     const auto& rates = std::as_const(*world).template store_of<RateType>();
 
     // Archetypes that require the state, segment by segment.
@@ -214,8 +210,8 @@ template <typename MethodType, typename... StateTypes,
 class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
     final {
   using DerivativeSystemList = flattened_list_t<DerivativeScheduleType>;
-  using Declared =
-      internal::ContinuousDeclared<TypeList<StateTypes...>, DerivativeSystemList>;
+  using Declared = internal::ContinuousDeclared<TypeList<StateTypes...>,
+                                                DerivativeSystemList>;
 
   static_assert(sizeof...(StateTypes) > 0,
                 "A Continuous element integrates at least one state.");
@@ -259,9 +255,9 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
   // Advances every state by `step.dt`.
   template <typename WorldType>
   auto run(const Step& step, lib::InOut<WorldType> world) -> void {
-    static_assert((contains_v<typename WorldType::ComponentList, StateTypes> &&
-                   ...),
-                  "A continuous state is not in the world.");
+    static_assert(
+        (contains_v<typename WorldType::ComponentList, StateTypes> && ...),
+        "A continuous state is not in the world.");
     static_assert(
         (contains_v<typename WorldType::ComponentList, rate_of_t<StateTypes>> &&
          ...),
@@ -343,10 +339,8 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
     }
 
     ContinuousRunner::walk<StateType>(
-        world,
-        [&](std::size_t n, StateType& state, const rate_of_t<StateType>*) {
-          scratch.start[n] = state;
-        });
+        world, [&](std::size_t n, StateType& state,
+                   const rate_of_t<StateType>*) { scratch.start[n] = state; });
   }
 
   // The rates of the first `COUNT` stages, weighted by `weights`.
@@ -376,8 +370,8 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
   auto after_stage(Duration dt, lib::InOut<WorldType> world) -> void {
     Scratch<StateType>& scratch = std::get<Scratch<StateType>>(scratch_);
     ContinuousRunner::walk<StateType>(
-        world, [&](std::size_t n, StateType& state,
-                   const rate_of_t<StateType>* rate) {
+        world,
+        [&](std::size_t n, StateType& state, const rate_of_t<StateType>* rate) {
           if (!rate) {
             return;
           }

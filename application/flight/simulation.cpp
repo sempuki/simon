@@ -32,19 +32,18 @@ auto create_aircraft(const Scenario& scenario, const AirState& state,
     -> std::expected<void, framework::Status> {
   // Roughly trimmed for level flight, so the autopilot starts near its work.
   constexpr double TRIM_THROTTLE = 0.3;
-  auto created = world->create<ArchetypeType>()
-                     .with(state)
-                     .with(FlightControls{.load_factor = 1.0,
-                                          .throttle = TRIM_THROTTLE})
-                     .with(Commands{.load_factor = 1.0,
-                                    .throttle = TRIM_THROTTLE})
-                     .with(scenario.airframe)
-                     .with(scenario.handling)
-                     .with(Autopilot{.altitude = model::altitude_of(state),
-                                     .heading = state.heading,
-                                     .speed = route.speed,
-                                     .throttle_integral = TRIM_THROTTLE})
-                     .with(route);
+  auto created =
+      world->create<ArchetypeType>()
+          .with(state)
+          .with(FlightControls{.load_factor = 1.0, .throttle = TRIM_THROTTLE})
+          .with(Commands{.load_factor = 1.0, .throttle = TRIM_THROTTLE})
+          .with(scenario.airframe)
+          .with(scenario.handling)
+          .with(Autopilot{.altitude = model::altitude_of(state),
+                          .heading = state.heading,
+                          .speed = route.speed,
+                          .throttle_integral = TRIM_THROTTLE})
+          .with(route);
   if constexpr (std::is_same_v<ArchetypeType, archetype::PreciseAircraft>) {
     RETURN_IF_UNEXPECTED(std::move(created).with(AirStateRate{}).build());
   } else {
@@ -79,12 +78,12 @@ auto build_scenario(const Scenario& scenario, lib::InOut<World> world)
   for (std::size_t i = 0; i < simple + precise; ++i) {
     double x = random.uniform(0.0, side);
     double y = random.uniform(0.0, side);
-    Route route{.speed = random.uniform(
-                             scenario.slowest.numerical_value_in(
-                                 model::meter_per_second),
-                             scenario.fastest.numerical_value_in(
-                                 model::meter_per_second)) *
-                         model::meter_per_second};
+    Route route{
+        .speed =
+            random.uniform(
+                scenario.slowest.numerical_value_in(model::meter_per_second),
+                scenario.fastest.numerical_value_in(model::meter_per_second)) *
+            model::meter_per_second};
     for (Position& waypoint : route.waypoints) {
       waypoint = model::meters(x + random.uniform(-reach, reach),
                                y + random.uniform(-reach, reach),
@@ -95,8 +94,8 @@ auto build_scenario(const Scenario& scenario, lib::InOut<World> world)
                    .speed = route.speed,
                    .heading = model::bearing(start, route.waypoints[0])};
     if (i < simple) {
-      RETURN_IF_UNEXPECTED(create_aircraft<archetype::Aircraft>(
-          scenario, state, route, world));
+      RETURN_IF_UNEXPECTED(
+          create_aircraft<archetype::Aircraft>(scenario, state, route, world));
     } else {
       RETURN_IF_UNEXPECTED(create_aircraft<archetype::PreciseAircraft>(
           scenario, state, route, world));

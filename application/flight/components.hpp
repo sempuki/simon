@@ -21,9 +21,9 @@ using framework::Duration;
 using framework::Entity;
 using framework::Step;
 using framework::TimePoint;
+using model::Airframe;
 using model::AirState;
 using model::AirStateRate;
-using model::Airframe;
 using model::Angle;
 using model::FlightControls;
 using model::Length;
@@ -82,11 +82,11 @@ struct Aircraft final                                                   //
                          Handling, Autopilot, Route>> {};               //
 
 // Opts in to Runge-Kutta 4 by having the rate of its AirState.
-struct PreciseAircraft final                                            //
-    : Archetype<"precise aircraft",                                     //
-                Requires<AirState, AirStateRate, FlightControls,        //
-                         Commands, Airframe, Handling, Autopilot,       //
-                         Route>> {};                                    //
+struct PreciseAircraft final                                       //
+    : Archetype<"precise aircraft",                                //
+                Requires<AirState, AirStateRate, FlightControls,   //
+                         Commands, Airframe, Handling, Autopilot,  //
+                         Route>> {};                               //
 
 }  // namespace archetype
 

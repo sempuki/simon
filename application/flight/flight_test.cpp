@@ -90,11 +90,10 @@ TEST_CASE("Autopilot") {
   Scheduler scheduler;
 
   SECTION("ShouldHoldAltitudeAndSpeedGivenTargetsAhead") {
-    Entity aircraft = create(
-        level(5000.0, 200.0, 0.0),
-        route_to(model::meters(0.0, 500000.0, 6000.0),
-                 220.0 * model::meter_per_second),
-        lib::InOut(world));
+    Entity aircraft = create(level(5000.0, 200.0, 0.0),
+                             route_to(model::meters(0.0, 500000.0, 6000.0),
+                                      220.0 * model::meter_per_second),
+                             lib::InOut(world));
 
     fly_for(3min, lib::InOut(scheduler), lib::InOut(world));
 
@@ -107,11 +106,10 @@ TEST_CASE("Autopilot") {
   }
 
   SECTION("ShouldTurnToWaypointGivenWaypointBehind") {
-    Entity aircraft = create(
-        level(5000.0, 200.0, 0.0),
-        route_to(model::meters(0.0, -500000.0, 5000.0),
-                 200.0 * model::meter_per_second),
-        lib::InOut(world));
+    Entity aircraft = create(level(5000.0, 200.0, 0.0),
+                             route_to(model::meters(0.0, -500000.0, 5000.0),
+                                      200.0 * model::meter_per_second),
+                             lib::InOut(world));
 
     fly_for(90s, lib::InOut(scheduler), lib::InOut(world));
 
@@ -162,9 +160,9 @@ TEST_CASE("Fidelity") {
 
     // The two fly the same route by different integrators: close, but not
     // the same.
-    double apart = model::distance(state_of(world, simple),
-                                   state_of(world, precise))
-                       .numerical_value_in(model::meter);
+    double apart =
+        model::distance(state_of(world, simple), state_of(world, precise))
+            .numerical_value_in(model::meter);
     CHECK(apart > 0.0);
     CHECK(apart < 100.0);
   }

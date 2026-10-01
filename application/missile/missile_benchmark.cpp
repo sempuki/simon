@@ -146,7 +146,8 @@ auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
       scenario.sites == 1 ? "" : "s", steps,
       static_cast<double>(entity_steps) / std::max(steps, 1));
   std::println(
-      "  total {:10.3f} ms/step {:10.1f} ns/entity-step, slowest step {:.3f} ms",
+      "  total {:10.3f} ms/step {:10.1f} ns/entity-step, slowest step {:.3f} "
+      "ms",
       1e3 * total / std::max(steps, 1),
       1e9 * total / std::max<double>(entity_steps, 1), 1e3 * slowest);
   auto names = names_of(List{});
@@ -194,7 +195,7 @@ auto main(int argc, char** argv) -> int {
     if (argument == "--in-turn") {
       in_turn = true;
     } else if (argument == "--steps" && i + 1 < argc &&
-        (count = count_of(argv[i + 1]))) {
+               (count = count_of(argv[i + 1]))) {
       steps = *count;
       budgeted = false;
       ++i;

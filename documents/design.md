@@ -844,12 +844,12 @@ Commands are an in-process type, a `std::variant` generated from the world's
 component list. Logging, replaying or sending them to another process (the DIS
 and HLA direction) would build on them, and is not built.
 
-Systems use builders too, through their `WorldAccess`:
+Systems use builders too, through their `ProjectedWorld`:
 `world.create<Interceptor>().under(self).with(...).build()`. Inside a system
 whose access parameter is `auto&`, the free-function form avoids the
 `template` keyword: `create<Interceptor>(lib::InOut(world))`.
 
-`WorldAccess` has the query forms as well, `world.destroy()` and
+`ProjectedWorld` has the query forms as well, `world.destroy()` and
 `world.change()`, limited to what the system declares it reads. Selecting by a
 component reads that component's store, so the component must be in the
 system's `AllowComponentList`. `within` reads the spatial index, so the
@@ -873,7 +873,7 @@ struct ClearOrigin final : System<const Health> {
 ```
 
 The query builders carry a read policy as a template parameter. The world's
-query forms use `ReadAnything`; `WorldAccess` passes one that answers from the
+query forms use `ReadAnything`; `ProjectedWorld` passes one that answers from the
 system's `AllowComponentList`, and `each` and `within` check it with a
 `static_assert`.
 
@@ -893,7 +893,7 @@ struct System {
 struct GuideInterceptors : System<const Interceptor, const Kinematics, Control> {
   using SequenceAfterSystemList = SystemList<UpdateTracks>;
   using AllowComponentList = TypeList<Kinematics>;   // other entities, always read-only
-  using LocalWorld = WorldAccess<GuideInterceptors>;
+  using LocalWorld = ProjectedWorld<GuideInterceptors>;
 
   auto operator()(LocalWorld& world, Entity self,
                   const Interceptor& interceptor, const Kinematics* kinematics,
@@ -961,12 +961,12 @@ Rules:
   one cannot both name and exclude a component. Fidelity levels use it: the
   flight application's single-pass `Fly` excludes the `AirStateRate` that
   only Runge-Kutta aircraft have.
-- **The call order is `(WorldAccess& world, Entity self, driving component,
-  other components..., Step step)`.** `WorldAccess<S, W>` is the system's
+- **The call order is `(ProjectedWorld& world, Entity self, driving component,
+  other components..., Step step)`.** `ProjectedWorld<S, W>` is the system's
   opt-in access to the world: its allow list, spatial and name queries, and
   builders. The `Step` (see [Time](#time-and-drivers)) is passed by value, on
   the stack, and is optional: the scheduler passes it only if the call
-  operator takes it. Time is not world data, so it is not in `WorldAccess`.
+  operator takes it. Time is not world data, so it is not in `ProjectedWorld`.
 - **Optional stages** (`prepare(world[, step])` before the main loop,
   `resolve(world[, step])` after it) are detected at compile time and cost
   nothing when absent. The older
@@ -1264,7 +1264,7 @@ using World = framework::World<
     size that is not positive (`CELL_SIZE_INVALID`) and holding more than a store's
     32-bit slots can index (`CAPACITY_TOO_LARGE`), and a refused plan leaves
     the world as it was.
-  - **A world never moves.** Builders, `WorldAccess` and domain builders keep a
+  - **A world never moves.** Builders, `ProjectedWorld` and domain builders keep a
     pointer to it and its stores never reallocate, so nothing that refers to a
     world can dangle while it lives. Its default constructor makes an empty
     world, and the builder fills it in place through a private `initialize`,
@@ -2191,7 +2191,7 @@ Decisions made while building it:
   them. Marking the covered tracks in `prepare`, from the scanning radars'
   side, only brought `UpdateTracks` back to 0.76 ms, so it was not kept.
 - **Systems name their concrete access type** with a member alias,
-  `using LocalWorld = WorldAccess<ThisSystem>;`, so builder
+  `using LocalWorld = ProjectedWorld<ThisSystem>;`, so builder
   calls with explicit template arguments, such as `detach<Tracked>()`, need no
   `template` keyword.
 

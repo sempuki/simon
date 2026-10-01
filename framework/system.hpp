@@ -182,7 +182,7 @@ struct BytesOf<TypeList<Types...>> final {
 // the driving component and every other component it names. An upper bound:
 // a sibling the entity's archetype cannot have costs nothing, and one it only
 // allows also costs an index entry. Reads of other entities through
-// WorldAccess come on top.
+// ProjectedWorld come on top.
 template <typename SystemType>
 inline constexpr std::size_t bytes_per_entity_v =
     sizeof(Entity) + BytesOf<declared_list_of_t<SystemType>>::value;
@@ -221,19 +221,20 @@ inline constexpr bool is_valid_schedule_v =
     ScheduleCheck<flattened_list_t<ScheduleType>>::unique &&
     ScheduleCheck<flattened_list_t<ScheduleType>>::ordered;
 
-//-- WorldAccess
+//-- ProjectedWorld
 //-------------------------------------------------------------------
 
-// What a system may use of the world besides its own entity's components: the
-// components its AllowComponentList declares (read-only), spatial and name
-// queries, and builders.
+// The world projected onto what a system declares, as a database projects a
+// table onto some of its columns: the components its AllowComponentList
+// declares (read-only), besides its own entity's, with spatial and name
+// queries and builders. Projection picks stores; it never filters entities.
 template <typename SystemType, typename WorldType>
-class WorldAccess final {
+class ProjectedWorld final {
  public:
   using SpatialComponent = typename WorldType::SpatialComponent;
 
   // Keeps a reference to `world` for as long as the access lives.
-  explicit WorldAccess(lib::Depend<WorldType> world) : world_{world.get()} {}
+  explicit ProjectedWorld(lib::Depend<WorldType> world) : world_{world.get()} {}
 
   // Another entity's `ComponentType`, or null if it is gone or lacks one.
   template <typename ComponentType>
@@ -331,36 +332,36 @@ class WorldAccess final {
   WorldType* world_ = nullptr;
 };
 
-// Free-function forms of the WorldAccess member templates, so a system whose
+// Free-function forms of the ProjectedWorld member templates, so a system whose
 // access parameter is `auto&` can write
 // `maybe_component_of<Collider>(access, other)` instead of
 // `access.template maybe_component_of<Collider>(other)`. Found by
 // argument-dependent lookup.
 template <typename ComponentType, typename SystemType, typename WorldType>
-auto maybe_component_of(const WorldAccess<SystemType, WorldType>& access,
+auto maybe_component_of(const ProjectedWorld<SystemType, WorldType>& access,
                         Entity entity) -> const ComponentType* {
   return access.template maybe_component_of<ComponentType>(entity);
 }
 
 template <typename ComponentType, typename SystemType, typename WorldType>
-auto component_of(const WorldAccess<SystemType, WorldType>& access,
+auto component_of(const ProjectedWorld<SystemType, WorldType>& access,
                   Entity entity) -> const ComponentType& {
   return access.template component_of<ComponentType>(entity);
 }
 
 template <typename ComponentType, typename SystemType, typename WorldType>
-auto store_of(const WorldAccess<SystemType, WorldType>& access)
+auto store_of(const ProjectedWorld<SystemType, WorldType>& access)
     -> const ComponentStore<ComponentType>& {
   return access.template store_of<ComponentType>();
 }
 
 template <Archetypal ArchetypeType, typename SystemType, typename WorldType>
 auto create(Alias alias,
-            lib::InOut<WorldAccess<SystemType, WorldType>> access) {
+            lib::InOut<ProjectedWorld<SystemType, WorldType>> access) {
   return access->template create<ArchetypeType>(std::move(alias));
 }
 template <Archetypal ArchetypeType, typename SystemType, typename WorldType>
-auto create(lib::InOut<WorldAccess<SystemType, WorldType>> access) {
+auto create(lib::InOut<ProjectedWorld<SystemType, WorldType>> access) {
   return access->template create<ArchetypeType>();
 }
 
@@ -394,7 +395,7 @@ struct SystemRunner final {
                   "A system cannot both name a component and exclude its "
                   "owners; the component would never be there.");
 
-    WorldAccess<SystemType, WorldType> access{lib::Depend(*world)};
+    ProjectedWorld<SystemType, WorldType> access{lib::Depend(*world)};
     // A prepare stage that returns false skips the per-entity loop, for steps
     // with nothing to do.
     bool proceed = stage(
@@ -431,10 +432,10 @@ struct SystemRunner final {
   // Calls an optional stage (prepare or resolve) as stage(world, step) or
   // stage(world), whichever the system declares. Returns what a stage that
   // returns bool returned, and true otherwise.
-  template <typename SystemType, typename WorldAccessType, typename CallType>
+  template <typename SystemType, typename ProjectedWorldType, typename CallType>
   static auto stage(const Step& step, CallType call,
                     lib::InOut<SystemType> system,
-                    lib::InOut<WorldAccessType> access) -> bool {
+                    lib::InOut<ProjectedWorldType> access) -> bool {
     Step copy = step;
     auto outcome = [](auto&& invoke) {
       if constexpr (std::is_same_v<decltype(invoke()), bool>) {
@@ -444,32 +445,32 @@ struct SystemRunner final {
         return true;
       }
     };
-    if constexpr (std::is_invocable_v<CallType, SystemType&, WorldAccessType&,
-                                      Step&>) {
+    if constexpr (std::is_invocable_v<CallType, SystemType&,
+                                      ProjectedWorldType&, Step&>) {
       return outcome([&] { return call(*system, *access, copy); });
     } else if constexpr (std::is_invocable_v<CallType, SystemType&,
-                                             WorldAccessType&>) {
+                                             ProjectedWorldType&>) {
       return outcome([&] { return call(*system, *access); });
     } else {
       return true;
     }
   }
 
-  template <typename SystemType, typename WorldType, typename WorldAccessType,
-            typename... OtherComponentTypes>
+  template <typename SystemType, typename WorldType,
+            typename ProjectedWorldType, typename... OtherComponentTypes>
   static auto loop(const Step& step, TypeList<OtherComponentTypes...>,
                    lib::InOut<SystemType> system, lib::InOut<WorldType> world,
-                   lib::InOut<WorldAccessType> access) -> void {
+                   lib::InOut<ProjectedWorldType> access) -> void {
     using DrivingComponentType = typename SystemType::DrivingComponent;
     constexpr bool TAKES_STEP =
-        std::is_invocable_v<SystemType&, WorldAccessType&, Entity,
+        std::is_invocable_v<SystemType&, ProjectedWorldType&, Entity,
                             DrivingComponentType&, OtherComponentTypes*...,
                             Step>;
     static_assert(
         TAKES_STEP ||
-            std::is_invocable_v<SystemType&, WorldAccessType&, Entity,
+            std::is_invocable_v<SystemType&, ProjectedWorldType&, Entity,
                                 DrivingComponentType&, OtherComponentTypes*...>,
-        "A system's call operator must accept (WorldAccess&, Entity, "
+        "A system's call operator must accept (ProjectedWorld&, Entity, "
         "DrivingComponentType&, OtherComponentTypes*...[, Step]), with const "
         "exactly where the System declares it.");
 
@@ -491,7 +492,7 @@ struct SystemRunner final {
 
     // Unwrapped once, outside the loop, so the hot path has no pointer checks.
     SystemType& call = *system;
-    WorldAccessType& shared = *access;
+    ProjectedWorldType& shared = *access;
     auto invoke = [&](Entity entity, DrivingComponentType& driving,
                       OtherComponentTypes*... others) {
       if constexpr (TAKES_STEP) {
@@ -683,10 +684,10 @@ auto flatten_systems(ScheduleType&& schedule) {
 // A schedule element that runs itself instead of being run per entity, such
 // as Continuous. It declares what it reads and writes as a system does.
 template <typename Type, typename WorldType>
-concept RunsItself = requires(Type& element, const Step& step,
-                              lib::InOut<WorldType> world) {
-  element.run(step, world);
-};
+concept RunsItself =
+    requires(Type& element, const Step& step, lib::InOut<WorldType> world) {
+      element.run(step, world);
+    };
 
 // Runs a schedule's systems in order, applying each system's commands before
 // the next one runs. Holds one instance of each system, so systems may keep
@@ -710,7 +711,9 @@ class Scheduler final {
 
   auto step(const Step& step, lib::InOut<WorldType> world) -> void {
     std::apply(
-        [&](auto&... system) { ((run(step, system, world), world->sync()), ...); },
+        [&](auto&... system) {
+          ((run(step, system, world), world->sync()), ...);
+        },
         systems_);
   }
 

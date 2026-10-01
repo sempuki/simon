@@ -21,14 +21,14 @@ using framework::TypeList;
 using namespace std::chrono_literals;
 
 template <typename SystemType>
-using WorldAccess = framework::WorldAccess<SystemType, World>;
+using ProjectedWorld = framework::ProjectedWorld<SystemType, World>;
 
 //-- Guidance and control: discrete, at their own rates ------------------------
 
 // Once a second, each aircraft steers its autopilot at its route's next
 // waypoint, and moves on to the one after when it is within capture range.
 struct FollowRoute final : System<Route, const AirState, Autopilot> {
-  using LocalWorld = WorldAccess<FollowRoute>;
+  using LocalWorld = ProjectedWorld<FollowRoute>;
 
   static constexpr Length CAPTURE = 3000.0 * model::meter;
 
@@ -67,18 +67,22 @@ struct AutopilotGains final {
   Rate climb = 1.0 * model::per_second;  // Of the flight-path angle error.
   Rate heading = 0.5 * model::per_second;
   // Throttle, from none to full, for the speed error.
-  model::PiGains<Speed> speed{.proportional = 0.05 * model::second / model::meter,
-                              .integral = 0.02 / model::meter,
-                              .low = 0.0,
-                              .high = 1.0};
+  model::PiGains<Speed> speed{
+      .proportional = 0.05 * model::second / model::meter,
+      .integral = 0.02 / model::meter,
+      .low = 0.0,
+      .high = 1.0};
 };
 
 // Ten times a second, each aircraft's autopilot turns its targets into
 // commands: a bank for the heading, a load factor for the altitude, and a
 // throttle for the speed.
-struct FlyAutopilot final : System<Commands, const AirState, const Handling,
-                                   const FlightControls, Autopilot> {
-  using LocalWorld = WorldAccess<FlyAutopilot>;
+struct FlyAutopilot final : System<Commands,              //
+                                   const AirState,        //
+                                   const Handling,        //
+                                   const FlightControls,  //
+                                   Autopilot> {
+  using LocalWorld = ProjectedWorld<FlyAutopilot>;
   using SequenceAfterSystemList = SystemList<FollowRoute>;
 
   auto prepare(LocalWorld&, Step step) -> bool {
@@ -105,13 +109,12 @@ struct FlyAutopilot final : System<Commands, const AirState, const Handling,
         1.0 - model::number_of(speed_error / gains_.speed_margin), 0.0, 1.0);
     climb = model::min(climb, gains_.steepest_climb * slow);
 
-    commands.load_factor =
-        std::clamp(model::load_factor_command(*state, climb, controls->bank,
-                                              gains_.climb),
-                   handling->min_load_factor, handling->max_load_factor);
-    commands.throttle = model::pi_control(
-        speed_error, gains_.speed, elapsed_,
-        lib::InOut(autopilot->throttle_integral));
+    commands.load_factor = std::clamp(
+        model::load_factor_command(*state, climb, controls->bank, gains_.climb),
+        handling->min_load_factor, handling->max_load_factor);
+    commands.throttle =
+        model::pi_control(speed_error, gains_.speed, elapsed_,
+                          lib::InOut(autopilot->throttle_integral));
   }
 
  private:
@@ -122,9 +125,8 @@ struct FlyAutopilot final : System<Commands, const AirState, const Handling,
 
 // Every step, each airframe follows its commands: the load factor and
 // throttle through first-order lags, the bank at no more than its roll rate.
-struct Actuate final
-    : System<FlightControls, const Commands, const Handling> {
-  using LocalWorld = WorldAccess<Actuate>;
+struct Actuate final : System<FlightControls, const Commands, const Handling> {
+  using LocalWorld = ProjectedWorld<Actuate>;
   using SequenceAfterSystemList = SystemList<FlyAutopilot>;
 
   auto operator()(LocalWorld&, Entity, FlightControls& controls,
@@ -134,11 +136,11 @@ struct Actuate final
       return;
     }
     Time dt = model::seconds(step.dt);
-    controls.load_factor = model::lag(controls.load_factor,
-                                      commands->load_factor,
-                                      handling->load_factor_lag, dt);
-    controls.bank =
-        model::approach(controls.bank, commands->bank, handling->roll_rate * dt);
+    controls.load_factor =
+        model::lag(controls.load_factor, commands->load_factor,
+                   handling->load_factor_lag, dt);
+    controls.bank = model::approach(controls.bank, commands->bank,
+                                    handling->roll_rate * dt);
     controls.throttle = model::lag(controls.throttle, commands->throttle,
                                    handling->throttle_lag, dt);
   }
@@ -159,7 +161,7 @@ inline auto rate_of(const AirState& state, const FlightControls& controls,
 // Aircraft that have an AirStateRate are Precise's, so Fly excludes them; the
 // runner skips the precise archetype's segment whole.
 struct Fly final : System<AirState, const FlightControls, const Airframe> {
-  using LocalWorld = WorldAccess<Fly>;
+  using LocalWorld = ProjectedWorld<Fly>;
   using SequenceAfterSystemList = SystemList<Actuate>;
   using ExcludeComponentList = TypeList<AirStateRate>;
 
@@ -178,10 +180,9 @@ struct Fly final : System<AirState, const FlightControls, const Airframe> {
 };
 
 // The opt-in: the rate of each precise aircraft's AirState, for Continuous.
-struct PointMassRates final
-    : System<AirStateRate, const AirState, const FlightControls,
-             const Airframe> {
-  using LocalWorld = WorldAccess<PointMassRates>;
+struct PointMassRates final : System<AirStateRate, const AirState,
+                                     const FlightControls, const Airframe> {
+  using LocalWorld = ProjectedWorld<PointMassRates>;
 
   auto operator()(LocalWorld&, Entity, AirStateRate& rate,
                   const AirState* state, const FlightControls* controls,
@@ -196,9 +197,9 @@ struct PointMassRates final
   model::StandardAirTable air_;
 };
 
-using Precise = framework::Continuous<framework::RungeKutta4,
-                                      TypeList<AirState>,
-                                      SystemList<PointMassRates>>;
+using Precise =
+    framework::Continuous<framework::RungeKutta4, TypeList<AirState>,
+                          SystemList<PointMassRates>>;
 
 //-- Schedule -----------------------------------------------------------------
 

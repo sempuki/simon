@@ -94,8 +94,8 @@ TEST_CASE("PiControl") {
         .high = 10.0 * meter_per_second_squared};
     AccelerationMagnitude integral = 0.0 * meter_per_second_squared;
 
-    AccelerationMagnitude output = pi_control(
-        speed(1.0), accelerate, 2.0 * second, lib::InOut(integral));
+    AccelerationMagnitude output =
+        pi_control(speed(1.0), accelerate, 2.0 * second, lib::InOut(integral));
 
     CHECK(integral == 1.0 * meter_per_second_squared);
     CHECK(output == 3.0 * meter_per_second_squared);

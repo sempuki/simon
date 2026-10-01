@@ -102,7 +102,7 @@ struct PiGains final {
 
   Proportional proportional = internal::zero_of<Proportional>();
   Integral integral = internal::zero_of<Integral>();
-  OutputType low = internal::zero_of<OutputType>();  // The lowest output.
+  OutputType low = internal::zero_of<OutputType>();   // The lowest output.
   OutputType high = internal::zero_of<OutputType>();  // The highest output.
 };
 
@@ -135,8 +135,7 @@ template <typename BreakpointType = double, typename ValueType = double>
 class Table1 final {
  public:
   // Needs at least one breakpoint, strictly increasing, and a value for each.
-  Table1(std::vector<BreakpointType> breakpoints,
-         std::vector<ValueType> values)
+  Table1(std::vector<BreakpointType> breakpoints, std::vector<ValueType> values)
       : breakpoints_{std::move(breakpoints)}, values_{std::move(values)} {
     CHECK_PRECONDITION(!breakpoints_.empty());
     CHECK_PRECONDITION(values_.size() == breakpoints_.size());
@@ -193,11 +192,10 @@ class Table2 final {
         values_{std::move(values)} {
     CHECK_PRECONDITION(!rows_.empty() && !columns_.empty());
     CHECK_PRECONDITION(values_.size() == rows_.size() * columns_.size());
-    CHECK_PRECONDITION(std::ranges::adjacent_find(rows_, std::greater_equal{}) ==
-                       rows_.end());
     CHECK_PRECONDITION(
-        std::ranges::adjacent_find(columns_, std::greater_equal{}) ==
-        columns_.end());
+        std::ranges::adjacent_find(rows_, std::greater_equal{}) == rows_.end());
+    CHECK_PRECONDITION(std::ranges::adjacent_find(
+                           columns_, std::greater_equal{}) == columns_.end());
   }
 
   auto operator()(const RowType& row, const ColumnType& column) const
@@ -216,7 +214,8 @@ class Table2 final {
     };
 
     ValueType low = along_row(r);
-    return row_weight == 0.0 ? low : low + (along_row(r + 1) - low) * row_weight;
+    return row_weight == 0.0 ? low
+                             : low + (along_row(r + 1) - low) * row_weight;
   }
 
  private:

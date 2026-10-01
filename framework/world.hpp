@@ -65,9 +65,9 @@ class SchedulerKey final {
 //   std::expected<void, Status> built = World::set_up().numbered(1)
 //       .holding<archetype::Drone>(1000).build(lib::Out(world));
 //
-// A world never moves. Builders and WorldAccess keep a pointer to it, and its
-// stores never reallocate, so nothing that refers to a world can dangle while
-// it lives.
+// A world never moves. Builders and ProjectedWorld keep a pointer to it, and
+// its stores never reallocate, so nothing that refers to a world can dangle
+// while it lives.
 //
 // Everything in it has a Name ({kind, instance}), an Identity computed from the
 // Name ("/world/1/entity/2"), and any number of Aliases ("ego"). See name.hpp.

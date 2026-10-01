@@ -93,10 +93,10 @@ TEST_CASE("Fly") {
     // order in the step.
     AirState state = level(200.0, 0.4);
     state.flight_path_angle = 0.1 * radian;
-    FlightControls controls{.load_factor = 1.5, .bank = 0.6 * radian,
-                            .throttle = 0.5};
-    AirStateRate rate = point_mass_rate(state, controls, JET,
-                                        standard_air(5000.0 * meter));
+    FlightControls controls{
+        .load_factor = 1.5, .bank = 0.6 * radian, .throttle = 0.5};
+    AirStateRate rate =
+        point_mass_rate(state, controls, JET, standard_air(5000.0 * meter));
 
     AirState next = fly(state, rate, 20ms);
     Vector3d expected = (state.position + velocity_of(next) * (0.02 * second))
@@ -159,8 +159,7 @@ TEST_CASE("AutopilotLaws") {
                WithinAbs(PI / 2.0, 1e-12));
     CHECK_THAT(radians(bearing(meters(0, 0, 0), meters(0, 10, 0))),
                WithinAbs(0.0, 1e-12));
-    CHECK(ground_distance(meters(0, 0, 0), meters(3, 4, 100)) ==
-          5.0 * meter);
+    CHECK(ground_distance(meters(0, 0, 0), meters(3, 4, 100)) == 5.0 * meter);
   }
 }
 

@@ -52,9 +52,7 @@ auto advance(const Point& point, const PointRate& rate, Duration dt) -> Point {
 }
 [[maybe_unused]] auto pose(const Point& a) -> Point { return a; }
 auto coordinates(const Point& a) -> Coordinates { return {a.x, 0.0, 0.0}; }
-auto coordinate_length(const Point&, double length) -> double {
-  return length;
-}
+auto coordinate_length(const Point&, double length) -> double { return length; }
 
 // Another entity whose position drives this one's rate.
 struct Follow final {
@@ -73,7 +71,8 @@ struct Follower final
 // other system.
 struct Rigid final : Archetype<"rigid", Requires<Point>> {};
 // Allows the state without requiring it, so it may lack a rate.
-struct Loose final : Archetype<"loose", Requires<>, Allows<Point, PointRate>> {};
+struct Loose final : Archetype<"loose", Requires<>, Allows<Point, PointRate>> {
+};
 
 using TestWorld = World<Point, TypeList<PointRate, Follow, Probe>,
                         TypeList<Mass, Follower, Rigid, Loose>>;
@@ -130,8 +129,8 @@ struct Spawn final : System<PointRate, const Point> {
 // Finds its own entity in the spatial index at the stage's position.
 struct Locate final : System<PointRate, const Point> {
   using AllowComponentList = TypeList<Point>;
-  auto operator()(auto& world, Entity self, PointRate& rate,
-                  const Point* point) -> void {
+  auto operator()(auto& world, Entity self, PointRate& rate, const Point* point)
+      -> void {
     bool found = false;
     world.within(*point, 1e-9, [&](Entity entity, const Point&) {
       found = found || entity == self;
@@ -144,8 +143,7 @@ struct Locate final : System<PointRate, const Point> {
 };
 
 template <typename MethodType>
-using Oscillate =
-    Continuous<MethodType, TypeList<Point>, SystemList<Spring>>;
+using Oscillate = Continuous<MethodType, TypeList<Point>, SystemList<Spring>>;
 
 // The error in the oscillator's state after one period, started at x = 1. At
 // the end x is at its peak, where a phase error barely shows, so the velocity
@@ -202,9 +200,9 @@ TEST_CASE("Continuous") {
                 .build());
     world.sync();
 
-    Scheduler<TestWorld,
-              SystemList<Continuous<RungeKutta4, TypeList<Point>,
-                                    SystemList<Lead>>>>
+    Scheduler<
+        TestWorld,
+        SystemList<Continuous<RungeKutta4, TypeList<Point>, SystemList<Lead>>>>
         scheduler;
     TimePoint time{};
     for (int i = 0; i < 10; ++i) {
@@ -214,9 +212,11 @@ TEST_CASE("Continuous") {
 
     // RK4 integrates the follower's t^2 / 2 exactly, but only if every stage
     // sees the leader where that stage put it.
-    CHECK_THAT(world.store_of<Point>().component_of(*leader).x, WithinAbs(1.0, 1e-12));
+    CHECK_THAT(world.store_of<Point>().component_of(*leader).x,
+               WithinAbs(1.0, 1e-12));
     world.store_of<Follow>().for_each([&](Entity follower, const Follow&) {
-      CHECK_THAT(world.store_of<Point>().component_of(follower).x, WithinAbs(0.5, 1e-12));
+      CHECK_THAT(world.store_of<Point>().component_of(follower).x,
+                 WithinAbs(0.5, 1e-12));
     });
   }
 
@@ -226,8 +226,9 @@ TEST_CASE("Continuous") {
     REQUIRE(world.create<Mass>().with(Point{}).with(PointRate{}).build());
     world.sync();
 
-    Scheduler<TestWorld, SystemList<Continuous<Midpoint, TypeList<Point>,
-                                               SystemList<Clock>>>>
+    Scheduler<
+        TestWorld,
+        SystemList<Continuous<Midpoint, TypeList<Point>, SystemList<Clock>>>>
         scheduler;
     TimePoint time{};
     for (int i = 0; i < 4; ++i) {
@@ -236,18 +237,18 @@ TEST_CASE("Continuous") {
     }
 
     // The midpoint rule integrates a linear rate exactly.
-    world.store_of<Point>().for_each(
-        [](Entity, const Point& point) { CHECK_THAT(point.x, WithinAbs(0.5, 1e-9)); });
+    world.store_of<Point>().for_each([](Entity, const Point& point) {
+      CHECK_THAT(point.x, WithinAbs(0.5, 1e-9));
+    });
   }
 
   SECTION("ShouldKeepStateGivenEntityWithoutRate") {
     TestWorld world;
     build(lib::Out(world));
-    auto without = world.create<Loose>().with(Point{.x = 3.0, .v = 1.0}).build();
-    auto with = world.create<Loose>()
-                    .with(Point{.x = 1.0})
-                    .with(PointRate{})
-                    .build();
+    auto without =
+        world.create<Loose>().with(Point{.x = 3.0, .v = 1.0}).build();
+    auto with =
+        world.create<Loose>().with(Point{.x = 1.0}).with(PointRate{}).build();
     REQUIRE(without);
     REQUIRE(with);
     world.sync();
@@ -294,13 +295,12 @@ TEST_CASE("Continuous") {
     REQUIRE(world.create<Mass>().with(Point{}).with(PointRate{}).build());
     world.sync();
 
-    Scheduler<TestWorld, SystemList<Continuous<Euler, TypeList<Point>,
-                                               SystemList<Spawn>>>>
+    Scheduler<TestWorld,
+              SystemList<Continuous<Euler, TypeList<Point>, SystemList<Spawn>>>>
         scheduler;
-    CHECK_THROWS_AS(
-        scheduler.step(Step{.time = TimePoint{}, .dt = 100ms},
-                       lib::InOut(world)),
-        std::logic_error);
+    CHECK_THROWS_AS(scheduler.step(Step{.time = TimePoint{}, .dt = 100ms},
+                                   lib::InOut(world)),
+                    std::logic_error);
   }
 
   SECTION("ShouldQuerySpaceAtStagesState") {
@@ -318,10 +318,9 @@ TEST_CASE("Continuous") {
   }
 
   SECTION("ShouldDescribeWhatItWritesAndReads") {
-    using Dynamics = Continuous<RungeKutta4, TypeList<Point>,
-                                SystemList<Lead>>;
-    static_assert(std::is_same_v<write_list_of_t<Dynamics>,
-                                 TypeList<Point, PointRate>>);
+    using Dynamics = Continuous<RungeKutta4, TypeList<Point>, SystemList<Lead>>;
+    static_assert(
+        std::is_same_v<write_list_of_t<Dynamics>, TypeList<Point, PointRate>>);
     static_assert(std::is_same_v<read_list_of_t<Dynamics>, TypeList<Follow>>);
     static_assert(
         std::is_same_v<allow_component_list_of_t<Dynamics>, TypeList<Point>>);

@@ -72,8 +72,7 @@ inline auto standard_air(Length altitude) -> Air {
                                    (GAS_CONSTANT * temperature)));
   }
 
-  Speed speed_of_sound{
-      units::sqrt(HEAT_RATIO * GAS_CONSTANT * temperature)};
+  Speed speed_of_sound{units::sqrt(HEAT_RATIO * GAS_CONSTANT * temperature)};
   return Air{
       .density = pressure / (GAS_CONSTANT * temperature),
       .speed_of_sound = speed_of_sound,
@@ -107,9 +106,8 @@ class StandardAirTable final {
     const Air& high = air_[i + 1];
     return Air{
         .density = low.density + (high.density - low.density) * weight,
-        .speed_of_sound =
-            low.speed_of_sound +
-            (high.speed_of_sound - low.speed_of_sound) * weight,
+        .speed_of_sound = low.speed_of_sound +
+                          (high.speed_of_sound - low.speed_of_sound) * weight,
     };
   }
 

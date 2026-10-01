@@ -34,8 +34,9 @@ struct Firing final {
 // since the gate last fired (zero the first time), never the driver's step.
 //
 // A gate given a first firing time fires first on the step that contains it
-// (or on the first step asked after it), and on each period after it. Gates of the same period with different first
-// times spread their work over the period instead of firing on one step.
+// (or on the first step asked after it), and on each period after it. Gates of
+// the same period with different first times spread their work over the period
+// instead of firing on one step.
 class RateGate final {
  public:
   RateGate() = default;

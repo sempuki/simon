@@ -307,15 +307,15 @@ TEST_CASE("ScanRadars") {
   };
 
   SECTION("ShouldScanTogetherGivenSite") {
-    CHECK(scans_per_step(create_site(model::meters(0, 0, 0),
-                                     lib::Depend(world))) ==
+    CHECK(scans_per_step(
+              create_site(model::meters(0, 0, 0), lib::Depend(world))) ==
           std::vector<int>{4, 0, 0, 0});
   }
 
   SECTION("ShouldScanInTurnGivenSiteScanningInTurn") {
-    CHECK(scans_per_step(
-              create_site(model::meters(0, 0, 0), lib::Depend(world))
-                  .scanning_in_turn()) == std::vector<int>{1, 1, 1, 1});
+    CHECK(scans_per_step(create_site(model::meters(0, 0, 0), lib::Depend(world))
+                             .scanning_in_turn()) ==
+          std::vector<int>{1, 1, 1, 1});
   }
 }
 

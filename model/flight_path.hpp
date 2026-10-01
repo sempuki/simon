@@ -52,8 +52,7 @@ inline auto operator+(const AirStateRate& a, const AirStateRate& b)
           .turn = a.turn + b.turn};
 }
 
-inline auto operator*(double weight, const AirStateRate& rate)
-    -> AirStateRate {
+inline auto operator*(double weight, const AirStateRate& rate) -> AirStateRate {
   return {.velocity = rate.velocity * weight,
           .acceleration = weight * rate.acceleration,
           .climb = weight * rate.climb,
@@ -178,9 +177,9 @@ inline auto point_mass_rate(const AirState& state,
                  number_of(air.density / SEA_LEVEL_DENSITY);
 
   return AirStateRate{
-      .velocity = Vector3d{cos_gamma * sin_chi, cos_gamma * cos_chi,
-                           sin_gamma} *
-                  state.speed,
+      .velocity =
+          Vector3d{cos_gamma * sin_chi, cos_gamma * cos_chi, sin_gamma} *
+          state.speed,
       .acceleration = (thrust - drag) / airframe.mass - g * sin_gamma,
       .climb = g / v * (controls.load_factor * cos_mu - cos_gamma) * radian,
       .turn = g * controls.load_factor * sin_mu /
@@ -238,8 +237,8 @@ inline auto fly(const AirState& state, const AirStateRate& rate,
 
 // The flight-path angle that climbs or descends toward `altitude` at
 // `response` (per second) of the error, at most `steepest` either way.
-inline auto climb_command(const AirState& state, Length altitude,
-                          Rate response, Angle steepest) -> Angle {
+inline auto climb_command(const AirState& state, Length altitude, Rate response,
+                          Angle steepest) -> Angle {
   Speed v = max(state.speed, 1.0 * meter_per_second);
   Speed climb_rate = response * (altitude - altitude_of(state));
   Angle climb = arcsin(std::clamp(number_of(climb_rate / v), -1.0, 1.0));

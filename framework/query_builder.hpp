@@ -26,7 +26,7 @@ namespace simon::framework {
 // A query form's read policy: which components its selection may read. Choosing
 // entities by a component reads that component's store, and `within` reads the
 // spatial component through the spatial index. A query form started from the
-// world may read anything; one started from a system's WorldAccess may read
+// world may read anything; one started from a system's ProjectedWorld may read
 // only what the system's AllowComponentList declares.
 struct ReadAnything final {
   template <typename ComponentType>

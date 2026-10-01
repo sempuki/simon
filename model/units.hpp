@@ -110,8 +110,7 @@ inline constexpr auto radian_per_second = radian / second;
 inline constexpr auto kilogram = units::si::kilogram;
 inline constexpr auto newton = units::si::newton;
 inline constexpr auto square_meter = units::square(meter);
-inline constexpr auto kilogram_per_cubic_meter =
-    kilogram / units::cubic(meter);
+inline constexpr auto kilogram_per_cubic_meter = kilogram / units::cubic(meter);
 inline constexpr auto kelvin = units::si::kelvin;
 inline constexpr auto pascal = units::si::pascal;
 inline constexpr auto joule_per_kilogram_kelvin =
