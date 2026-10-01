@@ -1185,13 +1185,27 @@ world.destroy(e).build()     sync points)          by space      world.within(ce
                                                    by relation   world.parent(e), world.children(e)
 ```
 
+We use database terms for ECS concepts where they fit:
+
 | Database | World |
 |---|---|
 | Primary key | `Entity` (local alias) and `Name` (canonical identity) |
-| Tables | Stores, one per component |
-| Indexes | The name index, the spatial index, the transform hierarchy |
-| Transactions | Command buffers, applied at sync points in recorded order |
-| Business logic | Systems |
+| Row | An entity, its fields spread across the stores of its components |
+| Column (of a column store) | A store: one component for every entity that has it |
+| Schema | The world's component list and archetype list, fixed at compile time |
+| `NOT NULL` and nullable columns | An archetype's `Requires` and `Allows`; builders refuse any other component |
+| Partitions | Archetype segments: each store is partitioned by archetype, in the same order in every store, so a row's fields sit at the same slot |
+| Indexes | Each store's entity index, the name index, the spatial index, the transform hierarchy |
+| Selection (`WHERE`) | `where`, `within`, `having` and `lacking` in queries and query forms |
+| Projection | `ProjectedWorld`: the stores a system declares, read-only beyond its own row |
+| Left outer join | A system's loop: `System<A, B, C>` runs for every `A`, with `B` and `C` null where absent |
+| Driving table | `DrivingComponent`: the store the loop scans row by row |
+| Merge join | A sibling the archetype requires, read from the same slot of the matching chunk |
+| Index nested-loop join | A sibling the archetype only allows, looked up through its store's index |
+| Anti-join (`NOT EXISTS`) | `ExcludeComponentList`: rows that have any of these components are left out |
+| Foreign key | An `Entity` field in a component, followed read-only through `AllowComponentList` |
+| Transactions | Commands, applied at sync points in recorded order; `world.transaction()` makes an utterance atomic and rolls it back unless committed |
+| Stored procedures | Systems |
 
 A world holds every entity-component its builders created, the mappings from
 Names to entities, the aliases, and any relationships between entities. The
