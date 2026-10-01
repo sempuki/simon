@@ -1325,7 +1325,30 @@ bool prepare(LocalWorld& world) { return radars_.collect(world); }
 
 Time every system at the population you care about, on an idle machine and
 under `--contend=N`, over the same number of steps, and check the bytes each
-loop reads per entity (`framework::bytes_per_entity_v`). Contention shows which
+loop reads per entity (`framework::bytes_per_entity_v`).
+
+Measure with both compilers too. Their inliners disagree, and a function that
+is not inlined into a hot loop shows up as its own line in `perf report`. Two
+cases so far:
+
+- **Contract checks.** `lib`'s `CHECK_*` macros used to expand, at every check,
+  into a `std::source_location`, a `std::format` and a `throw`. GCC discounts
+  that cold branch when it decides what to inline; Clang does not, so it left
+  small checked functions such as `InOut`'s `operator->` out of line, called
+  several times per entity by `Integrate`. The failure now happens in one cold,
+  never-inlined function, `lib::internal::do_contract_failure`, so a check is a
+  compare and a call. At 100,000 drones, Clang's `Integrate` went from 0.96 to
+  0.24 ms per step and its whole step from 3.92 to 3.14 ms; GCC's went from
+  3.23 to 3.17 ms.
+- **Hot framework helpers.** Clang declined to inline
+  `SpatialIndex::visit_cell`, which a nearest search calls from several places;
+  `[[gnu::always_inline]]` takes `ProposeEngagements` from 0.77 to 0.62 ms
+  under Clang and changes nothing under GCC.
+
+GCC, for its part, stopped inlining mp-units' `Position - Position` into
+`SteerRedDrones` and `TriggerWarheads` when the site builder added call sites,
+which costs it about 8%; that was accepted. With both fixes Clang runs the
+100,000-drone step in about 3.0 ms and GCC in about 3.2 ms. Contention shows which
 systems are bandwidth-bound: at 100,000 drones, four streaming neighbors slowed
 `ScanRadars` 2.6 times but `TriggerWarheads` 12 times.
 

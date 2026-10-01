@@ -100,7 +100,8 @@ class Driver final {
     return Flow::CONTINUE;
   }
 
-  SimulationType* simulation_;  // Never null; checked once by Depend.
+  // Never null once constructed; Depend checks it.
+  SimulationType* simulation_ = nullptr;
   TimePoint now_;
   Duration max_step_;
   Phase phase_ = Phase::NEW;

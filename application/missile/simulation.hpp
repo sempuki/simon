@@ -230,7 +230,8 @@ class [[nodiscard]] SiteBuilder final {
   };
 
   Position origin_;
-  World* world_;  // Never null; checked once by Depend at construction.
+  // Never null once constructed; Depend checks it.
+  World* world_ = nullptr;
   Health asset_health_{.points = 30.0};
   Placement<Radar> radars_;
   Placement<Launcher> launchers_;

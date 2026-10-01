@@ -123,7 +123,8 @@ class [[nodiscard]] CreateBuilder final {
   }
 
  private:
-  WorldType* world_;  // Never null; checked once by Depend at construction.
+  // Never null once constructed; Depend checks it.
+  WorldType* world_ = nullptr;
   Alias alias_;
   std::optional<Entity> parent_;
   std::tuple<InitialTypes...> components_;
@@ -216,7 +217,8 @@ ChangeBuilder<WorldType, TypeList<AttachedTypes...>, TypeList<DetachedTypes...>,
         "Each component may be attached or detached once per change.");
   }
 
-  WorldType* world_;  // Never null; checked once by Depend at construction.
+  // Never null once constructed; Depend checks it.
+  WorldType* world_ = nullptr;
   Entity entity_;
   std::tuple<AttachedTypes...> components_;
   AliasChanges aliases_;
@@ -234,7 +236,8 @@ class [[nodiscard]] DestroyBuilder final {
   }
 
  private:
-  WorldType* world_;  // Never null; checked once by Depend at construction.
+  // Never null once constructed; Depend checks it.
+  WorldType* world_ = nullptr;
   Entity entity_;
 };
 

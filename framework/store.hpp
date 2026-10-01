@@ -47,7 +47,7 @@ class Uninitialized final {
   Type* data() const { return data_; }
 
  private:
-  Type* data_;
+  Type* data_ = nullptr;
   std::size_t size_;
 };
 

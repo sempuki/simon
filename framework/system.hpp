@@ -301,7 +301,8 @@ class WorldAccess final {
   auto destroy(Entity entity) { return world_->destroy(entity); }
 
  private:
-  WorldType* world_;  // Never null; checked once by Depend at construction.
+  // Never null once constructed; Depend checks it.
+  WorldType* world_ = nullptr;
 };
 
 // Free-function forms of the WorldAccess member templates, so a system whose

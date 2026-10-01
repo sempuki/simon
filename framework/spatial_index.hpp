@@ -258,8 +258,10 @@ class SpatialIndex final {
   // unless every point in it is farther than `limit` (squared) from `center`.
   // `limit` is a reference, so a nearest search prunes by its best so far.
   template <typename ConsiderType>
-  void visit_cell(const Cell& cell, const Coordinates& center,
-                  const double& limit, ConsiderType& consider) const {
+  [[gnu::always_inline]] void visit_cell(const Cell& cell,
+                                         const Coordinates& center,
+                                         const double& limit,
+                                         ConsiderType& consider) const {
     if (squared_distance_to(cell, center) > limit) {
       return;
     }

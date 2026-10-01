@@ -95,9 +95,10 @@ class World<SpatialType,                  //
     final {
  public:
   using SpatialComponent = SpatialType;
-  using ComponentList =
-      TypeList<SpatialType, EntityArchetype, Parent, ComponentTypes...>;
-  using ArchetypeList = TypeList<ArchetypeTypes...>;
+  using ComponentList = TypeList<  //
+      SpatialType, EntityArchetype, Parent, ComponentTypes...>;
+  using ArchetypeList = TypeList<  //
+      ArchetypeTypes...>;
   using Command = command_for_t<ComponentList>;
 
   static_assert(is_unique_v<ComponentList>,
