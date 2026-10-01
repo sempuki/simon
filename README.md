@@ -32,16 +32,16 @@ The architecture, its decisions and the roadmap are in
 
 clangd needs a `compile_commands.json`, and the headers it names must stay put.
 Bazel's execution root does not: every build relinks it to only the external
-repositories that build needed. `tools/lsp/mirror.py` builds in an output base
-of its own, copies the headers clangd reads into `.lsp/mirror/` (ignored by git
-and Bazel), and writes `compile_commands.json` against that mirror, so builds
-and compiler switches never disturb your editor:
+repositories that build needed. lib's `bazel/lsp_mirror.py` builds in an output
+base of its own, copies the headers clangd reads into `.lsp/mirror/` (ignored
+by git and Bazel), and writes `compile_commands.json` against that mirror, so
+builds and compiler switches never disturb your editor:
 
 ```sh
-python3 tools/lsp/mirror.py                  # build the mirror now
-python3 tools/lsp/mirror.py --if-stale       # only if files or targets changed
-python3 tools/lsp/mirror.py --watch 60       # check every minute, e.g. in a tmux pane
-python3 tools/lsp/mirror.py --install-hooks  # refresh after checkout, merge, rebase
+python3 2nd_party/lib/bazel/lsp_mirror.py                  # build the mirror now
+python3 2nd_party/lib/bazel/lsp_mirror.py --if-stale       # only if anything changed
+python3 2nd_party/lib/bazel/lsp_mirror.py --watch 60       # check every minute
+python3 2nd_party/lib/bazel/lsp_mirror.py --install-hooks  # after checkout, merge, rebase
 ```
 
 `--if-stale` takes a fraction of a second when nothing changed, so it is cheap
