@@ -71,6 +71,13 @@ cc_library(
 )
 
 cc_library(
+    name = "atmosphere",
+    hdrs = ["atmosphere.hpp"],
+    copts = COPTS,
+    deps = [":units"],
+)
+
+cc_library(
     name = "control",
     hdrs = ["control.hpp"],
     copts = COPTS,
@@ -96,6 +103,7 @@ cc_library(
         "@lib//base:testing",
     ],
 ) for test in [
+    "atmosphere",
     "control",
     "guidance",
     "random",

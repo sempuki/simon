@@ -37,6 +37,20 @@ TEST_CASE("Units") {
               .is_approximately(Vector3d{8.0, -6.0, 0.0}));
   }
 
+  SECTION("ShouldCarryUnitsGivenAnglesAndForces") {
+    AngularRate turn = 0.1 * radian_per_second;
+    Angle turned = turn * (2.0 * second);
+    Force force = 10.0 * kilogram * (2.0 * meter_per_second_squared);
+    AccelerationMagnitude acceleration = force / (4.0 * kilogram);
+    Density density = 1.2 * kilogram_per_cubic_meter;
+    Force lift = 0.5 * density * (10.0 * meter_per_second) *
+                 (10.0 * meter_per_second) * (2.0 * square_meter);
+
+    CHECK(radians(turned) == 0.2);
+    CHECK(acceleration == 5.0 * meter_per_second_squared);
+    CHECK(lift.numerical_value_in(newton) == 120.0);
+  }
+
   SECTION("ShouldNotAddGivenDifferentUnits") {
     static_assert(!Addable<Displacement, Velocity>);
     static_assert(Addable<Displacement, Displacement>);

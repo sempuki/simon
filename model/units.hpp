@@ -103,6 +103,13 @@ inline constexpr auto second = units::si::second;
 inline constexpr auto meter_per_second = meter / second;
 inline constexpr auto meter_per_second_squared = meter / units::square(second);
 inline constexpr auto per_second = units::one / second;
+inline constexpr auto radian = units::si::radian;
+inline constexpr auto radian_per_second = radian / second;
+inline constexpr auto kilogram = units::si::kilogram;
+inline constexpr auto newton = units::si::newton;
+inline constexpr auto square_meter = units::square(meter);
+inline constexpr auto kilogram_per_cubic_meter =
+    kilogram / units::cubic(meter);
 
 // Scalars.
 using Length = units::quantity<meter, double>;
@@ -110,6 +117,12 @@ using Time = units::quantity<second, double>;
 using Speed = units::quantity<meter_per_second, double>;
 using AccelerationMagnitude = units::quantity<meter_per_second_squared, double>;
 using Rate = units::quantity<per_second, double>;
+using Angle = units::quantity<radian, double>;
+using AngularRate = units::quantity<radian_per_second, double>;
+using Mass = units::quantity<kilogram, double>;
+using Force = units::quantity<newton, double>;
+using Area = units::quantity<square_meter, double>;
+using Density = units::quantity<kilogram_per_cubic_meter, double>;
 
 // Vectors.
 using Displacement = units::quantity<meter, Vector3d>;
@@ -129,6 +142,11 @@ inline auto meters_per_second(double x, double y, double z) -> Velocity {
 inline auto meters_per_second_squared(double x, double y, double z)
     -> Acceleration {
   return Vector3d{x, y, z} * meter_per_second_squared;
+}
+
+// An angle in radians, as a plain number for the standard math functions.
+inline auto radians(Angle angle) -> double {
+  return angle.numerical_value_in(radian);
 }
 
 // A std::chrono duration as seconds.
