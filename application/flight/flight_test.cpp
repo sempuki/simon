@@ -256,9 +256,11 @@ auto rigid_737(const model::Earth& earth, const model::AircraftData& data,
                InOut<World> world) -> Entity {
   Route route{.speed = 200.0 * model::meter_per_second};
   route.waypoints.fill(model::meters(0.0, 500000.0, 6000.0));
-  auto entity = create_rigid_aircraft(data, earth, RigidTrim{},
-                                      0.0 * model::meter, 0.0 * model::meter,
-                                      0.0 * model::radian, route, world);
+  auto trim = trim_in_cruise(data, earth);
+  REQUIRE(trim);
+  auto entity = create_rigid_aircraft(data, earth, *trim, 0.0 * model::meter,
+                                      0.0 * model::meter, 0.0 * model::radian,
+                                      route, world);
   REQUIRE(entity);
   return *entity;
 }

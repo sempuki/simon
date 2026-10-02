@@ -45,9 +45,11 @@ constexpr int DEFAULT_STEPS = 250;  // 2 s simulated.
 auto populate(int count, const model::Earth& earth,
               const model::AircraftData& data, InOut<World> world) -> void {
   auto side = static_cast<int>(std::ceil(std::sqrt(count)));
+  auto trim = trim_in_cruise(data, earth);
+  CHECK_POSTCONDITION(trim.has_value());
   auto transaction = world->transaction();
   for (int i = 0; i < count; ++i) {
-    auto built = create_rigid_aircraft(data, earth, RigidTrim{},
+    auto built = create_rigid_aircraft(data, earth, *trim,
                                        2000.0 * (i % side) * model::meter,
                                        2000.0 * (i / side) * model::meter,
                                        0.0 * model::radian, Route{}, world);

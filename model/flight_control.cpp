@@ -270,9 +270,13 @@ auto find_signal(const FlightControlData& controls, std::string_view name)
   return static_cast<std::size_t>(found - controls.signals.begin());
 }
 
-auto run_flight_controls(const FlightControlData& controls,
-                         InOut<FlightSignals> signals, Time dt) -> void {
-  double seconds = dt.numerical_value_in(second);
+namespace {
+
+// Runs every block once, in order: over `seconds`, or, if `steady`, as each
+// block stands with its inputs held, with each kinematic block at its input
+// and each PID seeing no rate, its integral unchanged.
+auto run_blocks(const FlightControlData& controls, InOut<FlightSignals> signals,
+                double seconds, bool steady) -> void {
   for (std::size_t i = 0; i < controls.throttles.size(); ++i) {
     signals->values[controls.throttles[i]] =
         signals->values[index_of(FlightSignal::THROTTLE_COMMAND_0) + i];
@@ -313,13 +317,22 @@ auto run_flight_controls(const FlightControlData& controls,
         if (block.scale) {
           input *= block.detents.back();
         }
-        value = traverse(block, start_of(block, *signals), input, seconds);
+        value =
+            steady
+                ? std::clamp(input, block.detents.front(), block.detents.back())
+                : traverse(block, start_of(block, *signals), input, seconds);
         break;
       case FlightBlock::Kind::SWITCH:
         value = run_switch(block, *signals);
         break;
       case FlightBlock::Kind::PID:
-        value = run_pid(block, input, seconds, signals);
+        if (steady) {
+          signals->values[block.state + 1] = input;
+          signals->values[block.state + 2] = input;
+          value = block.kp * input + signals->values[block.state];
+        } else {
+          value = run_pid(block, input, seconds, signals);
+        }
         break;
       case FlightBlock::Kind::FUNCTION:
         value = run_function(block, *signals);
@@ -329,18 +342,16 @@ auto run_flight_controls(const FlightControlData& controls,
   }
 }
 
+}  // namespace
+
+auto run_flight_controls(const FlightControlData& controls,
+                         InOut<FlightSignals> signals, Time dt) -> void {
+  run_blocks(controls, signals, dt.numerical_value_in(second), false);
+}
+
 auto settle_flight_controls(const FlightControlData& controls,
                             InOut<FlightSignals> signals) -> void {
-  for (const FlightBlock& block : controls.blocks) {
-    if (block.kind == FlightBlock::Kind::KINEMATIC) {
-      double input = input_of(block, *signals);
-      if (block.scale) {
-        input *= block.detents.back();
-      }
-      write(block, signals,
-            std::clamp(input, block.detents.front(), block.detents.back()));
-    }
-  }
+  run_blocks(controls, signals, 0.0, true);
 }
 
 }  // namespace simon::model

@@ -17,6 +17,7 @@ cc_library(
     ],
     copts = COPTS,
     deps = [
+        "//model:trim",
         "//framework:vocabulary",
         "//engine:lifecycle",
         "//engine:rate_gate",
@@ -173,6 +174,7 @@ cc_test(
         ":testing",
         "//framework:vocabulary",
         ":flight_library",
+        "//model:trim",
         "@lib//base:testing",
     ],
 )
@@ -213,5 +215,27 @@ cc_binary(
         ":flight_library",
         "//framework:benchmarking",
         "@lib//base:core",
+    ],
+)
+
+cc_test(
+    name = "trim_test",
+    size = "small",
+    srcs = ["trim_test.cpp"],
+    copts = COPTS,
+    data = [
+        "aircraft/737.aircraft",
+        "aircraft/f16.aircraft",
+        "reference/jsbsim_737_check_initial.csv",
+        "reference/jsbsim_f16_check_initial.csv",
+    ],
+    deps = [
+        ":testing",
+        "//model:aircraft_data",
+        "//model:atmosphere",
+        "//model:rigid_aircraft",
+        "//model:trim",
+        "//model:units",
+        "@lib//base:testing",
     ],
 )

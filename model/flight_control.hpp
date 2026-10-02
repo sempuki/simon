@@ -246,9 +246,11 @@ auto find_signal(const FlightControlData& controls, std::string_view name)
 auto run_flight_controls(const FlightControlData& controls,
                          InOut<FlightSignals> signals, Time dt) -> void;
 
-// Sets every kinematic block, and its outputs, to where its input sends it,
-// as if it had all the time it needs: for an aircraft that starts with its
-// flaps and gear where its commands put them.
+// Runs every block once, in order, as it stands when its inputs hold still:
+// each kinematic block where its input sends it, as if it had all the time it
+// needs, and each PID seeing no rate, its integral unchanged. Running it again
+// settles blocks that read later blocks: for an aircraft that starts with its
+// surfaces, flaps and gear where its commands and state put them.
 auto settle_flight_controls(const FlightControlData& controls,
                             InOut<FlightSignals> signals) -> void;
 

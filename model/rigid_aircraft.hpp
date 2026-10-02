@@ -65,6 +65,12 @@ class Earth final {
   // The body's rate relative to the air, in body axes.
   auto air_rate(const RigidBody& body) const -> AngularVelocity;
 
+  // The rate relative to the air at which `body` keeps its attitude to the
+  // local north-east-down frame as it moves over the Earth, in body axes: the
+  // frame's turning, which flying level round the Earth needs. None over a
+  // flat Earth.
+  auto level_rate(const RigidBody& body, Time time) const -> AngularVelocity;
+
   // Height above sea level: the geodetic altitude, or z over a flat Earth.
   auto altitude(const RigidBody& body, Time time) const -> Length;
 

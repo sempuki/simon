@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -15,6 +16,7 @@
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 #include "framework/vocabulary.hpp"
+#include "model/trim.hpp"
 
 // The whole 737, and the whole F-16, against JSBSim's, open loop: from the
 // same trim, flown through the check cases reference/jsbsim_737_check_cases.py
@@ -173,7 +175,6 @@ auto trimmed_flight_controls(const model::AircraftData& data, const Row& trim,
 
   if (!recorded) {
     model::settle_flight_controls(controls, InOut(signals));
-    model::run_flight_controls(controls, InOut(signals), 0.0 * model::second);
     return signals;
   }
   for (std::size_t s = model::FLIGHT_SIGNAL_COUNT; s < controls.signals.size();
@@ -378,6 +379,131 @@ TEST_CASE("CheckCasesF16") {
     CHECK(simon.position < 0.2);
     CHECK(simon.position < std::max(theirs.position, 0.005));
     CHECK(simon.attitude < std::max(theirs.attitude, 1e-6));
+  }
+}
+
+// How far a trimmed aircraft wanders in 30 s: in altitude and in airspeed.
+struct Wander final {
+  double altitude = 0.0;  // m.
+  double speed = 0.0;     // m/s.
+
+  // Widens by `body` at `time`, against `start` at time zero, over `earth`.
+  auto widen(const model::Earth& earth, const RigidBody& start,
+             const RigidBody& body, model::Time time) -> void {
+    auto height = [&](const RigidBody& b, model::Time t) {
+      return earth.altitude(b, t).numerical_value_in(model::meter);
+    };
+    auto airspeed = [&](const RigidBody& b) {
+      return magnitude(
+          earth.air_velocity(b).numerical_value_in(model::meter_per_second));
+    };
+    altitude = std::max(altitude, std::abs(height(body, time) -
+                                           height(start, 0.0 * model::second)));
+    speed = std::max(speed, std::abs(airspeed(body) - airspeed(start)));
+  }
+};
+
+// With fuel burning, and with the mass held, as a trim alone is judged.
+using HoldSchedule =
+    SystemList<RunFlightControls, RunEngines, Rigid, BurnFuel, FollowRigidBody>;
+using HeldMassSchedule =
+    SystemList<RunFlightControls, RunEngines, Rigid, FollowRigidBody>;
+
+// Trims the aircraft of `checked` at the condition of JSBSim's trim, flies it
+// 30 s at 8 ms, burning fuel or not, and returns how far it wanders, and how
+// far JSBSim's own trim wanders at its reference frame, burning fuel.
+template <typename ScheduleType>
+auto hold(const Checked& checked) -> std::pair<Wander, Wander> {
+  auto data = model::load_aircraft(std::string{checked.aircraft});
+  REQUIRE(data);
+  std::vector<Row> initial = load_rows(checked.initial);
+  REQUIRE(initial.size() == 1);
+  model::Earth earth = model::Earth::round(model::wgs84::Geodetic{});
+  model::StandardAirTable air;
+  AirState start = earth.air_state(read_body(initial[0]), 0.0 * model::second);
+
+  model::FlightCondition condition{
+      .position = start.position,
+      .speed = start.speed,
+      .heading = start.heading,
+      .flight_path_angle = start.flight_path_angle,
+      .tanks = trimmed_tanks(*data, initial[0]),
+  };
+  auto trim = model::trim(*data, condition, earth, air);
+  REQUIRE(trim);
+
+  World world;
+  REQUIRE(
+      World::set_up().numbered(1).holding<archetype::RigidAircraft>(1).build(
+          Out(world)));
+  auto aircraft = world.create<archetype::RigidAircraft>()
+                      .with(earth.air_state(trim->body, 0.0 * model::second))
+                      .with(trim->body)
+                      .with(RigidBodyRate{})
+                      .with(trim->felt)
+                      .with(trim->signals)
+                      .with(trim->engines)
+                      .with(condition.tanks)
+                      .with(trim->mass)
+                      .with(AircraftType{.data = &*data})
+                      .with(Autopilot{})
+                      .with(Route{})
+                      .with(SurfaceAutopilot{})
+                      .build();
+  REQUIRE(aircraft);
+  world.sync();
+  model::Earth fixed = earth;
+  auto systems = [&] {
+    if constexpr (std::same_as<ScheduleType, HoldSchedule>) {
+      return HoldSchedule{
+          RunFlightControls{fixed, checked.flight_control_period},
+          RunEngines{fixed}, Rigid{SystemList{RigidAircraftRates{fixed}}},
+          BurnFuel{}, FollowRigidBody{fixed}};
+    } else {
+      return HeldMassSchedule{
+          RunFlightControls{fixed, checked.flight_control_period},
+          RunEngines{fixed}, Rigid{SystemList{RigidAircraftRates{fixed}}},
+          FollowRigidBody{fixed}};
+    }
+  };
+  framework::Scheduler<World, ScheduleType> scheduler{systems()};
+  Wander simon;
+  for (TimePoint time{}; time < TimePoint{30s}; time += 8ms) {
+    scheduler.step(Step{.time = time, .dt = 8ms}, InOut(world));
+    simon.widen(earth, trim->body,
+                world.store_of<RigidBody>().component_of(*aircraft),
+                model::seconds((time + 8ms).time_since_epoch()));
+  }
+
+  // JSBSim's from its own trim, every 0.2 s.
+  Wander theirs;
+  std::vector<RigidBody> bodies =
+      jsbsim(load_rows(checked.cases), Case::HOLD,
+             static_cast<int>(checked.reference.count()));
+  for (std::size_t i = 0; i < bodies.size(); ++i) {
+    theirs.widen(earth, bodies.front(), bodies[i],
+                 0.2 * static_cast<double>(i) * model::second);
+  }
+  return {simon, theirs};
+}
+
+TEST_CASE("HoldsTrim") {
+  for (const Checked* checked : {&BOEING_737_CASES, &F16_CASES}) {
+    CAPTURE(checked->aircraft);
+
+    // Burning fuel lightens the aircraft, which climbs and speeds up: 2 m and
+    // 0.1 m/s for the 737, 16 cm for the F-16, against 4 m and 2 m from
+    // JSBSim's trims.
+    auto [burning, theirs] = hold<HoldSchedule>(*checked);
+    CAPTURE(burning.altitude, burning.speed, theirs.altitude, theirs.speed);
+    CHECK(burning.altitude < theirs.altitude);
+    CHECK(burning.speed < theirs.speed);
+
+    // With the mass held, level over the Earth to millimeters in 30 s.
+    auto held = hold<HeldMassSchedule>(*checked).first;
+    CAPTURE(held.altitude, held.speed);
+    CHECK(held.altitude < 0.01);
+    CHECK(held.speed < 0.001);
   }
 }
 

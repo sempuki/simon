@@ -180,6 +180,24 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "trim",
+    srcs = ["trim.cpp"],
+    hdrs = ["trim.hpp"],
+    copts = COPTS,
+    deps = [
+        ":aircraft_data",
+        ":atmosphere",
+        ":flight_control",
+        ":rigid_aircraft",
+        ":rigid_body",
+        ":units",
+        "@eigen",
+        "@lib//base:core",
+        "@lib//base:status",
+    ],
+)
+
 cc_test(
     name = "rigid_body_test",
     size = "small",

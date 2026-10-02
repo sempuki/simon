@@ -168,6 +168,33 @@ auto Earth::north_east_down(const Position& fixed, Time time) const -> Matrix3 {
          north_east_down_to_fixed(where.latitude, where.longitude);
 }
 
+auto Earth::level_rate(const RigidBody& body, Time time) const
+    -> AngularVelocity {
+  if (!round_) {
+    return QuantityVector{} * radian_per_second;
+  }
+  Place here = place(body, time);
+  wgs84::Geodetic where = wgs84::fixed_to_geodetic(here.fixed);
+  Matrix3 to_north_east_down =
+      here.north_east_down.transpose() * body.attitude.toRotationMatrix();
+  Vector3 velocity = to_north_east_down * eigen(air_velocity(body));
+
+  // The ellipsoid's radii of curvature: in the prime vertical, and along
+  // the meridian.
+  double sin_lat = sin(where.latitude);
+  double w = 1.0 - wgs84::ECCENTRICITY_SQUARED * sin_lat * sin_lat;
+  double height = where.altitude.numerical_value_in(meter);
+  double prime = wgs84::SEMIMAJOR_AXIS / std::sqrt(w) + height;
+  double meridian = wgs84::SEMIMAJOR_AXIS *
+                        (1.0 - wgs84::ECCENTRICITY_SQUARED) /
+                        (w * std::sqrt(w)) +
+                    height;
+  Vector3 turning{velocity.y() / prime, -velocity.x() / meridian,
+                  -velocity.y() * std::tan(radians(where.latitude)) / prime};
+  return QuantityVector{to_north_east_down.transpose() * turning} *
+         radian_per_second;
+}
+
 auto Earth::body_to_north_east_down(const RigidBody& body, Time time) const
     -> Matrix3 {
   return north_east_down(find_fixed(body, time), time).transpose() *

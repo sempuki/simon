@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <optional>
 #include <type_traits>
 #include <utility>
 
@@ -62,53 +63,51 @@ auto create_aircraft(const Scenario& scenario, const AirState& state,
 
 }  // namespace
 
+auto trim_in_cruise(const model::AircraftData& data, const model::Earth& earth,
+                    Length altitude, Speed speed)
+    -> std::expected<model::Trim, framework::Status> {
+  model::FlightCondition condition{
+      .position =
+          model::meters(0.0, 0.0, altitude.numerical_value_in(model::meter)),
+      .speed = speed,
+      .tanks = model::fill_fuel_tanks(data),
+  };
+  return model::trim(data, condition, earth, model::StandardAirTable{});
+}
+
 auto create_rigid_aircraft(const model::AircraftData& data,
-                           const model::Earth& earth, const RigidTrim& trim,
+                           const model::Earth& earth, const model::Trim& trim,
                            Length x, Length y, Angle heading,
                            const Route& route, InOut<World> world)
     -> std::expected<Entity, framework::Status> {
-  double speed = trim.speed.numerical_value_in(model::meter_per_second);
-  RigidBody body = earth.body_at(
-      model::meters(x.numerical_value_in(model::meter),
-                    y.numerical_value_in(model::meter),
-                    trim.altitude.numerical_value_in(model::meter)),
-      0.0 * model::radian, trim.alpha, heading,
-      model::meters_per_second(speed * model::cos(trim.alpha), 0.0,
-                               speed * model::sin(trim.alpha)),
-      model::QuantityVector{} * model::radian_per_second, 0.0 * model::second);
-
-  FlightSignals signals;
-  signals[model::FlightSignal::PITCH_TRIM_COMMAND] = trim.pitch_trim;
-  for (std::size_t i = 0; i < data.engines.size(); ++i) {
-    signals
-        .values[model::index_of(model::FlightSignal::THROTTLE_COMMAND_0) + i] =
-        trim.throttle;
-  }
-  model::settle_flight_controls(data.flight_controls, InOut(signals));
-  model::run_flight_controls(data.flight_controls, InOut(signals),
-                             0.0 * model::second);
-  model::StandardAirTable air;
-  Engines engines = model::settled_engines(
-      data, signals,
-      model::compute_engine_air(body, earth, air, 0.0 * model::second));
-  FuelTanks tanks = model::fill_fuel_tanks(data);
-  MassBalance mass = model::compute_mass_balance(data, tanks);
-  BodyAcceleration felt;
-  model::rigid_aircraft_rate(body, signals, engines, mass, data, earth, air,
-                             0.0 * model::second, Out(felt));
+  model::Time start = 0.0 * model::second;
+  Length altitude = earth.altitude(trim.body, start);
+  Speed speed{magnitude(earth.air_velocity(trim.body).numerical_value_in(
+                  model::meter_per_second)) *
+              model::meter_per_second};
+  auto body_at = [&](const model::AngularVelocity& rate) {
+    return earth.body_at(
+        model::meters(x.numerical_value_in(model::meter),
+                      y.numerical_value_in(model::meter),
+                      altitude.numerical_value_in(model::meter)),
+        trim.bank, trim.pitch, heading, earth.air_velocity(trim.body), rate,
+        start);
+  };
+  // Level round the Earth on the new heading.
+  RigidBody body = body_at(model::QuantityVector{} * model::radian_per_second);
+  body = body_at(earth.level_rate(body, start));
 
   return world->create<archetype::RigidAircraft>()
-      .with(earth.air_state(body, 0.0 * model::second))
+      .with(earth.air_state(body, start))
       .with(body)
       .with(RigidBodyRate{})
-      .with(felt)
-      .with(signals)
-      .with(engines)
-      .with(tanks)
-      .with(mass)
+      .with(trim.felt)
+      .with(trim.signals)
+      .with(trim.engines)
+      .with(model::fill_fuel_tanks(data))
+      .with(trim.mass)
       .with(AircraftType{.data = &data})
-      .with(Autopilot{
-          .altitude = trim.altitude, .heading = heading, .speed = trim.speed})
+      .with(Autopilot{.altitude = altitude, .heading = heading, .speed = speed})
       .with(route)
       .with(SurfaceAutopilot{.pitch_trim = trim.pitch_trim,
                              .throttle_trim = trim.throttle})
@@ -139,6 +138,13 @@ auto build_scenario(const Scenario& scenario,
   double lowest = scenario.lowest.numerical_value_in(model::meter);
   double highest = scenario.highest.numerical_value_in(model::meter);
 
+  // One trim serves every rigid aircraft: over a flat Earth it holds
+  // anywhere, on any heading.
+  std::optional<model::Trim> cruise;
+  if (rigid > 0) {
+    RETURN_OR_ASSIGN(cruise, trim_in_cruise(*rigid_type, earth));
+  }
+
   auto transaction = world->transaction();
   for (std::size_t i = 0; i < simple + precise + rigid; ++i) {
     double x = random.uniform(0.0, side);
@@ -165,9 +171,9 @@ auto build_scenario(const Scenario& scenario,
       RETURN_IF_UNEXPECTED(create_aircraft<archetype::PreciseAircraft>(
           scenario, state, route, world));
     } else {
-      RETURN_IF_UNEXPECTED(create_rigid_aircraft(
-          *rigid_type, earth, RigidTrim{}, x * model::meter, y * model::meter,
-          state.heading, route, world));
+      RETURN_IF_UNEXPECTED(
+          create_rigid_aircraft(*rigid_type, earth, *cruise, x * model::meter,
+                                y * model::meter, state.heading, route, world));
     }
   }
   transaction.commit();
@@ -176,11 +182,9 @@ auto build_scenario(const Scenario& scenario,
 
 auto Simulation::configure() -> engine::PhaseResult {
   if (scenario_.rigid > 0) {
-    auto loaded = model::load_aircraft(scenario_.rigid_aircraft);
-    if (!loaded) {
-      return std::unexpected(loaded.error());
-    }
-    rigid_ = std::make_unique<model::AircraftData>(std::move(*loaded));
+    RETURN_OR_ASSIGN(model::AircraftData loaded,
+                     model::load_aircraft(scenario_.rigid_aircraft));
+    rigid_ = std::make_unique<model::AircraftData>(std::move(loaded));
   }
   RETURN_IF_UNEXPECTED(build_world(scenario_, Out(world_)));
   RETURN_IF_UNEXPECTED(build_scenario(scenario_, rigid_.get(), InOut(world_)));

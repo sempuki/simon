@@ -12,6 +12,7 @@
 #include "base/core.hpp"
 #include "engine/lifecycle.hpp"
 #include "framework/vocabulary.hpp"
+#include "model/trim.hpp"
 
 namespace simon::flight {
 
@@ -52,22 +53,20 @@ struct Scenario final {
                     .throttle_lag = 2.0 * model::second};
 };
 
-// A trim for the rigid aircraft: steady, level flight at `altitude` and
-// `speed`, held by `alpha`, `pitch_trim` and `throttle`. The default is
-// JSBSim's for its 737 (see reference/jsbsim_737_check_initial.csv).
-struct RigidTrim final {
-  Length altitude = 6000.0 * model::meter;
-  Speed speed = 200.0 * model::meter_per_second;
-  Angle alpha = 0.031689661 * model::radian;
-  double pitch_trim = -0.15092104889583785;
-  double throttle = 0.68974850653740216;
-};
+// Trims a rigid aircraft of type `data` over `earth` for level flight at
+// `altitude` and `speed`, its tanks full, heading north from the world's
+// origin.
+auto trim_in_cruise(const model::AircraftData& data, const model::Earth& earth,
+                    Length altitude = 6000.0 * model::meter,
+                    Speed speed = 200.0 * model::meter_per_second)
+    -> std::expected<model::Trim, framework::Status>;
 
 // Creates a rigid aircraft of type `data` over `earth`, trimmed by `trim`,
-// at `x` and `y` in the world's local frame and heading `heading`, flying
-// `route` from there.
+// at `x` and `y` in the world's local frame, at the trim's altitude, and
+// heading `heading`, flying `route` from there. Over a flat Earth a trim
+// holds wherever the aircraft is and whichever way it heads.
 auto create_rigid_aircraft(const model::AircraftData& data,
-                           const model::Earth& earth, const RigidTrim& trim,
+                           const model::Earth& earth, const model::Trim& trim,
                            Length x, Length y, Angle heading,
                            const Route& route, InOut<World> world)
     -> std::expected<Entity, framework::Status>;
