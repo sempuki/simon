@@ -107,6 +107,8 @@ inline constexpr auto meter_per_second_squared = meter / units::square(second);
 inline constexpr auto per_second = units::one / second;
 inline constexpr auto radian = units::si::radian;
 inline constexpr auto radian_per_second = radian / second;
+inline constexpr auto radian_per_second_squared =
+    radian / units::square(second);
 inline constexpr auto kilogram = units::si::kilogram;
 inline constexpr auto newton = units::si::newton;
 inline constexpr auto newton_meter = newton * meter;
@@ -138,6 +140,9 @@ using Velocity = units::quantity<meter_per_second, Vector3d>;
 using Acceleration = units::quantity<meter_per_second_squared, Vector3d>;
 using ForceVector = units::quantity<newton, Vector3d>;
 using Moment = units::quantity<newton_meter, Vector3d>;
+using AngularVelocity = units::quantity<radian_per_second, Vector3d>;
+using AngularAcceleration =
+    units::quantity<radian_per_second_squared, Vector3d>;
 
 // Positions are displacements from the world origin, the origin of the local
 // Cartesian frame.

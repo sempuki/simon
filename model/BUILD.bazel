@@ -111,6 +111,40 @@ cc_library(
 )
 
 cc_library(
+    name = "earth",
+    hdrs = ["earth.hpp"],
+    copts = COPTS,
+    deps = [
+        ":units",
+        "@eigen",
+    ],
+)
+
+cc_library(
+    name = "rigid_body",
+    hdrs = ["rigid_body.hpp"],
+    copts = COPTS,
+    deps = [
+        ":kinematics",
+        ":units",
+        "//framework",
+        "@eigen",
+    ],
+)
+
+cc_test(
+    name = "rigid_body_test",
+    size = "small",
+    srcs = ["rigid_body_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":rigid_body",
+        "//framework:continuous",
+        "@lib//base:testing",
+    ],
+)
+
+cc_library(
     name = "flight_path",
     hdrs = ["flight_path.hpp"],
     copts = COPTS,
@@ -142,6 +176,7 @@ cc_library(
     "aerodynamics",
     "aircraft_data",
     "atmosphere",
+    "earth",
     "control",
     "flight_path",
     "guidance",

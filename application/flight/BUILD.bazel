@@ -75,6 +75,22 @@ cc_test(
     ],
 )
 
+# Checks simon's equations of motion against JSBSim's 737 at recorded
+# states. reference/jsbsim_737_rigid_body.py regenerates the reference.
+cc_test(
+    name = "rigid_body_test",
+    size = "small",
+    srcs = ["rigid_body_test.cpp"],
+    copts = COPTS,
+    data = ["reference/jsbsim_737_rigid_body.csv"],
+    deps = [
+        "//model:earth",
+        "//model:rigid_body",
+        "//model:units",
+        "@lib//base:testing",
+    ],
+)
+
 # Flies one scenario as fast as possible and prints what it did.
 cc_binary(
     name = "flight",
