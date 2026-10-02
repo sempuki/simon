@@ -68,6 +68,44 @@ AXES = {'DRAG': ('drag', LBF), 'SIDE': ('side', LBF), 'LIFT': ('lift', LBF),
         'YAW': ('yaw', LBF * FT)}
 
 
+# Signals the flight control system reads from the pilot, by simon's name.
+COMMANDS = {
+    'fcs/elevator-cmd-norm': 'elevator_command',
+    'fcs/aileron-cmd-norm': 'aileron_command',
+    'fcs/rudder-cmd-norm': 'rudder_command',
+    'fcs/flap-cmd-norm': 'flaps_command',
+    'gear/gear-cmd-norm': 'gear_command',
+    'fcs/speedbrake-cmd-norm': 'speedbrake_command',
+    'fcs/spoiler-cmd-norm': 'spoilers_command',
+    'fcs/pitch-trim-cmd-norm': 'pitch_trim_command',
+    'fcs/roll-trim-cmd-norm': 'roll_trim_command',
+    'fcs/yaw-trim-cmd-norm': 'yaw_trim_command',
+}
+
+# Signals it reads from the aircraft's state: angles and rates, which need no
+# change of units.
+STATE = {
+    'velocities/mach': 'mach',
+    'velocities/p-aero-rad_sec': 'roll_rate',
+    'velocities/q-aero-rad_sec': 'pitch_rate',
+    'velocities/r-aero-rad_sec': 'yaw_rate',
+    'aero/alpha-rad': 'alpha',
+    'aero/beta-rad': 'beta',
+}
+
+# Signals it sets, which the aerodynamics read.
+SURFACES = {
+    'fcs/elevator-pos-rad': 'elevator',
+    'fcs/left-aileron-pos-rad': 'left_aileron',
+    'fcs/right-aileron-pos-rad': 'right_aileron',
+    'fcs/rudder-pos-rad': 'rudder',
+    'fcs/flap-pos-norm': 'flaps',
+    'gear/gear-pos-norm': 'gear',
+    'fcs/speedbrake-pos-norm': 'speedbrake',
+    'fcs/spoiler-pos-norm': 'spoilers',
+}
+
+
 class ConversionError(Exception):
     pass
 
@@ -315,6 +353,8 @@ def convert(path, engine_directory, out):
     for engine in propulsion.findall('engine'):
         convert_engine(engine, engine_directory, out)
 
+    convert_flight_controls(root, out)
+
     aerodynamics = root.find('aerodynamics')
     functions = {f.get('name'): f for f in aerodynamics.findall('function')}
     for axis in aerodynamics.findall('axis'):
@@ -328,6 +368,112 @@ def convert(path, engine_directory, out):
             term.multiply(body(function), functions, jsbsim_metrics, where)
             term.constant *= unit
             term.write(out, axis_name, where.split('/')[-1])
+
+
+def component_property(name):
+    """The property JSBSim gives a component's output (FGFCSComponent)."""
+    if '/' in name:
+        return name
+    return 'fcs/' + name.strip().lower().replace(' ', '-')
+
+
+def signal_name(prop):
+    """simon's name for a signal JSBSim calls `prop`."""
+    for table in (COMMANDS, STATE, SURFACES):
+        if prop in table:
+            return table[prop]
+    if prop.startswith('fcs/'):
+        return prop[len('fcs/'):].replace('/', '-')
+    raise ConversionError('the flight controls read %s, which is unsupported'
+                          % prop)
+
+
+def bounds(element, name):
+    child = element.find(name)
+    if child is None:
+        return None
+    return float(child.find('min').text), float(child.find('max').text)
+
+
+def convert_flight_controls(root, out):
+    """Each component of each channel, in the order JSBSim runs them."""
+    controls = root.find('flight_control')
+    if controls is None:
+        return
+    known = {}  # Properties the components set, by the signal that holds them.
+    blocks = []
+    for channel in controls.findall('channel'):
+        for component in channel:
+            kind = component.tag
+            name = component.get('name')
+            where = '%s %s' % (kind, name)
+            output_prop = component_property(name)
+            block = {'kind': kind, 'name': signal_name(output_prop),
+                     'inputs': [], 'lines': []}
+            for element in component.findall('input'):
+                text = element.text.strip()
+                sign = '-' if text.startswith('-') else ''
+                block['inputs'].append(sign + signal_name(text.lstrip('-')))
+            clip = component.find('clipto')
+            if clip is not None:
+                block['lines'].append('clip %.17g %.17g' % (
+                    float(clip.find('min').text), float(clip.find('max').text)))
+            extra = component.find('output')
+            if extra is not None:
+                block['lines'].append('output %s' % signal_name(extra.text.strip()))
+            if kind == 'summer':
+                bias = component.find('bias')
+                if bias is not None:
+                    block['lines'].append('bias %.17g' % float(bias.text))
+            elif kind in ('pure_gain', 'scheduled_gain', 'aerosurface_scale'):
+                gain = component.find('gain')
+                if gain is not None:
+                    block['lines'].append('gain %.17g' % float(gain.text))
+                if kind == 'aerosurface_scale':
+                    domain = bounds(component, 'domain') or (-1.0, 1.0)
+                    span = bounds(component, 'range')
+                    if span is None:
+                        raise ConversionError('%s has no range' % where)
+                    block['lines'].append('domain %.17g %.17g' % domain)
+                    block['lines'].append('range %.17g %.17g' % span)
+                    zero = component.find('zero_centered')
+                    centered = zero is None or zero.text.strip() not in ('0', 'false')
+                    block['lines'].append('zero_centered %d' % centered)
+                if kind == 'scheduled_gain':
+                    table = component.find('table')
+                    variables = table.findall('independentVar')
+                    if len(variables) != 1:
+                        raise ConversionError('%s: one variable only' % where)
+                    data = [float(x) for x in table.find('tableData').text.split()]
+                    block['table'] = (signal_name(variables[0].text.strip()), data)
+            elif kind == 'kinematic':
+                if component.find('noscale') is not None:
+                    block['lines'].append('scale 0')
+                for setting in component.find('traverse').findall('setting'):
+                    block['lines'].append('setting %.17g %.17g' % (
+                        float(setting.find('position').text),
+                        float(setting.find('time').text)))
+            else:
+                raise ConversionError('%s is unsupported' % where)
+            blocks.append(block)
+            known[output_prop] = block['name']
+
+    out.write('flight_controls\n')
+    for block in blocks:
+        kind = {'aerosurface_scale': 'surface_scale'}.get(block['kind'], block['kind'])
+        out.write('  block %s %s\n' % (kind, block['name']))
+        for name in block['inputs']:
+            out.write('    input %s\n' % name)
+        for line in block['lines']:
+            out.write('    %s\n' % line)
+        if 'table' in block:
+            variable, data = block['table']
+            out.write('    table %s\n' % variable)
+            for x, y in zip(data[0::2], data[1::2]):
+                out.write('      %.17g %.17g\n' % (x, y))
+            out.write('    end\n')
+        out.write('  end\n')
+    out.write('end\n')
 
 
 def convert_engine(engine, engine_directory, out):

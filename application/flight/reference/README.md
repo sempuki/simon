@@ -14,3 +14,4 @@ need JSBSim's Python package (`pip install jsbsim numpy`).
 | `jsbsim_737_aero.py` | The 737's aerodynamic loads at recorded states | `aero_test` |
 | `jsbsim_737_rigid_body.py` | The 737's equations of motion, air data and mass balance at recorded states | `rigid_body_test` |
 | `jsbsim_737_turbine.py` | The 737's turbines, frame by frame through throttle changes | `turbine_test` |
+| `jsbsim_737_flight_control.py` | The 737's flight controls, frame by frame through command sweeps | `flight_control_test` |

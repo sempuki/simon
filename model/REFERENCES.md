@@ -12,6 +12,7 @@ names its source in brief, and the full reference is here.
 | `rigid_body.hpp` | Six-degree-of-freedom equations of motion in an inertial frame, with a quaternion attitude | B. L. Stevens and F. L. Lewis, *Aircraft Control and Simulation*, 2nd edition, Wiley, 2003, section 1.5 |
 | `aerodynamics.hpp` | Coefficient build-up of aerodynamic forces and moments | JSBSim's aerodynamics model, [JSBSim Reference Manual](https://jsbsim-team.github.io/jsbsim-reference-manual/) |
 | `turbine.hpp` | A turbine's spools, thrust and fuel flow | JSBSim's turbine model, FGTurbine, as the [JSBSim Reference Manual](https://jsbsim-team.github.io/jsbsim-reference-manual/) describes it |
+| `flight_control.hpp` | Flight control blocks: summers, gains, scheduled gains, surface scales and kinematic actuators | JSBSim's flight control components (FGSummer, FGGain, FGKinemat), as the JSBSim Reference Manual describes them |
 | `control.hpp` | Exact discretization of a first-order lag | The zero-order-hold equivalent, as in G. F. Franklin, J. D. Powell and M. Workman, *Digital Control of Dynamic Systems*, 3rd edition, 1998 |
 | `flight_path.hpp` | Point-mass flight-path equations | Stevens and Lewis, above |
 

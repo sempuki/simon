@@ -99,12 +99,24 @@ cc_library(
 )
 
 cc_library(
+    name = "flight_control",
+    srcs = ["flight_control.cpp"],
+    hdrs = ["flight_control.hpp"],
+    copts = COPTS,
+    deps = [
+        ":control",
+        ":units",
+    ],
+)
+
+cc_library(
     name = "aircraft_data",
     srcs = ["aircraft_data.cpp"],
     hdrs = ["aircraft_data.hpp"],
     copts = COPTS,
     deps = [
         ":aerodynamics",
+        ":flight_control",
         ":units",
         "@lib//base:status",
     ],

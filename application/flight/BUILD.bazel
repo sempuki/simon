@@ -119,6 +119,25 @@ cc_test(
     ],
 )
 
+# Checks the 737's converted flight controls against JSBSim's, frame by
+# frame. reference/jsbsim_737_flight_control.py regenerates the reference.
+cc_test(
+    name = "flight_control_test",
+    size = "small",
+    srcs = ["flight_control_test.cpp"],
+    copts = COPTS,
+    data = [
+        "aircraft/737.aircraft",
+        "reference/jsbsim_737_flight_control.csv",
+    ],
+    deps = [
+        "//model:aircraft_data",
+        "//model:flight_control",
+        "//model:units",
+        "@lib//base:testing",
+    ],
+)
+
 # Flies one scenario as fast as possible and prints what it did.
 cc_binary(
     name = "flight",

@@ -100,6 +100,131 @@ engine turbine CFM56
       1.2 0 0 0 0 0 0 0 0
     end
 end
+flight_controls
+  block summer pitch-trim-sum
+    input elevator_command
+    input pitch_trim_command
+    clip -1 1
+  end
+  block surface_scale elevator-control
+    input pitch-trim-sum
+    output elevator
+    domain -1 1
+    range -0.29999999999999999 0.29999999999999999
+    zero_centered 1
+  end
+  block surface_scale elevator-normalized
+    input elevator
+    output elevator-pos-norm
+    domain -0.29999999999999999 0.29999999999999999
+    range -1 1
+    zero_centered 1
+  end
+  block summer roll-trim-sum
+    input aileron_command
+    input roll_trim_command
+    clip -1 1
+  end
+  block surface_scale left-aileron-control
+    input roll-trim-sum
+    output left_aileron
+    domain -1 1
+    range -0.34999999999999998 0.34999999999999998
+    zero_centered 1
+  end
+  block surface_scale right-aileron-control
+    input -roll-trim-sum
+    output right_aileron
+    domain -1 1
+    range -0.34999999999999998 0.34999999999999998
+    zero_centered 1
+  end
+  block surface_scale left-aileron-normalized
+    input left_aileron
+    output left-aileron-pos-norm
+    domain -0.34999999999999998 0.34999999999999998
+    range -1 1
+    zero_centered 1
+  end
+  block surface_scale right-aileron-normalized
+    input right_aileron
+    output right-aileron-pos-norm
+    domain -0.34999999999999998 0.34999999999999998
+    range -1 1
+    zero_centered 1
+  end
+  block summer rudder-command-sum
+    input rudder_command
+    input yaw_trim_command
+    clip -1 1
+  end
+  block scheduled_gain yaw-damper
+    input yaw_rate
+    table mach
+      0 0
+      0.10000000000000001 0
+      0.11 1
+    end
+  end
+  block scheduled_gain yaw-damper-final
+    input yaw-damper
+    table mach
+      0 0
+      0.10000000000000001 0
+      0.11 1
+    end
+  end
+  block summer rudder-sum
+    input rudder-command-sum
+    input yaw-damper-final
+    clip -1 1
+  end
+  block surface_scale rudder-control
+    input rudder-sum
+    output rudder
+    domain -1 1
+    range -0.34999999999999998 0.34999999999999998
+    zero_centered 1
+  end
+  block surface_scale rudder-normalized
+    input rudder
+    output rudder-pos-norm
+    domain -0.34999999999999998 0.34999999999999998
+    range -1 1
+    zero_centered 1
+  end
+  block kinematic flaps-control
+    input flaps_command
+    output flaps
+    setting 0 0
+    setting 0.125 5
+    setting 0.25 4
+    setting 0.375 3
+    setting 0.5 2
+    setting 0.625 2
+    setting 0.75 2
+    setting 0.875 2
+    setting 1 2
+  end
+  block kinematic gear-control
+    input gear_command
+    output gear
+    setting 0 0
+    setting 1 5
+  end
+  block kinematic flight-spoilers-control
+    input speedbrake_command
+    output speedbrake
+    setting 0 0
+    setting 1 0.59999999999999998
+  end
+  block kinematic ground-spoilers-control
+    input spoilers_command
+    output spoilers
+    setting 0 0
+    setting 1 0.59999999999999998
+  end
+end
 term drag CD0
   constant 108.78945984000001
   factor dynamic_pressure

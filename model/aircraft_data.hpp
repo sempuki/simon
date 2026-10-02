@@ -12,6 +12,7 @@
 
 #include "base/status.hpp"
 #include "model/aerodynamics.hpp"
+#include "model/flight_control.hpp"
 #include "model/units.hpp"
 
 // An aircraft as data: what tools/jsbsim/convert.py writes from a JSBSim
@@ -65,6 +66,7 @@ struct AircraftData final {
 
   std::vector<FuelTank> tanks;
   std::vector<TurbineData> engines;
+  FlightControlData flight_controls;
   AeroModel aero;
 };
 

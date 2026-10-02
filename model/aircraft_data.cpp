@@ -93,6 +93,8 @@ class Parser final {
         read = engine(data);
       } else if (key == "term") {
         read = term(data);
+      } else if (key == "flight_controls") {
+        read = flight_controls(data);
       } else {
         return fail("unknown entry `" + std::string{key} + "`");
       }
@@ -424,6 +426,203 @@ class Parser final {
     ++at_;
     data.engines.push_back(std::move(turbine));
     return {};
+  }
+
+  // A block as written, its signals still by name.
+  struct NamedBlock final {
+    FlightBlock block;
+    std::vector<std::pair<std::string, bool>> inputs;
+    std::string output;
+    std::string schedule_signal;
+    std::size_t line = 0;
+  };
+
+  // `flight_controls`, then blocks, then `end`. A block is
+  // `block <kind> <name>`, its entries, then `end`.
+  auto flight_controls(AircraftData& data) -> std::expected<void, lib::Status> {
+    ++at_;
+    std::vector<NamedBlock> named;
+    while (!done() && line().words[0] != "end") {
+      auto read = block();
+      if (!read) {
+        return Failure{read.error()};
+      }
+      named.push_back(std::move(*read));
+    }
+    if (done()) {
+      return fail("`flight_controls` needs an `end`");
+    }
+    ++at_;
+
+    // Every signal: the fixed ones, then each block's own and outputs.
+    FlightControlData& controls = data.flight_controls;
+    controls.signals.clear();
+    for (std::size_t i = 0; i < FLIGHT_SIGNAL_COUNT; ++i) {
+      controls.signals.emplace_back(
+          flight_signal_name(static_cast<FlightSignal>(i)));
+    }
+    auto find = [&](const std::string& name) -> std::optional<std::size_t> {
+      auto found = std::ranges::find(controls.signals, name);
+      if (found == controls.signals.end()) {
+        return std::nullopt;
+      }
+      return static_cast<std::size_t>(found - controls.signals.begin());
+    };
+    auto add = [&](const std::string& name) -> std::size_t {
+      if (std::optional<std::size_t> found = find(name)) {
+        return *found;
+      }
+      controls.signals.push_back(name);
+      return controls.signals.size() - 1;
+    };
+    for (NamedBlock& each : named) {
+      each.block.signal = add(each.block.name);
+      if (!each.output.empty()) {
+        each.block.output = add(each.output);
+      }
+    }
+    if (controls.signals.size() > MAX_FLIGHT_SIGNALS) {
+      return fail("the flight controls have more than " +
+                  std::to_string(MAX_FLIGHT_SIGNALS) + " signals");
+    }
+
+    // Then what each block reads.
+    for (NamedBlock& each : named) {
+      for (const auto& [name, negated] : each.inputs) {
+        std::optional<std::size_t> signal = find(name);
+        if (!signal) {
+          return Failure{lib::raise(AircraftDataError::MALFORMED,
+                                    "line " + std::to_string(each.line) +
+                                        ": no signal `" + name + "`")};
+        }
+        each.block.inputs.push_back({.signal = *signal, .negated = negated});
+      }
+      if (!each.schedule_signal.empty()) {
+        std::optional<std::size_t> signal = find(each.schedule_signal);
+        if (!signal) {
+          return Failure{lib::raise(AircraftDataError::MALFORMED,
+                                    "line " + std::to_string(each.line) +
+                                        ": no signal `" + each.schedule_signal +
+                                        "`")};
+        }
+        each.block.schedule_signal = *signal;
+      }
+      controls.blocks.push_back(std::move(each.block));
+    }
+    return {};
+  }
+
+  auto block() -> std::expected<NamedBlock, lib::Status> {
+    const Line& header = line();
+    if (header.words.size() != 3 || header.words[0] != "block") {
+      return fail("expected `block <kind> <name>`");
+    }
+    NamedBlock named{.line = header.number};
+    FlightBlock& block = named.block;
+    std::string_view kind = header.words[1];
+    if (kind == "summer") {
+      block.kind = FlightBlock::Kind::SUMMER;
+    } else if (kind == "pure_gain") {
+      block.kind = FlightBlock::Kind::GAIN;
+    } else if (kind == "scheduled_gain") {
+      block.kind = FlightBlock::Kind::SCHEDULED_GAIN;
+    } else if (kind == "surface_scale") {
+      block.kind = FlightBlock::Kind::SURFACE_SCALE;
+    } else if (kind == "kinematic") {
+      block.kind = FlightBlock::Kind::KINEMATIC;
+    } else {
+      return fail("unknown block kind `" + std::string{kind} + "`");
+    }
+    block.name = std::string{header.words[2]};
+    ++at_;
+
+    while (!done() && line().words[0] != "end") {
+      std::string_view key = line().words[0];
+      const std::vector<std::string_view>& words = line().words;
+      if (key == "input" || key == "output") {
+        if (words.size() != 2) {
+          return fail("`" + std::string{key} + "` takes one signal");
+        }
+        std::string_view name = words[1];
+        if (key == "output") {
+          named.output = std::string{name};
+        } else {
+          bool negated = name.starts_with('-');
+          named.inputs.emplace_back(
+              std::string{negated ? name.substr(1) : name}, negated);
+        }
+        ++at_;
+        continue;
+      }
+      if (key == "table") {
+        if (words.size() != 2) {
+          return fail("a schedule's `table` takes one signal");
+        }
+        named.schedule_signal = std::string{words[1]};
+        ++at_;
+        std::vector<double> xs;
+        std::vector<double> ys;
+        while (!done() && line().words[0] != "end") {
+          auto row = values(1);
+          if (!row) {
+            return Failure{row.error()};
+          }
+          xs.push_back(*number(lines_[at_ - 1].words[0]));
+          ys.push_back((*row)[0]);
+        }
+        if (done()) {
+          return fail("a table needs an `end`");
+        }
+        if (!increasing(xs)) {
+          return fail("table breakpoints must be strictly increasing");
+        }
+        ++at_;
+        block.schedule = Table1<>{std::move(xs), std::move(ys)};
+        continue;
+      }
+      std::size_t count =
+          key == "clip" || key == "domain" || key == "range" || key == "setting"
+              ? 2
+              : 1;
+      auto read = values(count);
+      if (!read) {
+        return Failure{read.error()};
+      }
+      const std::vector<double>& v = *read;
+      if (key == "clip") {
+        block.clip = std::pair{v[0], v[1]};
+      } else if (key == "domain") {
+        block.domain = {v[0], v[1]};
+      } else if (key == "range") {
+        block.range = {v[0], v[1]};
+      } else if (key == "setting") {
+        block.detents.push_back(v[0]);
+        block.times.push_back(v[1]);
+      } else if (key == "bias") {
+        block.bias = v[0];
+      } else if (key == "gain") {
+        block.gain = v[0];
+      } else if (key == "zero_centered") {
+        block.zero_centered = v[0] != 0.0;
+      } else if (key == "scale") {
+        block.scale = v[0] != 0.0;
+      } else {
+        --at_;
+        return fail("unknown block entry `" + std::string{key} + "`");
+      }
+    }
+    if (done()) {
+      return fail("a block needs an `end`");
+    }
+    ++at_;
+    if (block.kind == FlightBlock::Kind::SCHEDULED_GAIN && !block.schedule) {
+      return fail("a scheduled gain needs a table");
+    }
+    if (block.kind == FlightBlock::Kind::KINEMATIC &&
+        (block.detents.size() < 2 || !increasing(block.detents))) {
+      return fail("a kinematic block needs two or more increasing settings");
+    }
+    return named;
   }
 
   std::vector<Line> lines_;
