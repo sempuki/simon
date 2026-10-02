@@ -82,7 +82,9 @@ cc_test(
     copts = COPTS,
     data = [
         "aircraft/737.aircraft",
+        "aircraft/f16.aircraft",
         "reference/jsbsim_737_aero.csv",
+        "reference/jsbsim_f16_aero.csv",
     ],
     deps = [
         ":testing",
@@ -138,7 +140,9 @@ cc_test(
     copts = COPTS,
     data = [
         "aircraft/737.aircraft",
+        "aircraft/f16.aircraft",
         "reference/jsbsim_737_flight_control.csv",
+        "reference/jsbsim_f16_flight_control.csv",
     ],
     deps = [
         ":testing",

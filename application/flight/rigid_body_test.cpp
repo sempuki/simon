@@ -84,7 +84,7 @@ TEST_CASE("RigidBody737") {
     CHECK(worst_angular < 1e-12);
   }
 
-  auto aircraft = load_aircraft(AIRCRAFT);
+  auto aircraft = load_aircraft(BOEING_737);
   REQUIRE(aircraft);
   Earth earth = Earth::round(wgs84::Geodetic{});
   StandardAirTable air;

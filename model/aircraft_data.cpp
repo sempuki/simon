@@ -76,25 +76,29 @@ class Parser final {
       std::string_view key = line().words[0];
       std::expected<void, lib::Status> read;
       if (key == "name") {
-        read = text(Out(data.name));
+        read = read_text(Out(data.name));
       } else if (key == "metrics") {
-        read = metrics(InOut(data));
+        read = read_metrics(InOut(data));
       } else if (key == "aero_reference") {
-        read = location(Out(data.aero_reference));
+        read = read_location(Out(data.aero_reference));
+      } else if (key == "eye_point") {
+        read = read_location(Out(data.eye_point));
+      } else if (key == "point_mass") {
+        read = append_point_mass(InOut(data));
       } else if (key == "empty_mass") {
-        read = mass(Out(data.empty_mass));
+        read = read_mass(Out(data.empty_mass));
       } else if (key == "empty_inertia") {
-        read = numbers(Out(data.empty_inertia));
+        read = read_numbers(Out(data.empty_inertia));
       } else if (key == "empty_center_of_mass") {
-        read = location(Out(data.empty_center_of_mass));
+        read = read_location(Out(data.empty_center_of_mass));
       } else if (key == "tank") {
-        read = tank(InOut(data));
+        read = append_tank(InOut(data));
       } else if (key == "engine") {
-        read = engine(InOut(data));
+        read = append_engine(InOut(data));
       } else if (key == "term") {
-        read = term(InOut(data));
+        read = append_term(InOut(data));
       } else if (key == "flight_controls") {
-        read = flight_controls(InOut(data));
+        read = read_flight_controls(InOut(data));
       } else {
         return fail("unknown entry `" + std::string{key} + "`");
       }
@@ -109,6 +113,10 @@ class Parser final {
     for (const TurbineData& turbine : data.engines) {
       if (!turbine.idle_thrust || !turbine.military_thrust_factor) {
         return fail("engine `" + turbine.name + "` needs both thrust tables");
+      }
+      if (turbine.has_reheat() && turbine.max_thrust <= 0.0 * newton) {
+        return fail("engine `" + turbine.name +
+                    "` has reheat and needs its maximum thrust");
       }
       for (std::size_t feed : turbine.feeds) {
         if (feed >= data.tanks.size()) {
@@ -162,17 +170,25 @@ class Parser final {
     return value;
   }
 
-  auto text(Out<std::string> out) -> std::expected<void, lib::Status> {
-    if (line().words.size() != 2) {
-      return fail("`name` takes one word");
+  // The words after the key, joined by single spaces.
+  auto read_text(Out<std::string> out) -> std::expected<void, lib::Status> {
+    const std::vector<std::string_view>& words = line().words;
+    if (words.size() < 2) {
+      return fail("`" + std::string{words[0]} + "` takes some words");
     }
-    *out = std::string{line().words[1]};
+    out->clear();
+    for (std::size_t i = 1; i < words.size(); ++i) {
+      if (i > 1) {
+        *out += ' ';
+      }
+      *out += words[i];
+    }
     ++at_;
     return {};
   }
 
   template <std::size_t Count>
-  auto numbers(Out<std::array<double, Count>> out)
+  auto read_numbers(Out<std::array<double, Count>> out)
       -> std::expected<void, lib::Status> {
     auto read = values(Count);
     if (!read) {
@@ -182,27 +198,29 @@ class Parser final {
     return {};
   }
 
-  auto location(Out<Displacement> out) -> std::expected<void, lib::Status> {
+  auto read_location(Out<Displacement> out)
+      -> std::expected<void, lib::Status> {
     std::array<double, 3> xyz{};
-    auto read = numbers(Out(xyz));
+    auto read = read_numbers(Out(xyz));
     if (read) {
       *out = meters(xyz[0], xyz[1], xyz[2]);
     }
     return read;
   }
 
-  auto mass(Out<Mass> out) -> std::expected<void, lib::Status> {
+  auto read_mass(Out<Mass> out) -> std::expected<void, lib::Status> {
     std::array<double, 1> value{};
-    auto read = numbers(Out(value));
+    auto read = read_numbers(Out(value));
     if (read) {
       *out = value[0] * kilogram;
     }
     return read;
   }
 
-  auto metrics(InOut<AircraftData> data) -> std::expected<void, lib::Status> {
+  auto read_metrics(InOut<AircraftData> data)
+      -> std::expected<void, lib::Status> {
     std::array<double, 3> value{};
-    auto read = numbers(Out(value));
+    auto read = read_numbers(Out(value));
     if (read) {
       data->wing_area = value[0] * square_meter;
       data->wing_span = value[1] * meter;
@@ -211,9 +229,23 @@ class Parser final {
     return read;
   }
 
-  auto tank(InOut<AircraftData> data) -> std::expected<void, lib::Status> {
+  auto append_point_mass(InOut<AircraftData> data)
+      -> std::expected<void, lib::Status> {
+    std::array<double, 4> value{};
+    auto read = read_numbers(Out(value));
+    if (read) {
+      data->point_masses.push_back(PointMass{
+          .mass = value[0] * kilogram,
+          .location = meters(value[1], value[2], value[3]),
+      });
+    }
+    return read;
+  }
+
+  auto append_tank(InOut<AircraftData> data)
+      -> std::expected<void, lib::Status> {
     std::array<double, 5> value{};
-    auto read = numbers(Out(value));
+    auto read = read_numbers(Out(value));
     if (read) {
       data->tanks.push_back(FuelTank{
           .location = meters(value[0], value[1], value[2]),
@@ -335,7 +367,8 @@ class Parser final {
                      .table = Table1<>{std::move(rows), std::move(values)}};
   }
 
-  auto term(InOut<AircraftData> data) -> std::expected<void, lib::Status> {
+  auto append_term(InOut<AircraftData> data)
+      -> std::expected<void, lib::Status> {
     const Line& header = line();
     if (header.words.size() != 3) {
       return fail("`term` takes an axis and a name");
@@ -383,7 +416,8 @@ class Parser final {
     return {};
   }
 
-  auto engine(InOut<AircraftData> data) -> std::expected<void, lib::Status> {
+  auto append_engine(InOut<AircraftData> data)
+      -> std::expected<void, lib::Status> {
     const Line& header = line();
     if (header.words.size() != 3 || header.words[1] != "turbine") {
       return fail("`engine` takes `turbine` and a name");
@@ -404,7 +438,7 @@ class Parser final {
       };
       double thrust = 0.0;
       if (key == "location") {
-        read = location(Out(turbine.location));
+        read = read_location(Out(turbine.location));
       } else if (key == "feeds") {
         for (std::size_t i = 1; i < line().words.size(); ++i) {
           auto value = number(line().words[i]);
@@ -423,6 +457,11 @@ class Parser final {
         read = scalar(Out(turbine.thrust_specific_fuel_consumption));
       } else if (key == "bleed") {
         read = scalar(Out(turbine.bleed));
+      } else if (key == "max_thrust") {
+        read = scalar(Out(thrust));
+        turbine.max_thrust = thrust * newton;
+      } else if (key == "reheat_thrust_specific_fuel_consumption") {
+        read = scalar(Out(turbine.reheat_thrust_specific_fuel_consumption));
       } else if (key == "idle_n1") {
         read = scalar(Out(turbine.idle_n1));
       } else if (key == "idle_n2") {
@@ -441,7 +480,8 @@ class Parser final {
         read = scalar(Out(turbine.n2_spool_up));
       } else if (key == "n2_spool_down") {
         read = scalar(Out(turbine.n2_spool_down));
-      } else if (key == "idle_thrust" || key == "military_thrust_factor") {
+      } else if (key == "idle_thrust" || key == "military_thrust_factor" ||
+                 key == "max_thrust_factor") {
         ++at_;
         if (done() || line().words[0] != "table") {
           return fail("`" + std::string{key} + "` is followed by a table");
@@ -450,8 +490,9 @@ class Parser final {
         if (!table_read) {
           return Failure{table_read.error()};
         }
-        (key == "idle_thrust" ? turbine.idle_thrust
-                              : turbine.military_thrust_factor) =
+        (key == "idle_thrust"              ? turbine.idle_thrust
+         : key == "military_thrust_factor" ? turbine.military_thrust_factor
+                                           : turbine.max_thrust_factor) =
             std::move(*table_read);
       } else {
         return fail("unknown engine entry `" + std::string{key} + "`");
@@ -468,22 +509,62 @@ class Parser final {
     return {};
   }
 
+  // An input as written: a signal's name, whether it is negated, and the
+  // scale that converts it.
+  struct NamedInput final {
+    std::string name;
+    bool negated = false;
+    double scale = 1.0;
+  };
+
+  struct NamedOperand final {
+    double value = 0.0;
+    std::optional<NamedInput> input;
+  };
+
+  struct NamedCondition final {
+    std::string signal;
+    FlightBlock::Condition::Comparison comparison =
+        FlightBlock::Condition::Comparison::EQ;
+    NamedOperand right;
+  };
+
+  struct NamedTest final {
+    bool any = false;
+    NamedOperand value;
+    std::vector<NamedCondition> conditions;
+  };
+
   // A block as written, its signals still by name.
   struct NamedBlock final {
     FlightBlock block;
-    std::vector<std::pair<std::string, bool>> inputs;
-    std::string output;
+    std::vector<NamedInput> inputs;
+    std::optional<NamedInput> output;
     std::string schedule_signal;
+    NamedOperand fallback;
+    std::vector<NamedTest> tests;
+    std::optional<NamedInput> trigger;
+    std::vector<std::optional<NamedInput>> pushes;  // By operation.
     std::size_t line = 0;
   };
 
-  // `flight_controls`, then blocks, then `end`. A block is
+  // `flight_controls`, then signals and blocks, then `end`. A signal is
+  // `signal <name>`: one nothing writes, which holds zero. A block is
   // `block <kind> <name>`, its entries, then `end`.
-  auto flight_controls(InOut<AircraftData> data)
+  auto read_flight_controls(InOut<AircraftData> data)
       -> std::expected<void, lib::Status> {
     ++at_;
+    std::vector<std::string> declared;
     std::vector<NamedBlock> named;
     while (!done() && line().words[0] != "end") {
+      if (line().words[0] == "signal") {
+        if (line().words.size() != 2) {
+          return fail("`signal` takes a name");
+        }
+        declared.emplace_back(line().words[1]);
+        ++at_;
+        continue;
+      }
       auto read = block();
       if (!read) {
         return Failure{read.error()};
@@ -495,27 +576,37 @@ class Parser final {
     }
     ++at_;
 
-    // Every signal: the fixed ones, then each block's own and outputs.
+    // Every signal: the fixed ones, the declared ones, each block's own and
+    // outputs, then each PID's state.
     FlightControlData& controls = data->flight_controls;
     controls.signals.clear();
     for (std::size_t i = 0; i < FLIGHT_SIGNAL_COUNT; ++i) {
       controls.signals.emplace_back(
           flight_signal_name(static_cast<FlightSignal>(i)));
     }
-    auto find = [&](const std::string& name) -> std::optional<std::size_t> {
-      return find_signal(controls, name);
-    };
-    auto add = [&](const std::string& name) -> std::size_t {
-      if (std::optional<std::size_t> found = find(name)) {
+    auto find_or_append = [&](const std::string& name) -> std::size_t {
+      if (std::optional<std::size_t> found = find_signal(controls, name)) {
         return *found;
       }
       controls.signals.push_back(name);
       return controls.signals.size() - 1;
     };
+    for (const std::string& name : declared) {
+      find_or_append(name);
+    }
     for (NamedBlock& each : named) {
-      each.block.signal = add(each.block.name);
-      if (!each.output.empty()) {
-        each.block.output = add(each.output);
+      each.block.signal = find_or_append(each.block.name);
+      if (each.output) {
+        each.block.output = find_or_append(each.output->name);
+        each.block.output_scale = each.output->scale;
+      }
+    }
+    for (NamedBlock& each : named) {
+      if (each.block.kind == FlightBlock::Kind::PID) {
+        each.block.state = controls.signals.size();
+        for (std::string_view part : {"/integral", "/previous", "/before"}) {
+          controls.signals.push_back(each.block.name + std::string{part});
+        }
       }
     }
     if (controls.signals.size() > MAX_FLIGHT_SIGNALS) {
@@ -525,28 +616,154 @@ class Parser final {
 
     // Then what each block reads.
     for (NamedBlock& each : named) {
-      for (const auto& [name, negated] : each.inputs) {
-        std::optional<std::size_t> signal = find(name);
-        if (!signal) {
-          return Failure{lib::raise(AircraftDataError::MALFORMED,
-                                    "line " + std::to_string(each.line) +
-                                        ": no signal `" + name + "`")};
-        }
-        each.block.inputs.push_back({.signal = *signal, .negated = negated});
-      }
-      if (!each.schedule_signal.empty()) {
-        std::optional<std::size_t> signal = find(each.schedule_signal);
-        if (!signal) {
-          return Failure{lib::raise(AircraftDataError::MALFORMED,
-                                    "line " + std::to_string(each.line) +
-                                        ": no signal `" + each.schedule_signal +
-                                        "`")};
-        }
-        each.block.schedule_signal = *signal;
+      auto resolved = resolve(controls, InOut(each));
+      if (!resolved) {
+        return Failure{resolved.error()};
       }
       controls.blocks.push_back(std::move(each.block));
     }
     return {};
+  }
+
+  // Finds each signal `each` reads by name.
+  static auto resolve(const FlightControlData& controls, InOut<NamedBlock> each)
+      -> std::expected<void, lib::Status> {
+    std::string missing;
+    auto signal = [&](const std::string& name) -> std::size_t {
+      std::optional<std::size_t> found = find_signal(controls, name);
+      if (!found) {
+        missing = name;
+        return 0;
+      }
+      return *found;
+    };
+    auto input = [&](const NamedInput& named) -> FlightBlock::Input {
+      return FlightBlock::Input{.signal = signal(named.name),
+                                .negated = named.negated,
+                                .scale = named.scale};
+    };
+    auto operand = [&](const NamedOperand& named) -> FlightBlock::Operand {
+      FlightBlock::Operand result{.value = named.value};
+      if (named.input) {
+        result.input = input(*named.input);
+      }
+      return result;
+    };
+
+    FlightBlock& block = each->block;
+    for (const NamedInput& named : each->inputs) {
+      block.inputs.push_back(input(named));
+    }
+    if (!each->schedule_signal.empty()) {
+      block.schedule_signal = signal(each->schedule_signal);
+    }
+    block.fallback = operand(each->fallback);
+    for (const NamedTest& named : each->tests) {
+      FlightBlock::Test test{.any = named.any, .value = operand(named.value)};
+      for (const NamedCondition& condition : named.conditions) {
+        test.conditions.push_back(
+            FlightBlock::Condition{.signal = signal(condition.signal),
+                                   .comparison = condition.comparison,
+                                   .right = operand(condition.right)});
+      }
+      block.tests.push_back(std::move(test));
+    }
+    if (each->trigger) {
+      block.trigger = input(*each->trigger);
+    }
+    for (std::size_t i = 0; i < block.operations.size(); ++i) {
+      if (each->pushes[i]) {
+        block.operations[i].input = input(*each->pushes[i]);
+      }
+    }
+    if (!missing.empty()) {
+      return Failure{lib::raise(AircraftDataError::MALFORMED,
+                                "line " + std::to_string(each->line) +
+                                    ": no signal `" + missing + "`")};
+    }
+    return {};
+  }
+
+  // `<name> [<scale>]` from word `at` of the current line, the name maybe
+  // negated.
+  auto named_input(std::size_t at) const
+      -> std::expected<NamedInput, lib::Status> {
+    const std::vector<std::string_view>& words = line().words;
+    if (words.size() != at + 1 && words.size() != at + 2) {
+      return fail("`" + std::string{words[0]} +
+                  "` takes a signal and maybe a scale");
+    }
+    std::string_view name = words[at];
+    bool negated = name.starts_with('-');
+    NamedInput named{.name = std::string{negated ? name.substr(1) : name},
+                     .negated = negated};
+    if (words.size() == at + 2) {
+      auto scale = number(words[at + 1]);
+      if (!scale) {
+        return Failure{scale.error()};
+      }
+      named.scale = *scale;
+    }
+    return named;
+  }
+
+  // A number, or a signal's name, maybe negated.
+  auto operand(std::string_view word) const -> NamedOperand {
+    double value = 0.0;
+    auto [end, error] =
+        std::from_chars(word.data(), word.data() + word.size(), value);
+    if (error == std::errc{} && end == word.data() + word.size()) {
+      return NamedOperand{.value = value};
+    }
+    bool negated = word.starts_with('-');
+    return NamedOperand{
+        .input =
+            NamedInput{.name = std::string{negated ? word.substr(1) : word},
+                       .negated = negated}};
+  }
+
+  // `test <and|or> <value>`, then `condition <signal> <comparison> <operand>`
+  // lines, then `end`.
+  auto test() -> std::expected<NamedTest, lib::Status> {
+    const std::vector<std::string_view>& words = line().words;
+    if (words.size() != 3 || (words[1] != "and" && words[1] != "or")) {
+      return fail("expected `test <and|or> <value>`");
+    }
+    NamedTest named{.any = words[1] == "or", .value = operand(words[2])};
+    ++at_;
+    while (!done() && line().words[0] != "end") {
+      const std::vector<std::string_view>& condition = line().words;
+      if (condition.size() != 4 || condition[0] != "condition") {
+        return fail("expected `condition <signal> <comparison> <operand>`");
+      }
+      using enum FlightBlock::Condition::Comparison;
+      constexpr std::array<
+          std::pair<std::string_view, FlightBlock::Condition::Comparison>, 6>
+          COMPARISONS{{{"lt", LT},
+                       {"le", LE},
+                       {"gt", GT},
+                       {"ge", GE},
+                       {"eq", EQ},
+                       {"ne", NE}}};
+      auto found = std::ranges::find(
+          COMPARISONS, condition[2],
+          &std::pair<std::string_view,
+                     FlightBlock::Condition::Comparison>::first);
+      if (found == COMPARISONS.end()) {
+        return fail("unknown comparison `" + std::string{condition[2]} + "`");
+      }
+      named.conditions.push_back(NamedCondition{
+          .signal = std::string{condition[1]},
+          .comparison = found->second,
+          .right = operand(condition[3]),
+      });
+      ++at_;
+    }
+    if (done()) {
+      return fail("a test needs an `end`");
+    }
+    ++at_;
+    return named;
   }
 
   auto block() -> std::expected<NamedBlock, lib::Status> {
@@ -556,37 +773,48 @@ class Parser final {
     }
     NamedBlock named{.line = header.number};
     FlightBlock& block = named.block;
-    std::string_view kind = header.words[1];
-    if (kind == "summer") {
-      block.kind = FlightBlock::Kind::SUMMER;
-    } else if (kind == "pure_gain") {
-      block.kind = FlightBlock::Kind::GAIN;
-    } else if (kind == "scheduled_gain") {
-      block.kind = FlightBlock::Kind::SCHEDULED_GAIN;
-    } else if (kind == "surface_scale") {
-      block.kind = FlightBlock::Kind::SURFACE_SCALE;
-    } else if (kind == "kinematic") {
-      block.kind = FlightBlock::Kind::KINEMATIC;
-    } else {
-      return fail("unknown block kind `" + std::string{kind} + "`");
+    using enum FlightBlock::Kind;
+    constexpr std::array<std::pair<std::string_view, FlightBlock::Kind>, 8>
+        KINDS{{{"summer", SUMMER},
+               {"pure_gain", GAIN},
+               {"scheduled_gain", SCHEDULED_GAIN},
+               {"surface_scale", SURFACE_SCALE},
+               {"kinematic", KINEMATIC},
+               {"switch", SWITCH},
+               {"pid", PID},
+               {"function", FUNCTION}}};
+    auto kind = std::ranges::find(
+        KINDS, header.words[1],
+        &std::pair<std::string_view, FlightBlock::Kind>::first);
+    if (kind == KINDS.end()) {
+      return fail("unknown block kind `" + std::string{header.words[1]} + "`");
     }
+    block.kind = kind->second;
     block.name = std::string{header.words[2]};
     ++at_;
 
+    using Operation = FlightBlock::Operation;
     while (!done() && line().words[0] != "end") {
       std::string_view key = line().words[0];
       const std::vector<std::string_view>& words = line().words;
-      if (key == "input" || key == "output") {
-        if (words.size() != 2) {
-          return fail("`" + std::string{key} + "` takes one signal");
+      if (key == "input" || key == "output" || key == "trigger" ||
+          key == "push") {
+        auto read = named_input(1);
+        if (!read) {
+          return Failure{read.error()};
         }
-        std::string_view name = words[1];
-        if (key == "output") {
-          named.output = std::string{name};
+        if (key == "input") {
+          named.inputs.push_back(std::move(*read));
+        } else if (key == "output") {
+          if (read->negated) {
+            return fail("an output cannot be negated");
+          }
+          named.output = std::move(*read);
+        } else if (key == "trigger") {
+          named.trigger = std::move(*read);
         } else {
-          bool negated = name.starts_with('-');
-          named.inputs.emplace_back(
-              std::string{negated ? name.substr(1) : name}, negated);
+          block.operations.push_back(Operation{.kind = Operation::Kind::PUSH});
+          named.pushes.push_back(std::move(*read));
         }
         ++at_;
         continue;
@@ -617,6 +845,65 @@ class Parser final {
         block.schedule = Table1<>{std::move(xs), std::move(ys)};
         continue;
       }
+      if (key == "default") {
+        if (words.size() != 2) {
+          return fail("`default` takes a value");
+        }
+        named.fallback = operand(words[1]);
+        ++at_;
+        continue;
+      }
+      if (key == "test") {
+        auto read = test();
+        if (!read) {
+          return Failure{read.error()};
+        }
+        named.tests.push_back(std::move(*read));
+        continue;
+      }
+      if (key == "integrator") {
+        using enum FlightBlock::Integrator;
+        constexpr std::array<
+            std::pair<std::string_view, FlightBlock::Integrator>, 5>
+            INTEGRATORS{{{"none", NONE},
+                         {"rect", RECTANGULAR},
+                         {"trap", TRAPEZOIDAL},
+                         {"ab2", ADAMS_BASHFORTH_2},
+                         {"ab3", ADAMS_BASHFORTH_3}}};
+        auto found =
+            words.size() == 2
+                ? std::ranges::find(INTEGRATORS, words[1],
+                                    &std::pair<std::string_view,
+                                               FlightBlock::Integrator>::first)
+                : INTEGRATORS.end();
+        if (found == INTEGRATORS.end()) {
+          return fail("unknown integrator");
+        }
+        block.integrator = found->second;
+        ++at_;
+        continue;
+      }
+      // A function's operations that take nothing more.
+      constexpr std::array<std::pair<std::string_view, Operation::Kind>, 6>
+          OPERATIONS{{{"difference", Operation::Kind::DIFFERENCE},
+                      {"quotient", Operation::Kind::QUOTIENT},
+                      {"sin", Operation::Kind::SIN},
+                      {"cos", Operation::Kind::COS},
+                      {"tan", Operation::Kind::TAN},
+                      {"abs", Operation::Kind::ABS}}};
+      if (auto operation = std::ranges::find(
+              OPERATIONS, key,
+              &std::pair<std::string_view, Operation::Kind>::first);
+          operation != OPERATIONS.end()) {
+        if (words.size() != 1) {
+          return fail("`" + std::string{key} + "` takes nothing");
+        }
+        block.operations.push_back(Operation{.kind = operation->second});
+        named.pushes.emplace_back();
+        ++at_;
+        continue;
+      }
+
       std::size_t count =
           key == "clip" || key == "domain" || key == "range" || key == "setting"
               ? 2
@@ -643,6 +930,26 @@ class Parser final {
         block.zero_centered = v[0] != 0.0;
       } else if (key == "scale") {
         block.scale = v[0] != 0.0;
+      } else if (key == "kp") {
+        block.kp = v[0];
+      } else if (key == "ki") {
+        block.ki = v[0];
+      } else if (key == "kd") {
+        block.kd = v[0];
+      } else if (key == "constant") {
+        block.operations.push_back(
+            Operation{.kind = Operation::Kind::CONSTANT, .value = v[0]});
+        named.pushes.emplace_back();
+      } else if (key == "sum" || key == "product") {
+        if (v[0] < 1.0) {
+          --at_;
+          return fail("`" + std::string{key} + "` takes a count");
+        }
+        block.operations.push_back(
+            Operation{.kind = key == "sum" ? Operation::Kind::SUM
+                                           : Operation::Kind::PRODUCT,
+                      .count = static_cast<std::size_t>(v[0])});
+        named.pushes.emplace_back();
       } else {
         --at_;
         return fail("unknown block entry `" + std::string{key} + "`");
@@ -652,14 +959,59 @@ class Parser final {
       return fail("a block needs an `end`");
     }
     ++at_;
-    if (block.kind == FlightBlock::Kind::SCHEDULED_GAIN && !block.schedule) {
+    if (block.kind == SCHEDULED_GAIN && !block.schedule) {
       return fail("a scheduled gain needs a table");
     }
-    if (block.kind == FlightBlock::Kind::KINEMATIC &&
+    if (block.kind == KINEMATIC &&
         (block.detents.size() < 2 || !increasing(block.detents))) {
       return fail("a kinematic block needs two or more increasing settings");
     }
+    if (block.kind == PID && named.inputs.size() != 1) {
+      return fail("a PID needs one input");
+    }
+    if (block.kind == FUNCTION && !balanced(block.operations)) {
+      return fail("a function's operations must leave one value");
+    }
     return named;
+  }
+
+  // Whether `operations` always have what they take, never hold more than a
+  // function's stack does, and leave one value.
+  static auto balanced(const std::vector<FlightBlock::Operation>& operations)
+      -> bool {
+    std::size_t size = 0;
+    for (const FlightBlock::Operation& operation : operations) {
+      using enum FlightBlock::Operation::Kind;
+      std::size_t takes = 0;
+      switch (operation.kind) {
+        case PUSH:
+        case CONSTANT:
+          takes = 0;
+          break;
+        case SUM:
+        case PRODUCT:
+          takes = operation.count;
+          break;
+        case DIFFERENCE:
+        case QUOTIENT:
+          takes = 2;
+          break;
+        case SIN:
+        case COS:
+        case TAN:
+        case ABS:
+          takes = 1;
+          break;
+      }
+      if (size < takes) {
+        return false;
+      }
+      size = size - takes + 1;
+      if (size > FUNCTION_STACK_SIZE) {
+        return false;
+      }
+    }
+    return size == 1;
   }
 
   std::vector<Line> lines_;

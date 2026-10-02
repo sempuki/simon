@@ -14,8 +14,9 @@
 #include "model/flight_control.hpp"
 #include "model/units.hpp"
 
-// The 737's aerodynamics, converted from JSBSim by tools/jsbsim/convert.py,
-// against JSBSim's own at states that reference/jsbsim_737_aero.py recorded.
+// The 737's and the F-16's aerodynamics, converted from JSBSim by
+// tools/jsbsim/convert.py, against JSBSim's own at states that
+// reference/jsbsim_737_aero.py and jsbsim_f16_aero.py recorded.
 // Both evaluate the same build-up from the same inputs, so they should agree
 // to rounding.
 namespace simon::model {
@@ -23,8 +24,6 @@ namespace simon::model {
 namespace {
 
 using namespace flight::testing;
-
-constexpr char REFERENCE[] = "application/flight/reference/jsbsim_737_aero.csv";
 
 // The inputs `row` records, by simon's names: the variables, and the
 // aircraft's flight control signals.
@@ -43,12 +42,13 @@ auto read_inputs(const Row& row, const AircraftData& aircraft) -> AeroInputs {
   return inputs;
 }
 
-}  // namespace
-
-TEST_CASE("Aerodynamics737") {
-  auto aircraft = load_aircraft(AIRCRAFT);
-  REQUIRE(aircraft);
-  std::vector<Row> rows = load_rows(REFERENCE);
+// Checks the aircraft at `path` against JSBSim's recording at `reference`.
+auto check_against_jsbsim(const char* path, const char* reference) -> void {
+  auto aircraft = load_aircraft(path);
+  if (!aircraft) {
+    FAIL(aircraft.error().message());
+  }
+  std::vector<Row> rows = load_rows(reference);
   REQUIRE(rows.size() > 200);
 
   // They differ by rounding in JSBSim's sums and in the unit conversions:
@@ -104,6 +104,17 @@ TEST_CASE("Aerodynamics737") {
     CHECK(worst_force < TOLERANCE);
     CHECK(worst_moment < TOLERANCE);
   }
+}
+
+}  // namespace
+
+TEST_CASE("Aerodynamics737") {
+  check_against_jsbsim(BOEING_737,
+                       "application/flight/reference/jsbsim_737_aero.csv");
+}
+
+TEST_CASE("AerodynamicsF16") {
+  check_against_jsbsim(F16, "application/flight/reference/jsbsim_f16_aero.csv");
 }
 
 }  // namespace simon::model

@@ -31,6 +31,8 @@ LBM = 0.45359237  # kg.
 SLUG = LBF / FT  # kg: a slug is a pound-force second squared per foot.
 SLUG_FT2 = SLUG * FT * FT  # kg m^2.
 PSF = LBF / (FT * FT)  # Pa.
+KT = 1852.0 / 3600.0  # m/s.
+DEG = math.pi / 180.0  # rad.
 
 # JSBSim's aerodynamic state properties, by simon's name for them and the
 # factor from JSBSim's units to SI.
@@ -72,18 +74,34 @@ COMMANDS = {
     'fcs/pitch-trim-cmd-norm': 'pitch_trim_command',
     'fcs/roll-trim-cmd-norm': 'roll_trim_command',
     'fcs/yaw-trim-cmd-norm': 'yaw_trim_command',
+    'fcs/throttle-cmd-norm': 'throttle_command_0',
 }
+for engine_index in range(4):
+    COMMANDS['fcs/throttle-cmd-norm[%d]' % engine_index] = (
+        'throttle_command_%d' % engine_index)
 
-# Signals it reads from the aircraft's state: angles and rates, which need no
-# change of units.
+# Signals it reads from the aircraft's state, by simon's name and the factor
+# from JSBSim's units to SI. The pilot's accelerations are in g, along body
+# axes. The aircraft is always flying, so no wheel carries weight.
 STATE = {
-    'velocities/mach': 'mach',
-    'velocities/p-aero-rad_sec': 'roll_rate',
-    'velocities/q-aero-rad_sec': 'pitch_rate',
-    'velocities/r-aero-rad_sec': 'yaw_rate',
-    'aero/alpha-rad': 'alpha',
-    'aero/beta-rad': 'beta',
+    'velocities/mach': ('mach', 1.0),
+    'velocities/p-aero-rad_sec': ('roll_rate', 1.0),
+    'velocities/q-aero-rad_sec': ('pitch_rate', 1.0),
+    'velocities/r-aero-rad_sec': ('yaw_rate', 1.0),
+    'aero/alpha-rad': ('alpha', 1.0),
+    'aero/alpha-deg': ('alpha', DEG),
+    'aero/beta-rad': ('beta', 1.0),
+    'velocities/vc-kts': ('calibrated_airspeed', KT),
+    'velocities/vg-fps': ('ground_speed', FT),
+    'velocities/u-fps': ('body_velocity_x', FT),
+    'velocities/v-fps': ('body_velocity_y', FT),
+    'attitude/pitch-rad': ('pitch', 1.0),
+    'attitude/roll-rad': ('roll', 1.0),
+    'accelerations/n-pilot-y-norm': ('pilot_acceleration_y', 1.0),
+    'accelerations/n-pilot-z-norm': ('pilot_acceleration_z', 1.0),
 }
+for gear_index in range(16):
+    STATE['gear/unit[%d]/WOW' % gear_index] = ('weight_on_wheels', 1.0)
 
 # The surfaces JSBSim's flight control system has built in (FGFCS), by
 # simon's name for each. JSBSim keeps a surface's deflection in radians and
@@ -320,6 +338,8 @@ def convert(path, engine_directory, out):
     for point in metrics_element.findall('location'):
         if point.get('name') == 'AERORP':
             out.write('aero_reference %.17g %.17g %.17g\n' % tuple(location(point)))
+        elif point.get('name') == 'EYEPOINT':
+            out.write('eye_point %.17g %.17g %.17g\n' % tuple(location(point)))
 
     balance = root.find('mass_balance')
     inertia = [number(balance, axis, 0.0) * SLUG_FT2
@@ -341,8 +361,12 @@ def convert(path, engine_directory, out):
         if point.get('name') == 'CG':
             out.write('empty_center_of_mass %.17g %.17g %.17g\n'
                       % tuple(location(point)))
-    if balance.findall('pointmass'):
-        raise ConversionError('point masses are unsupported')
+    # Each point mass, such as the pilot, as a mass at a location.
+    for point in balance.findall('pointmass'):
+        if point.find('form') is not None:
+            raise ConversionError('point masses with a shape are unsupported')
+        out.write('point_mass %.17g %.17g %.17g %.17g\n' % (
+            mass(point, 'weight'), *location(point.find('location'))))
 
     propulsion = root.find('propulsion')
     for tank in propulsion.findall('tank'):
@@ -381,9 +405,10 @@ def component_property(name):
 def flight_signal(prop):
     """simon's name for the signal JSBSim calls `prop`, and the factor from
     JSBSim's units to SI."""
-    for table in (COMMANDS, STATE):
-        if prop in table:
-            return table[prop], 1.0
+    if prop in COMMANDS:
+        return COMMANDS[prop], 1.0
+    if prop in STATE:
+        return STATE[prop]
     for base, name in SURFACES.items():
         if prop == base + '-rad':
             return name, 1.0
@@ -393,18 +418,21 @@ def flight_signal(prop):
             return name + '_norm', 1.0
     if prop == 'gear/gear-pos-norm':
         return 'gear', 1.0
+    if prop.startswith('fcs/throttle-pos-norm'):
+        index = prop[len('fcs/throttle-pos-norm'):].strip('[]') or '0'
+        return 'throttle_%s' % index, 1.0
     if prop.startswith('fcs/'):
         return prop[len('fcs/'):].replace('/', '-'), 1.0
     raise ConversionError('unsupported property %s' % prop)
 
 
 def signal_name(prop):
-    """simon's name for a signal the flight controls read or write, which
-    must be in SI units already."""
+    """simon's name for a signal a component writes as its own, which must be
+    in SI units already."""
     name, scale = flight_signal(prop)
     if scale != 1.0:
-        raise ConversionError('the flight controls read or write %s, whose '
-                              'units need converting' % prop)
+        raise ConversionError('a component named %s would need its units '
+                              'converted' % prop)
     return name
 
 
@@ -415,85 +443,258 @@ def bounds(element, name):
     return float(child.find('min').text), float(child.find('max').text)
 
 
+def scaled(name, scale):
+    """A signal as a block line reads it: by name, then the factor that
+    takes the signal's SI value back to JSBSim's units, if there is one."""
+    if scale == 1.0:
+        return name
+    return '%s %.17g' % (name, scale)
+
+
+# Comparisons a switch's conditions make, by JSBSim's names for them.
+COMPARISONS = {'lt': 'lt', '<': 'lt', 'le': 'le', '<=': 'le',
+               'gt': 'gt', '>': 'gt', 'ge': 'ge', '>=': 'ge',
+               'eq': 'eq', '==': 'eq', 'ne': 'ne', '!=': 'ne'}
+
+# A function's operations that take a fixed number of arguments.
+OPERATIONS = {'sin': 1, 'cos': 1, 'tan': 1, 'abs': 1,
+              'difference': 2, 'quotient': 2}
+
+
+class FlightControls:
+    """The blocks of a JSBSim <flight_control>, in the order JSBSim runs
+    them, as lines of simon's format."""
+
+    def __init__(self):
+        self.written = set()  # The signals some block writes.
+        self.read = []  # The signals blocks read, in order.
+        self.blocks = []
+
+    def reads(self, prop):
+        """A property a block reads in JSBSim's units: simon's name, and the
+        factor from SI back to JSBSim's units."""
+        name, scale = flight_signal(prop)
+        if name not in self.read:
+            self.read.append(name)
+        return name, 1.0 / scale
+
+    def input(self, text):
+        text = text.strip()
+        sign = '-' if text.startswith('-') else ''
+        name, scale = self.reads(text.lstrip('-'))
+        return sign + scaled(name, scale)
+
+    def operand(self, text):
+        """A switch's value or a side of a condition: a number, or a signal
+        in SI units, which a condition compares with the other side in SI."""
+        text = text.strip()
+        try:
+            return float(text), None
+        except ValueError:
+            pass
+        sign = -1.0 if text.startswith('-') else 1.0
+        return sign, self.reads(text.lstrip('-'))
+
+    def value(self, text, where):
+        """A switch's value, as a block line: a number, or a signal, which
+        must need no change of units."""
+        number, signal = self.operand(text)
+        if signal is None:
+            return '%.17g' % number
+        if signal[1] != 1.0:
+            raise ConversionError('%s: a value that needs its units converted'
+                                  % where)
+        return ('-' if number < 0 else '') + signal[0]
+
+    def condition(self, text, where):
+        words = text.split()
+        if len(words) != 3 or words[1] not in COMPARISONS:
+            raise ConversionError('%s: condition "%s" is unsupported'
+                                  % (where, text))
+        left, right = self.operand(words[0]), self.operand(words[2])
+        if left[1] is None:
+            raise ConversionError('%s: a condition starts with a property'
+                                  % where)
+        left_name, left_scale = left[1]
+        if right[1] is None:
+            # The number in SI, so the comparison is JSBSim's.
+            right_text = '%.17g' % (right[0] / left_scale)
+        else:
+            if right[1][1] != left_scale or right[0] < 0 or left[0] < 0:
+                raise ConversionError('%s: condition "%s" is unsupported'
+                                      % (where, text))
+            right_text = right[1][0]
+        return 'condition %s %s %s' % (left_name, COMPARISONS[words[1]],
+                                       right_text)
+
+    def function(self, element, lines, where):
+        """A function's body as postfix operations."""
+        tag = element.tag
+        if tag == 'property':
+            lines.append('push %s' % self.input(element.text))
+        elif tag == 'value':
+            lines.append('constant %.17g' % float(element.text))
+        elif tag in ('sum', 'product'):
+            children = [c for c in element if c.tag != 'description']
+            for child in children:
+                self.function(child, lines, where)
+            lines.append('%s %d' % (tag, len(children)))
+        elif tag in OPERATIONS:
+            children = [c for c in element if c.tag != 'description']
+            if len(children) != OPERATIONS[tag]:
+                raise ConversionError('%s: <%s> takes %d arguments'
+                                      % (where, tag, OPERATIONS[tag]))
+            for child in children:
+                self.function(child, lines, where)
+            lines.append(tag)
+        else:
+            raise ConversionError('%s: <%s> is unsupported' % (where, tag))
+
+    def add(self, component):
+        kind = component.tag
+        name = component.get('name')
+        where = '%s %s' % (kind, name)
+        own = signal_name(component_property(name))
+        lines = []
+        for element in component.findall('input'):
+            lines.append('input %s' % self.input(element.text))
+        clip = component.find('clipto')
+        if clip is not None:
+            lines.append('clip %.17g %.17g' % (
+                float(clip.find('min').text), float(clip.find('max').text)))
+        for element in component.findall('output'):
+            out, scale = flight_signal(element.text.strip())
+            lines.append('output %s' % scaled(out, scale))
+            self.written.add(out)
+
+        if kind == 'summer':
+            bias = component.find('bias')
+            if bias is not None:
+                lines.append('bias %.17g' % float(bias.text))
+        elif kind in ('pure_gain', 'scheduled_gain', 'aerosurface_scale'):
+            gain = component.find('gain')
+            if gain is not None:
+                lines.append('gain %.17g' % float(gain.text))
+            if kind == 'aerosurface_scale':
+                domain = bounds(component, 'domain') or (-1.0, 1.0)
+                span = bounds(component, 'range')
+                if span is None:
+                    raise ConversionError('%s has no range' % where)
+                lines.append('domain %.17g %.17g' % domain)
+                lines.append('range %.17g %.17g' % span)
+                zero = component.find('zero_centered')
+                centered = zero is None or zero.text.strip() not in ('0', 'false')
+                lines.append('zero_centered %d' % centered)
+            if kind == 'scheduled_gain':
+                table = component.find('table')
+                variables = table.findall('independentVar')
+                if len(variables) != 1:
+                    raise ConversionError('%s: one variable only' % where)
+                variable_name, scale = self.reads(variables[0].text.strip())
+                data = [float(x) for x in table.find('tableData').text.split()]
+                # Breakpoints into SI.
+                lines.append('table %s' % variable_name)
+                for x, y in zip(data[0::2], data[1::2]):
+                    lines.append('%.17g %.17g' % (x / scale, y))
+                lines.append('end')
+        elif kind == 'kinematic':
+            if component.find('noscale') is not None:
+                lines.append('scale 0')
+            for setting in component.find('traverse').findall('setting'):
+                lines.append('setting %.17g %.17g' % (
+                    float(setting.find('position').text),
+                    float(setting.find('time').text)))
+        elif kind == 'switch':
+            for test in component:
+                if test.tag == 'default':
+                    lines.append('default %s' % self.value(test.get('value'), where))
+                elif test.tag == 'test':
+                    if test.findall('test'):
+                        raise ConversionError('%s: nested tests are unsupported'
+                                              % where)
+                    logic = test.get('logic', 'AND').lower()
+                    if logic not in ('and', 'or'):
+                        raise ConversionError('%s: logic %s' % (where, logic))
+                    lines.append('test %s %s' % (
+                        logic, self.value(test.get('value'), where)))
+                    for text in test.text.strip().splitlines():
+                        if text.strip():
+                            lines.append(self.condition(text, where))
+                    lines.append('end')
+                elif test.tag not in ('output', 'clipto', 'description'):
+                    raise ConversionError('%s: <%s> is unsupported'
+                                          % (where, test.tag))
+            if component.find('delay') is not None:
+                raise ConversionError('%s: delays are unsupported' % where)
+        elif kind == 'pid':
+            if component.get('type', '') == 'standard':
+                raise ConversionError('%s: standard PIDs are unsupported' % where)
+            if component.find('pvdot') is not None:
+                raise ConversionError('%s: <pvdot> is unsupported' % where)
+            trigger = component.find('trigger')
+            if trigger is not None:
+                lines.append('trigger %s' % self.input(trigger.text))
+            for gain in ('kp', 'ki', 'kd'):
+                element = component.find(gain)
+                if element is not None:
+                    lines.append('%s %.17g' % (gain, float(element.text)))
+            ki = component.find('ki')
+            # JSBSim integrates by Adams-Bashforth 2 unless told otherwise.
+            integrator = 'none' if ki is None else {
+                'rect': 'rect', 'trap': 'trap', 'ab3': 'ab3'}.get(
+                    ki.get('type', ''), 'ab2')
+            lines.append('integrator %s' % integrator)
+        elif kind == 'fcs_function':
+            function = component.find('function')
+            self.function(body(function), lines, where)
+        else:
+            raise ConversionError('%s is unsupported' % where)
+        kind = {'aerosurface_scale': 'surface_scale',
+                'fcs_function': 'function'}.get(kind, kind)
+        self.blocks.append((kind, own, lines))
+        self.written.add(own)
+
+    def write(self, out, declared):
+        out.write('flight_controls\n')
+        # Signals blocks read that nothing writes and that the aircraft is
+        # not given: they hold zero, as JSBSim's do.
+        for name in declared + [n for n in self.read if n not in declared]:
+            if name not in self.written and not is_fixed(name):
+                out.write('  signal %s\n' % name)
+        for kind, name, lines in self.blocks:
+            out.write('  block %s %s\n' % (kind, name))
+            depth = 4
+            for line in lines:
+                if line == 'end':
+                    depth -= 2
+                out.write('%s%s\n' % (' ' * depth, line))
+                if line.startswith(('table ', 'test ')):
+                    depth += 2
+            out.write('  end\n')
+        out.write('end\n')
+
+
+def is_fixed(name):
+    """Whether `name` is a signal the aircraft is given."""
+    return (name in COMMANDS.values() or
+            name in (state for state, _ in STATE.values()))
+
+
 def convert_flight_controls(root, out):
     """Each component of each channel, in the order JSBSim runs them."""
     controls = root.find('flight_control')
     if controls is None:
         return
-    known = {}  # Properties the components set, by the signal that holds them.
-    blocks = []
+    blocks = FlightControls()
+    declared = []
+    for prop in controls.findall('property'):
+        if prop.get('value') not in (None, '0', '0.0'):
+            raise ConversionError('declared %s starts at a value' % prop.text)
+        declared.append(signal_name(prop.text.strip()))
     for channel in controls.findall('channel'):
         for component in channel:
-            kind = component.tag
-            name = component.get('name')
-            where = '%s %s' % (kind, name)
-            output_prop = component_property(name)
-            block = {'kind': kind, 'name': signal_name(output_prop),
-                     'inputs': [], 'lines': []}
-            for element in component.findall('input'):
-                text = element.text.strip()
-                sign = '-' if text.startswith('-') else ''
-                block['inputs'].append(sign + signal_name(text.lstrip('-')))
-            clip = component.find('clipto')
-            if clip is not None:
-                block['lines'].append('clip %.17g %.17g' % (
-                    float(clip.find('min').text), float(clip.find('max').text)))
-            extra = component.find('output')
-            if extra is not None:
-                block['lines'].append('output %s' % signal_name(extra.text.strip()))
-            if kind == 'summer':
-                bias = component.find('bias')
-                if bias is not None:
-                    block['lines'].append('bias %.17g' % float(bias.text))
-            elif kind in ('pure_gain', 'scheduled_gain', 'aerosurface_scale'):
-                gain = component.find('gain')
-                if gain is not None:
-                    block['lines'].append('gain %.17g' % float(gain.text))
-                if kind == 'aerosurface_scale':
-                    domain = bounds(component, 'domain') or (-1.0, 1.0)
-                    span = bounds(component, 'range')
-                    if span is None:
-                        raise ConversionError('%s has no range' % where)
-                    block['lines'].append('domain %.17g %.17g' % domain)
-                    block['lines'].append('range %.17g %.17g' % span)
-                    zero = component.find('zero_centered')
-                    centered = zero is None or zero.text.strip() not in ('0', 'false')
-                    block['lines'].append('zero_centered %d' % centered)
-                if kind == 'scheduled_gain':
-                    table = component.find('table')
-                    variables = table.findall('independentVar')
-                    if len(variables) != 1:
-                        raise ConversionError('%s: one variable only' % where)
-                    data = [float(x) for x in table.find('tableData').text.split()]
-                    block['table'] = (signal_name(variables[0].text.strip()), data)
-            elif kind == 'kinematic':
-                if component.find('noscale') is not None:
-                    block['lines'].append('scale 0')
-                for setting in component.find('traverse').findall('setting'):
-                    block['lines'].append('setting %.17g %.17g' % (
-                        float(setting.find('position').text),
-                        float(setting.find('time').text)))
-            else:
-                raise ConversionError('%s is unsupported' % where)
-            blocks.append(block)
-            known[output_prop] = block['name']
-
-    out.write('flight_controls\n')
-    for block in blocks:
-        kind = {'aerosurface_scale': 'surface_scale'}.get(block['kind'], block['kind'])
-        out.write('  block %s %s\n' % (kind, block['name']))
-        for name in block['inputs']:
-            out.write('    input %s\n' % name)
-        for line in block['lines']:
-            out.write('    %s\n' % line)
-        if 'table' in block:
-            variable, data = block['table']
-            out.write('    table %s\n' % variable)
-            for x, y in zip(data[0::2], data[1::2]):
-                out.write('      %.17g %.17g\n' % (x, y))
-            out.write('    end\n')
-        out.write('  end\n')
-    out.write('end\n')
+            blocks.add(component)
+    blocks.write(out, declared)
 
 
 def convert_engine(engine, engine_directory, out):
@@ -508,8 +709,13 @@ def convert_engine(engine, engine_directory, out):
     angles = [number(orient, axis, 0.0) for axis in ['roll', 'pitch', 'yaw']]
     if any(angles):
         raise ConversionError('tilted thrusters are unsupported')
-    if int(number(turbine, 'augmented', 0)) or int(number(turbine, 'injected', 0)):
-        raise ConversionError('augmented or injected turbines are unsupported')
+    if int(number(turbine, 'injected', 0)):
+        raise ConversionError('injected turbines are unsupported')
+    augmented = int(number(turbine, 'augmented', 0))
+    method = int(number(turbine, 'augmethod', 0))
+    if augmented and method != 2:
+        raise ConversionError('only reheat by throttle (augmethod 2) is '
+                              'supported')
 
     out.write('# Engine %s, from JSBSim\'s %s, by %s.\n' % (
         turbine.get('name'), os.path.basename(path), engine_provenance(path)))
@@ -522,6 +728,11 @@ def convert_engine(engine, engine_directory, out):
     out.write('  thrust_specific_fuel_consumption %.17g\n' % (
         number(turbine, 'tsfc') * LBM / 3600.0 / LBF))
     out.write('  bleed %.17g\n' % number(turbine, 'bleed', 0.0))
+    if augmented:
+        # Throttle past 1 lights the reheat, which is full at 2.
+        out.write('  max_thrust %.17g\n' % (number(turbine, 'maxthrust') * LBF))
+        out.write('  reheat_thrust_specific_fuel_consumption %.17g\n' % (
+            number(turbine, 'atsfc') * LBM / 3600.0 / LBF))
     for key, name in [('idlen1', 'idle_n1'), ('idlen2', 'idle_n2'),
                       ('maxn1', 'max_n1'), ('maxn2', 'max_n2')]:
         out.write('  %s %.17g\n' % (name, number(turbine, key)))
@@ -535,8 +746,10 @@ def convert_engine(engine, engine_directory, out):
                          ('n2_spool_up', 1.0), ('n2_spool_down', 3.0)]:
         out.write('  %s %.17g\n' % (name, factor * spool))
     for function in turbine.findall('function'):
-        name = {'IdleThrust': 'idle_thrust', 'MilThrust': 'military_thrust_factor'}.get(
-            function.get('name'))
+        name = {'IdleThrust': 'idle_thrust', 'MilThrust': 'military_thrust_factor',
+                'AugThrust': 'max_thrust_factor'}.get(function.get('name'))
+        if name == 'max_thrust_factor' and not augmented:
+            continue
         if name is None:
             raise ConversionError('turbine function %s is unsupported' % function.get('name'))
         out.write('  %s\n' % name)

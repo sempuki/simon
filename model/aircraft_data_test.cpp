@@ -109,6 +109,64 @@ end
     CHECK_THAT(drag[0](inputs), WithinAbs(3.0 * -0.5 * 0.5, 1e-12));
   }
 
+  SECTION("ShouldReadSwitchesPidsAndFunctionsGivenTheirEntries") {
+    std::string text = GLIDER;
+    text.replace(text.find("term lift"), 0, R"(flight_controls
+  signal override
+  block switch pick
+    default 0.5
+    test or -alpha
+      condition mach gt 0.9
+      condition override eq 1
+    end
+  end
+  block pid hold
+    input pick 2
+    trigger override
+    kp 3
+    ki 0.5
+    integrator trap
+  end
+  block function product
+    push alpha
+    cos
+    constant 2
+    product 2
+  end
+end
+)");
+    auto data = parse_aircraft(text);
+    REQUIRE(data);
+    const FlightControlData& controls = data->flight_controls;
+    REQUIRE(controls.blocks.size() == 3);
+    const FlightBlock& pick = controls.blocks[0];
+    REQUIRE(pick.tests.size() == 1);
+    CHECK(pick.tests[0].any);
+    CHECK(pick.tests[0].value.input->negated);
+    CHECK(pick.tests[0].conditions.size() == 2);
+    CHECK(pick.fallback.value == 0.5);
+    const FlightBlock& hold = controls.blocks[1];
+    CHECK(hold.inputs[0].scale == 2.0);
+    CHECK(hold.integrator == FlightBlock::Integrator::TRAPEZOIDAL);
+    CHECK(controls.signals[hold.state] == "hold/integral");
+    CHECK(controls.blocks[2].operations.size() == 4);
+  }
+
+  SECTION("ShouldRefuseGivenFunctionThatLeavesTwoValues") {
+    std::string text = GLIDER;
+    text.replace(text.find("term lift"), 0, R"(flight_controls
+  block function both
+    push alpha
+    push beta
+  end
+end
+)");
+    auto data = parse_aircraft(text);
+    REQUIRE_FALSE(data);
+    CHECK_THAT(std::string{data.error().message()},
+               ContainsSubstring("leave one value"));
+  }
+
   SECTION("ShouldSayWhereGivenUnknownVariable") {
     std::string text = GLIDER;
     text.replace(text.find("factor dynamic_pressure"), 23, "factor wind");

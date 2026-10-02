@@ -22,7 +22,8 @@
 // Shared by the flight tests.
 namespace simon::flight::testing {
 
-inline constexpr char AIRCRAFT[] = "application/flight/aircraft/737.aircraft";
+inline constexpr char BOEING_737[] = "application/flight/aircraft/737.aircraft";
+inline constexpr char F16[] = "application/flight/aircraft/f16.aircraft";
 
 // One row of a recording, as columns by name.
 using Row = std::map<std::string, double, std::less<>>;

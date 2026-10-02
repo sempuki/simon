@@ -42,7 +42,7 @@ auto column(const char* name, int engine) -> std::string {
 }  // namespace
 
 TEST_CASE("Turbine737") {
-  auto aircraft = load_aircraft(AIRCRAFT);
+  auto aircraft = load_aircraft(BOEING_737);
   REQUIRE(aircraft);
   REQUIRE(aircraft->engines.size() == 2);
   std::vector<Row> rows = load_rows(REFERENCE);

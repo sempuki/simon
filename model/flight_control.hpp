@@ -40,6 +40,10 @@ enum class FlightSignal : std::uint8_t {
   PITCH_TRIM_COMMAND,
   ROLL_TRIM_COMMAND,
   YAW_TRIM_COMMAND,
+  THROTTLE_COMMAND_0,  // Each engine's, from 0 to 1.
+  THROTTLE_COMMAND_1,
+  THROTTLE_COMMAND_2,
+  THROTTLE_COMMAND_3,
   // State, read at the step's start.
   MACH,
   ROLL_RATE,  // Relative to the air, rad/s.
@@ -47,6 +51,15 @@ enum class FlightSignal : std::uint8_t {
   YAW_RATE,
   ALPHA,  // rad.
   BETA,
+  CALIBRATED_AIRSPEED,  // m/s.
+  GROUND_SPEED,         // Over the ground, horizontally.
+  BODY_VELOCITY_X,      // Along body axes.
+  BODY_VELOCITY_Y,
+  PITCH,  // Euler angles from the local north-east-down frame, rad.
+  ROLL,
+  PILOT_ACCELERATION_Y,  // At the pilot, along body axes, less gravity, in g.
+  PILOT_ACCELERATION_Z,
+  WEIGHT_ON_WHEELS,  // Always 0: the aircraft is always flying.
   COUNT,
 };
 
@@ -54,7 +67,10 @@ inline constexpr std::size_t FLIGHT_SIGNAL_COUNT =
     static_cast<std::size_t>(FlightSignal::COUNT);
 
 // The most signals an aircraft may have, its blocks' included.
-inline constexpr std::size_t MAX_FLIGHT_SIGNALS = 64;
+inline constexpr std::size_t MAX_FLIGHT_SIGNALS = 128;
+
+// The most values a function block's operations hold at once.
+inline constexpr std::size_t FUNCTION_STACK_SIZE = 16;
 
 // The fixed signal `name` names, if any, and the name of each.
 auto flight_signal_named(std::string_view name) -> std::optional<FlightSignal>;
@@ -86,10 +102,22 @@ struct FlightSignals final {
 //                  separately, times `gain`
 //   KINEMATIC      moves toward its input, scaled by the last detent unless
 //                  `scale` is off, through `detents`, taking
-//                  `times[i]` to go from detent i - 1 to detent i
+//                  `times[i]` to go from detent i - 1 to detent i; it moves
+//                  from its output, if it has one, which another block may
+//                  have written
+//   SWITCH         the value of the first of `tests` whose conditions hold,
+//                  or `fallback` if none does
+//   PID            `kp` times its input, plus its integral, plus `kd` times
+//                  its input's rate; the integral grows by `ki` times the
+//                  input, integrated by `integrator`, only while `trigger`
+//                  is zero, and resets while `trigger` is negative
+//   FUNCTION       `operations` run on a stack, the last one's result
 //
 // Then the output is clipped to `clip`, if there is one, and written to the
-// block's own signal and to `output`, if it has one.
+// block's own signal and, times `output_scale`, to `output`, if it has one.
+//
+// A block works in its JSBSim aircraft's units. Signals are in SI, so an
+// input whose units differ has a `scale` that converts it back.
 struct FlightBlock final {
   enum class Kind : std::uint8_t {
     SUMMER,
@@ -97,11 +125,67 @@ struct FlightBlock final {
     SCHEDULED_GAIN,
     SURFACE_SCALE,
     KINEMATIC,
+    SWITCH,
+    PID,
+    FUNCTION,
   };
 
   struct Input final {
     std::size_t signal = 0;
     bool negated = false;
+    double scale = 1.0;
+  };
+
+  // A constant, or an input.
+  struct Operand final {
+    double value = 0.0;
+    std::optional<Input> input;
+  };
+
+  // A signal compared with an operand, both in SI.
+  struct Condition final {
+    enum class Comparison : std::uint8_t { LT, LE, GT, GE, EQ, NE };
+
+    std::size_t signal = 0;
+    Comparison comparison = Comparison::EQ;
+    Operand right;
+  };
+
+  // Holds if all its conditions do, or if `any`, if one does.
+  struct Test final {
+    bool any = false;
+    Operand value;
+    std::vector<Condition> conditions;
+  };
+
+  enum class Integrator : std::uint8_t {
+    NONE,
+    RECTANGULAR,
+    TRAPEZOIDAL,
+    ADAMS_BASHFORTH_2,
+    ADAMS_BASHFORTH_3,
+  };
+
+  // One step of a function: push an input or a constant, or replace the top
+  // `count` values, or the top one or two, with their result.
+  struct Operation final {
+    enum class Kind : std::uint8_t {
+      PUSH,
+      CONSTANT,
+      SUM,
+      PRODUCT,
+      DIFFERENCE,
+      QUOTIENT,
+      SIN,
+      COS,
+      TAN,
+      ABS,
+    };
+
+    Kind kind = Kind::PUSH;
+    Input input;
+    double value = 0.0;
+    std::size_t count = 0;
   };
 
   Kind kind = Kind::SUMMER;
@@ -109,6 +193,7 @@ struct FlightBlock final {
   std::size_t signal = 0;  // Its own.
   std::vector<Input> inputs;
   std::optional<std::size_t> output;
+  double output_scale = 1.0;
   std::optional<std::pair<double, double>> clip;
 
   double bias = 0.0;
@@ -121,6 +206,20 @@ struct FlightBlock final {
   std::vector<double> times;
   bool zero_centered = true;
   bool scale = true;
+
+  Operand fallback;
+  std::vector<Test> tests;
+
+  std::optional<Input> trigger;
+  double kp = 0.0;
+  double ki = 0.0;
+  double kd = 0.0;
+  Integrator integrator = Integrator::NONE;
+  // The first of three signals that hold its state: the integral, and its
+  // input one and two steps before.
+  std::size_t state = 0;
+
+  std::vector<Operation> operations;
 };
 
 struct FlightControlData final {

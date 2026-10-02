@@ -196,7 +196,7 @@ auto apart(const std::vector<RigidBody>& a, const std::vector<RigidBody>& b)
 }  // namespace
 
 TEST_CASE("CheckCases737") {
-  auto data = model::load_aircraft(AIRCRAFT);
+  auto data = model::load_aircraft(BOEING_737);
   REQUIRE(data);
   std::vector<Row> initial = load_rows(INITIAL);
   REQUIRE(initial.size() == 1);

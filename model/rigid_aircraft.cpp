@@ -241,6 +241,11 @@ auto compute_mass_balance(const AircraftData& aircraft,
   double empty = aircraft.empty_mass.numerical_value_in(kilogram);
   double total = empty;
   Vector3 moment = empty * eigen(aircraft.empty_center_of_mass);
+  for (const PointMass& point : aircraft.point_masses) {
+    double mass = point.mass.numerical_value_in(kilogram);
+    total += mass;
+    moment += mass * eigen(point.location);
+  }
   for (std::size_t i = 0; i < contents.size(); ++i) {
     double fuel = contents[i].numerical_value_in(kilogram);
     total += fuel;
@@ -255,6 +260,10 @@ auto compute_mass_balance(const AircraftData& aircraft,
       j[4], j[5], j[2];
   inertia += point_inertia(
       empty, eigen(body_offset(aircraft.empty_center_of_mass, center)));
+  for (const PointMass& point : aircraft.point_masses) {
+    inertia += point_inertia(point.mass.numerical_value_in(kilogram),
+                             eigen(body_offset(point.location, center)));
+  }
   for (std::size_t i = 0; i < contents.size(); ++i) {
     inertia +=
         point_inertia(contents[i].numerical_value_in(kilogram),
