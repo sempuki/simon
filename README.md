@@ -94,8 +94,8 @@ bazel test //application/flight:check_case_test   # about 3 minutes
 ### It flies the 737 through its flight controls
 
 The 737's flight controls are JSBSim's model of the airliner's, converted
-block for block. They move the surfaces where the pilot's controls and trims put them,
-with one loop, a yaw damper:
+block for block. They move the surfaces where the pilot's controls and trims
+put them, with one loop, a yaw damper:
 
 | Channel | What the controls do |
 |---|---|
