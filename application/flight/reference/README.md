@@ -12,4 +12,5 @@ need JSBSim's Python package (`pip install jsbsim numpy`).
 |---|---|---|
 | `jsbsim_737.py` | The 737's path and the point-mass controls that fly it | `accuracy_test` |
 | `jsbsim_737_aero.py` | The 737's aerodynamic loads at recorded states | `aero_test` |
-| `jsbsim_737_rigid_body.py` | The 737's equations of motion at recorded states | `rigid_body_test` |
+| `jsbsim_737_rigid_body.py` | The 737's equations of motion, air data and mass balance at recorded states | `rigid_body_test` |
+| `jsbsim_737_turbine.py` | The 737's turbines, frame by frame through throttle changes | `turbine_test` |

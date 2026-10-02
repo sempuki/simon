@@ -100,6 +100,25 @@ cc_test(
     ],
 )
 
+# Checks the 737's converted turbines against JSBSim's, frame by frame.
+# reference/jsbsim_737_turbine.py regenerates the reference.
+cc_test(
+    name = "turbine_test",
+    size = "small",
+    srcs = ["turbine_test.cpp"],
+    copts = COPTS,
+    data = [
+        "aircraft/737.aircraft",
+        "reference/jsbsim_737_turbine.csv",
+    ],
+    deps = [
+        "//model:aircraft_data",
+        "//model:turbine",
+        "//model:units",
+        "@lib//base:testing",
+    ],
+)
+
 # Flies one scenario as fast as possible and prints what it did.
 cc_binary(
     name = "flight",

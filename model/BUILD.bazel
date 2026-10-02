@@ -133,6 +133,18 @@ cc_library(
 )
 
 cc_library(
+    name = "turbine",
+    srcs = ["turbine.cpp"],
+    hdrs = ["turbine.hpp"],
+    copts = COPTS,
+    deps = [
+        ":aerodynamics",
+        ":aircraft_data",
+        ":units",
+    ],
+)
+
+cc_library(
     name = "rigid_aircraft",
     srcs = ["rigid_aircraft.cpp"],
     hdrs = ["rigid_aircraft.hpp"],

@@ -39,6 +39,13 @@ struct TurbineData final {
   double idle_n2 = 0.0;
   double max_n1 = 0.0;
   double max_n2 = 0.0;
+  double idle_fuel_flow = 0.0;  // kg/s.
+  // How fast each spool speeds up and slows down at full speed at sea level,
+  // in percent per second.
+  double n1_spool_up = 0.0;
+  double n1_spool_down = 0.0;
+  double n2_spool_up = 0.0;
+  double n2_spool_down = 0.0;
   std::optional<AeroTable> idle_thrust;
   std::optional<AeroTable> military_thrust_factor;
 };

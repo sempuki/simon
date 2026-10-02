@@ -34,6 +34,11 @@ engine turbine CFM56
   idle_n2 60
   max_n1 100
   max_n2 100
+  idle_fuel_flow 0.097713150597679085
+  n1_spool_up 10.112359550561797
+  n1_spool_down 24.26966292134831
+  n2_spool_up 10.112359550561797
+  n2_spool_down 30.337078651685388
   idle_thrust
     table mach density_altitude
       columns -3048 0 3048 6096 9144 12192 15240 18288
@@ -68,6 +73,11 @@ engine turbine CFM56
   idle_n2 60
   max_n1 100
   max_n2 100
+  idle_fuel_flow 0.097713150597679085
+  n1_spool_up 10.112359550561797
+  n1_spool_down 24.26966292134831
+  n2_spool_up 10.112359550561797
+  n2_spool_down 30.337078651685388
   idle_thrust
     table mach density_altitude
       columns -3048 0 3048 6096 9144 12192 15240 18288

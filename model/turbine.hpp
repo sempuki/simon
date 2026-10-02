@@ -1,0 +1,44 @@
+// Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+
+#pragma once
+
+#include "model/aircraft_data.hpp"
+#include "model/units.hpp"
+
+// A running turbine, as JSBSim models one (FGTurbine; see
+// model/REFERENCES.md): its spools turn toward speeds the throttle sets, at
+// rates that fall as they slow and as the air thins, and its thrust runs from
+// idle to military as the core spool's speed above idle, squared. Fuel flows
+// at the thrust times a specific consumption that rises at part power and
+// with temperature, at least the idle flow, and following its target at
+// limited rates.
+//
+// Thrust is held for a step, as JSBSim holds it for a frame. Starting,
+// stalling, reheat and water injection are left out.
+namespace simon::model {
+
+// The air a turbine breathes.
+struct EngineAir final {
+  double mach = 0.0;
+  Length density_altitude = 0.0 * meter;
+  double density_ratio = 1.0;  // To the standard sea level's.
+  Temperature temperature = units::delta<kelvin>(288.15);
+};
+
+struct TurbineState final {
+  double n1 = 0.0;         // Fan speed, percent.
+  double n2 = 0.0;         // Core speed, percent.
+  double fuel_flow = 0.0;  // kg/s.
+  Force thrust = 0.0 * newton;
+};
+
+// A turbine settled at `throttle` (from 0 to 1) in `air`.
+auto steady_turbine(const TurbineData& turbine, double throttle,
+                    const EngineAir& air) -> TurbineState;
+
+// `state` advanced by `dt` at `throttle` in `air`.
+auto run_turbine(const TurbineData& turbine, const TurbineState& state,
+                 double throttle, const EngineAir& air, Time dt)
+    -> TurbineState;
+
+}  // namespace simon::model

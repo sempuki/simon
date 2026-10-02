@@ -359,6 +359,15 @@ def convert_engine(engine, engine_directory, out):
     for key, name in [('idlen1', 'idle_n1'), ('idlen2', 'idle_n2'),
                       ('maxn1', 'max_n1'), ('maxn2', 'max_n2')]:
         out.write('  %s %.17g\n' % (name, number(turbine, key)))
+    # JSBSim estimates what the file leaves out: the idle fuel flow from the
+    # military thrust, in pounds per hour, and how fast the spools turn, in
+    # percent per second, from the bypass ratio (FGTurbine).
+    military = number(turbine, 'milthrust')
+    out.write('  idle_fuel_flow %.17g\n' % (military**0.2 * 107.0 * LBM / 3600.0))
+    spool = 90.0 / (number(turbine, 'bypassratio', 0.0) + 3.0)
+    for name, factor in [('n1_spool_up', 1.0), ('n1_spool_down', 2.4),
+                         ('n2_spool_up', 1.0), ('n2_spool_down', 3.0)]:
+        out.write('  %s %.17g\n' % (name, factor * spool))
     for function in turbine.findall('function'):
         name = {'IdleThrust': 'idle_thrust', 'MilThrust': 'military_thrust_factor'}.get(
             function.get('name'))

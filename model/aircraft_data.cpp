@@ -389,6 +389,16 @@ class Parser final {
         read = scalar(turbine.max_n1);
       } else if (key == "max_n2") {
         read = scalar(turbine.max_n2);
+      } else if (key == "idle_fuel_flow") {
+        read = scalar(turbine.idle_fuel_flow);
+      } else if (key == "n1_spool_up") {
+        read = scalar(turbine.n1_spool_up);
+      } else if (key == "n1_spool_down") {
+        read = scalar(turbine.n1_spool_down);
+      } else if (key == "n2_spool_up") {
+        read = scalar(turbine.n2_spool_up);
+      } else if (key == "n2_spool_down") {
+        read = scalar(turbine.n2_spool_down);
       } else if (key == "idle_thrust" || key == "military_thrust_factor") {
         ++at_;
         if (done() || line().words[0] != "table") {
