@@ -12,8 +12,7 @@
 //               sibling: it sits in the archetype's segment of its store, at
 //               the entity's own local index.
 //   handle      plain arrays, and a pointer to the sibling resolved when the
-//               entity was built (the older simulator's handle, without its
-//               upkeep).
+//               entity was built.
 //   structural  plain arrays walked together.
 //   baseline    the driving component alone, with no sibling.
 //

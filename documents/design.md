@@ -312,9 +312,8 @@ dying, so the dense store wins. Run the benchmark with
 A system walks its driving component and reaches each entity's siblings (see
 [Terminology](#terminology)) through `maybe_component_of`. Siblings the
 archetype requires are the common case, since a drone's `Control` exists for
-as long as its `Kinematics` does. The older simulator's handles resolved such a
-sibling once, at creation. The store before segments looked it up on every
-step.
+as long as its `Kinematics` does. A handle resolves such a sibling once, at
+creation; a lookup by entity finds it every step.
 
 `framework/system_benchmark.cpp` measures that lookup against a handle (a
 pointer resolved at creation) and against "structural" access, where both
@@ -410,8 +409,7 @@ What each layout taught:
 
 Locality comes from correlations the world already knows. Components present
 together are declared by an archetype's `Requires`. Components read together
-are declared by each `System<Driving, Others...>`. The older simulator's
-handles modeled the same dependency at creation. Segments use the archetype
+are declared by each `System<Driving, Others...>`. Segments use the archetype
 directly:
 
 ```
@@ -481,7 +479,7 @@ has more fixed cost than an array. It now collects the step's blasts once in
 
 ### Handles and references
 
-A handle has three duties, carried over from the older simulator:
+A handle has three duties:
 
 1. Hide indices and addresses from the component programmer.
 2. Never allow a memory error.
@@ -504,16 +502,14 @@ Raw pointers or references returned by `maybe_component_of` or
 `component_of` are only valid until the next
 sync point. Systems must not keep them across steps.
 
-Nothing registers handles or patches them. The older simulator's self-patching
-handle met the same three duties, but every copy made a virtual call and a hash
-insert to follow objects that reallocation had moved. Fixed capacity removes
-the reallocation, and the generation check replaces the patching.
+Nothing registers handles or patches them. Stores have fixed capacity, so a
+component never moves, and the generation check catches a handle to an entity
+that is gone.
 
-The older handle also made a structural sibling, such as a drone's `Control`,
-free to reach on every step. Archetype segments (see
-[Sibling components](#sibling-components)) recover that without a handle: a
-component the archetype requires sits at the entity's own index in the
-sibling's store.
+Archetype segments (see [Sibling components](#sibling-components)) make a
+structural sibling, such as a drone's `Control`, free to reach on every step
+without a handle: a component the archetype requires sits at the entity's own
+index in the sibling's store.
 
 ### Names, identities and aliases
 
@@ -602,11 +598,8 @@ world.query<const Kinematics, const Team>()
 
 A query iterates the smallest store in the set and looks up the rest.
 
-The older simulator also let code ask for a named thing before it existed and
-get a callback when it appeared. That needed the `DependencyTracker`, about
-750 lines of string-keyed tables with callbacks that could not be unregistered.
-It existed because scenarios were parsed in arbitrary order. simon replaces it
-with two simpler rules:
+Code never asks for a named thing before it exists, so nothing waits on a
+callback for one to appear. Two rules make that hold:
 
 - **Scenario loading is two-phase.** Create every named entity first, then
   resolve references by name.
@@ -984,8 +977,7 @@ Rules:
   operator takes it. Time is not world data, so it is not in `ProjectedWorld`.
 - **Optional stages** (`prepare(world[, step])` before the main loop,
   `resolve(world[, step])` after it) are detected at compile time and cost
-  nothing when absent. The older simulator did the same with stage tags. A
-  prepare that returns false skips the loop and resolve with it: resolve is
+  nothing when absent. A prepare that returns false skips the loop and resolve with it: resolve is
   the loop's post-processing, and work a step needs regardless belongs in
   prepare. Pre- and post-processing belong in one system's stages when they
   work on exactly the data the loop does, or must always run just before or
@@ -1181,9 +1173,8 @@ using MissileSystems = SystemList<Sensing, ProposeEngagements, ResolveEngagement
   type. This recovers the discoverability a type list otherwise costs.
 - **Sub-schedules can be tested alone** against a small world.
 
-The older simulator also fixed order by template arguments, but kept the
-dependencies that justified the order in comments. simon keeps the type list
-and makes the dependencies part of the type.
+The order is the type list, and the dependencies that justify it are part of
+the system types, so the compiler checks them.
 
 ### The world
 
@@ -1950,8 +1941,8 @@ otherwise:
   contains one of its period boundaries. Steps are half-open, `[time,
   time + dt)`.
 - `Firing::elapsed` is the time since the gate last fired (zero the first
-  time), never the driver's `dt`. The older simulator's `PeriodicStep` passed
-  the driver's `dt`, which was wrong for any gated work.
+  time), never the driver's `dt`: gated work needs the time since it last
+  ran.
 - The catch-up policy is explicit. `CatchUp::SKIP` fires once and drops missed
   periods. `CatchUp::EVERY` fires once and reports, in `Firing::periods`, how
   many periods fell in the step, so the work can run once per period.
@@ -2789,36 +2780,3 @@ interop.
   (8,333,333.3 ns) is not exact, and rate ratios such as 120 to 40 Hz drift.
   Rates that divide 10^9 (100, 125, 200, 250, 500 Hz) are exact. Whether to
   support others with a rational step is undecided.
-
-## Lessons from the older simulator
-
-simon takes ideas from an older simulator its author wrote. What we kept:
-
-- Plain-data components, and physics as free functions testable without the
-  ECS.
-- Computes as template functors with optional stages, so the hot path inlines.
-- Execution order fixed by a type list.
-- `(time, step)` passed explicitly, with no global clock.
-- A driver that owns time, around a simulation that only steps.
-- Rate gates as values inside components.
-- An event queue for rare events only.
-- Sensors as entities with their own pose.
-- Strongly typed internal IDs, kept separate from external IDs.
-- Names as typed magic numbers, so everything can be debugged.
-- Builders as the type-safe, user-friendly way to ask for specific things,
-  hiding type details without losing them.
-
-What we changed, and why:
-
-| Old | New | Why |
-|---|---|---|
-| Self-patching handles registered with their pool | Generation-checked `Entity` handles and fixed-capacity stores | Same three duties. Every old handle copy made a virtual call and a hash insert, only to track reallocation. |
-| Pools with holes, iterated through a rebuilt `vector<T*>` | Dense stores iterated directly | Holes and pointer chasing defeat the cache the architecture exists to use. |
-| Components with vtables, and entities holding a hash map of components | Plain structs, and entities that are only IDs | Idiomatic ECS. The entity map needed a hash lookup and a `dynamic_cast` per access. |
-| `DependencyTracker` with deferred callbacks | Two-phase loading, lookup by name at use time, and an `EntityCreated` event | Deferred resolution existed only because of arbitrary construction order. |
-| Identities drawn from static counters | Identities owned by the builder that creates the entity | Names become deterministic and traceable to their creator. |
-| Builders with several modes that built in the destructor and type-erased through `dynamic_cast` | One builder per request with an explicit, checked terminal call that emits typed commands | Keeps the builder as the user-facing language. Invalid utterances were only caught at runtime, and failures were only logged. |
-| Order by template arguments, dependencies in comments | Order by template arguments, dependencies declared in `System` types and checked | Keeps the compiler-fixed order and makes the dependencies checkable. |
-| One system per component type, with `ComputeNone` fillers | Systems that iterate any set of components; stores exist without a system | A store is data. It does not need a system to exist. |
-| Scenarios assembled from string paths into an external proto schema | Code-first scenarios now; scenario files with two-phase loading later | Removes about 45 near-identical attach functions. |
-| Multi-process state machines and liveness inside the engine | A small lifecycle enum and `advance_to` in the framework; transport outside it | Keeps what every simulator needs and leaves deployment concerns at the edge. |
