@@ -56,6 +56,25 @@ cc_test(
     ],
 )
 
+# Checks the 737's converted aerodynamics against JSBSim's at recorded
+# states. reference/jsbsim_737_aero.py regenerates the reference.
+cc_test(
+    name = "aero_test",
+    size = "small",
+    srcs = ["aero_test.cpp"],
+    copts = COPTS,
+    data = [
+        "aircraft/737.aircraft",
+        "reference/jsbsim_737_aero.csv",
+    ],
+    deps = [
+        "//model:aerodynamics",
+        "//model:aircraft_data",
+        "//model:units",
+        "@lib//base:testing",
+    ],
+)
+
 # Flies one scenario as fast as possible and prints what it did.
 cc_binary(
     name = "flight",

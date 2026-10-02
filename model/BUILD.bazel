@@ -88,6 +88,29 @@ cc_library(
 )
 
 cc_library(
+    name = "aerodynamics",
+    srcs = ["aerodynamics.cpp"],
+    hdrs = ["aerodynamics.hpp"],
+    copts = COPTS,
+    deps = [
+        ":control",
+        ":units",
+    ],
+)
+
+cc_library(
+    name = "aircraft_data",
+    srcs = ["aircraft_data.cpp"],
+    hdrs = ["aircraft_data.hpp"],
+    copts = COPTS,
+    deps = [
+        ":aerodynamics",
+        ":units",
+        "@lib//base:status",
+    ],
+)
+
+cc_library(
     name = "flight_path",
     hdrs = ["flight_path.hpp"],
     copts = COPTS,
@@ -116,6 +139,8 @@ cc_library(
         "@lib//base:testing",
     ],
 ) for test in [
+    "aerodynamics",
+    "aircraft_data",
     "atmosphere",
     "control",
     "flight_path",

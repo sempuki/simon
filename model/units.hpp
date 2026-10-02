@@ -109,6 +109,7 @@ inline constexpr auto radian = units::si::radian;
 inline constexpr auto radian_per_second = radian / second;
 inline constexpr auto kilogram = units::si::kilogram;
 inline constexpr auto newton = units::si::newton;
+inline constexpr auto newton_meter = newton * meter;
 inline constexpr auto square_meter = units::square(meter);
 inline constexpr auto kilogram_per_cubic_meter = kilogram / units::cubic(meter);
 inline constexpr auto kelvin = units::si::kelvin;
@@ -135,6 +136,8 @@ using Pressure = units::quantity<pascal, double>;
 using Displacement = units::quantity<meter, Vector3d>;
 using Velocity = units::quantity<meter_per_second, Vector3d>;
 using Acceleration = units::quantity<meter_per_second_squared, Vector3d>;
+using ForceVector = units::quantity<newton, Vector3d>;
+using Moment = units::quantity<newton_meter, Vector3d>;
 
 // Positions are displacements from the world origin, the origin of the local
 // Cartesian frame.
