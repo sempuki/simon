@@ -91,6 +91,37 @@ throttle step.
 bazel test //application/flight:check_case_test   # about 3 minutes
 ```
 
+### It flies the F-16 through its fly-by-wire
+
+The F-16's flight controls are JSBSim's model of its fly-by-wire, converted
+block for block. The pilot's stick and rudder command rates and load, and the
+controls close the loops:
+
+| Channel | Loop |
+|---|---|
+| Roll | A PID on the commanded roll rate less the aircraft's |
+| Pitch | A PID on the commanded pitch rate and load factor, the stick's nose-down travel limited to 44% for 9 g up and 4 g down, and its authority falling to zero at 30° angle of attack |
+| Yaw | A PID on the commanded yaw rate and the pilot's lateral acceleration |
+| Flaps | Leading-edge flaps by angle of attack and Mach, trailing-edge flaps below 250 kt |
+| Speedbrake | Out when commanded, or above 53° angle of attack with little sideways velocity |
+| Throttle | Doubled, so the second half of its travel lights the reheat |
+
+That is 60 blocks: summers, gains, scheduled gains, surface scales and
+actuators, with 11 switches, 3 PIDs and a function. The controls read the
+state a real flight control computer senses: calibrated airspeed, by JSBSim's
+pitot formulas, ground speed, body velocity, attitude, and the accelerations
+the pilot feels at the eye point. The flight controls run at a fixed 8 ms, as
+a digital flight control computer does, whatever step the dynamics take.
+
+Replayed through three recorded flights, every block's output agrees with
+JSBSim's to 2e-16 on every frame. The flights cruise while the stick, rudder
+and throttle sweep, pull to high angle of attack below 250 kt, and fly
+supersonic.
+
+```sh
+bazel test //application/flight:flight_control_test
+```
+
 ### It trims its own aircraft
 
 simon finds its own trim. Angle of attack, throttle, pitch trim, bank, aileron
