@@ -2417,13 +2417,14 @@ aircraft's XML into simon's aircraft format, in SI units, and
 `model/aircraft_data` reads it back, refusing bad files with the line at
 fault. A converted aircraft holds its metrics, mass balance, fuel tanks,
 turbines, flight control system and aerodynamics. The 737 is
-`application/flight/aircraft/737.aircraft`.
+`application/flight/aircraft/737.aircraft`, and the F-16 is `f16.aircraft`
+beside it (see [The F-16](#the-f-16)).
 
 | Layer | Holds |
 |---|---|
 | `model/aerodynamics` | The coefficient build-up: terms of a constant, inputs and tables of inputs, summed by axis, and turned into body loads about the center of mass. An input is a state variable or a flight control signal, such as a surface's deflection, so an aircraft's surfaces need no code |
-| `model/flight_control` | Flight control blocks over named signals: summers, gains, scheduled gains, surface scales and kinematic actuators |
-| `model/turbine` | JSBSim's turbine: spools, thrust from idle to military, fuel flow |
+| `model/flight_control` | Flight control blocks over named signals: summers, gains, scheduled gains, surface scales, kinematic actuators, switches, PIDs and functions |
+| `model/turbine` | JSBSim's turbine: spools, thrust from idle to military and through reheat to maximum, fuel flow |
 | `model/earth` | The WGS84 ellipsoid, J2 gravitation, the Earth's rotation, geodetic conversion |
 | `model/rigid_body` | Stevens and Lewis's equations of motion in an inertial frame, as a `ContinuousState` |
 | `model/rigid_aircraft` | The flat or round Earth, air data, mass balance, engines and fuel, and the body's rate |
@@ -2432,7 +2433,10 @@ turbines, flight control system and aerodynamics. The 737 is
 Each step a rigid aircraft runs `RunFlightControls`, `RunEngines`, then
 `Rigid` (Runge-Kutta 4 over `RigidAircraftRates`), then `BurnFuel` and
 `FollowRigidBody`, which keeps its `AirState` on its body for the rest of
-the world. The Earth is flat unless the systems are built with a round
+the world. `RunFlightControls` runs every step, or at a fixed period if it is
+given one, as a digital flight control computer runs at its own rate. Each
+engine's throttle is a flight control signal, `throttle_<n>`, set from its
+command before the blocks run, as JSBSim sets it, so a block may change it. The Earth is flat unless the systems are built with a round
 one; round, the inertial frame is ECI and the world's local frame is the
 plane tangent to the ellipsoid at an origin.
 
@@ -2508,6 +2512,90 @@ everything read after a frame belongs together; its mass balance runs
 before its engines burn; its `inertia/ixy` and `iyz` properties are the
 tensor's elements negated but `ixz` is not; and its kinematic actuators keep
 the frame time the model loaded with.
+
+#### The F-16
+
+JSBSim's F-16 shows that the converter and the models were not fitted to
+the 737. The same code converts it, and the same tests check it. It brings
+what the 737 lacks:
+
+- **Fly-by-wire flight controls.** They close loops on roll rate, on pitch
+  rate and load factor, and on yaw rate and lateral acceleration, through
+  three PIDs, eleven switches and a function. `model/flight_control` gains those three
+  kinds of block.
+- **Reheat.** A throttle past 1 lights it, and the flight controls double
+  the pilot's throttle, so half throttle is military power.
+- **A pilot.** The pilot is a point mass in the mass balance, and the flight
+  controls feel the pilot's accelerations at the eye point.
+
+The aerodynamics read flight control signals by name, so the F-16's
+surfaces (combined aileron, leading-edge flaps, flaperons, speedbrake) are
+data and need no code. The converter maps JSBSim's built-in surfaces:
+`-rad` and `-deg` to the deflection in radians, `-norm` to
+`<surface>_norm`, and `mag-` to `|surface|`, the magnitude. A block works in
+the aircraft's own units, and where a signal it reads or writes is in other
+units, such as knots or degrees, the converter gives it a scale, and turns
+the numbers a switch compares into SI. Ground contacts, the hook, pushback
+and the canopy are left out: weight on wheels is always 0.
+
+The flight controls read the state they need, which `sense_flight_state`
+finds: air data, calibrated airspeed by JSBSim's pitot formulas, ground
+speed, body velocity, attitude, and the pilot's accelerations. An aircraft
+finds only what its flight controls read, so the 737 pays nothing for the
+F-16's. The pilot's accelerations come from the step before:
+`RigidAircraftRates` keeps what each body feels at every stage, and the last
+stage's is left after `Rigid`. A step's own would need the surfaces the
+flight controls are about to set. JSBSim's flight controls read the frame
+before's air data and accelerations two frames old.
+
+Matching JSBSim's flight controls block by block turned up two of its
+behaviors. A kinematic block with an output starts each frame from the
+output's value, and the F-16's yaw PID writes the rudder's position just
+before its actuator moves it. And JSBSim's trim runs the PIDs before it has
+an airspeed, so they integrate, and their integral cannot be read; the
+references zero it after the trim, as simon starts. The F-16's PID triggers
+hold their integrals in flight, so in flight its PIDs are proportional and
+derivative.
+
+Each layer agrees with JSBSim to rounding: the aerodynamics to 9e-15 at 300
+states up to Mach 1.36, every one of the 60 flight control blocks to 2e-16
+on every frame of three flights, the engine to 1e-13 through reheat and out,
+and the mass balance to JSBSim's rounded slug.
+
+The check cases need the flight controls at a fixed rate. The F-16's control
+laws differentiate the pilot's commands and then clip them, so at every
+frame they change with the frame, and JSBSim does not converge: after the
+roll doublet it moves 38 cm between 0.5 and 0.125 ms. A digital flight
+control computer runs at its own rate whatever the dynamics do, so the
+F-16's run every 8 ms in simon (`RunFlightControls` given a period) and in
+the reference, which flies JSBSim at 0.125 ms with each channel run every
+64th frame. The throttle's channel still runs every frame, because JSBSim
+sets the throttle to its command each frame before the channels run; its
+command changes only on the computer's frames, so that is the same. Every
+flight starts from JSBSim's trim at 8 ms: its trim at 0.125 ms comes to the
+same state, but its pitch trim differs by 6e-5, which alone moves the F-16
+10 cm in 30 s.
+
+The largest distance from JSBSim at 0.125 ms over 30 s:
+
+| Case | simon at 0.5 ms | simon at 8 ms | JSBSim at 8 ms |
+|---|---:|---:|---:|
+| Trim hold | 3.7 mm | 3.7 mm | 0.05 mm |
+| Pitch doublet | 2.1 mm | 2.1 mm | 1.5 cm |
+| Roll doublet | 5.6 cm | 5.6 cm | 3.53 m |
+| Rudder doublet | 3.7 mm | 3.7 mm | 0.8 mm |
+| Throttle step into reheat | 1.1 cm | 14.7 cm | 63.2 cm |
+
+- **simon has converged at 8 ms** in every case but the step into reheat,
+  where the engine's thrust, held for a step, is the error.
+- **The physics agrees to millimeters,** as the 737's does, and to 6 cm after
+  the roll doublet, where JSBSim has itself converged only to about 5 cm.
+- **At 8 ms simon is closer than JSBSim** after the roll doublet, by 63
+  times, and the throttle step, by 4 times. In the hold and the rudder
+  doublet JSBSim at 8 ms is closer, both being under simon's floor of 4 mm.
+
+Rigid aircraft cost what they did: 1.79 µs per aircraft-step flat and 2.86 µs
+round at 1,000, against 1.77 and 2.83 µs before.
 
 #### Mixed fidelity
 
@@ -2620,8 +2708,10 @@ Each step ends with a working application and passing tests.
      [Rigid aircraft](#rigid-aircraft)).
    - Done: every level in one world, rigid aircraft flying routes by a small
      surface autopilot (see [Mixed fidelity](#mixed-fidelity)).
-   - Next for rigid aircraft: a trim of simon's own, more JSBSim aircraft
-     and the flight control components they need, and many rigid aircraft
+   - Done: a second, very different aircraft, JSBSim's F-16, with
+     fly-by-wire flight controls and reheat, converted by the same code and
+     checked the same way (see [The F-16](#the-f-16)).
+   - Next for rigid aircraft: a trim of simon's own, and many rigid aircraft
      batched in one segment.
    - Later: Adams-Bashforth with rate history, many replicas of a scenario
      in one world, world snapshots, and trim tables computed offline. JSBSim,

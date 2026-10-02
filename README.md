@@ -10,32 +10,39 @@ simon is a framework for entity-component simulations. Its flight
 application shows that the framework can carry a flight simulator comparable
 to [JSBSim](https://github.com/JSBSim-Team/jsbsim), a widely used open-source
 flight dynamics model. The application's physics matches JSBSim's layer by
-layer, and one thread flies a hundred thousand aircraft at mixed fidelity.
+layer for two very different aircraft, a 737 airliner and an F-16 fighter,
+and one thread flies a hundred thousand aircraft at mixed fidelity.
 Each claim below names the command that checks it. Timings are GCC builds on
 one core of an AMD Ryzen 9 5900XT. The details are in
 [documents/design.md](documents/design.md#flight).
 
 ### The physics matches JSBSim
 
-An offline converter (`tools/jsbsim/convert.py`) turns JSBSim's 737 into
-simon's own aircraft format. The application rebuilds each layer of the
-aircraft, and each layer is tested against tables recorded from JSBSim:
+An offline converter (`tools/jsbsim/convert.py`) turns JSBSim's aircraft
+into simon's own format, and the same code converts both. The F-16 brings
+what the 737 lacks: fly-by-wire flight controls that close loops on roll
+rate, pitch rate and load factor through PIDs and switches, an afterburning
+engine, and a pilot whose accelerations the flight controls feel. The
+application rebuilds each layer of each aircraft, and each layer is tested
+against tables recorded from JSBSim:
 
-| Test | Checks | Agreement |
-|---|---|---:|
-| `aero_test` | Aerodynamic forces and moments at 240 states, from ground effect to Mach 0.94 | 5e-14 |
-| `rigid_body_test` | Equations of motion, air data and mass balance at 480 states, at the equator and 60° north | 5e-13 |
-| `turbine_test` | Spools, thrust and fuel flow, frame by frame through throttle steps | 1e-13 |
-| `flight_control_test` | Surface positions, frame by frame through command sweeps | 4e-15 |
+| Test | Checks | 737 | F-16 |
+|---|---|---:|---:|
+| `aero_test` | Aerodynamic forces and moments at 240 and 300 states, from ground effect to Mach 1.36 | 5e-14 | 9e-15 |
+| `rigid_body_test` | Equations of motion, air data and mass balance at 480 states, at the equator and 60° north | 5e-13 | |
+| `turbine_test` | Spools, thrust and fuel flow, frame by frame through throttle steps, and for the F-16 into reheat and out | 1e-13 | 1e-13 |
+| `flight_control_test` | Every block's output, frame by frame: the 737's surfaces through command sweeps, and all 60 blocks of the F-16's fly-by-wire through three flights | 4e-15 | 2e-16 |
 
-These differences are rounding in double precision.
+These differences are rounding in double precision. Both aircraft share the
+equations of motion, and the F-16's mass, center of mass and inertia, its
+pilot included, match JSBSim's to within JSBSim's rounded slug, 1.4e-8.
 
 ```sh
 bazel test //application/flight:aero_test //application/flight:rigid_body_test \
     //application/flight:turbine_test //application/flight:flight_control_test
 ```
 
-### The whole aircraft matches JSBSim, and beats it at the same step
+### Both whole aircraft match JSBSim
 
 `check_case_test` flies the 737 open loop for 30 s from JSBSim's trim at 6 km,
 round the rotating WGS84 Earth, through three doublets and a throttle step.
@@ -58,8 +65,30 @@ shortcuts. It has no one-frame lags in induced drag, angle-of-attack rate or
 flight-control inputs, it computes geodetic altitude exactly, and it uses exact
 unit constants.
 
+The F-16 flies the same five cases from its own trim, with the stick in
+place of the elevator and aileron, and its throttle step into reheat. Its
+flight controls run every 8 ms in simon and in the reference alike, as a
+digital flight control computer runs at its own rate. Its control laws
+differentiate the pilot's commands and then clip them, so run at every frame
+they change with the frame and never converge. The reference is JSBSim at
+0.125 ms:
+
+| Case | simon at 0.5 ms | simon at 8 ms | JSBSim at 8 ms |
+|---|---:|---:|---:|
+| Trim hold | 3.7 mm | 3.7 mm | 0.05 mm |
+| Pitch doublet | 2.1 mm | 2.1 mm | 1.5 cm |
+| Roll doublet | 5.6 cm | 5.6 cm | 3.53 m |
+| Rudder doublet | 3.7 mm | 3.7 mm | 0.8 mm |
+| Throttle step into reheat | 1.1 cm | 14.7 cm | 63.2 cm |
+
+simon has converged at 8 ms in every case but the step into reheat. It stays
+within 4 mm of the reference, and within 6 cm after the roll doublet, where
+JSBSim has itself converged only to about 5 cm. At 8 ms simon is 63 times
+closer than JSBSim after the roll doublet, and 4 times closer after the
+throttle step.
+
 ```sh
-bazel test //application/flight:check_case_test   # about 90 s
+bazel test //application/flight:check_case_test   # about 3 minutes
 ```
 
 ### It runs faster than JSBSim
@@ -130,8 +159,7 @@ regenerate a table, run its script after `pip install jsbsim numpy`.
 
 ### What it does not show yet
 
-- **A second aircraft.** Every JSBSim comparison uses the 737. A very
-  different aircraft would show that the converter and models generalize.
+- **A trim of simon's own.** Both aircraft start from JSBSim's trims.
 - **Point-mass accuracy.** The point-mass model drifts 1.8 km from JSBSim
   over a 130 km flight (`accuracy_test`). Its fitted drag polar causes most of
   that drift. The model suits traffic at scale, and the rigid model suits
