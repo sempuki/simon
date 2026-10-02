@@ -94,7 +94,8 @@ auto measure(int aircraft, Fidelity fidelity, int steps,
   std::expected<void, framework::Status> built =
       build_world(scenario, Out(world));
   CHECK_POSTCONDITION(built.has_value());
-  built = build_scenario(scenario, &rigid, InOut(world));
+  built =
+      build_scenario(scenario, RigidTypes{.airliner = &rigid}, InOut(world));
   CHECK_POSTCONDITION(built.has_value());
   world.sync();
 

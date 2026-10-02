@@ -2638,30 +2638,35 @@ held, the trim alone is measured.
 
 #### Mixed fidelity
 
-Every level flies in one world. A scenario's `rigid` count makes some of
-its aircraft rigid 737s, and they fly the same kind of routes as the rest:
-`FollowRoute` sets their autopilot's targets as it sets every aircraft's.
-`bazel run //application/flight -- <aircraft> <precise> <rigid> <seed>` flies
-one, over a flat Earth so that every level shares the world's frame.
+Every level flies in one world. A scenario's `rigid` and `fighters` counts
+make some of its aircraft rigid 737s and rigid F-16s, and they fly the same
+kind of routes as the rest: `FollowRoute` sets their autopilot's targets as it
+sets every aircraft's. `bazel run //application/flight -- <aircraft>
+<precise> <rigid> <fighters> <seed>` flies one, over a flat Earth so that
+every level shares the world's frame.
 
 Rigid aircraft start from simon's trim in cruise (`trim_in_cruise`; see
-[Trim](#trim)), one for them all, since over a flat Earth a trim holds
+[Trim](#trim)), one for each type, since over a flat Earth a trim holds
 wherever an aircraft is and whichever way it heads. They fly their
 surfaces with `FlySurfaces`, an autopilot kept small on purpose. It takes the
 point-mass autopilot's laws for the bank a heading needs, the flight-path
 angle an altitude needs and putting speed first, and flies them with three
 lines: aileron from the bank error with roll damping, elevator from the
 flight-path angle error with pitch damping, the pull a turn needs and a
-bounded integral, and throttle from the speed error about the trim. It
-banks up to 45°, so a 737 at 200 m/s turns on about 4 km, near the 3 km at
-which `FollowRoute` captures a waypoint.
+bounded integral, and throttle from the speed error about the trim. Each
+aircraft carries its gains in its `SurfaceAutopilot`. A 737 banks up to 45°,
+so at 200 m/s it turns on about 4 km, near the 3 km at which `FollowRoute`
+captures a waypoint. An F-16 flies the same gains through its fly-by-wire,
+whose stick commands rates and load, and banks up to 60°, turning on about
+2 km. Its flight controls run every 20 ms step.
 
 At the world's 20 ms step, rigid aircraft stay within 15 cm of the converged
 JSBSim reference after the 30 s check cases, and within 9 cm after the rudder
 doublet, against JSBSim's 41.5 cm at 8 ms. Over 10 minutes of routes they
 keep between 3 and 8.3 km and between 197 and 236 m/s, and reach about 4.4
 waypoints each to the point-mass aircraft's 6.5: a 737 turns wider than the
-point-mass jet.
+point-mass jet. F-16s keep between 4.0 and 7.7 km and between 200 and 238
+m/s, and reach about 6 waypoints each.
 
 `flight_benchmark` adds a mixed population, 1% on Runge-Kutta 4 and 0.1%
 rigid. At 100,000 aircraft, GCC, 20 ms steps:

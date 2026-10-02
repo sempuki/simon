@@ -25,12 +25,20 @@ struct Scenario final {
   std::uint64_t seed = 1;
 
   int aircraft = 100;
-  // The number of them on Runge-Kutta 4, and the number flying as rigid
-  // bodies. The rest fly the single-pass model.
+  // The number of them on Runge-Kutta 4, and the numbers flying as rigid
+  // bodies: airliners and fighters. The rest fly the single-pass model.
   int precise = 0;
   int rigid = 0;
-  // The rigid aircraft's data, as tools/jsbsim/convert.py writes it.
+  int fighters = 0;
+  // The rigid aircraft's data, as tools/jsbsim/convert.py writes it, and the
+  // gains their autopilots fly by.
   std::string rigid_aircraft = "application/flight/aircraft/737.aircraft";
+  std::string fighter_aircraft = "application/flight/aircraft/f16.aircraft";
+  SurfaceGains airliner_gains;
+  // A fighter's fly-by-wire turns a stick into rates and load, which the
+  // airliner's gains fly as well; it banks to 60 degrees, so it turns on
+  // about 2 km at 200 m/s.
+  SurfaceGains fighter_gains{.max_bank = 1.05 * model::radian};
 
   Length spacing = 5000.0 * model::meter;  // Per aircraft, on average.
   Length route_reach = 20000.0 * model::meter;
@@ -63,22 +71,30 @@ auto trim_in_cruise(const model::AircraftData& data, const model::Earth& earth,
 
 // Creates a rigid aircraft of type `data` over `earth`, trimmed by `trim`,
 // at `x` and `y` in the world's local frame, at the trim's altitude, and
-// heading `heading`, flying `route` from there. Over a flat Earth a trim
-// holds wherever the aircraft is and whichever way it heads.
+// heading `heading`, flying `route` from there by `gains`. Over a flat Earth
+// a trim holds wherever the aircraft is and whichever way it heads.
 auto create_rigid_aircraft(const model::AircraftData& data,
                            const model::Earth& earth, const model::Trim& trim,
-                           Length x, Length y, Angle heading,
-                           const Route& route, InOut<World> world)
+                           const SurfaceGains& gains, Length x, Length y,
+                           Angle heading, const Route& route,
+                           InOut<World> world)
     -> std::expected<Entity, framework::Status>;
+
+// The rigid aircraft types a scenario flies, read once: null where it flies
+// none of that type.
+struct RigidTypes final {
+  const model::AircraftData* airliner = nullptr;
+  const model::AircraftData* fighter = nullptr;
+};
 
 // Builds in `world` the world a scenario needs.
 auto build_world(const Scenario& scenario, Out<World> world)
     -> std::expected<void, framework::Status>;
 
 // Creates every aircraft of a scenario, with its route, flying level toward
-// its first waypoint at its route's speed; rigid aircraft, of type `rigid`,
-// start at their trim's altitude and speed.
-auto build_scenario(const Scenario& scenario, const model::AircraftData* rigid,
+// its first waypoint at its route's speed; rigid aircraft, of `types`, start
+// at their trim's altitude and speed.
+auto build_scenario(const Scenario& scenario, const RigidTypes& types,
                     InOut<World> world)
     -> std::expected<void, framework::Status>;
 
@@ -103,7 +119,9 @@ class Simulation final {
 
  private:
   Scenario scenario_;
-  std::unique_ptr<model::AircraftData> rigid_;  // Loaded if there are any.
+  // Each rigid type, read if the scenario flies any.
+  std::unique_ptr<model::AircraftData> airliner_;
+  std::unique_ptr<model::AircraftData> fighter_;
   World world_;  // Empty until configure builds it.
   Scheduler scheduler_;
 };

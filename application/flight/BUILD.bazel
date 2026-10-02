@@ -53,7 +53,10 @@ cc_test(
     size = "medium",
     srcs = ["flight_test.cpp"],
     copts = COPTS,
-    data = ["aircraft/737.aircraft"],
+    data = [
+        "aircraft/737.aircraft",
+        "aircraft/f16.aircraft",
+    ],
     deps = [
         "//framework:vocabulary",
         ":flight_library",
@@ -183,7 +186,10 @@ cc_binary(
     name = "flight",
     srcs = ["main.cpp"],
     copts = COPTS,
-    data = ["aircraft/737.aircraft"],
+    data = [
+        "aircraft/737.aircraft",
+        "aircraft/f16.aircraft",
+    ],
     deps = [
         "//framework:vocabulary",
         ":flight_library",

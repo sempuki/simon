@@ -229,7 +229,7 @@ converged JSBSim reference.
 
 ```sh
 bazel run -c opt //application/flight:flight_benchmark   # the mixed population
-bazel run -c opt //application/flight -- 10000 100 10    # 10 minutes of flight in about 25 s
+bazel run -c opt //application/flight -- 10000 100 10 10 # and 10 F-16s: 10 min in 25 s
 ```
 
 ### Anyone can regenerate the references

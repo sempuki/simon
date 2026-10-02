@@ -243,6 +243,39 @@ TEST_CASE("Simulation") {
     CHECK(simulation.waypoints_reached() >
           simulation.rigid_waypoints_reached());
   }
+
+  SECTION("ShouldFlyRoutesGivenRigidFightersAmongPointMass") {
+    // F-16s fly the same routes through their fly-by-wire, at the world's
+    // 20 ms step, and stay in the routes' envelope throughout.
+    Simulation simulation{
+        Scenario{.seed = 3, .aircraft = 40, .precise = 10, .fighters = 6}};
+    REQUIRE(simulation.configure());
+    double lowest = 1e9;
+    double highest = 0.0;
+    double slowest = 1e9;
+    double fastest = 0.0;
+    for (TimePoint time{}; time < TimePoint{5min}; time += DT) {
+      REQUIRE(simulation.step(framework::Step{.time = time, .dt = DT}));
+      const World& world = simulation.world();
+      world.store_of<RigidBody>().for_each([&](Entity entity,
+                                               const RigidBody&) {
+        const AirState& state = state_of(world, entity);
+        double altitude =
+            model::altitude_of(state).numerical_value_in(model::meter);
+        double speed = state.speed.numerical_value_in(model::meter_per_second);
+        lowest = std::min(lowest, altitude);
+        highest = std::max(highest, altitude);
+        slowest = std::min(slowest, speed);
+        fastest = std::max(fastest, speed);
+      });
+    }
+    CAPTURE(lowest, highest, slowest, fastest);
+    CHECK(lowest > 2500.0);
+    CHECK(highest < 9500.0);
+    CHECK(slowest > 150.0);
+    CHECK(fastest < 270.0);
+    CHECK(simulation.rigid_waypoints_reached() >= 6);
+  }
 }
 
 namespace {
@@ -258,9 +291,9 @@ auto rigid_737(const model::Earth& earth, const model::AircraftData& data,
   route.waypoints.fill(model::meters(0.0, 500000.0, 6000.0));
   auto trim = trim_in_cruise(data, earth);
   REQUIRE(trim);
-  auto entity = create_rigid_aircraft(data, earth, *trim, 0.0 * model::meter,
-                                      0.0 * model::meter, 0.0 * model::radian,
-                                      route, world);
+  auto entity = create_rigid_aircraft(data, earth, *trim, SurfaceGains{},
+                                      0.0 * model::meter, 0.0 * model::meter,
+                                      0.0 * model::radian, route, world);
   REQUIRE(entity);
   return *entity;
 }

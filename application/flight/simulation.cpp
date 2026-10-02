@@ -21,18 +21,24 @@ auto count(int value) -> std::size_t {
 }
 
 // The aircraft that fly the single-pass model, those that opt in to
-// Runge-Kutta 4, and those that fly as rigid bodies.
+// Runge-Kutta 4, and those that fly as rigid bodies, airliners and fighters.
 struct Split final {
   std::size_t simple = 0;
   std::size_t precise = 0;
-  std::size_t rigid = 0;
+  std::size_t airliners = 0;
+  std::size_t fighters = 0;
 };
 
 auto split(const Scenario& scenario) -> Split {
   std::size_t all = count(scenario.aircraft);
-  std::size_t rigid = std::min(count(scenario.rigid), all);
+  std::size_t airliners = std::min(count(scenario.rigid), all);
+  std::size_t fighters = std::min(count(scenario.fighters), all - airliners);
+  std::size_t rigid = airliners + fighters;
   std::size_t precise = std::min(count(scenario.precise), all - rigid);
-  return {.simple = all - precise - rigid, .precise = precise, .rigid = rigid};
+  return {.simple = all - precise - rigid,
+          .precise = precise,
+          .airliners = airliners,
+          .fighters = fighters};
 }
 
 template <typename ArchetypeType>
@@ -77,8 +83,9 @@ auto trim_in_cruise(const model::AircraftData& data, const model::Earth& earth,
 
 auto create_rigid_aircraft(const model::AircraftData& data,
                            const model::Earth& earth, const model::Trim& trim,
-                           Length x, Length y, Angle heading,
-                           const Route& route, InOut<World> world)
+                           const SurfaceGains& gains, Length x, Length y,
+                           Angle heading, const Route& route,
+                           InOut<World> world)
     -> std::expected<Entity, framework::Status> {
   model::Time start = 0.0 * model::second;
   Length altitude = earth.altitude(trim.body, start);
@@ -109,27 +116,29 @@ auto create_rigid_aircraft(const model::AircraftData& data,
       .with(AircraftType{.data = &data})
       .with(Autopilot{.altitude = altitude, .heading = heading, .speed = speed})
       .with(route)
-      .with(SurfaceAutopilot{.pitch_trim = trim.pitch_trim,
+      .with(SurfaceAutopilot{.gains = gains,
+                             .pitch_trim = trim.pitch_trim,
                              .throttle_trim = trim.throttle})
       .build();
 }
 
 auto build_world(const Scenario& scenario, Out<World> world)
     -> std::expected<void, framework::Status> {
-  auto [simple, precise, rigid] = split(scenario);
+  auto [simple, precise, airliners, fighters] = split(scenario);
   return World::set_up()
       .numbered(1)
       .holding<archetype::Aircraft>(simple)
       .holding<archetype::PreciseAircraft>(precise)
-      .holding<archetype::RigidAircraft>(rigid)
+      .holding<archetype::RigidAircraft>(airliners + fighters)
       .build(world);
 }
 
-auto build_scenario(const Scenario& scenario,
-                    const model::AircraftData* rigid_type, InOut<World> world)
+auto build_scenario(const Scenario& scenario, const RigidTypes& types,
+                    InOut<World> world)
     -> std::expected<void, framework::Status> {
-  auto [simple, precise, rigid] = split(scenario);
-  CHECK_PRECONDITION(rigid == 0 || rigid_type);
+  auto [simple, precise, airliners, fighters] = split(scenario);
+  CHECK_PRECONDITION(airliners == 0 || types.airliner);
+  CHECK_PRECONDITION(fighters == 0 || types.fighter);
   model::Earth earth = model::Earth::flat();
   model::Random random{scenario.seed};
   double side = scenario.spacing.numerical_value_in(model::meter) *
@@ -138,15 +147,20 @@ auto build_scenario(const Scenario& scenario,
   double lowest = scenario.lowest.numerical_value_in(model::meter);
   double highest = scenario.highest.numerical_value_in(model::meter);
 
-  // One trim serves every rigid aircraft: over a flat Earth it holds
-  // anywhere, on any heading.
-  std::optional<model::Trim> cruise;
-  if (rigid > 0) {
-    RETURN_OR_ASSIGN(cruise, trim_in_cruise(*rigid_type, earth));
+  // One trim serves every rigid aircraft of a type: over a flat Earth it
+  // holds anywhere, on any heading.
+  std::optional<model::Trim> airliner_trim;
+  if (airliners > 0) {
+    RETURN_OR_ASSIGN(airliner_trim, trim_in_cruise(*types.airliner, earth));
+  }
+  std::optional<model::Trim> fighter_trim;
+  if (fighters > 0) {
+    RETURN_OR_ASSIGN(fighter_trim, trim_in_cruise(*types.fighter, earth));
   }
 
   auto transaction = world->transaction();
-  for (std::size_t i = 0; i < simple + precise + rigid; ++i) {
+  std::size_t all = simple + precise + airliners + fighters;
+  for (std::size_t i = 0; i < all; ++i) {
     double x = random.uniform(0.0, side);
     double y = random.uniform(0.0, side);
     Route route{
@@ -170,10 +184,14 @@ auto build_scenario(const Scenario& scenario,
     } else if (i < simple + precise) {
       RETURN_IF_UNEXPECTED(create_aircraft<archetype::PreciseAircraft>(
           scenario, state, route, world));
+    } else if (i < simple + precise + airliners) {
+      RETURN_IF_UNEXPECTED(create_rigid_aircraft(
+          *types.airliner, earth, *airliner_trim, scenario.airliner_gains,
+          x * model::meter, y * model::meter, state.heading, route, world));
     } else {
-      RETURN_IF_UNEXPECTED(
-          create_rigid_aircraft(*rigid_type, earth, *cruise, x * model::meter,
-                                y * model::meter, state.heading, route, world));
+      RETURN_IF_UNEXPECTED(create_rigid_aircraft(
+          *types.fighter, earth, *fighter_trim, scenario.fighter_gains,
+          x * model::meter, y * model::meter, state.heading, route, world));
     }
   }
   transaction.commit();
@@ -184,10 +202,18 @@ auto Simulation::configure() -> engine::PhaseResult {
   if (scenario_.rigid > 0) {
     RETURN_OR_ASSIGN(model::AircraftData loaded,
                      model::load_aircraft(scenario_.rigid_aircraft));
-    rigid_ = std::make_unique<model::AircraftData>(std::move(loaded));
+    airliner_ = std::make_unique<model::AircraftData>(std::move(loaded));
+  }
+  if (scenario_.fighters > 0) {
+    RETURN_OR_ASSIGN(model::AircraftData loaded,
+                     model::load_aircraft(scenario_.fighter_aircraft));
+    fighter_ = std::make_unique<model::AircraftData>(std::move(loaded));
   }
   RETURN_IF_UNEXPECTED(build_world(scenario_, Out(world_)));
-  RETURN_IF_UNEXPECTED(build_scenario(scenario_, rigid_.get(), InOut(world_)));
+  RETURN_IF_UNEXPECTED(build_scenario(
+      scenario_,
+      RigidTypes{.airliner = airliner_.get(), .fighter = fighter_.get()},
+      InOut(world_)));
   world_.sync();
   return engine::Flow::CONTINUE;
 }

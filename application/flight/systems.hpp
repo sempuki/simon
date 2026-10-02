@@ -228,17 +228,6 @@ using Precise =
     framework::Continuous<framework::RungeKutta4, TypeList<AirState>,
                           SystemList<PointMassRates>>;
 
-// A rigid aircraft's autopilot gains. The targets come from the point-mass
-// autopilot's laws; these fly the surfaces to them.
-struct SurfaceGains final {
-  double bank = 1.0;      // Aileron per radian of bank error.
-  double roll = 2.0;      // Aileron per rad/s of roll rate.
-  double climb = 1.2;     // Elevator per radian of flight-path angle error.
-  double pitch = 4.0;     // Elevator per rad/s of pitch rate.
-  double integral = 1.0;  // Elevator per radian second of the same error.
-  double speed = 0.05;    // Throttle per m/s of speed error.
-};
-
 // Each step, each rigid aircraft's autopilot flies its surfaces toward the
 // targets FollowRoute sets, as it sets every aircraft's: aileron for the bank
 // its heading needs, elevator for the flight-path angle its altitude needs,
@@ -266,6 +255,7 @@ struct FlySurfaces final       //
     if (!state || !body || !autopilot || !trim) {
       return;
     }
+    const SurfaceGains& gains = trim->gains;
     Matrix3 attitude = earth_.body_to_north_east_down(
         *body, model::seconds(step.time.time_since_epoch()));
     double bank = std::atan2(attitude(2, 1), attitude(2, 2));
@@ -273,12 +263,9 @@ struct FlySurfaces final       //
                         .numerical_value_in(model::radian_per_second)
                         .eigen();
 
-    // Up to 45 degrees of bank: a 737 turns on a radius of about 4 km at
-    // 200 m/s, near the 3 km FollowRoute captures a waypoint at, so it seldom
-    // circles one.
     double bank_error = model::radians(model::bank_command(
                             *state, autopilot->heading, 0.5 * model::per_second,
-                            0.79 * model::radian)) -
+                            gains.max_bank)) -
                         bank;
     // Speed comes first, as it does for point-mass aircraft: a slow
     // aircraft climbs less steeply, or not at all.
@@ -305,15 +292,15 @@ struct FlySurfaces final       //
 
     using enum model::FlightSignal;
     // The 737's elevator command is positive nose down.
-    signals[AILERON_COMMAND] = std::clamp(
-        gains_.bank * bank_error - gains_.roll * rates.x(), -1.0, 1.0);
+    signals[AILERON_COMMAND] =
+        std::clamp(gains.bank * bank_error - gains.roll * rates.x(), -1.0, 1.0);
     signals[ELEVATOR_COMMAND] = std::clamp(
-        -gains_.climb * climb_error - gains_.pitch * (turn - rates.y()) -
-            gains_.integral * trim->climb_integral,
+        -gains.climb * climb_error - gains.pitch * (turn - rates.y()) -
+            gains.integral * trim->climb_integral,
         -1.0, 1.0);
     signals[PITCH_TRIM_COMMAND] = trim->pitch_trim;
     double throttle =
-        std::clamp(trim->throttle_trim + gains_.speed * speed_error, 0.0, 1.0);
+        std::clamp(trim->throttle_trim + gains.speed * speed_error, 0.0, 1.0);
     for (std::size_t i = 0; i < model::MAX_ENGINES; ++i) {
       signals.values[model::index_of(THROTTLE_COMMAND_0) + i] = throttle;
     }
@@ -321,7 +308,6 @@ struct FlySurfaces final       //
 
  private:
   model::Earth earth_;
-  SurfaceGains gains_;
 };
 
 // Each rigid aircraft's flight controls read its state and its pilot's

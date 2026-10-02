@@ -49,7 +49,7 @@ auto populate(int count, const model::Earth& earth,
   CHECK_POSTCONDITION(trim.has_value());
   auto transaction = world->transaction();
   for (int i = 0; i < count; ++i) {
-    auto built = create_rigid_aircraft(data, earth, *trim,
+    auto built = create_rigid_aircraft(data, earth, *trim, SurfaceGains{},
                                        2000.0 * (i % side) * model::meter,
                                        2000.0 * (i / side) * model::meter,
                                        0.0 * model::radian, Route{}, world);

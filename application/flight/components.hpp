@@ -81,9 +81,27 @@ struct Route final {
   std::uint32_t reached = 0;  // Waypoints reached so far.
 };
 
-// A rigid aircraft's autopilot state: the trim it flies about, and the
+// A rigid aircraft's autopilot gains. The targets come from the point-mass
+// autopilot's laws; these fly the surfaces to them. The defaults fly a 737,
+// whose stick moves its elevator; an aircraft whose stick commands rates and
+// load through fly-by-wire needs others.
+struct SurfaceGains final {
+  double bank = 1.0;      // Aileron per radian of bank error.
+  double roll = 2.0;      // Aileron per rad/s of roll rate.
+  double climb = 1.2;     // Elevator per radian of flight-path angle error.
+  double pitch = 4.0;     // Elevator per rad/s of pitch rate.
+  double integral = 1.0;  // Elevator per radian second of the same error.
+  double speed = 0.05;    // Throttle per m/s of speed error.
+  // Up to 45 degrees of bank by default: a 737 turns on a radius of about 4 km
+  // at 200 m/s, near the 3 km FollowRoute captures a waypoint at, so it
+  // seldom circles one.
+  Angle max_bank = 0.79 * model::radian;
+};
+
+// A rigid aircraft's autopilot: its gains, the trim it flies about, and the
 // integral of its flight-path angle error.
 struct SurfaceAutopilot final {
+  SurfaceGains gains;
   double pitch_trim = 0.0;  // The pitch trim command it holds.
   double throttle_trim = 0.0;
   double climb_integral = 0.0;  // rad s.

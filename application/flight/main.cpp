@@ -2,7 +2,11 @@
 
 // Flies one flight scenario as fast as possible and prints what it did:
 //
-//   bazel run //application/flight -- [aircraft] [precise] [rigid] [seed]
+//   bazel run //application/flight -- [aircraft] [precise] [rigid] [fighters]
+//       [seed]
+//
+// `rigid` aircraft are 737s and `fighters` F-16s, both flying as rigid
+// bodies.
 
 #include <chrono>
 #include <cstdint>
@@ -28,7 +32,10 @@ auto main(int argc, char** argv) -> int {
     scenario.rigid = std::atoi(argv[3]);
   }
   if (argc > 4) {
-    scenario.seed = std::strtoull(argv[4], nullptr, 10);
+    scenario.fighters = std::atoi(argv[4]);
+  }
+  if (argc > 5) {
+    scenario.seed = std::strtoull(argv[5], nullptr, 10);
   }
   flight::Simulation simulation{scenario};
   engine::BatchDriver driver{engine::Timing{.max_step = 20ms},
@@ -45,9 +52,10 @@ auto main(int argc, char** argv) -> int {
                     .count();
 
   std::println(
-      "seed {}: {} aircraft ({} precise, {} rigid) flew {:.0f} s, reaching {} "
-      "waypoints ({} by rigid aircraft), in {:.2f} s",
+      "seed {}: {} aircraft ({} precise, {} rigid 737s, {} rigid F-16s) flew "
+      "{:.0f} s, reaching {} waypoints ({} by rigid aircraft), in {:.2f} s",
       scenario.seed, scenario.aircraft, scenario.precise, scenario.rigid,
+      scenario.fighters,
       std::chrono::duration<double>(reached->time_since_epoch()).count(),
       simulation.waypoints_reached(), simulation.rigid_waypoints_reached(),
       wall);
