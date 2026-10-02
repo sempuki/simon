@@ -90,9 +90,9 @@ class Earth final {
       -> Eigen::Matrix3d;
   auto fixed_of(const RigidBody& body, Time time) const -> Position;
 
-  bool round_ = false;
   Position origin_fixed_ = meters(0.0, 0.0, 0.0);
   Eigen::Matrix3d fixed_to_local_ = Eigen::Matrix3d::Identity();
+  bool round_ = false;
 };
 
 // Where the control surfaces stand: deflections in radians, extensions from
