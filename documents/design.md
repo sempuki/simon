@@ -2509,6 +2509,46 @@ before its engines burn; its `inertia/ixy` and `iyz` properties are the
 tensor's elements negated but `ixz` is not; and its kinematic actuators keep
 the frame time the model loaded with.
 
+#### Mixed fidelity
+
+Every level flies in one world. A scenario's `rigid` count makes some of
+its aircraft rigid 737s, and they fly the same kind of routes as the rest:
+`FollowRoute` sets their autopilot's targets as it sets every aircraft's.
+`bazel run //application/flight -- <aircraft> <precise> <rigid> <seed>` flies
+one, over a flat Earth so that every level shares the world's frame.
+
+Rigid aircraft start from JSBSim's trim in cruise (`RigidTrim`) and fly their
+surfaces with `FlySurfaces`, an autopilot kept small on purpose. It takes the
+point-mass autopilot's laws for the bank a heading needs, the flight-path
+angle an altitude needs and putting speed first, and flies them with three
+lines: aileron from the bank error with roll damping, elevator from the
+flight-path angle error with pitch damping, the pull a turn needs and a
+bounded integral, and throttle from the speed error about the trim. It
+banks up to 45°, so a 737 at 200 m/s turns on about 4 km, near the 3 km at
+which `FollowRoute` captures a waypoint.
+
+At the world's 20 ms step, rigid aircraft stay within 15 cm of the converged
+JSBSim reference after the 30 s check cases, and within 9 cm after the rudder
+doublet, against JSBSim's 41.5 cm at 8 ms. Over 10 minutes of routes they
+keep between 3 and 8.3 km and between 197 and 236 m/s, and reach about 4.4
+waypoints each to the point-mass aircraft's 6.5: a 737 turns wider than the
+point-mass jet.
+
+`flight_benchmark` adds a mixed population, 1% on Runge-Kutta 4 and 0.1%
+rigid. At 100,000 aircraft, GCC, 20 ms steps:
+
+| Aircraft | Systems | ms per step | Share |
+|---|---|---:|---:|
+| 98,900 single pass | `FollowRoute`, `FlyAutopilot`, `Actuate`, `Fly` | 7.17 | 95.2% |
+| 1,000 Runge-Kutta 4 | `Continuous(AirState)` | 0.17 | 2.3% |
+| 100 rigid 737s | `FlySurfaces` to `FollowRigidBody` | 0.19 | 2.5% |
+| All | | 7.53 | |
+
+One thread runs it 2.7 times faster than real time. Each level costs what
+its own aircraft cost, and nothing more: the single-pass aircraft run as
+fast as they do alone (7.25 ms at 100,000), because each level's systems are
+driven by components only its aircraft have.
+
 ## Libraries
 
 | Need | Library |
@@ -2578,9 +2618,11 @@ Each step ends with a working application and passing tests.
      converted to data, round a WGS84 Earth or over a flat one, checked
      against JSBSim layer by layer and whole (see
      [Rigid aircraft](#rigid-aircraft)).
-   - Next for rigid aircraft: a trim of simon's own, an autopilot that flies
-     them by their surfaces, more JSBSim aircraft and the flight control
-     components they need, and many rigid aircraft batched in one segment.
+   - Done: every level in one world, rigid aircraft flying routes by a small
+     surface autopilot (see [Mixed fidelity](#mixed-fidelity)).
+   - Next for rigid aircraft: a trim of simon's own, more JSBSim aircraft
+     and the flight control components they need, and many rigid aircraft
+     batched in one segment.
    - Later: Adams-Bashforth with rate history, many replicas of a scenario
      in one world, world snapshots, and trim tables computed offline. JSBSim,
      run offline, stays the reference each level's accuracy is measured

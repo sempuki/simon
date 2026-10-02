@@ -17,7 +17,6 @@
 #include <cmath>
 #include <cstddef>
 #include <expected>
-#include <numbers>
 #include <optional>
 #include <print>
 #include <string>
@@ -27,6 +26,7 @@
 #include <vector>
 
 #include "application/flight/components.hpp"
+#include "application/flight/simulation.hpp"
 #include "application/flight/systems.hpp"
 #include "base/core.hpp"
 
@@ -44,38 +44,13 @@ constexpr int DEFAULT_STEPS = 250;  // 2 s simulated.
 auto populate(int count, const model::Earth& earth,
               const model::AircraftData& data, lib::InOut<World> world)
     -> void {
-  constexpr double ALPHA = 2.0 * std::numbers::pi / 180.0;
-  model::StandardAirTable air;
   auto side = static_cast<int>(std::ceil(std::sqrt(count)));
   auto transaction = world->transaction();
   for (int i = 0; i < count; ++i) {
-    RigidBody body = earth.body_at(
-        model::meters(2000.0 * (i % side), 2000.0 * (i / side), 6000.0),
-        0.0 * model::radian, ALPHA * model::radian, 0.0 * model::radian,
-        model::meters_per_second(200.0 * std::cos(ALPHA), 0.0,
-                                 200.0 * std::sin(ALPHA)),
-        model::Vector3d{} * model::radian_per_second, 0.0 * model::second);
-    FlightSignals signals;
-    signals[model::FlightSignal::PITCH_TRIM_COMMAND] = -0.15;
-    model::run_flight_controls(data.flight_controls, signals,
-                               0.0 * model::second);
-    EngineControls controls{.throttle = {0.69, 0.69}};
-    Engines engines = model::settled_engines(
-        data, controls,
-        model::engine_air_of(body, earth, air, 0.0 * model::second));
-    FuelTanks tanks = model::fuel_tanks_of(data);
-    auto built = world->create<archetype::RigidAircraft>()
-                     .with(earth.air_state(body, 0.0 * model::second))
-                     .with(body)
-                     .with(RigidBodyRate{})
-                     .with(signals)
-                     .with(ControlSurfaces{})
-                     .with(controls)
-                     .with(engines)
-                     .with(tanks)
-                     .with(model::mass_balance_of(data, tanks))
-                     .with(AircraftType{.data = &data})
-                     .build();
+    auto built = create_rigid_aircraft(data, earth, RigidTrim{},
+                                       2000.0 * (i % side) * model::meter,
+                                       2000.0 * (i / side) * model::meter,
+                                       0.0 * model::radian, Route{}, world);
     CHECK_POSTCONDITION(built.has_value());
   }
   transaction.commit();

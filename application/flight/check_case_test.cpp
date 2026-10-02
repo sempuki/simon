@@ -195,6 +195,9 @@ auto fly(Case flown, Duration dt, const model::AircraftData& data,
                       .with(tanks)
                       .with(model::mass_balance_of(data, tanks))
                       .with(AircraftType{.data = &data})
+                      .with(Autopilot{})
+                      .with(Route{})
+                      .with(SurfaceAutopilot{})
                       .build();
   REQUIRE(aircraft);
   world.sync();

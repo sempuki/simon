@@ -227,6 +227,101 @@ using Precise =
     framework::Continuous<framework::RungeKutta4, TypeList<AirState>,
                           SystemList<PointMassRates>>;
 
+// A rigid aircraft's autopilot gains. The targets come from the point-mass
+// autopilot's laws; these fly the surfaces to them.
+struct SurfaceGains final {
+  double bank = 1.0;      // Aileron per radian of bank error.
+  double roll = 2.0;      // Aileron per rad/s of roll rate.
+  double climb = 1.2;     // Elevator per radian of flight-path angle error.
+  double pitch = 4.0;     // Elevator per rad/s of pitch rate.
+  double integral = 1.0;  // Elevator per radian second of the same error.
+  double speed = 0.05;    // Throttle per m/s of speed error.
+};
+
+// Each step, each rigid aircraft's autopilot flies its surfaces toward the
+// targets FollowRoute sets, as it sets every aircraft's: aileron for the bank
+// its heading needs, elevator for the flight-path angle its altitude needs,
+// and throttle for its speed. Bank, climb and speed laws are the point-mass
+// autopilot's.
+struct FlySurfaces final       //
+    : System<FlightSignals,    //
+             const AirState,   //
+             const RigidBody,  //
+             const Autopilot,  //
+             EngineControls,   //
+             SurfaceAutopilot> {
+  using SystemWorld = ProjectedWorld<FlySurfaces>;
+  using SequenceAfterSystemList = SystemList<FollowRoute>;
+
+  explicit FlySurfaces(model::Earth earth = model::Earth::flat())
+      : earth_{earth} {}
+
+  auto operator()(SystemWorld&, Entity,        //
+                  FlightSignals& signals,      //
+                  const AirState* state,       //
+                  const RigidBody* body,       //
+                  const Autopilot* autopilot,  //
+                  EngineControls* controls,    //
+                  SurfaceAutopilot* trim,      //
+                  Step step) const -> void {
+    if (!state || !body || !autopilot || !controls || !trim) {
+      return;
+    }
+    Eigen::Matrix3d attitude = earth_.body_to_north_east_down(
+        *body, model::seconds(step.time.time_since_epoch()));
+    double bank = std::atan2(attitude(2, 1), attitude(2, 2));
+    Eigen::Vector3d rates = earth_.air_rate(*body)
+                                .numerical_value_in(model::radian_per_second)
+                                .eigen();
+
+    // Up to 45 degrees of bank: a 737 turns on a radius of about 4 km at
+    // 200 m/s, near the 3 km FollowRoute captures a waypoint at, so it seldom
+    // circles one.
+    double bank_error = model::radians(model::bank_command(
+                            *state, autopilot->heading, 0.5 * model::per_second,
+                            0.79 * model::radian)) -
+                        bank;
+    // Speed comes first, as it does for point-mass aircraft: a slow
+    // aircraft climbs less steeply, or not at all.
+    double speed_error = (autopilot->speed - state->speed)
+                             .numerical_value_in(model::meter_per_second);
+    double steepest = 0.08 * std::clamp(1.0 - speed_error / 20.0, 0.0, 1.0);
+    double climb_error =
+        std::min(model::radians(model::climb_command(
+                     *state, autopilot->altitude, 0.05 * model::per_second,
+                     0.08 * model::radian)),
+                 steepest) -
+        model::radians(state->flight_path_angle);
+    trim->climb_integral = std::clamp(
+        trim->climb_integral +
+            climb_error *
+                model::seconds(step.dt).numerical_value_in(model::second),
+        -0.1, 0.1);
+    // A turn needs a pitch rate of g/V sin(bank) tan(bank) to hold its
+    // flight path.
+    double turn = model::STANDARD_GRAVITY.numerical_value_in(
+                      model::meter_per_second_squared) /
+                  state->speed.numerical_value_in(model::meter_per_second) *
+                  std::sin(bank) * std::tan(bank);
+
+    using enum model::FlightSignal;
+    // The 737's elevator command is positive nose down.
+    signals[AILERON_COMMAND] = std::clamp(
+        gains_.bank * bank_error - gains_.roll * rates.x(), -1.0, 1.0);
+    signals[ELEVATOR_COMMAND] = std::clamp(
+        -gains_.climb * climb_error - gains_.pitch * (turn - rates.y()) -
+            gains_.integral * trim->climb_integral,
+        -1.0, 1.0);
+    signals[PITCH_TRIM_COMMAND] = trim->pitch_trim;
+    controls->throttle.fill(
+        std::clamp(trim->throttle_trim + gains_.speed * speed_error, 0.0, 1.0));
+  }
+
+ private:
+  model::Earth earth_;
+  SurfaceGains gains_;
+};
+
 // Each step, each rigid aircraft's flight controls read its state and its
 // pilot's commands, and set its control surfaces.
 struct RunFlightControls final    //
@@ -414,7 +509,7 @@ struct FollowRigidBody final  //
 //-- Schedule -----------------------------------------------------------------
 
 using Schedule =
-    SystemList<FollowRoute, FlyAutopilot, Actuate, Fly, Precise,
+    SystemList<FollowRoute, FlyAutopilot, Actuate, Fly, Precise, FlySurfaces,
                RunFlightControls, RunEngines, Rigid, BurnFuel, FollowRigidBody>;
 using Scheduler = framework::Scheduler<World, Schedule>;
 

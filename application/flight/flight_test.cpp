@@ -182,7 +182,7 @@ TEST_CASE("Simulation") {
   };
 
   SECTION("ShouldRepeatGivenSameSeed") {
-    Scenario scenario{.seed = 7, .aircraft = 50, .precise = 10};
+    Scenario scenario{.seed = 7, .aircraft = 50, .precise = 10, .rigid = 5};
     auto [first, first_reached] = run(scenario);
     auto [second, second_reached] = run(scenario);
 
@@ -208,58 +208,64 @@ TEST_CASE("Simulation") {
     }
     CHECK(reached > 0);
   }
+
+  SECTION("ShouldFlyRoutesGivenRigidAircraftAmongPointMass") {
+    // Point-mass and rigid aircraft fly the same kind of routes in one
+    // world; the rigid ones stay in the routes' envelope throughout.
+    Simulation simulation{
+        Scenario{.seed = 3, .aircraft = 40, .precise = 10, .rigid = 6}};
+    REQUIRE(simulation.configure());
+    double lowest = 1e9;
+    double highest = 0.0;
+    double slowest = 1e9;
+    double fastest = 0.0;
+    for (TimePoint time{}; time < TimePoint{5min}; time += DT) {
+      REQUIRE(simulation.step(framework::Step{.time = time, .dt = DT}));
+      const World& world = simulation.world();
+      world.store_of<RigidBody>().for_each([&](Entity entity,
+                                               const RigidBody&) {
+        const AirState& state = state_of(world, entity);
+        double altitude =
+            model::altitude_of(state).numerical_value_in(model::meter);
+        double speed = state.speed.numerical_value_in(model::meter_per_second);
+        lowest = std::min(lowest, altitude);
+        highest = std::max(highest, altitude);
+        slowest = std::min(slowest, speed);
+        fastest = std::max(fastest, speed);
+      });
+    }
+    CAPTURE(lowest, highest, slowest, fastest);
+    CHECK(lowest > 2500.0);
+    CHECK(highest < 9500.0);
+    CHECK(slowest > 150.0);
+    CHECK(fastest < 270.0);
+    CHECK(simulation.rigid_waypoints_reached() >= 6);
+    CHECK(simulation.waypoints_reached() >
+          simulation.rigid_waypoints_reached());
+  }
 }
 
 namespace {
 
 constexpr char BOEING_737[] = "application/flight/aircraft/737.aircraft";
 
-// A 737 flying level at 6 km and 200 m/s, heading north at 2 degrees angle
-// of attack, from the world's origin, with its engines settled at
-// `throttle`.
+// A 737 trimmed in cruise at 6 km and 200 m/s, heading north from the
+// world's origin toward a waypoint 500 km ahead.
 auto rigid_737(const model::Earth& earth, const model::AircraftData& data,
-               lib::InOut<World> world, double throttle = 0.0) -> Entity {
-  constexpr double ALPHA = 2.0 * PI / 180.0;
-  RigidBody body = earth.body_at(
-      model::meters(0.0, 0.0, 6000.0), 0.0 * model::radian,
-      ALPHA * model::radian, 0.0 * model::radian,
-      model::meters_per_second(200.0 * std::cos(ALPHA), 0.0,
-                               200.0 * std::sin(ALPHA)),
-      model::Vector3d{} * model::radian_per_second, 0.0 * model::second);
-
-  FlightSignals signals;
-  // The elevator surface scale turns a command of -1/6 into -0.05 rad.
-  signals[model::FlightSignal::ELEVATOR_COMMAND] = -0.05 / 0.3;
-  model::run_flight_controls(data.flight_controls, signals,
-                             0.0 * model::second);
-  ControlSurfaces surfaces{.elevator = signals[model::FlightSignal::ELEVATOR]};
-  EngineControls controls{.throttle = {throttle, throttle}};
-  model::StandardAirTable air;
-  Engines engines = model::settled_engines(
-      data, controls,
-      model::engine_air_of(body, earth, air, 0.0 * model::second));
-  FuelTanks tanks = model::fuel_tanks_of(data);
-
-  auto entity = world->create<archetype::RigidAircraft>()
-                    .with(earth.air_state(body, 0.0 * model::second))
-                    .with(body)
-                    .with(RigidBodyRate{})
-                    .with(signals)
-                    .with(surfaces)
-                    .with(controls)
-                    .with(engines)
-                    .with(tanks)
-                    .with(model::mass_balance_of(data, tanks))
-                    .with(AircraftType{.data = &data})
-                    .build();
+               lib::InOut<World> world) -> Entity {
+  Route route{.speed = 200.0 * model::meter_per_second};
+  route.waypoints.fill(model::meters(0.0, 500000.0, 6000.0));
+  auto entity = create_rigid_aircraft(data, earth, RigidTrim{},
+                                      0.0 * model::meter, 0.0 * model::meter,
+                                      0.0 * model::radian, route, world);
   REQUIRE(entity);
   return *entity;
 }
 
 auto scheduler_for(const model::Earth& earth) -> Scheduler {
   return Scheduler{Schedule{FollowRoute{}, FlyAutopilot{}, Actuate{}, Fly{},
-                            Precise{}, RunFlightControls{earth},
-                            RunEngines{earth},
+                            Precise{}, FlySurfaces{earth},
+                            RunFlightControls{earth}, RunEngines{earth},
                             Rigid{SystemList{RigidAircraftRates{earth}}},
                             BurnFuel{}, FollowRigidBody{earth}}};
 }
@@ -325,7 +331,7 @@ TEST_CASE("RigidAircraft") {
 
   SECTION("ShouldBurnFuelGivenEnginesRunning") {
     model::Earth earth = model::Earth::flat();
-    Entity aircraft = rigid_737(earth, *data, lib::InOut(world), 0.7);
+    Entity aircraft = rigid_737(earth, *data, lib::InOut(world));
     Scheduler scheduler = scheduler_for(earth);
     model::Mass start = model::mass_balance_of(*data).properties.mass;
 

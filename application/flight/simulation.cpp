@@ -18,12 +18,19 @@ auto count(int value) -> std::size_t {
   return static_cast<std::size_t>(std::max(value, 0));
 }
 
-// The aircraft that fly the single-pass model, and those that opt in to
-// Runge-Kutta 4.
-auto split(const Scenario& scenario) -> std::pair<std::size_t, std::size_t> {
+// The aircraft that fly the single-pass model, those that opt in to
+// Runge-Kutta 4, and those that fly as rigid bodies.
+struct Split final {
+  std::size_t simple = 0;
+  std::size_t precise = 0;
+  std::size_t rigid = 0;
+};
+
+auto split(const Scenario& scenario) -> Split {
   std::size_t all = count(scenario.aircraft);
-  std::size_t precise = std::min(count(scenario.precise), all);
-  return {all - precise, precise};
+  std::size_t rigid = std::min(count(scenario.rigid), all);
+  std::size_t precise = std::min(count(scenario.precise), all - rigid);
+  return {.simple = all - precise - rigid, .precise = precise, .rigid = rigid};
 }
 
 template <typename ArchetypeType>
@@ -54,19 +61,71 @@ auto create_aircraft(const Scenario& scenario, const AirState& state,
 
 }  // namespace
 
+auto create_rigid_aircraft(const model::AircraftData& data,
+                           const model::Earth& earth, const RigidTrim& trim,
+                           Length x, Length y, Angle heading,
+                           const Route& route, lib::InOut<World> world)
+    -> std::expected<Entity, framework::Status> {
+  double speed = trim.speed.numerical_value_in(model::meter_per_second);
+  RigidBody body = earth.body_at(
+      model::meters(x.numerical_value_in(model::meter),
+                    y.numerical_value_in(model::meter),
+                    trim.altitude.numerical_value_in(model::meter)),
+      0.0 * model::radian, trim.alpha, heading,
+      model::meters_per_second(speed * model::cos(trim.alpha), 0.0,
+                               speed * model::sin(trim.alpha)),
+      model::Vector3d{} * model::radian_per_second, 0.0 * model::second);
+
+  FlightSignals signals;
+  signals[model::FlightSignal::PITCH_TRIM_COMMAND] = trim.pitch_trim;
+  model::settle_flight_controls(data.flight_controls, signals);
+  model::run_flight_controls(data.flight_controls, signals,
+                             0.0 * model::second);
+  EngineControls controls;
+  controls.throttle.fill(trim.throttle);
+  model::StandardAirTable air;
+  Engines engines = model::settled_engines(
+      data, controls,
+      model::engine_air_of(body, earth, air, 0.0 * model::second));
+  FuelTanks tanks = model::fuel_tanks_of(data);
+
+  return world->create<archetype::RigidAircraft>()
+      .with(earth.air_state(body, 0.0 * model::second))
+      .with(body)
+      .with(RigidBodyRate{})
+      .with(signals)
+      .with(ControlSurfaces{})
+      .with(controls)
+      .with(engines)
+      .with(tanks)
+      .with(model::mass_balance_of(data, tanks))
+      .with(AircraftType{.data = &data})
+      .with(Autopilot{
+          .altitude = trim.altitude, .heading = heading, .speed = trim.speed})
+      .with(route)
+      .with(SurfaceAutopilot{.pitch_trim = trim.pitch_trim,
+                             .throttle_trim = trim.throttle})
+      .build();
+}
+
 auto build_world(const Scenario& scenario, lib::Out<World> world)
     -> std::expected<void, framework::Status> {
-  auto [simple, precise] = split(scenario);
+  auto [simple, precise, rigid] = split(scenario);
   return World::set_up()
       .numbered(1)
       .holding<archetype::Aircraft>(simple)
       .holding<archetype::PreciseAircraft>(precise)
+      .holding<archetype::RigidAircraft>(rigid)
       .build(world);
 }
 
-auto build_scenario(const Scenario& scenario, lib::InOut<World> world)
+auto build_scenario(const Scenario& scenario,
+                    const model::AircraftData* rigid_type,
+                    lib::InOut<World> world)
     -> std::expected<void, framework::Status> {
-  auto [simple, precise] = split(scenario);
+  auto [simple, precise, rigid] = split(scenario);
+  CHECK_PRECONDITION(rigid == 0 || rigid_type);
+  model::Earth earth = model::Earth::flat();
   model::Random random{scenario.seed};
   double side = scenario.spacing.numerical_value_in(model::meter) *
                 std::sqrt(static_cast<double>(simple + precise));
@@ -75,7 +134,7 @@ auto build_scenario(const Scenario& scenario, lib::InOut<World> world)
   double highest = scenario.highest.numerical_value_in(model::meter);
 
   auto transaction = world->transaction();
-  for (std::size_t i = 0; i < simple + precise; ++i) {
+  for (std::size_t i = 0; i < simple + precise + rigid; ++i) {
     double x = random.uniform(0.0, side);
     double y = random.uniform(0.0, side);
     Route route{
@@ -96,9 +155,13 @@ auto build_scenario(const Scenario& scenario, lib::InOut<World> world)
     if (i < simple) {
       RETURN_IF_UNEXPECTED(
           create_aircraft<archetype::Aircraft>(scenario, state, route, world));
-    } else {
+    } else if (i < simple + precise) {
       RETURN_IF_UNEXPECTED(create_aircraft<archetype::PreciseAircraft>(
           scenario, state, route, world));
+    } else {
+      RETURN_IF_UNEXPECTED(create_rigid_aircraft(
+          *rigid_type, earth, RigidTrim{}, x * model::meter, y * model::meter,
+          state.heading, route, world));
     }
   }
   transaction.commit();
@@ -106,8 +169,16 @@ auto build_scenario(const Scenario& scenario, lib::InOut<World> world)
 }
 
 auto Simulation::configure() -> engine::PhaseResult {
+  if (scenario_.rigid > 0) {
+    auto loaded = model::load_aircraft(scenario_.rigid_aircraft);
+    if (!loaded) {
+      return std::unexpected(loaded.error());
+    }
+    rigid_ = std::make_unique<model::AircraftData>(std::move(*loaded));
+  }
   RETURN_IF_UNEXPECTED(build_world(scenario_, lib::Out(world_)));
-  RETURN_IF_UNEXPECTED(build_scenario(scenario_, lib::InOut(world_)));
+  RETURN_IF_UNEXPECTED(
+      build_scenario(scenario_, rigid_.get(), lib::InOut(world_)));
   world_.sync();
   return engine::Flow::CONTINUE;
 }
@@ -121,6 +192,17 @@ auto Simulation::waypoints_reached() const -> std::uint64_t {
   std::uint64_t reached = 0;
   world_.store_of<Route>().for_each(
       [&](Entity, const Route& route) { reached += route.reached; });
+  return reached;
+}
+
+auto Simulation::rigid_waypoints_reached() const -> std::uint64_t {
+  std::uint64_t reached = 0;
+  const auto& bodies = world_.store_of<RigidBody>();
+  world_.store_of<Route>().for_each([&](Entity entity, const Route& route) {
+    if (bodies.maybe_component_of(entity)) {
+      reached += route.reached;
+    }
+  });
   return reached;
 }
 

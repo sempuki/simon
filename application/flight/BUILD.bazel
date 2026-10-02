@@ -35,7 +35,7 @@ cc_library(
 
 cc_test(
     name = "flight_test",
-    size = "small",
+    size = "medium",
     srcs = ["flight_test.cpp"],
     copts = COPTS,
     data = ["aircraft/737.aircraft"],
@@ -161,6 +161,7 @@ cc_binary(
     name = "flight",
     srcs = ["main.cpp"],
     copts = COPTS,
+    data = ["aircraft/737.aircraft"],
     deps = [
         ":flight_library",
         "//engine:driver",
@@ -174,6 +175,7 @@ cc_binary(
     name = "flight_benchmark",
     srcs = ["flight_benchmark.cpp"],
     copts = COPTS,
+    data = ["aircraft/737.aircraft"],
     deps = [
         ":flight_library",
         "//framework",

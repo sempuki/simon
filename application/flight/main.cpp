@@ -2,7 +2,7 @@
 
 // Flies one flight scenario as fast as possible and prints what it did:
 //
-//   bazel run //application/flight -- [aircraft] [precise] [seed]
+//   bazel run //application/flight -- [aircraft] [precise] [rigid] [seed]
 
 #include <chrono>
 #include <cstdint>
@@ -24,7 +24,10 @@ auto main(int argc, char** argv) -> int {
     scenario.precise = std::atoi(argv[2]);
   }
   if (argc > 3) {
-    scenario.seed = std::strtoull(argv[3], nullptr, 10);
+    scenario.rigid = std::atoi(argv[3]);
+  }
+  if (argc > 4) {
+    scenario.seed = std::strtoull(argv[4], nullptr, 10);
   }
   flight::Simulation simulation{scenario};
   engine::BatchDriver driver{engine::Timing{.max_step = 20ms},
@@ -41,10 +44,11 @@ auto main(int argc, char** argv) -> int {
                     .count();
 
   std::println(
-      "seed {}: {} aircraft ({} precise) flew {:.0f} s, reaching {} "
-      "waypoints, in {:.2f} s",
-      scenario.seed, scenario.aircraft, scenario.precise,
+      "seed {}: {} aircraft ({} precise, {} rigid) flew {:.0f} s, reaching {} "
+      "waypoints ({} by rigid aircraft), in {:.2f} s",
+      scenario.seed, scenario.aircraft, scenario.precise, scenario.rigid,
       std::chrono::duration<double>(reached->time_since_epoch()).count(),
-      simulation.waypoints_reached(), wall);
+      simulation.waypoints_reached(), simulation.rigid_waypoints_reached(),
+      wall);
   return EXIT_SUCCESS;
 }

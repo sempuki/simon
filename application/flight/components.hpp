@@ -82,6 +82,14 @@ struct Route final {
   std::uint32_t reached = 0;  // Waypoints reached so far.
 };
 
+// What a rigid aircraft's autopilot keeps: the trim it flies about, and the
+// integral of its flight-path angle error.
+struct SurfaceAutopilot final {
+  double pitch_trim = 0.0;  // The pitch trim command it holds.
+  double throttle_trim = 0.0;
+  double climb_integral = 0.0;  // rad s.
+};
+
 // The data a rigid aircraft flies by, which every aircraft of its type
 // shares. It outlives the world.
 struct AircraftType final {
@@ -107,15 +115,17 @@ struct PreciseAircraft final                                       //
                          Route>> {};                               //
 
 // Flies six degrees of freedom, integrated with Runge-Kutta 4: its flight
-// controls turn the pilot's commands, in its FlightSignals, into control
-// surface positions, and its engines make thrust from its throttles and burn
-// its fuel. Its AirState follows its body, for the rest of the world.
-struct RigidAircraft final                                    //
-    : Archetype<"rigid aircraft",                             //
-                Requires<AirState, RigidBody, RigidBodyRate,  //
-                         FlightSignals, ControlSurfaces,      //
-                         EngineControls, Engines, FuelTanks,  //
-                         MassBalance, AircraftType>> {};      //
+// controls turn its commands, in its FlightSignals, into control surface
+// positions, and its engines make thrust from its throttles and burn its
+// fuel. It follows a route as any aircraft does, its autopilot flying the
+// surfaces. Its AirState follows its body, for the rest of the world.
+struct RigidAircraft final                                      //
+    : Archetype<"rigid aircraft",                               //
+                Requires<AirState, RigidBody, RigidBodyRate,    //
+                         FlightSignals, ControlSurfaces,        //
+                         EngineControls, Engines, FuelTanks,    //
+                         MassBalance, AircraftType, Autopilot,  //
+                         Route, SurfaceAutopilot>> {};          //
 
 }  // namespace archetype
 
@@ -124,7 +134,7 @@ using World = framework::World<
     framework::TypeList<AirStateRate, FlightControls, Commands, Airframe,
                         Handling, Autopilot, Route, RigidBody, RigidBodyRate,
                         FlightSignals, ControlSurfaces, EngineControls, Engines,
-                        FuelTanks, MassBalance, AircraftType>,
+                        FuelTanks, MassBalance, AircraftType, SurfaceAutopilot>,
     framework::TypeList<archetype::Aircraft, archetype::PreciseAircraft,
                         archetype::RigidAircraft>>;
 
