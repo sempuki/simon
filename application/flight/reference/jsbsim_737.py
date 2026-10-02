@@ -45,7 +45,9 @@ SAMPLE = 0.2  # s.
 
 
 def standard_density(altitude):
-    """The International Standard Atmosphere's density, in the troposphere."""
+    """The International Standard Atmosphere's density, in the troposphere,
+    at a geometric altitude."""
+    altitude = 6356766.0 * altitude / (6356766.0 + altitude)  # Geopotential.
     temperature = 288.15 - 0.0065 * altitude
     pressure = 101325.0 * (temperature / 288.15) ** (G0 / (0.0065 * 287.052874))
     return pressure / (287.052874 * temperature)

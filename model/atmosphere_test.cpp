@@ -19,21 +19,27 @@ TEST_CASE("StandardAir") {
         .speed_of_sound.numerical_value_in(meter_per_second);
   };
 
-  // Published ISA values.
+  // The 1976 standard's values, by geometric altitude.
   SECTION("ShouldMatchStandardGivenSeaLevel") {
     CHECK_THAT(density(0.0), WithinRel(1.2250, 1e-4));
     CHECK_THAT(sound(0.0), WithinRel(340.29, 1e-4));
   }
 
   SECTION("ShouldMatchStandardGivenTroposphere") {
-    CHECK_THAT(density(5000.0), WithinRel(0.73643, 1e-3));
-    CHECK_THAT(sound(5000.0), WithinRel(320.53, 1e-3));
+    CHECK_THAT(density(5000.0), WithinRel(0.73643, 1e-4));
+    CHECK_THAT(sound(5000.0), WithinRel(320.55, 1e-4));
   }
 
   SECTION("ShouldMatchStandardGivenStratosphere") {
-    CHECK_THAT(density(11000.0), WithinRel(0.36392, 1e-3));
-    CHECK_THAT(density(20000.0), WithinRel(0.08803, 1e-3));
-    CHECK_THAT(sound(15000.0), WithinRel(295.07, 1e-3));
+    CHECK_THAT(density(11000.0), WithinRel(0.36480, 1e-4));
+    CHECK_THAT(density(20000.0), WithinRel(0.088910, 1e-4));
+    CHECK_THAT(sound(15000.0), WithinRel(295.07, 1e-4));
+  }
+
+  SECTION("ShouldLayerByGeopotentialAltitude") {
+    // The tropopause is 11 km geopotential, 11019 m geometric.
+    CHECK_THAT(sound(11019.1), WithinRel(sound(15000.0), 1e-9));
+    CHECK(sound(10990.0) > sound(15000.0));
   }
 
   SECTION("ShouldHoldCeilingAirGivenAltitudeAboveCeiling") {

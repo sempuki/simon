@@ -2264,7 +2264,9 @@ The code is in three layers:
 The model is point-mass flight path: an `AirState` of position, speed,
 flight-path angle and heading, flown by commanding load factor, bank and
 throttle. Lift is a load factor times weight, drag comes from a drag polar,
-and thrust falls with the standard atmosphere's density. `AirState` is the
+and thrust falls with the standard atmosphere's density. The atmosphere's
+layers are in geopotential altitude, as the 1976 standard and JSBSim have
+them, so its density is within 10^-5 of JSBSim's up to 20 km. `AirState` is the
 world's spatial component, so no copy of the position is kept anywhere else.
 
 Components (`application/flight/components.hpp`):
@@ -2338,10 +2340,10 @@ and once with every aircraft on Runge-Kutta 4. GCC, ms per step:
   Runge-Kutta 4 step from 29.8 to 19.1 ms. The rates take each sine and
   cosine once, and `fly` gets the new velocity from the rate's derivative,
   not more trigonometry. `wrap` calls `std::remainder` only when a heading
-  leaves [-π, π]. `StandardAirTable`, the atmosphere tabulated every 100 m
-  (within a few parts in 10^5), replaced the power and exponential of
-  `standard_air`; it saved 6% of `Fly`, and 20% of Runge-Kutta 4, which
-  evaluates the air four times.
+  leaves [-π, π]. `StandardAirTable`, the atmosphere tabulated every 100 m of
+  geopotential altitude (within a few parts in 10^5), replaced the power and
+  exponential of `standard_air`; it saved 6% of `Fly`, and 20% of Runge-Kutta
+  4, which evaluates the air four times.
 - **Clang is about 13% slower** (8.3 and 22.7 ms at 100,000).
 
 #### Accuracy against JSBSim
@@ -2378,12 +2380,12 @@ trim is 9.7% off. The largest drift over the flight, which covers 130 km:
 
 | Step | Model | Position | Altitude | Speed | Heading |
 |---:|---|---:|---:|---:|---:|
-| 20 ms | Single pass | 1.82 km | 51 m | 3.3 m/s | 1.3° |
-| 20 ms | Runge-Kutta 4 | 1.81 km | 50 m | 3.3 m/s | 1.3° |
-| 200 ms | Single pass | 1.89 km | 62 m | 3.6 m/s | 1.3° |
-| 200 ms | Runge-Kutta 4 | 1.80 km | 50 m | 3.3 m/s | 1.3° |
-| 1 s | Single pass | 2.09 km | 94 m | 4.6 m/s | 1.9° |
-| 1 s | Runge-Kutta 4 | 1.70 km | 52 m | 3.2 m/s | 1.9° |
+| 20 ms | Single pass | 1.78 km | 51 m | 3.3 m/s | 1.2° |
+| 20 ms | Runge-Kutta 4 | 1.77 km | 50 m | 3.3 m/s | 1.2° |
+| 200 ms | Single pass | 1.85 km | 62 m | 3.6 m/s | 1.3° |
+| 200 ms | Runge-Kutta 4 | 1.76 km | 50 m | 3.2 m/s | 1.3° |
+| 1 s | Single pass | 2.05 km | 94 m | 4.5 m/s | 1.9° |
+| 1 s | Runge-Kutta 4 | 1.66 km | 53 m | 3.2 m/s | 1.9° |
 
 - **The drag polar is most of the drift.** Its speed error changes the turn
   rate, which bends the path away. In a turn the 737 holds more elevator
@@ -2393,7 +2395,7 @@ trim is 9.7% off. The largest drift over the flight, which covers 130 km:
   own drag drifts 55 m, so the equations and integrators are not the limit.
 - **Runge-Kutta 4 buys little at the steps simon runs.** At 20 ms the two
   models differ by 10 m against a drift of 1.8 km. At 1 s Runge-Kutta 4 holds
-  altitude to 52 m against 94 m. A better drag model would be worth more than
+  altitude to 53 m against 94 m. A better drag model would be worth more than
   either integrator.
 
 The test holds the drift at 20 ms and 1 s with about 25% headroom. To

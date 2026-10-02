@@ -12,7 +12,10 @@
 
 // The International Standard Atmosphere, from sea level to 20 km: a
 // troposphere whose temperature falls linearly to 11 km, then an isothermal
-// lower stratosphere.
+// lower stratosphere. Its layers are in geopotential altitude, which counts
+// height by the work done against gravity as it weakens with height, so
+// geometric altitudes are converted first, as the 1976 standard and JSBSim
+// do.
 namespace simon::model {
 
 struct Air final {
@@ -37,10 +40,13 @@ inline constexpr Temperature SEA_LEVEL_TEMPERATURE =
 inline constexpr Pressure SEA_LEVEL_PRESSURE = 101325.0 * pascal;
 inline constexpr auto LAPSE_RATE = units::delta<kelvin>(0.0065) / meter;
 
-inline constexpr Length TROPOPAUSE = 11000.0 * meter;
+// The Earth's radius the standard converts altitudes with.
+inline constexpr Length EARTH_RADIUS = 6356766.0 * meter;
+
+inline constexpr Length TROPOPAUSE = 11000.0 * meter;  // Geopotential.
 inline constexpr Temperature TROPOPAUSE_TEMPERATURE =
     SEA_LEVEL_TEMPERATURE - LAPSE_RATE * TROPOPAUSE;
-inline constexpr Length CEILING = 20000.0 * meter;
+inline constexpr Length CEILING = 20000.0 * meter;  // Geometric.
 
 // The exponent of pressure in temperature through the troposphere.
 inline auto pressure_exponent() -> double {
@@ -49,12 +55,16 @@ inline auto pressure_exponent() -> double {
 
 }  // namespace internal
 
-// The air at `altitude` above sea level. Altitudes above 20 km get the air at
-// 20 km.
-inline auto standard_air(Length altitude) -> Air {
-  using namespace internal;
-  Length h = std::min(altitude, CEILING);
+// The geopotential altitude of a geometric `altitude`.
+inline auto geopotential(Length altitude) -> Length {
+  using internal::EARTH_RADIUS;
+  return EARTH_RADIUS * altitude / (EARTH_RADIUS + altitude);
+}
 
+namespace internal {
+
+// The air at geopotential altitude `h`, at most the ceiling's.
+inline auto air_at_geopotential(Length h) -> Air {
   Temperature temperature = TROPOPAUSE_TEMPERATURE;
   Pressure pressure = 0.0 * pascal;
   if (h <= TROPOPAUSE) {
@@ -79,26 +89,38 @@ inline auto standard_air(Length altitude) -> Air {
   };
 }
 
+}  // namespace internal
+
+// The air at `altitude` above sea level, geometric. Altitudes above 20 km get
+// the air at 20 km.
+inline auto standard_air(Length altitude) -> Air {
+  return internal::air_at_geopotential(
+      geopotential(std::min(altitude, internal::CEILING)));
+}
+
 // The standard atmosphere, tabulated every `spacing` from sea level to 20 km
 // and interpolated linearly. Much cheaper than standard_air, which takes a
 // power or an exponential, and within a few parts in 10^5 of it at the default
-// 100 m. Altitudes outside the table get the air at its ends.
+// 100 m. Altitudes outside the table get the air at its ends. The table is
+// spaced in geopotential altitude, so the tropopause falls on a breakpoint.
 class StandardAirTable final {
  public:
   explicit StandardAirTable(Length spacing = 100.0 * meter)
-      : spacing_{spacing} {
-    auto points = static_cast<std::size_t>(
-                      std::ceil(number_of(internal::CEILING / spacing_))) +
-                  1;
+      : spacing_{spacing},
+        top_{number_of(geopotential(internal::CEILING) / spacing)} {
+    // The last breakpoint may lie past the ceiling, still in the isothermal
+    // layer.
+    auto points = static_cast<std::size_t>(std::ceil(top_)) + 1;
     air_.reserve(points);
     for (std::size_t i = 0; i < points; ++i) {
-      air_.push_back(standard_air(static_cast<double>(i) * spacing_));
+      air_.push_back(
+          internal::air_at_geopotential(static_cast<double>(i) * spacing_));
     }
   }
 
   auto operator()(Length altitude) const -> Air {
-    double position = std::clamp(number_of(altitude / spacing_), 0.0,
-                                 static_cast<double>(air_.size() - 1));
+    double position =
+        std::clamp(number_of(geopotential(altitude) / spacing_), 0.0, top_);
     auto i = std::min(static_cast<std::size_t>(position), air_.size() - 2);
     double weight = position - static_cast<double>(i);
 
@@ -113,6 +135,7 @@ class StandardAirTable final {
 
  private:
   Length spacing_;
+  double top_;  // The ceiling's position in the table.
   std::vector<Air> air_;
 };
 
