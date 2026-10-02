@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -10,6 +11,7 @@
 #include "base/testing.hpp"
 #include "model/aerodynamics.hpp"
 #include "model/aircraft_data.hpp"
+#include "model/flight_control.hpp"
 #include "model/units.hpp"
 
 // The 737's aerodynamics, converted from JSBSim by tools/jsbsim/convert.py,
@@ -24,17 +26,20 @@ using namespace flight::testing;
 
 constexpr char REFERENCE[] = "application/flight/reference/jsbsim_737_aero.csv";
 
-// The inputs `row` records, by their JSBSim names.
-auto read_inputs(const Row& row) -> AeroInputs {
+// The inputs `row` records, by simon's names: the variables, and the
+// aircraft's flight control signals.
+auto read_inputs(const Row& row, const AircraftData& aircraft) -> AeroInputs {
   AeroInputs inputs;
-  for (std::size_t i = 0; i < AERO_VARIABLE_COUNT; ++i) {
-    auto variable = static_cast<AeroVariable>(i);
-    for (const auto& [name, value] : row) {
-      if (aero_variable_named(name) == variable) {
-        inputs[variable] = value;
-      }
+  FlightSignals signals;
+  for (const auto& [name, value] : row) {
+    if (std::optional<AeroVariable> variable = aero_variable_named(name)) {
+      inputs[*variable] = value;
+    } else if (std::optional<std::size_t> signal =
+                   find_signal(aircraft.flight_controls, name)) {
+      signals.values[*signal] = value;
     }
   }
+  inputs.read(aircraft.aero.signals, signals.values);
   return inputs;
 }
 
@@ -53,7 +58,7 @@ TEST_CASE("Aerodynamics737") {
   SECTION("ShouldMatchJsbsimGivenWindAxisForces") {
     double worst = 0.0;
     for (const Row& row : rows) {
-      AeroSums sums = aircraft->aero(read_inputs(row));
+      AeroSums sums = aircraft->aero(read_inputs(row, *aircraft));
       double scale = std::max(std::abs(row.at("lift")), 1.0);
       worst = worse(worst, sums[0], row.at("drag"), scale);
       worst = worse(worst, sums[1], row.at("side"), scale);
@@ -67,7 +72,7 @@ TEST_CASE("Aerodynamics737") {
     double worst_force = 0.0;
     double worst_moment = 0.0;
     for (const Row& row : rows) {
-      AeroSums sums = aircraft->aero(read_inputs(row));
+      AeroSums sums = aircraft->aero(read_inputs(row, *aircraft));
 
       // The reference point from the center of mass, from the structural
       // frame (x aft, z up) to body axes (x forward, z down).

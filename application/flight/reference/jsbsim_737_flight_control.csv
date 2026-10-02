@@ -1,4 +1,4 @@
-elevator_command,aileron_command,rudder_command,flaps_command,gear_command,speedbrake_command,spoilers_command,pitch_trim_command,roll_trim_command,yaw_trim_command,mach,yaw_rate,elevator,left_aileron,right_aileron,rudder,flaps,gear,speedbrake,spoilers
+elevator_command,aileron_command,rudder_command,flaps_command,gear_command,speedbrake_command,spoilers_command,pitch_trim_command,roll_trim_command,yaw_trim_command,mach,yaw_rate,elevator,left_aileron,right_aileron,rudder,flaps_norm,gear,speedbrake_norm,spoilers_norm
 0,0,0,0,0,0,0,0,0,0,0.63200880970713,0,0,0,0,0,0,0.99,0,0
 0.0129989828942444,0.0104997618071766,0.00666658950644076,0,0,0,0,0,0,0,0.631936062968513,-9.39359538505019e-19,0.00389969486827332,0.00367491663251181,-0.00367491663251181,0.00233330632725426,0,0.986666666666667,0,0
 0.0259918637269062,0.0209980944963172,0.013332716057956,0,0,0,0,0,0,0,0.632016628566522,3.21157584213242e-09,0.00779755911807185,0.00734933307371103,-0.00734933307371103,0.00466645174433616,0,0.983333333333334,0,0

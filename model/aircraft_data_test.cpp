@@ -2,6 +2,7 @@
 
 #include "model/aircraft_data.hpp"
 
+#include <optional>
 #include <string>
 
 #include "base/testing.hpp"
@@ -77,6 +78,35 @@ TEST_CASE("ParseAircraft") {
     inputs[AeroVariable::DYNAMIC_PRESSURE] = 2.0;
     inputs[AeroVariable::ALPHA] = 0.1;
     CHECK_THAT(lift[0](inputs), WithinAbs(10.0 * 2.0 * 0.7, 1e-12));
+  }
+
+  SECTION("ShouldReadSignalsGivenFlightControlsBeforeTerms") {
+    std::string text = GLIDER;
+    text.replace(text.find("term lift"), 0, R"(flight_controls
+  block pure_gain flap
+    input flaps_command
+    gain 0.5
+  end
+end
+term drag CDflap
+  constant 3
+  factor flap
+  factor |flap|
+end
+)");
+    auto data = parse_aircraft(text);
+    REQUIRE(data);
+    std::optional<std::size_t> flap =
+        find_signal(data->flight_controls, "flap");
+    REQUIRE(flap);
+    FlightSignals signals;
+    signals.values[*flap] = -0.5;
+    const auto& drag =
+        data->aero.axes[static_cast<std::size_t>(AeroAxis::DRAG)];
+    REQUIRE(drag.size() == 1);
+    AeroInputs inputs;
+    inputs.read(data->aero.signals, signals.values);
+    CHECK_THAT(drag[0](inputs), WithinAbs(3.0 * -0.5 * 0.5, 1e-12));
   }
 
   SECTION("ShouldSayWhereGivenUnknownVariable") {

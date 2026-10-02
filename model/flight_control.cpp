@@ -26,14 +26,6 @@ constexpr std::array<std::string_view, FLIGHT_SIGNAL_COUNT> SIGNAL_NAMES{
     "yaw_rate",
     "alpha",
     "beta",
-    "elevator",
-    "left_aileron",
-    "right_aileron",
-    "rudder",
-    "flaps",
-    "gear",
-    "speedbrake",
-    "spoilers",
 };
 
 auto input_of(const FlightBlock& block, const FlightSignals& signals)
@@ -76,14 +68,14 @@ auto traverse(const FlightBlock& block, double output, double input, double dt)
   return output;
 }
 
-auto write(const FlightBlock& block, FlightSignals& signals, double value)
+auto write(const FlightBlock& block, InOut<FlightSignals> signals, double value)
     -> void {
   if (block.clip) {
     value = std::clamp(value, block.clip->first, block.clip->second);
   }
-  signals.values[block.signal] = value;
+  signals->values[block.signal] = value;
   if (block.output) {
-    signals.values[*block.output] = value;
+    signals->values[*block.output] = value;
   }
 }
 
@@ -101,16 +93,25 @@ auto flight_signal_name(FlightSignal signal) -> std::string_view {
   return SIGNAL_NAMES[index_of(signal)];
 }
 
+auto find_signal(const FlightControlData& controls, std::string_view name)
+    -> std::optional<std::size_t> {
+  auto found = std::ranges::find(controls.signals, name);
+  if (found == controls.signals.end()) {
+    return std::nullopt;
+  }
+  return static_cast<std::size_t>(found - controls.signals.begin());
+}
+
 auto run_flight_controls(const FlightControlData& controls,
-                         FlightSignals& signals, Time dt) -> void {
+                         InOut<FlightSignals> signals, Time dt) -> void {
   double seconds = dt.numerical_value_in(second);
   for (const FlightBlock& block : controls.blocks) {
-    double input = input_of(block, signals);
+    double input = input_of(block, *signals);
     double value = 0.0;
     switch (block.kind) {
       case FlightBlock::Kind::SUMMER:
         for (const FlightBlock::Input& each : block.inputs) {
-          double term = signals.values[each.signal];
+          double term = signals->values[each.signal];
           value += each.negated ? -term : term;
         }
         value += block.bias;
@@ -120,7 +121,7 @@ auto run_flight_controls(const FlightControlData& controls,
         break;
       case FlightBlock::Kind::SCHEDULED_GAIN:
         value = block.gain *
-                (*block.schedule)(signals.values[block.schedule_signal]) *
+                (*block.schedule)(signals->values[block.schedule_signal]) *
                 input;
         break;
       case FlightBlock::Kind::SURFACE_SCALE: {
@@ -141,7 +142,7 @@ auto run_flight_controls(const FlightControlData& controls,
         if (block.scale) {
           input *= block.detents.back();
         }
-        value = traverse(block, signals.values[block.signal], input, seconds);
+        value = traverse(block, signals->values[block.signal], input, seconds);
         break;
     }
     write(block, signals, value);
@@ -149,10 +150,10 @@ auto run_flight_controls(const FlightControlData& controls,
 }
 
 auto settle_flight_controls(const FlightControlData& controls,
-                            FlightSignals& signals) -> void {
+                            InOut<FlightSignals> signals) -> void {
   for (const FlightBlock& block : controls.blocks) {
     if (block.kind == FlightBlock::Kind::KINEMATIC) {
-      double input = input_of(block, signals);
+      double input = input_of(block, *signals);
       if (block.scale) {
         input *= block.detents.back();
       }

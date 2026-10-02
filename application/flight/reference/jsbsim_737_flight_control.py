@@ -42,10 +42,10 @@ SURFACES = [
     ('left_aileron', 'fcs/left-aileron-pos-rad'),
     ('right_aileron', 'fcs/right-aileron-pos-rad'),
     ('rudder', 'fcs/rudder-pos-rad'),
-    ('flaps', 'fcs/flap-pos-norm'),
+    ('flaps_norm', 'fcs/flap-pos-norm'),
     ('gear', 'gear/gear-pos-norm'),
-    ('speedbrake', 'fcs/speedbrake-pos-norm'),
-    ('spoilers', 'fcs/spoiler-pos-norm'),
+    ('speedbrake_norm', 'fcs/speedbrake-pos-norm'),
+    ('spoilers_norm', 'fcs/spoiler-pos-norm'),
 ]
 
 

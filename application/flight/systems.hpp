@@ -324,23 +324,21 @@ struct FlySurfaces final       //
 
 // Each step, each rigid aircraft's flight controls read its state and its
 // pilot's commands, and set its control surfaces.
-struct RunFlightControls final    //
-    : System<FlightSignals,       //
-             const RigidBody,     //
-             const AircraftType,  //
-             ControlSurfaces> {
+struct RunFlightControls final  //
+    : System<FlightSignals,     //
+             const RigidBody,   //
+             const AircraftType> {
   using SystemWorld = ProjectedWorld<RunFlightControls>;
 
   explicit RunFlightControls(model::Earth earth = model::Earth::flat())
       : earth_{earth} {}
 
-  auto operator()(SystemWorld&, Entity,       //
-                  FlightSignals& signals,     //
-                  const RigidBody* body,      //
-                  const AircraftType* type,   //
-                  ControlSurfaces* surfaces,  //
+  auto operator()(SystemWorld&, Entity,      //
+                  FlightSignals& signals,    //
+                  const RigidBody* body,     //
+                  const AircraftType* type,  //
                   Step step) const -> void {
-    if (!body || !type || !type->data || !surfaces) {
+    if (!body || !type || !type->data) {
       return;
     }
     model::Time time = model::seconds(step.time.time_since_epoch());
@@ -360,18 +358,8 @@ struct RunFlightControls final    //
     signals[ALPHA] = std::atan2(uvw.z(), uvw.x());
     signals[BETA] = std::atan2(uvw.y(), std::hypot(uvw.x(), uvw.z()));
 
-    model::run_flight_controls(type->data->flight_controls, signals,
+    model::run_flight_controls(type->data->flight_controls, InOut(signals),
                                model::seconds(step.dt));
-    *surfaces = ControlSurfaces{
-        .elevator = signals[ELEVATOR],
-        .left_aileron = signals[LEFT_AILERON],
-        .right_aileron = signals[RIGHT_AILERON],
-        .rudder = signals[RUDDER],
-        .flaps = signals[FLAPS],
-        .gear = signals[GEAR],
-        .speedbrake = signals[SPEEDBRAKE],
-        .spoilers = signals[SPOILERS],
-    };
   }
 
  private:
@@ -405,7 +393,7 @@ struct RunEngines final             //
     }
     model::EngineAir air = model::compute_engine_air(
         *body, earth_, air_, model::seconds(step.time.time_since_epoch()));
-    model::run_engines(*type->data, engines, *controls, *tanks, air,
+    model::run_engines(*type->data, InOut(engines), *controls, *tanks, air,
                        model::seconds(step.dt));
   }
 
@@ -416,31 +404,31 @@ struct RunEngines final             //
 
 // The rate of each rigid aircraft's body, over a flat Earth unless
 // constructed with a round one.
-struct RigidAircraftRates final      //
-    : System<RigidBodyRate,          //
-             const RigidBody,        //
-             const ControlSurfaces,  //
-             const Engines,          //
-             const MassBalance,      //
+struct RigidAircraftRates final    //
+    : System<RigidBodyRate,        //
+             const RigidBody,      //
+             const FlightSignals,  //
+             const Engines,        //
+             const MassBalance,    //
              const AircraftType> {
   using SystemWorld = ProjectedWorld<RigidAircraftRates>;
 
   explicit RigidAircraftRates(model::Earth earth = model::Earth::flat())
       : earth_{earth} {}
 
-  auto operator()(SystemWorld&, Entity,             //
-                  RigidBodyRate& rate,              //
-                  const RigidBody* body,            //
-                  const ControlSurfaces* surfaces,  //
-                  const Engines* engines,           //
-                  const MassBalance* mass,          //
-                  const AircraftType* type,         //
+  auto operator()(SystemWorld&, Entity,          //
+                  RigidBodyRate& rate,           //
+                  const RigidBody* body,         //
+                  const FlightSignals* signals,  //
+                  const Engines* engines,        //
+                  const MassBalance* mass,       //
+                  const AircraftType* type,      //
                   Step step) const -> void {
-    if (!body || !surfaces || !engines || !mass || !type || !type->data) {
+    if (!body || !signals || !engines || !mass || !type || !type->data) {
       return;
     }
     rate = model::rigid_aircraft_rate(
-        *body, *surfaces, *engines, *mass, *type->data, earth_, air_,
+        *body, *signals, *engines, *mass, *type->data, earth_, air_,
         model::seconds(step.time.time_since_epoch()));
   }
 
@@ -471,7 +459,8 @@ struct BurnFuel final             //
     if (!engines || !type || !type->data || !mass) {
       return;
     }
-    model::burn_fuel(*type->data, *engines, tanks, model::seconds(step.dt));
+    model::burn_fuel(*type->data, *engines, InOut(tanks),
+                     model::seconds(step.dt));
     *mass = model::compute_mass_balance(*type->data, tanks);
   }
 };

@@ -45,10 +45,10 @@ COLUMNS = [
     ('left_aileron', 'fcs/left-aileron-pos-rad', 1.0),
     ('right_aileron', 'fcs/right-aileron-pos-rad', 1.0),
     ('rudder', 'fcs/rudder-pos-rad', 1.0),
-    ('flaps', 'fcs/flap-pos-norm', 1.0),
+    ('flaps_norm', 'fcs/flap-pos-norm', 1.0),
     ('gear', 'gear/gear-pos-norm', 1.0),
-    ('speedbrake', 'fcs/speedbrake-pos-norm', 1.0),
-    ('spoilers', 'fcs/spoiler-pos-norm', 1.0),
+    ('speedbrake_norm', 'fcs/speedbrake-pos-norm', 1.0),
+    ('spoilers_norm', 'fcs/spoiler-pos-norm', 1.0),
     # The center of mass, structural frame.
     ('cg_x', 'inertia/cg-x-in', IN),
     ('cg_y', 'inertia/cg-y-in', IN),

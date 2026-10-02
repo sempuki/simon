@@ -328,12 +328,12 @@ auto has_fuel(const TurbineData& turbine, const FuelTanks& tanks) -> bool {
 
 }  // namespace
 
-auto run_engines(const AircraftData& aircraft, Engines& engines,
+auto run_engines(const AircraftData& aircraft, InOut<Engines> engines,
                  const EngineControls& controls, const FuelTanks& tanks,
                  const EngineAir& air, Time dt) -> void {
   for (std::size_t i = 0; i < aircraft.engines.size(); ++i) {
     const TurbineData& turbine = aircraft.engines[i];
-    TurbineState& state = engines.turbines[i];
+    TurbineState& state = engines->turbines[i];
     if (!has_fuel(turbine, tanks)) {
       state.thrust = 0.0 * newton;
       state.fuel_flow = 0.0;
@@ -344,11 +344,11 @@ auto run_engines(const AircraftData& aircraft, Engines& engines,
 }
 
 auto burn_fuel(const AircraftData& aircraft, const Engines& engines,
-               FuelTanks& tanks, Time dt) -> void {
+               InOut<FuelTanks> tanks, Time dt) -> void {
   for (std::size_t i = 0; i < aircraft.engines.size(); ++i) {
     const TurbineData& turbine = aircraft.engines[i];
     auto feeding = std::ranges::count_if(turbine.feeds, [&](std::size_t tank) {
-      return tanks.contents[tank] > 0.0 * kilogram;
+      return tanks->contents[tank] > 0.0 * kilogram;
     });
     if (feeding == 0) {
       continue;
@@ -356,9 +356,9 @@ auto burn_fuel(const AircraftData& aircraft, const Engines& engines,
     Mass share = engines.turbines[i].fuel_flow * dt.numerical_value_in(second) /
                  static_cast<double>(feeding) * kilogram;
     for (std::size_t tank : turbine.feeds) {
-      if (tanks.contents[tank] > 0.0 * kilogram) {
-        tanks.contents[tank] =
-            max(tanks.contents[tank] - share, 0.0 * kilogram);
+      if (tanks->contents[tank] > 0.0 * kilogram) {
+        tanks->contents[tank] =
+            max(tanks->contents[tank] - share, 0.0 * kilogram);
       }
     }
   }
@@ -366,15 +366,15 @@ auto burn_fuel(const AircraftData& aircraft, const Engines& engines,
 
 //-- Aerodynamics --------------------------------------------------------------
 
-auto compute_aero_inputs(const RigidBody& body, const ControlSurfaces& surfaces,
+auto compute_aero_inputs(const RigidBody& body, const FlightSignals& signals,
                          const AircraftData& aircraft,
                          const Displacement& reference, const Earth& earth,
                          const StandardAirTable& air, Time time) -> AeroInputs {
-  return compute_aero_inputs(body, surfaces, aircraft, reference, earth,
+  return compute_aero_inputs(body, signals, aircraft, reference, earth,
                              earth.place(body, time), air);
 }
 
-auto compute_aero_inputs(const RigidBody& body, const ControlSurfaces& surfaces,
+auto compute_aero_inputs(const RigidBody& body, const FlightSignals& signals,
                          const AircraftData& aircraft,
                          const Displacement& reference, const Earth& earth,
                          const Place& place, const StandardAirTable& air)
@@ -389,6 +389,7 @@ auto compute_aero_inputs(const RigidBody& body, const ControlSurfaces& surfaces,
   double density = here.density.numerical_value_in(kilogram_per_cubic_meter);
 
   AeroInputs inputs;
+  inputs.read(aircraft.aero.signals, signals.values);
   using enum AeroVariable;
   inputs[ALPHA] = along_and_down > 0.0 ? std::atan2(uvw.z(), uvw.x()) : 0.0;
   inputs[BETA] = speed > 0.0 ? std::atan2(uvw.y(), along_and_down) : 0.0;
@@ -403,15 +404,6 @@ auto compute_aero_inputs(const RigidBody& body, const ControlSurfaces& surfaces,
   inputs[ROLL_RATE] = rates.x();
   inputs[PITCH_RATE] = rates.y();
   inputs[YAW_RATE] = rates.z();
-  inputs[ELEVATOR] = surfaces.elevator;
-  inputs[ELEVATOR_MAGNITUDE] = std::abs(surfaces.elevator);
-  inputs[LEFT_AILERON] = surfaces.left_aileron;
-  inputs[RIGHT_AILERON] = surfaces.right_aileron;
-  inputs[RUDDER] = surfaces.rudder;
-  inputs[FLAPS] = surfaces.flaps;
-  inputs[GEAR] = surfaces.gear;
-  inputs[SPEEDBRAKE] = surfaces.speedbrake;
-  inputs[SPOILERS] = surfaces.spoilers;
   // The reference point's height: the body's, less how far down from it the
   // point lies.
   double below =
@@ -439,14 +431,13 @@ auto sum(const AeroModel& model, AeroAxis axis, const AeroInputs& inputs)
 
 auto reads(const AeroModel& model, AeroAxis axis, AeroVariable variable)
     -> bool {
+  auto is = [&](AeroInput input) { return input == aero_input(variable); };
   for (const AeroTerm& term : model.axes[index(axis)]) {
-    for (AeroVariable factor : term.factors) {
-      if (factor == variable) {
-        return true;
-      }
+    if (std::ranges::any_of(term.factors, is)) {
+      return true;
     }
     for (const AeroTable& table : term.tables) {
-      if (table.row == variable || table.column == variable) {
+      if (is(table.row) || (table.column && is(*table.column))) {
         return true;
       }
     }
@@ -456,7 +447,7 @@ auto reads(const AeroModel& model, AeroAxis axis, AeroVariable variable)
 
 }  // namespace
 
-auto rigid_aircraft_rate(const RigidBody& body, const ControlSurfaces& surfaces,
+auto rigid_aircraft_rate(const RigidBody& body, const FlightSignals& signals,
                          const Engines& engines, const MassBalance& mass,
                          const AircraftData& aircraft, const Earth& earth,
                          const StandardAirTable& air, Time time)
@@ -465,7 +456,7 @@ auto rigid_aircraft_rate(const RigidBody& body, const ControlSurfaces& surfaces,
   Displacement reference =
       body_offset(aircraft.aero_reference, mass.center_of_mass);
   Place place = earth.place(body, time);
-  AeroInputs inputs = compute_aero_inputs(body, surfaces, aircraft, reference,
+  AeroInputs inputs = compute_aero_inputs(body, signals, aircraft, reference,
                                           earth, place, air);
   Acceleration gravity = earth.gravity(place);
   Angle alpha = inputs[AeroVariable::ALPHA] * radian;

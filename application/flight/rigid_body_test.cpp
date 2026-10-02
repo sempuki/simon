@@ -138,8 +138,8 @@ TEST_CASE("RigidBody737") {
       MassBalance balance = compute_mass_balance(*aircraft, fuel);
       Displacement reference =
           body_offset(aircraft->aero_reference, balance.center_of_mass);
-      AeroInputs inputs = compute_aero_inputs(
-          body, ControlSurfaces{}, *aircraft, reference, earth, air, time);
+      AeroInputs inputs = compute_aero_inputs(body, FlightSignals{}, *aircraft,
+                                              reference, earth, air, time);
 
       using enum AeroVariable;
       worst_angle = worse(worst_angle, inputs[ALPHA], row.at("alpha"), 1.0);

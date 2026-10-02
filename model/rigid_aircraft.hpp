@@ -95,19 +95,6 @@ class Earth final {
   bool round_ = false;
 };
 
-// The control surfaces' positions: deflections in radians, extensions from 0
-// to 1.
-struct ControlSurfaces final {
-  double elevator = 0.0;
-  double left_aileron = 0.0;
-  double right_aileron = 0.0;
-  double rudder = 0.0;
-  double flaps = 0.0;
-  double gear = 0.0;
-  double speedbrake = 0.0;
-  double spoilers = 0.0;
-};
-
 // Each engine's state, in the aircraft data's order.
 struct Engines final {
   std::array<TurbineState, MAX_ENGINES> turbines{};
@@ -138,14 +125,14 @@ auto compute_engine_air(const RigidBody& body, const Earth& earth,
 
 // Advances each engine by `dt` at its throttle. An engine whose tanks are
 // empty makes no thrust and burns nothing.
-auto run_engines(const AircraftData& aircraft, Engines& engines,
+auto run_engines(const AircraftData& aircraft, InOut<Engines> engines,
                  const EngineControls& controls, const FuelTanks& tanks,
                  const EngineAir& air, Time dt) -> void;
 
 // Burns each engine's fuel flow for `dt`, from its feed tanks that have fuel,
 // in equal shares, as JSBSim does.
 auto burn_fuel(const AircraftData& aircraft, const Engines& engines,
-               FuelTanks& tanks, Time dt) -> void;
+               InOut<FuelTanks> tanks, Time dt) -> void;
 
 // An aircraft's mass properties as loaded: its mass, its inertia about its
 // center of mass in body axes, and where that center is, in the structural
@@ -171,13 +158,14 @@ auto compute_mass_balance(const AircraftData& aircraft, const FuelTanks& tanks)
 auto body_offset(const Displacement& structural,
                  const Displacement& center_of_mass) -> Displacement;
 
-// The rate of a rigid aircraft's body, under its aerodynamics, its engines'
+// The rate of a rigid aircraft's body, under its aerodynamics, which read its
+// flight control `signals`, its engines'
 // thrust, along body x from where each is mounted, and gravity. Lift is summed
 // first, so induced drag reads this
 // step's lift coefficient, and the forces before the moments, so the rate of
 // angle of attack that the moments read is this step's exact one, as long as
 // no force reads it; if one does, the forces are found again with it.
-auto rigid_aircraft_rate(const RigidBody& body, const ControlSurfaces& surfaces,
+auto rigid_aircraft_rate(const RigidBody& body, const FlightSignals& signals,
                          const Engines& engines, const MassBalance& mass,
                          const AircraftData& aircraft, const Earth& earth,
                          const StandardAirTable& air, Time time)
@@ -187,11 +175,11 @@ auto rigid_aircraft_rate(const RigidBody& body, const ControlSurfaces& surfaces,
 // attack, which needs the body's acceleration. `reference` is the aerodynamic
 // reference point from the center of mass, in body axes: ground effect reads
 // its height.
-auto compute_aero_inputs(const RigidBody& body, const ControlSurfaces& surfaces,
+auto compute_aero_inputs(const RigidBody& body, const FlightSignals& signals,
                          const AircraftData& aircraft,
                          const Displacement& reference, const Earth& earth,
                          const StandardAirTable& air, Time time) -> AeroInputs;
-auto compute_aero_inputs(const RigidBody& body, const ControlSurfaces& surfaces,
+auto compute_aero_inputs(const RigidBody& body, const FlightSignals& signals,
                          const AircraftData& aircraft,
                          const Displacement& reference, const Earth& earth,
                          const Place& place, const StandardAirTable& air)

@@ -20,12 +20,14 @@
 // writes them from a JSBSim aircraft's <flight_control>.
 //
 // Blocks read and write signals, plain numbers each aircraft keeps: the
-// commands and state it is given, the surfaces it sets, and whatever the
-// blocks name in between. A signal keeps its value from step to step, so a
-// block that reads one a later block writes reads the step before's.
+// commands and state it is given, and whatever the blocks name, such as the
+// surface positions the aerodynamics read. A signal keeps its value from step
+// to step, so a block that reads one a later block writes reads the step
+// before's.
 namespace simon::model {
 
-// The signals every flight control system has, in a fixed place.
+// The signals every flight control system has, in a fixed place: those the
+// aircraft is given.
 enum class FlightSignal : std::uint8_t {
   // Commands, from -1 to 1 or 0 to 1.
   ELEVATOR_COMMAND,
@@ -45,15 +47,6 @@ enum class FlightSignal : std::uint8_t {
   YAW_RATE,
   ALPHA,  // rad.
   BETA,
-  // Surfaces: deflections in radians, extensions from 0 to 1.
-  ELEVATOR,
-  LEFT_AILERON,
-  RIGHT_AILERON,
-  RUDDER,
-  FLAPS,
-  GEAR,
-  SPEEDBRAKE,
-  SPOILERS,
   COUNT,
 };
 
@@ -135,14 +128,18 @@ struct FlightControlData final {
   std::vector<FlightBlock> blocks;
 };
 
+// The index of the signal `controls` names `name`, if any.
+auto find_signal(const FlightControlData& controls, std::string_view name)
+    -> std::optional<std::size_t>;
+
 // Runs every block once, in order, over `dt`.
 auto run_flight_controls(const FlightControlData& controls,
-                         FlightSignals& signals, Time dt) -> void;
+                         InOut<FlightSignals> signals, Time dt) -> void;
 
 // Sets every kinematic block, and its outputs, to where its input sends it,
 // as if it had all the time it needs: for an aircraft that starts with its
 // flaps and gear where its commands put them.
 auto settle_flight_controls(const FlightControlData& controls,
-                            FlightSignals& signals) -> void;
+                            InOut<FlightSignals> signals) -> void;
 
 }  // namespace simon::model

@@ -2421,7 +2421,7 @@ turbines, flight control system and aerodynamics. The 737 is
 
 | Layer | Holds |
 |---|---|
-| `model/aerodynamics` | The coefficient build-up: terms of a constant, state variables and tables, summed by axis, and turned into body loads about the center of mass |
+| `model/aerodynamics` | The coefficient build-up: terms of a constant, inputs and tables of inputs, summed by axis, and turned into body loads about the center of mass. An input is a state variable or a flight control signal, such as a surface's deflection, so an aircraft's surfaces need no code |
 | `model/flight_control` | Flight control blocks over named signals: summers, gains, scheduled gains, surface scales and kinematic actuators |
 | `model/turbine` | JSBSim's turbine: spools, thrust from idle to military, fuel flow |
 | `model/earth` | The WGS84 ellipsoid, J2 gravitation, the Earth's rotation, geodetic conversion |

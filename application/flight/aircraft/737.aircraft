@@ -115,7 +115,7 @@ flight_controls
   end
   block surface_scale elevator-normalized
     input elevator
-    output elevator-pos-norm
+    output elevator_norm
     domain -0.29999999999999999 0.29999999999999999
     range -1 1
     zero_centered 1
@@ -141,14 +141,14 @@ flight_controls
   end
   block surface_scale left-aileron-normalized
     input left_aileron
-    output left-aileron-pos-norm
+    output left_aileron_norm
     domain -0.34999999999999998 0.34999999999999998
     range -1 1
     zero_centered 1
   end
   block surface_scale right-aileron-normalized
     input right_aileron
-    output right-aileron-pos-norm
+    output right_aileron_norm
     domain -0.34999999999999998 0.34999999999999998
     range -1 1
     zero_centered 1
@@ -188,14 +188,14 @@ flight_controls
   end
   block surface_scale rudder-normalized
     input rudder
-    output rudder-pos-norm
+    output rudder_norm
     domain -0.34999999999999998 0.34999999999999998
     range -1 1
     zero_centered 1
   end
   block kinematic flaps-control
     input flaps_command
-    output flaps
+    output flaps_norm
     setting 0 0
     setting 0.125 5
     setting 0.25 4
@@ -214,13 +214,13 @@ flight_controls
   end
   block kinematic flight-spoilers-control
     input speedbrake_command
-    output speedbrake
+    output speedbrake_norm
     setting 0 0
     setting 1 0.59999999999999998
   end
   block kinematic ground-spoilers-control
     input spoilers_command
-    output spoilers
+    output spoilers_norm
     setting 0 0
     setting 1 0.59999999999999998
   end
@@ -266,7 +266,7 @@ end
 term drag CDflap
   constant 6.4185781305599994
   factor dynamic_pressure
-  factor flaps
+  factor flaps_norm
 end
 term drag CDgear
   constant 1.6318418976
@@ -276,12 +276,12 @@ end
 term drag CDsb
   constant 2.1757891967999998
   factor dynamic_pressure
-  factor speedbrake
+  factor speedbrake_norm
 end
 term drag CDsp
   constant 4.3515783935999997
   factor dynamic_pressure
-  factor spoilers
+  factor spoilers_norm
 end
 term drag CDbeta
   constant 108.78945984000001
@@ -297,7 +297,7 @@ end
 term drag CDde
   constant 6.4185781305599994
   factor dynamic_pressure
-  factor elevator_magnitude
+  factor |elevator|
 end
 term side CYb
   constant -108.78945984000001
@@ -322,11 +322,11 @@ term lift CLalpha
     1 1.002
     1.1000000000000001 1
   end
-  table speedbrake
+  table speedbrake_norm
     0 1
     0.10000000000000001 0.84999999999999998
   end
-  table spoilers
+  table spoilers_norm
     0 1
     0.10000000000000001 0.59999999999999998
   end
@@ -340,7 +340,7 @@ end
 term lift dCLflap
   constant 97.910513856000009
   factor dynamic_pressure
-  factor flaps
+  factor flaps_norm
   table height_over_span
     0 1.2030000000000001
     0.10000000000000001 1.127
@@ -356,11 +356,11 @@ term lift dCLflap
     1 1.002
     1.1000000000000001 1
   end
-  table speedbrake
+  table speedbrake_norm
     0 1
     0.10000000000000001 0.84999999999999998
   end
-  table spoilers
+  table spoilers_norm
     0 1
     0.10000000000000001 0.59999999999999998
   end

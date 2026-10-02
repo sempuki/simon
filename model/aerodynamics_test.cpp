@@ -2,6 +2,7 @@
 
 #include "model/aerodynamics.hpp"
 
+#include <array>
 #include <numbers>
 
 #include "base/testing.hpp"
@@ -18,20 +19,31 @@ TEST_CASE("AeroTerm") {
   inputs[AeroVariable::MACH] = 0.5;
 
   SECTION("ShouldMultiplyConstantByFactors") {
-    AeroTerm term{
-        .constant = 2.0,
-        .factors = {AeroVariable::DYNAMIC_PRESSURE, AeroVariable::ALPHA}};
+    AeroTerm term{.constant = 2.0,
+                  .factors = {aero_input(AeroVariable::DYNAMIC_PRESSURE),
+                              aero_input(AeroVariable::ALPHA)}};
     CHECK_THAT(term(inputs), WithinAbs(200.0, 1e-12));
+  }
+
+  SECTION("ShouldReadSignalsGivenSignalAndMagnitudeFactors") {
+    std::array<double, 3> signals{7.0, 0.5, -0.25};
+    std::array<AeroSignal, 2> read{AeroSignal{.signal = 1},
+                                   AeroSignal{.signal = 2, .magnitude = true}};
+    inputs.read(read, signals);
+    AeroTerm term{.constant = 2.0,
+                  .factors = {AeroInput{.index = AERO_VARIABLE_COUNT},
+                              AeroInput{.index = AERO_VARIABLE_COUNT + 1}}};
+    CHECK_THAT(term(inputs), WithinAbs(2.0 * 0.5 * 0.25, 1e-12));
   }
 
   SECTION("ShouldMultiplyByTablesGivenTablesOfOneAndTwoVariables") {
     AeroTerm term{
         .constant = 1.0,
         .tables = {
-            AeroTable{.row = AeroVariable::ALPHA,
+            AeroTable{.row = aero_input(AeroVariable::ALPHA),
                       .table = Table1<>{{0.0, 0.2}, {0.0, 2.0}}},
-            AeroTable{.row = AeroVariable::MACH,
-                      .column = AeroVariable::ALPHA,
+            AeroTable{.row = aero_input(AeroVariable::MACH),
+                      .column = aero_input(AeroVariable::ALPHA),
                       .table = Table2<>{{0.0, 1.0}, {0.0, 0.2}, {1, 1, 3, 3}}},
         }};
     // 1.0 from the first table, times 2.0 from the second.

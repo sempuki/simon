@@ -24,15 +24,6 @@ constexpr std::array<std::pair<std::string_view, AeroVariable>,
         {"alpha_rate", AeroVariable::ALPHA_RATE},
         {"lift_coefficient_squared", AeroVariable::LIFT_COEFFICIENT_SQUARED},
         {"height_over_span", AeroVariable::HEIGHT_OVER_SPAN},
-        {"elevator", AeroVariable::ELEVATOR},
-        {"elevator_magnitude", AeroVariable::ELEVATOR_MAGNITUDE},
-        {"left_aileron", AeroVariable::LEFT_AILERON},
-        {"right_aileron", AeroVariable::RIGHT_AILERON},
-        {"rudder", AeroVariable::RUDDER},
-        {"flaps", AeroVariable::FLAPS},
-        {"gear", AeroVariable::GEAR},
-        {"speedbrake", AeroVariable::SPEEDBRAKE},
-        {"spoilers", AeroVariable::SPOILERS},
         {"density_altitude", AeroVariable::DENSITY_ALTITUDE},
     }};
 
@@ -76,7 +67,7 @@ auto AeroTable::operator()(const AeroInputs& inputs) const -> double {
 
 auto AeroTerm::operator()(const AeroInputs& inputs) const -> double {
   double value = constant;
-  for (AeroVariable factor : factors) {
+  for (AeroInput factor : factors) {
     value *= inputs[factor];
   }
   for (const AeroTable& table : tables) {

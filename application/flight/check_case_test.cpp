@@ -125,8 +125,8 @@ auto fly(Case flown, Duration dt, const model::AircraftData& data,
   signals[PITCH_TRIM_COMMAND] = trim.at("pitch_trim");
   signals[ROLL_TRIM_COMMAND] = trim.at("roll_trim");
   signals[YAW_TRIM_COMMAND] = trim.at("yaw_trim");
-  model::settle_flight_controls(data.flight_controls, signals);
-  model::run_flight_controls(data.flight_controls, signals,
+  model::settle_flight_controls(data.flight_controls, InOut(signals));
+  model::run_flight_controls(data.flight_controls, InOut(signals),
                              0.0 * model::second);
   EngineControls controls{
       .throttle = {trim.at("throttle_0"), trim.at("throttle_1")}};
@@ -143,7 +143,6 @@ auto fly(Case flown, Duration dt, const model::AircraftData& data,
                       .with(body)
                       .with(RigidBodyRate{})
                       .with(signals)
-                      .with(ControlSurfaces{})
                       .with(controls)
                       .with(engines)
                       .with(tanks)

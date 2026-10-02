@@ -79,8 +79,8 @@ auto create_rigid_aircraft(const model::AircraftData& data,
 
   FlightSignals signals;
   signals[model::FlightSignal::PITCH_TRIM_COMMAND] = trim.pitch_trim;
-  model::settle_flight_controls(data.flight_controls, signals);
-  model::run_flight_controls(data.flight_controls, signals,
+  model::settle_flight_controls(data.flight_controls, InOut(signals));
+  model::run_flight_controls(data.flight_controls, InOut(signals),
                              0.0 * model::second);
   EngineControls controls;
   controls.throttle.fill(trim.throttle);
@@ -95,7 +95,6 @@ auto create_rigid_aircraft(const model::AircraftData& data,
       .with(body)
       .with(RigidBodyRate{})
       .with(signals)
-      .with(ControlSurfaces{})
       .with(controls)
       .with(engines)
       .with(tanks)

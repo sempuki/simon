@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "application/flight/testing.hpp"
@@ -40,11 +41,9 @@ constexpr std::array COMMANDS{
     FlightSignal::YAW_RATE,
 };
 
-constexpr std::array SURFACES{
-    FlightSignal::ELEVATOR,      FlightSignal::LEFT_AILERON,
-    FlightSignal::RIGHT_AILERON, FlightSignal::RUDDER,
-    FlightSignal::FLAPS,         FlightSignal::GEAR,
-    FlightSignal::SPEEDBRAKE,    FlightSignal::SPOILERS,
+constexpr std::array<std::string_view, 8> SURFACES{
+    "elevator",   "left_aileron", "right_aileron",   "rudder",
+    "flaps_norm", "gear",         "speedbrake_norm", "spoilers_norm",
 };
 
 auto name_of(FlightSignal signal) -> std::string {
@@ -58,6 +57,9 @@ TEST_CASE("FlightControl737") {
   REQUIRE(aircraft);
   const FlightControlData& controls = aircraft->flight_controls;
   REQUIRE(controls.blocks.size() > 10);
+  for (std::string_view surface : SURFACES) {
+    REQUIRE(find_signal(controls, surface));
+  }
   std::vector<Row> rows = load_rows(REFERENCE);
   REQUIRE(rows.size() > 800);
 
@@ -79,12 +81,14 @@ TEST_CASE("FlightControl737") {
       for (FlightSignal command : COMMANDS) {
         signals[command] = row.at(name_of(command));
       }
-      run_flight_controls(controls, signals, DT * second);
-      for (FlightSignal surface : SURFACES) {
-        double error = std::abs(signals[surface] - row.at(name_of(surface)));
+      run_flight_controls(controls, InOut(signals), DT * second);
+      for (std::string_view surface : SURFACES) {
+        std::string name{surface};
+        double error = std::abs(
+            signals.values[*find_signal(controls, surface)] - row.at(name));
         if (error > worst) {
           worst = error;
-          where = name_of(surface) + " at frame " + std::to_string(i);
+          where = name + " at frame " + std::to_string(i);
         }
       }
     }
@@ -96,9 +100,9 @@ TEST_CASE("FlightControl737") {
     FlightSignals signals;
     signals[FlightSignal::FLAPS_COMMAND] = 0.5;
     signals[FlightSignal::GEAR_COMMAND] = 1.0;
-    settle_flight_controls(controls, signals);
-    CHECK(signals[FlightSignal::FLAPS] == 0.5);
-    CHECK(signals[FlightSignal::GEAR] == 1.0);
+    settle_flight_controls(controls, InOut(signals));
+    CHECK(signals.values[*find_signal(controls, "flaps_norm")] == 0.5);
+    CHECK(signals.values[*find_signal(controls, "gear")] == 1.0);
   }
 }
 

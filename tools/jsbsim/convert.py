@@ -19,6 +19,7 @@ Anything JSBSim can express that this subset cannot, such as a sum inside a
 product, stops the conversion with the function's name.
 """
 
+import math
 import os
 import sys
 import xml.etree.ElementTree as ElementTree
@@ -31,8 +32,8 @@ SLUG = LBF / FT  # kg: a slug is a pound-force second squared per foot.
 SLUG_FT2 = SLUG * FT * FT  # kg m^2.
 PSF = LBF / (FT * FT)  # Pa.
 
-# JSBSim's state properties, by simon's name for them and the factor from
-# JSBSim's units to SI.
+# JSBSim's aerodynamic state properties, by simon's name for them and the
+# factor from JSBSim's units to SI.
 VARIABLES = {
     'aero/qbar-psf': ('dynamic_pressure', PSF),
     'aero/alpha-rad': ('alpha', 1.0),
@@ -46,15 +47,6 @@ VARIABLES = {
     'aero/alphadot-rad_sec': ('alpha_rate', 1.0),
     'aero/cl-squared': ('lift_coefficient_squared', 1.0),
     'aero/h_b-mac-ft': ('height_over_span', 1.0),  # A ratio, despite its name.
-    'fcs/elevator-pos-rad': ('elevator', 1.0),
-    'fcs/mag-elevator-pos-rad': ('elevator_magnitude', 1.0),
-    'fcs/left-aileron-pos-rad': ('left_aileron', 1.0),
-    'fcs/right-aileron-pos-rad': ('right_aileron', 1.0),
-    'fcs/rudder-pos-rad': ('rudder', 1.0),
-    'fcs/flap-pos-norm': ('flaps', 1.0),
-    'gear/gear-pos-norm': ('gear', 1.0),
-    'fcs/speedbrake-pos-norm': ('speedbrake', 1.0),
-    'fcs/spoiler-pos-norm': ('spoilers', 1.0),
     'atmosphere/density-altitude': ('density_altitude', FT),
 }
 
@@ -93,16 +85,19 @@ STATE = {
     'aero/beta-rad': 'beta',
 }
 
-# Signals it sets, which the aerodynamics read.
+# The surfaces JSBSim's flight control system has built in (FGFCS), by
+# simon's name for each. JSBSim keeps a surface's deflection in radians and
+# degrees as one value, `-rad` and `-deg`, and its normalized position,
+# `-norm`, as another. simon keeps the deflection in radians, under the
+# surface's name, and the position under its name and `_norm`.
 SURFACES = {
-    'fcs/elevator-pos-rad': 'elevator',
-    'fcs/left-aileron-pos-rad': 'left_aileron',
-    'fcs/right-aileron-pos-rad': 'right_aileron',
-    'fcs/rudder-pos-rad': 'rudder',
-    'fcs/flap-pos-norm': 'flaps',
-    'gear/gear-pos-norm': 'gear',
-    'fcs/speedbrake-pos-norm': 'speedbrake',
-    'fcs/spoiler-pos-norm': 'spoilers',
+    'fcs/elevator-pos': 'elevator',
+    'fcs/left-aileron-pos': 'left_aileron',
+    'fcs/right-aileron-pos': 'right_aileron',
+    'fcs/rudder-pos': 'rudder',
+    'fcs/flap-pos': 'flaps',
+    'fcs/speedbrake-pos': 'speedbrake',
+    'fcs/spoiler-pos': 'spoilers',
 }
 
 
@@ -147,9 +142,15 @@ def location(element):
 
 
 def variable(name):
-    if name not in VARIABLES:
-        raise ConversionError('unsupported property %s' % name)
-    return VARIABLES[name]
+    """What the aerodynamics read for property `name`: simon's name for the
+    variable or signal, and the factor from JSBSim's units to SI. A
+    surface's magnitude is its signal's name between bars."""
+    if name in VARIABLES:
+        return VARIABLES[name]
+    if name.startswith('fcs/mag-') and name.endswith('-rad'):
+        signal, scale = flight_signal('fcs/' + name[len('fcs/mag-'):])
+        return '|%s|' % signal, scale
+    return flight_signal(name)
 
 
 class Table:
@@ -377,15 +378,34 @@ def component_property(name):
     return 'fcs/' + name.strip().lower().replace(' ', '-')
 
 
-def signal_name(prop):
-    """simon's name for a signal JSBSim calls `prop`."""
-    for table in (COMMANDS, STATE, SURFACES):
+def flight_signal(prop):
+    """simon's name for the signal JSBSim calls `prop`, and the factor from
+    JSBSim's units to SI."""
+    for table in (COMMANDS, STATE):
         if prop in table:
-            return table[prop]
+            return table[prop], 1.0
+    for base, name in SURFACES.items():
+        if prop == base + '-rad':
+            return name, 1.0
+        if prop == base + '-deg':
+            return name, math.pi / 180.0
+        if prop == base + '-norm':
+            return name + '_norm', 1.0
+    if prop == 'gear/gear-pos-norm':
+        return 'gear', 1.0
     if prop.startswith('fcs/'):
-        return prop[len('fcs/'):].replace('/', '-')
-    raise ConversionError('the flight controls read %s, which is unsupported'
-                          % prop)
+        return prop[len('fcs/'):].replace('/', '-'), 1.0
+    raise ConversionError('unsupported property %s' % prop)
+
+
+def signal_name(prop):
+    """simon's name for a signal the flight controls read or write, which
+    must be in SI units already."""
+    name, scale = flight_signal(prop)
+    if scale != 1.0:
+        raise ConversionError('the flight controls read or write %s, whose '
+                              'units need converting' % prop)
+    return name
 
 
 def bounds(element, name):
