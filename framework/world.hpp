@@ -213,8 +213,7 @@ class World<SpatialType,                  //
    private:
     friend class World;
 
-    // Where the transaction began: how many commands and undo steps there
-    // were.
+    // The transaction's start: the counts of commands and undo steps then.
     struct Mark final {
       std::size_t commands = 0;
       std::size_t undo = 0;
@@ -321,8 +320,8 @@ class World<SpatialType,                  //
                                              : std::nullopt;
   }
 
-  auto identity_of(Name name) const -> Identity {
-    return framework::identity_of(number_, name);
+  auto format_identity(Name name) const -> Identity {
+    return framework::format_identity(number_, name);
   }
 
   // The name an identity refers to, if it names something in this world.
@@ -353,7 +352,7 @@ class World<SpatialType,                  //
   // A one-line description for a console, e.g.
   // "/world/1/entity/2 (red) archetype ball: Kinematics, Collider".
   auto describe(Name name) const -> std::string {
-    std::string text = identity_of(name).string();
+    std::string text = format_identity(name).string();
     std::vector<Alias> aliases = aliases_of(name);
     for (std::size_t i = 0; i < aliases.size(); ++i) {
       text += std::format("{}{}", i == 0 ? " (" : ", ", aliases[i]);
@@ -443,8 +442,8 @@ class World<SpatialType,                  //
  private:
   friend class SetUpBuilder<World>;
 
-  // How big a world is, worked out by SetUpBuilder from how many of each
-  // archetype it holds.
+  // A world's size, worked out by SetUpBuilder from its count of each
+  // archetype.
   struct Configuration final {
     std::uint32_t number = 0;  // The world's instance in its Name and Identity.
     std::size_t entities = 0;  // Entity capacity.
@@ -989,7 +988,7 @@ class World<SpatialType,                  //
   std::vector<bool> destroying_;
   std::vector<std::uint32_t> destroying_list_;
 
-  // How to undo what open transactions planned, oldest first.
+  // The undo steps for open transactions' plans, oldest first.
   std::vector<std::function<void()>> undo_;
   std::size_t transaction_depth_ = 0;
 

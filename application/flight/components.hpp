@@ -44,7 +44,7 @@ using model::RigidBodyRate;
 using model::Speed;
 using model::Time;
 
-// What the autopilot commands; the airframe follows it with lags and limits
+// The autopilot's commands, which the airframe follows with lags and limits
 // (see Handling).
 struct Commands final {
   double load_factor = 1.0;
@@ -52,8 +52,8 @@ struct Commands final {
   double throttle = 0.0;
 };
 
-// How the airframe follows its commands, and how hard it may be flown. Read
-// by the autopilot and the actuators, never by the dynamics.
+// The airframe's response to its commands, and its limits. Read by the
+// autopilot and the actuators, never by the dynamics.
 struct Handling final {
   double max_load_factor = 3.0;
   double min_load_factor = 0.0;
@@ -63,8 +63,8 @@ struct Handling final {
   Time throttle_lag = 2.0 * model::second;
 };
 
-// What the autopilot holds: an altitude, a heading and a speed, which the
-// route sets. Its throttle integral is the speed loop's state.
+// The altitude, heading and speed the autopilot holds, which the route sets.
+// Its throttle integral is the speed loop's state.
 struct Autopilot final {
   Length altitude = 0.0 * model::meter;
   Angle heading = 0.0 * model::radian;
@@ -82,7 +82,7 @@ struct Route final {
   std::uint32_t reached = 0;  // Waypoints reached so far.
 };
 
-// What a rigid aircraft's autopilot keeps: the trim it flies about, and the
+// A rigid aircraft's autopilot state: the trim it flies about, and the
 // integral of its flight-path angle error.
 struct SurfaceAutopilot final {
   double pitch_trim = 0.0;  // The pitch trim command it holds.

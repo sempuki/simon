@@ -427,9 +427,9 @@ TEST_CASE("World") {
     world.sync();
     Name position = world.name_of<Position>(entity);
 
-    CHECK(world.identity_of(world.name()) == "/world/1");
-    CHECK(world.identity_of(world.name_of(entity)) == "/world/1/entity/0");
-    CHECK(world.identity_of(position) == "/world/1/entity/0/component/0");
+    CHECK(world.format_identity(world.name()) == "/world/1");
+    CHECK(world.format_identity(world.name_of(entity)) == "/world/1/entity/0");
+    CHECK(world.format_identity(position) == "/world/1/entity/0/component/0");
     CHECK(world.find_name_of(Identity{"/world/1/entity/0"}) ==
           world.name_of(entity));
     CHECK(world.find_name_of(Identity{"/world/1/entity/0/component/0"}) ==
@@ -516,7 +516,7 @@ TEST_CASE("World") {
     CHECK(archetype.kind == static_cast<std::uint32_t>(Kind::ARCHETYPE));
     CHECK(world.aliases_of(archetype) == std::vector<Alias>{"launcher"});
     CHECK(world.archetype_of(body) != archetype);
-    CHECK(world.identity_of(archetype) == "/world/1/archetype/0");
+    CHECK(world.format_identity(archetype) == "/world/1/archetype/0");
   }
 
   SECTION("ShouldRecordParentGivenUnder") {

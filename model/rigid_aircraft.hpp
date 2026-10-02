@@ -20,14 +20,15 @@
 // documents/design.md), for the few aircraft whose handling matters.
 namespace simon::model {
 
-// Where rigid aircraft fly. Over a flat, still Earth, the inertial frame is
-// the world's local frame (x east, y north, z up) and gravity is standard.
+// The Earth that rigid aircraft fly over. Over a flat, still Earth, the
+// inertial frame is the world's local frame (x east, y north, z up) and
+// gravity is standard.
 // Round a turning WGS84 Earth, the inertial frame is ECI, which coincides
 // with ECEF at time zero, and the world's local frame is the plane tangent to
 // the ellipsoid at `origin`, so the rest of a world can treat the aircraft as
 // it treats any other. There is no wind: the air turns with the Earth.
-// Where a body is on the Earth at a time, found once for what the frames,
-// gravity and the air need.
+// A body's place on the Earth at a time, found once for the frames, gravity
+// and the air to share.
 struct Place final {
   Matrix3 inertial_to_fixed = Matrix3::Identity();
   Position fixed = meters(0.0, 0.0, 0.0);
@@ -43,10 +44,10 @@ class Earth final {
 
   auto is_round() const -> bool { return round_; }
 
-  // How far the Earth has turned at `time`.
+  // The angle the Earth has turned through at `time`.
   auto angle(Time time) const -> Angle;
 
-  // Where `body` is at `time`.
+  // The place of `body` at `time`.
   auto place(const RigidBody& body, Time time) const -> Place;
 
   // The gravitational acceleration at `body`, in the inertial frame.
@@ -71,7 +72,7 @@ class Earth final {
   auto body_to_north_east_down(const RigidBody& body, Time time) const
       -> Matrix3;
 
-  // Where the body is in the world's local frame, and its flight path
+  // The body's position in the world's local frame, and its flight path
   // relative to the air: speed, flight-path angle above the local horizon,
   // and heading from local north.
   auto air_state(const RigidBody& body, Time time) const -> AirState;
@@ -87,15 +88,15 @@ class Earth final {
  private:
   // From the local north-east-down frame at `fixed` to the inertial frame.
   auto north_east_down(const Position& fixed, Time time) const -> Matrix3;
-  auto fixed_of(const RigidBody& body, Time time) const -> Position;
+  auto find_fixed(const RigidBody& body, Time time) const -> Position;
 
   Position origin_fixed_ = meters(0.0, 0.0, 0.0);
   Matrix3 fixed_to_local_ = Matrix3::Identity();
   bool round_ = false;
 };
 
-// Where the control surfaces stand: deflections in radians, extensions from
-// 0 to 1.
+// The control surfaces' positions: deflections in radians, extensions from 0
+// to 1.
 struct ControlSurfaces final {
   double elevator = 0.0;
   double left_aileron = 0.0;
@@ -123,7 +124,7 @@ struct FuelTanks final {
 };
 
 // The tanks as the aircraft data fills them.
-auto fuel_tanks_of(const AircraftData& aircraft) -> FuelTanks;
+auto fill_fuel_tanks(const AircraftData& aircraft) -> FuelTanks;
 
 // The engines settled at `controls` in `air`.
 auto settled_engines(const AircraftData& aircraft,
@@ -132,8 +133,8 @@ auto settled_engines(const AircraftData& aircraft,
 
 // The air the engines breathe at `body`. Over the standard atmosphere the
 // density altitude is the altitude.
-auto engine_air_of(const RigidBody& body, const Earth& earth,
-                   const StandardAirTable& air, Time time) -> EngineAir;
+auto compute_engine_air(const RigidBody& body, const Earth& earth,
+                        const StandardAirTable& air, Time time) -> EngineAir;
 
 // Advances each engine by `dt` at its throttle. An engine whose tanks are
 // empty makes no thrust and burns nothing.
@@ -157,13 +158,13 @@ struct MassBalance final {
 // The mass balance of `aircraft` with `contents` in its tanks, one for each,
 // by the parallel axis theorem: the empty aircraft and each tank's fuel, as a
 // point mass, about the combined center of mass.
-auto mass_balance_of(const AircraftData& aircraft,
-                     std::span<const Mass> contents) -> MassBalance;
+auto compute_mass_balance(const AircraftData& aircraft,
+                          std::span<const Mass> contents) -> MassBalance;
 
 // The same, with each tank as the aircraft data fills it, or as `tanks`
 // holds.
-auto mass_balance_of(const AircraftData& aircraft) -> MassBalance;
-auto mass_balance_of(const AircraftData& aircraft, const FuelTanks& tanks)
+auto compute_mass_balance(const AircraftData& aircraft) -> MassBalance;
+auto compute_mass_balance(const AircraftData& aircraft, const FuelTanks& tanks)
     -> MassBalance;
 
 // A point in the structural frame, from the center of mass, in body axes.
@@ -182,17 +183,18 @@ auto rigid_aircraft_rate(const RigidBody& body, const ControlSurfaces& surfaces,
                          const StandardAirTable& air, Time time)
     -> RigidBodyRate;
 
-// What the aerodynamics read at `body`, before the rate of angle of attack,
-// which needs the body's acceleration. `reference` is the aerodynamic
+// Computes the aerodynamics' inputs at `body`, all but the rate of angle of
+// attack, which needs the body's acceleration. `reference` is the aerodynamic
 // reference point from the center of mass, in body axes: ground effect reads
 // its height.
-auto aero_inputs_of(const RigidBody& body, const ControlSurfaces& surfaces,
-                    const AircraftData& aircraft, const Displacement& reference,
-                    const Earth& earth, const StandardAirTable& air, Time time)
+auto compute_aero_inputs(const RigidBody& body, const ControlSurfaces& surfaces,
+                         const AircraftData& aircraft,
+                         const Displacement& reference, const Earth& earth,
+                         const StandardAirTable& air, Time time) -> AeroInputs;
+auto compute_aero_inputs(const RigidBody& body, const ControlSurfaces& surfaces,
+                         const AircraftData& aircraft,
+                         const Displacement& reference, const Earth& earth,
+                         const Place& place, const StandardAirTable& air)
     -> AeroInputs;
-auto aero_inputs_of(const RigidBody& body, const ControlSurfaces& surfaces,
-                    const AircraftData& aircraft, const Displacement& reference,
-                    const Earth& earth, const Place& place,
-                    const StandardAirTable& air) -> AeroInputs;
 
 }  // namespace simon::model

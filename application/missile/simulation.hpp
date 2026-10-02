@@ -231,7 +231,8 @@ class Simulation final {
   // The world: empty until configured.
   auto world() const -> const World& { return world_; }
   auto asset() const -> Entity { return asset_; }
-  // What the simulation raises, such as WeaponsHoldExpired, for subscribers.
+  // The events the simulation raises, such as WeaponsHoldExpired, for
+  // subscribers.
   auto events() -> engine::EventQueue& { return events_; }
 
   // Interceptors fired so far, from what the launchers have left.

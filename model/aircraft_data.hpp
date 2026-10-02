@@ -45,8 +45,8 @@ struct TurbineData final {
   double max_n1 = 0.0;
   double max_n2 = 0.0;
   double idle_fuel_flow = 0.0;  // kg/s.
-  // How fast each spool speeds up and slows down at full speed at sea level,
-  // in percent per second.
+  // Each spool's rates of speeding up and slowing down at full speed at sea
+  // level, in percent per second.
   double n1_spool_up = 0.0;
   double n1_spool_down = 0.0;
   double n2_spool_up = 0.0;
@@ -74,7 +74,7 @@ struct AircraftData final {
   AeroModel aero;
 };
 
-// Why an aircraft could not be read.
+// The reasons an aircraft could not be read.
 enum class AircraftDataError {
   UNREADABLE,  // The file could not be opened.
   MALFORMED,   // The message says where and how.

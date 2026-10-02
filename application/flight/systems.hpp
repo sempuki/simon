@@ -68,7 +68,7 @@ struct FollowRoute final      //
 struct AutopilotGains final {
   Rate altitude = 0.2 * model::per_second;  // Climb rate per meter of error.
   Angle steepest_climb = 0.25 * model::radian;
-  // How slow an aircraft may be before it stops climbing: the steepest climb
+  // The speed deficit at which an aircraft stops climbing: the steepest climb
   // shrinks to nothing as the speed falls this far below its target, so a
   // climb never trades away more speed than that.
   Speed speed_margin = 20.0 * model::meter_per_second;
@@ -165,9 +165,9 @@ struct Actuate final          //
 
 // The rate of each aircraft's AirState under its controls, in the air at its
 // altitude.
-inline auto rate_of(const AirState& state, const FlightControls& controls,
-                    const Airframe& airframe,
-                    const model::StandardAirTable& air) -> AirStateRate {
+inline auto compute_rate(const AirState& state, const FlightControls& controls,
+                         const Airframe& airframe,
+                         const model::StandardAirTable& air) -> AirStateRate {
   return model::point_mass_rate(state, controls, airframe,
                                 air(model::altitude_of(state)));
 }
@@ -192,8 +192,8 @@ struct Fly final                    //
     if (!controls || !airframe) {
       return;
     }
-    state =
-        model::fly(state, rate_of(state, *controls, *airframe, air_), step.dt);
+    state = model::fly(state, compute_rate(state, *controls, *airframe, air_),
+                       step.dt);
   }
 
  private:
@@ -216,7 +216,7 @@ struct PointMassRates final         //
     if (!state || !controls || !airframe) {
       return;
     }
-    rate = rate_of(*state, *controls, *airframe, air_);
+    rate = compute_rate(*state, *controls, *airframe, air_);
   }
 
  private:
@@ -403,7 +403,7 @@ struct RunEngines final             //
     if (!body || !controls || !tanks || !type || !type->data) {
       return;
     }
-    model::EngineAir air = model::engine_air_of(
+    model::EngineAir air = model::compute_engine_air(
         *body, earth_, air_, model::seconds(step.time.time_since_epoch()));
     model::run_engines(*type->data, engines, *controls, *tanks, air,
                        model::seconds(step.dt));
@@ -472,7 +472,7 @@ struct BurnFuel final             //
       return;
     }
     model::burn_fuel(*type->data, *engines, tanks, model::seconds(step.dt));
-    *mass = model::mass_balance_of(*type->data, tanks);
+    *mass = model::compute_mass_balance(*type->data, tanks);
   }
 };
 

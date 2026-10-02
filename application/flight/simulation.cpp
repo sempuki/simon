@@ -87,8 +87,8 @@ auto create_rigid_aircraft(const model::AircraftData& data,
   model::StandardAirTable air;
   Engines engines = model::settled_engines(
       data, controls,
-      model::engine_air_of(body, earth, air, 0.0 * model::second));
-  FuelTanks tanks = model::fuel_tanks_of(data);
+      model::compute_engine_air(body, earth, air, 0.0 * model::second));
+  FuelTanks tanks = model::fill_fuel_tanks(data);
 
   return world->create<archetype::RigidAircraft>()
       .with(earth.air_state(body, 0.0 * model::second))
@@ -99,7 +99,7 @@ auto create_rigid_aircraft(const model::AircraftData& data,
       .with(controls)
       .with(engines)
       .with(tanks)
-      .with(model::mass_balance_of(data, tanks))
+      .with(model::compute_mass_balance(data, tanks))
       .with(AircraftType{.data = &data})
       .with(Autopilot{
           .altitude = trim.altitude, .heading = heading, .speed = trim.speed})

@@ -332,7 +332,7 @@ struct ResolveEngagements final  //
   std::vector<Proposal> proposals_;
 };
 
-// What every interceptor is built with.
+// The parameters every interceptor is built with.
 struct InterceptorDesign final {
   Speed speed = 150.0 * model::meter_per_second;
   AccelerationMagnitude agility = 300.0 * model::meter_per_second_squared;

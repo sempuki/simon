@@ -49,7 +49,7 @@ struct Blast final {
   Name source;  // The warhead's entity.
 };
 
-// What an entity flies at: the asset for a red drone, the drone for an
+// The entity this one flies at: the asset for a red drone, the drone for an
 // interceptor. A sibling both archetypes require, so a system that needs only
 // the target, such as TriggerWarheads, reads 8 bytes.
 struct Target final {
@@ -74,9 +74,9 @@ struct Radar final {
   bool scanned = false;  // Whether it scanned this step.
 };
 
-// What blue believes about a red drone: which drone, and when a radar last
-// saw it. A track's estimate and engagement are siblings its archetype
-// requires, so systems that need one of them read only that.
+// Blue's belief about a red drone: the drone, and when a radar last saw it.
+// A track's estimate and engagement are siblings its archetype requires, so
+// systems that need one of them read only that.
 struct Track final {
   Entity target;
   TimePoint last_seen{};
@@ -88,7 +88,7 @@ struct Estimate final {
   Velocity velocity = model::meters_per_second(0.0, 0.0, 0.0);
 };
 
-// Which launcher is engaging a track, if any, and until when.
+// The launcher engaging a track, if any, and until when.
 struct Engagement final {
   Entity engaged_by;
   TimePoint engaged_until{};  // When the engagement lapses if it has not ended.

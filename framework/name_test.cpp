@@ -33,12 +33,14 @@ TEST_CASE("Name") {
 
 TEST_CASE("Identity") {
   SECTION("ShouldFormatRestPathGivenEachKind") {
-    CHECK(identity_of(1, Name{Kind::WORLD, 1}) == "/world/1");
-    CHECK(identity_of(1, Name{Kind::ARCHETYPE, 0}) == "/world/1/archetype/0");
-    CHECK(identity_of(1, Name{Kind::COMPONENT, 3}) == "/world/1/component/3");
-    CHECK(identity_of(1, Name{Kind::SYSTEM, 4}) == "/world/1/system/4");
-    CHECK(identity_of(1, Name{Kind::ENTITY, 2}) == "/world/1/entity/2");
-    CHECK(identity_of(1, entity_component_name(3, 2)) ==
+    CHECK(format_identity(1, Name{Kind::WORLD, 1}) == "/world/1");
+    CHECK(format_identity(1, Name{Kind::ARCHETYPE, 0}) ==
+          "/world/1/archetype/0");
+    CHECK(format_identity(1, Name{Kind::COMPONENT, 3}) ==
+          "/world/1/component/3");
+    CHECK(format_identity(1, Name{Kind::SYSTEM, 4}) == "/world/1/system/4");
+    CHECK(format_identity(1, Name{Kind::ENTITY, 2}) == "/world/1/entity/2");
+    CHECK(format_identity(1, entity_component_name(3, 2)) ==
           "/world/1/entity/2/component/3");
   }
 
@@ -46,7 +48,7 @@ TEST_CASE("Identity") {
     for (Name name : {Name{Kind::WORLD, 7}, Name{Kind::ARCHETYPE, 1},
                       Name{Kind::COMPONENT, 3}, Name{Kind::SYSTEM, 4},
                       Name{Kind::ENTITY, 2}, entity_component_name(5, 9)}) {
-      auto parsed = parse_identity(identity_of(7, name));
+      auto parsed = parse_identity(format_identity(7, name));
       REQUIRE(parsed);
       CHECK(parsed->world == 7u);
       CHECK(parsed->name == name);

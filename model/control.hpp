@@ -154,8 +154,8 @@ class Table1 final {
     return values_[i] + (values_[i + 1] - values_[i]) * weight;
   }
 
-  // Where `x` falls among `breakpoints`: the breakpoint at or below it, and
-  // how far toward the next one, in [0, 1). Clamped to the ends.
+  // Locates `x` among `breakpoints`: the breakpoint at or below it, and the
+  // fraction of the way to the next one, in [0, 1). Clamped to the ends.
   static auto locate(const std::vector<BreakpointType>& breakpoints,
                      const BreakpointType& x)
       -> std::pair<std::size_t, double> {

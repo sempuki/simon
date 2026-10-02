@@ -2,14 +2,12 @@
 
 #include <algorithm>
 #include <array>
-#include <charconv>
 #include <cmath>
 #include <cstddef>
-#include <fstream>
-#include <map>
 #include <string>
 #include <vector>
 
+#include "application/flight/testing.hpp"
 #include "base/testing.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/earth.hpp"
@@ -25,74 +23,22 @@ namespace simon::model {
 
 namespace {
 
+using namespace flight::testing;
+
 constexpr char REFERENCE[] =
     "application/flight/reference/jsbsim_737_rigid_body.csv";
-constexpr char AIRCRAFT[] = "application/flight/aircraft/737.aircraft";
-
-using Row = std::map<std::string, double, std::less<>>;
-
-auto load_reference() -> std::vector<Row> {
-  std::ifstream file{REFERENCE};
-  REQUIRE(file);
-  std::string line;
-  std::getline(file, line);
-  std::vector<std::string> names;
-  for (std::size_t at = 0; at <= line.size();) {
-    std::size_t comma = std::min(line.find(',', at), line.size());
-    names.emplace_back(line.substr(at, comma - at));
-    at = comma + 1;
-  }
-
-  std::vector<Row> rows;
-  while (std::getline(file, line)) {
-    Row row;
-    const char* next = line.data();
-    const char* end = line.data() + line.size();
-    for (const std::string& name : names) {
-      double value = 0.0;
-      auto [stop, error] = std::from_chars(next, end, value);
-      REQUIRE(error == std::errc{});
-      row[name] = value;
-      next = stop + 1;
-    }
-    rows.push_back(std::move(row));
-  }
-  return rows;
-}
-
-auto vector_of(const Row& row, const char* x, const char* y, const char* z)
-    -> QuantityVector {
-  return QuantityVector{row.at(x), row.at(y), row.at(z)};
-}
-
-auto body_of(const Row& row) -> RigidBody {
-  return RigidBody{
-      .position = vector_of(row, "x", "y", "z") * meter,
-      .velocity = vector_of(row, "vx", "vy", "vz") * meter_per_second,
-      .attitude =
-          Quaternion{row.at("qw"), row.at("qx"), row.at("qy"), row.at("qz")},
-      .rate = vector_of(row, "p", "q", "r") * radian_per_second,
-  };
-}
-
-// The largest of `worst` and how far `actual` is from `expected`, relative
-// to `scale`.
-auto worse(double worst, double actual, double expected, double scale)
-    -> double {
-  return std::max(worst, std::abs(actual - expected) / scale);
-}
 
 }  // namespace
 
 TEST_CASE("RigidBody737") {
-  std::vector<Row> rows = load_reference();
+  std::vector<Row> rows = load_rows(REFERENCE);
   REQUIRE(rows.size() > 400);
 
   SECTION("ShouldMatchJsbsimRatesGivenRecordedStates") {
     double worst_acceleration = 0.0;
     double worst_angular = 0.0;
     for (const Row& row : rows) {
-      RigidBody body = body_of(row);
+      RigidBody body = read_body(row);
       // JSBSim reports the tensor's xz element as it is, but its xy and yz
       // elements negated (FGMassBalance's GetIxz, GetIxy and GetIyz).
       Matrix3 inertia;
@@ -115,19 +61,20 @@ TEST_CASE("RigidBody737") {
                                  .eigen()};
 
       RigidBodyRate rate = rigid_body_rate(
-          body, vector_of(row, "force_x", "force_y", "force_z") * newton,
-          vector_of(row, "moment_x", "moment_y", "moment_z") * newton_meter,
+          body, read_vector(row, "force_x", "force_y", "force_z") * newton,
+          read_vector(row, "moment_x", "moment_y", "moment_z") * newton_meter,
           mass, gravity * meter_per_second_squared);
 
       QuantityVector acceleration =
           rate.acceleration.numerical_value_in(meter_per_second_squared);
-      QuantityVector expected = vector_of(row, "ax", "ay", "az");
+      QuantityVector expected = read_vector(row, "ax", "ay", "az");
       worst_acceleration = std::max(worst_acceleration,
                                     magnitude(acceleration - expected) / 9.8);
 
       QuantityVector angular = rate.angular_acceleration.numerical_value_in(
           radian_per_second_squared);
-      QuantityVector expected_angular = vector_of(row, "pdot", "qdot", "rdot");
+      QuantityVector expected_angular =
+          read_vector(row, "pdot", "qdot", "rdot");
       worst_angular = std::max(worst_angular,
                                magnitude(angular - expected_angular) /
                                    std::max(magnitude(expected_angular), 1e-3));
@@ -150,14 +97,14 @@ TEST_CASE("RigidBody737") {
       std::array<Mass, 3> fuel{row.at("fuel_0") * kilogram,
                                row.at("fuel_1") * kilogram,
                                row.at("fuel_2") * kilogram};
-      MassBalance balance = mass_balance_of(*aircraft, fuel);
+      MassBalance balance = compute_mass_balance(*aircraft, fuel);
       worst_mass = worse(worst_mass,
                          balance.properties.mass.numerical_value_in(kilogram),
                          row.at("mass"), row.at("mass"));
       QuantityVector center = balance.center_of_mass.numerical_value_in(meter);
-      worst_center =
-          std::max(worst_center,
-                   magnitude(center - vector_of(row, "cg_x", "cg_y", "cg_z")));
+      worst_center = std::max(
+          worst_center,
+          magnitude(center - read_vector(row, "cg_x", "cg_y", "cg_z")));
       const Matrix3& j = balance.properties.inertia;
       double scale = row.at("izz");
       worst_inertia = worse(worst_inertia, j(0, 0), row.at("ixx"), scale);
@@ -183,16 +130,16 @@ TEST_CASE("RigidBody737") {
     double worst_density = 0.0;   // Relative: dynamic pressure and Mach.
     double worst_ground = 0.0;    // Height over span.
     for (const Row& row : rows) {
-      RigidBody body = body_of(row);
+      RigidBody body = read_body(row);
       Time time = row.at("time") * second;
       std::array<Mass, 3> fuel{row.at("fuel_0") * kilogram,
                                row.at("fuel_1") * kilogram,
                                row.at("fuel_2") * kilogram};
-      MassBalance balance = mass_balance_of(*aircraft, fuel);
+      MassBalance balance = compute_mass_balance(*aircraft, fuel);
       Displacement reference =
           body_offset(aircraft->aero_reference, balance.center_of_mass);
-      AeroInputs inputs = aero_inputs_of(body, ControlSurfaces{}, *aircraft,
-                                         reference, earth, air, time);
+      AeroInputs inputs = compute_aero_inputs(
+          body, ControlSurfaces{}, *aircraft, reference, earth, air, time);
 
       using enum AeroVariable;
       worst_angle = worse(worst_angle, inputs[ALPHA], row.at("alpha"), 1.0);

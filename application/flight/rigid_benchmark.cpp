@@ -117,7 +117,7 @@ auto measure(int aircraft, bool round, int steps,
 }
 
 // A whole positive number, or nothing.
-auto count_of(std::string_view text) -> std::optional<int> {
+auto parse_count(std::string_view text) -> std::optional<int> {
   int count = 0;
   auto [end, error] =
       std::from_chars(text.data(), text.data() + text.size(), count);
@@ -138,10 +138,10 @@ auto main(int argc, char** argv) -> int {
     std::string_view argument{argv[i]};
     std::optional<int> count;
     if (argument == "--steps" && i + 1 < argc &&
-        (count = simon::flight::count_of(argv[i + 1]))) {
+        (count = simon::flight::parse_count(argv[i + 1]))) {
       steps = *count;
       ++i;
-    } else if ((count = simon::flight::count_of(argument))) {
+    } else if ((count = simon::flight::parse_count(argument))) {
       populations.push_back(*count);
     } else {
       std::println(stderr, "unknown argument: {}", argument);

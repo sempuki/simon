@@ -1,29 +1,26 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
 #include <algorithm>
-#include <array>
-#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <expected>
-#include <fstream>
 #include <numbers>
-#include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
 #include "application/flight/components.hpp"
 #include "application/flight/systems.hpp"
+#include "application/flight/testing.hpp"
 #include "base/testing.hpp"
 #include "framework/vocabulary.hpp"
 
-// How far simon's point-mass model drifts from JSBSim's 737 flying the same
-// maneuvers. reference/jsbsim_737.py flew them and recorded the controls a
+// Measures the drift of simon's point-mass model from JSBSim's 737 flying the
+// same maneuvers. reference/jsbsim_737.py flew them and recorded the controls a
 // point mass needs to follow its path; here Fly and Precise replay those
-// controls, and the paths are compared. Both see the same controls, so what
-// is left is the model's own error, mostly its drag polar, and the
+// controls, and the paths are compared. Both see the same controls, so the
+// rest is the model's own error, mostly its drag polar, and the
 // integrator's.
 namespace simon::flight {
 
@@ -63,24 +60,18 @@ struct Sample final {
 };
 
 auto load_reference() -> std::vector<Sample> {
-  std::ifstream file{REFERENCE};
-  REQUIRE(file);
-  std::string line;
-  std::getline(file, line);  // The header.
-
   std::vector<Sample> samples;
-  while (std::getline(file, line)) {
-    std::array<double, 10> fields{};
-    const char* next = line.data();
-    const char* end = line.data() + line.size();
-    for (double& field : fields) {
-      auto [stop, error] = std::from_chars(next, end, field);
-      REQUIRE(error == std::errc{});
-      next = stop + 1;  // Past the comma.
-    }
-    samples.push_back(Sample{fields[0], fields[1], fields[2], fields[3],
-                             fields[4], fields[5], fields[6], fields[7],
-                             fields[8], fields[9]});
+  for (const testing::Row& row : testing::load_rows(REFERENCE)) {
+    samples.push_back(Sample{.time = row.at("time"),
+                             .load_factor = row.at("load_factor"),
+                             .bank = row.at("bank"),
+                             .throttle = row.at("throttle"),
+                             .x = row.at("x"),
+                             .y = row.at("y"),
+                             .z = row.at("z"),
+                             .speed = row.at("speed"),
+                             .flight_path_angle = row.at("flight_path_angle"),
+                             .heading = row.at("heading")});
   }
   return samples;
 }

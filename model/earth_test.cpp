@@ -26,7 +26,7 @@ TEST_CASE("Geodetic") {
         Geodetic where{.latitude = latitude * DEGREE * radian,
                        .longitude = (latitude * 2.0 + 10.0) * DEGREE * radian,
                        .altitude = altitude * meter};
-        Geodetic back = geodetic_of(fixed_of(where));
+        Geodetic back = fixed_to_geodetic(geodetic_to_fixed(where));
         CHECK_THAT(radians(back.latitude),
                    WithinAbs(radians(where.latitude), 1e-12));
         CHECK_THAT(
@@ -42,10 +42,11 @@ TEST_CASE("Geodetic") {
   SECTION("ShouldMatchIterationGivenHighLatitude") {
     // Bowring's fixed-point iteration, run to convergence, as an independent
     // reference.
-    QuantityVector xyz = fixed_of(Geodetic{.latitude = 60.0 * DEGREE * radian,
-                                           .longitude = 10.0 * DEGREE * radian,
-                                           .altitude = 6000.0 * meter})
-                             .numerical_value_in(meter);
+    QuantityVector xyz =
+        geodetic_to_fixed(Geodetic{.latitude = 60.0 * DEGREE * radian,
+                                   .longitude = 10.0 * DEGREE * radian,
+                                   .altitude = 6000.0 * meter})
+            .numerical_value_in(meter);
     double p = std::hypot(xyz.eigen().x(), xyz.eigen().y());
     double z = xyz.eigen().z();
     double latitude = std::atan2(z, p * (1.0 - ECCENTRICITY_SQUARED));
@@ -59,17 +60,19 @@ TEST_CASE("Geodetic") {
       latitude = std::atan2(
           z, p * (1.0 - ECCENTRICITY_SQUARED * normal / (normal + height)));
     }
-    Geodetic found = geodetic_of(xyz * meter);
+    Geodetic found = fixed_to_geodetic(xyz * meter);
     CHECK_THAT(found.altitude.numerical_value_in(meter),
                WithinAbs(height, 1e-6));
     CHECK_THAT(radians(found.latitude), WithinAbs(latitude, 1e-12));
   }
 
   SECTION("ShouldLieOnAxesGivenEquatorAndPole") {
-    QuantityVector equator = fixed_of(Geodetic{}).numerical_value_in(meter);
+    QuantityVector equator =
+        geodetic_to_fixed(Geodetic{}).numerical_value_in(meter);
     CHECK(equator.is_approximately(QuantityVector{SEMIMAJOR_AXIS, 0.0, 0.0}));
-    QuantityVector pole = fixed_of(Geodetic{.latitude = 90.0 * DEGREE * radian})
-                              .numerical_value_in(meter);
+    QuantityVector pole =
+        geodetic_to_fixed(Geodetic{.latitude = 90.0 * DEGREE * radian})
+            .numerical_value_in(meter);
     CHECK_THAT(pole.eigen().z(), WithinAbs(SEMIMINOR_AXIS, 1e-6));
   }
 }
@@ -80,12 +83,13 @@ TEST_CASE("Gravitation") {
     // the poles (WGS84); gravitation is that plus the centrifugal part.
     double centrifugal = ROTATION_RATE * ROTATION_RATE * SEMIMAJOR_AXIS;
     double equator =
-        magnitude(gravitation(fixed_of(Geodetic{}))
+        magnitude(gravitation(geodetic_to_fixed(Geodetic{}))
                       .numerical_value_in(meter_per_second_squared));
     CHECK_THAT(equator - centrifugal, WithinRel(9.7803253, 1e-4));
-    double pole = magnitude(
-        gravitation(fixed_of(Geodetic{.latitude = 90.0 * DEGREE * radian}))
-            .numerical_value_in(meter_per_second_squared));
+    double pole =
+        magnitude(gravitation(geodetic_to_fixed(
+                                  Geodetic{.latitude = 90.0 * DEGREE * radian}))
+                      .numerical_value_in(meter_per_second_squared));
     CHECK_THAT(pole, WithinRel(9.8321849, 1e-4));
   }
 }

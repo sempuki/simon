@@ -156,9 +156,9 @@ struct ContinuousRunner final {
 
 namespace internal {
 
-// What a Continuous element declares, from its states and derivative systems:
-// it writes the states and whatever its systems write, and reads the rest of
-// what they read.
+// Derives a Continuous element's declarations from its states and derivative
+// systems: it writes the states and whatever its systems write, and reads the
+// rest of what they read.
 template <typename StateListType, typename SystemListType>
 struct ContinuousDeclared;
 
@@ -229,9 +229,9 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
                 "system writes rates.");
 
  public:
-  // What the element writes (the states, and what its derivative systems
-  // write) and reads, in the form a system declares them, for the schedule's
-  // checks and describe().
+  // The element's writes (its states, and its derivative systems' writes) and
+  // reads, in the form a system declares them, for the schedule's checks and
+  // describe().
   using DrivingComponent =
       typename internal::Split<typename Declared::DeclaredList>::First;
   using OtherComponentList =
@@ -280,7 +280,7 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
  private:
   static constexpr std::size_t STAGES = MethodType::stages;
 
-  // Where each state began the step, and its rate at each stage, by walk
+  // Each state at the step's start, and its rate at each stage, by walk
   // order. Unused, and never allocated, by one-stage methods.
   template <typename StateType>
   struct Scratch final {

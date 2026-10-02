@@ -44,7 +44,6 @@ cc_test(
     ],
 )
 
-# Runs one scenario as fast as possible and prints the outcome.
 cc_binary(
     name = "missile",
     srcs = ["main.cpp"],
@@ -56,7 +55,6 @@ cc_binary(
     ],
 )
 
-# Watches one scenario in real time, with a map and controls.
 cc_binary(
     name = "viewer",
     srcs = ["viewer.cpp"],
@@ -74,8 +72,6 @@ cc_binary(
     ],
 )
 
-# Times the simulation at growing populations, system by system. Run with
-# bazel run -c opt //application/missile:missile_benchmark
 cc_binary(
     name = "missile_benchmark",
     srcs = ["missile_benchmark.cpp"],

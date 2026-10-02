@@ -291,7 +291,7 @@ TEST_CASE("ScanRadars") {
   framework::Scheduler<World, SystemList<ScanRadars>> scheduler;
   Radar radar{.range = 1000.0 * model::meter, .scan = engine::RateGate{1s}};
 
-  // How many of a site's radars scanned on each step of the first second.
+  // Counts a site's radars that scanned on each step of the first second.
   auto scans_per_step = [&](SiteBuilder site) {
     REQUIRE(std::move(site).watched_by(4, radar, 500.0 * model::meter).build());
     world.sync();

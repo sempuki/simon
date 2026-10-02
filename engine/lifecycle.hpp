@@ -29,7 +29,7 @@ concept Simulation = requires(Type simulation, const framework::Step& step) {
   { simulation.step(step) } -> std::same_as<PhaseResult>;
 };
 
-// Where a driver is in the lifecycle.
+// A driver's phase in the lifecycle.
 enum class Phase {
   NEW,       // Not yet configured and initialized.
   RUNNING,   // Stepping.

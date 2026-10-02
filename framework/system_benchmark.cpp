@@ -1,6 +1,7 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
-// What a system pays to reach a sibling: another component of the same entity.
+// Measures the cost of reaching a sibling, another component of the same
+// entity.
 // One system integrates a 72-byte driving component using a 24-byte sibling,
 // five ways:
 //

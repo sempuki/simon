@@ -24,7 +24,7 @@
 // meters. aero_loads turns the sums into typed forces and moments.
 namespace simon::model {
 
-// What a term may read. Each is in SI units, or a plain number.
+// The variables a term may read. Each is in SI units, or a plain number.
 enum class AeroVariable : std::uint8_t {
   DYNAMIC_PRESSURE,        // Pa.
   ALPHA,                   // Angle of attack, rad.

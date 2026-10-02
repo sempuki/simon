@@ -121,8 +121,8 @@ struct Skippable final  //
   auto prepare(auto&) -> bool { return run; }
   auto operator()(auto&, Entity, const Health&) -> void { ++called; }
   auto resolve(auto&) -> void { resolved = true; }
-  bool run = true;
   int called = 0;
+  bool run = true;
   bool resolved = false;
 };
 

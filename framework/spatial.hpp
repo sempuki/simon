@@ -9,7 +9,7 @@
 
 namespace simon::framework {
 
-// What a world needs to know about space: a distance, a pose, and, for its
+// Describes space to a world: a distance, a pose, and, for its
 // spatial index, plain coordinates. The world indexes every entity-component
 // of its spatial type. Distances may carry units; `coordinate_length` gives
 // one as a plain number in the same unit as `coordinates`.

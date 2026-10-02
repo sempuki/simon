@@ -201,7 +201,7 @@ class RealTimeDriver final {
         return driver_.finish();
       }
       std::this_thread::sleep_until(
-          wall_time_of(driver_.now() + driver_.max_step()));
+          to_wall_time(driver_.now() + driver_.max_step()));
     }
   }
 
@@ -229,7 +229,7 @@ class RealTimeDriver final {
     wall_start_ = WallClockType::now();
   }
 
-  auto wall_time_of(TimePoint time) const ->
+  auto to_wall_time(TimePoint time) const ->
       typename WallClockType::time_point {
     auto simulated = std::chrono::duration<double>(time - start_);
     // Rounded up, so waiting until then never wakes just before the time.

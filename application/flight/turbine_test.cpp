@@ -1,14 +1,12 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
 #include <algorithm>
-#include <charconv>
 #include <cmath>
 #include <cstddef>
-#include <fstream>
-#include <map>
 #include <string>
 #include <vector>
 
+#include "application/flight/testing.hpp"
 #include "base/testing.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/turbine.hpp"
@@ -22,43 +20,13 @@ namespace simon::model {
 
 namespace {
 
-constexpr char AIRCRAFT[] = "application/flight/aircraft/737.aircraft";
+using namespace flight::testing;
+
 constexpr char REFERENCE[] =
     "application/flight/reference/jsbsim_737_turbine.csv";
 constexpr double DT = 1.0 / 60.0;  // The reference's frame, seconds.
 
-using Row = std::map<std::string, double, std::less<>>;
-
-auto load_reference() -> std::vector<Row> {
-  std::ifstream file{REFERENCE};
-  REQUIRE(file);
-  std::string line;
-  std::getline(file, line);
-  std::vector<std::string> names;
-  for (std::size_t at = 0; at <= line.size();) {
-    std::size_t comma = std::min(line.find(',', at), line.size());
-    names.emplace_back(line.substr(at, comma - at));
-    at = comma + 1;
-  }
-
-  std::vector<Row> rows;
-  while (std::getline(file, line)) {
-    Row row;
-    const char* next = line.data();
-    const char* end = line.data() + line.size();
-    for (const std::string& name : names) {
-      double value = 0.0;
-      auto [stop, error] = std::from_chars(next, end, value);
-      REQUIRE(error == std::errc{});
-      row[name] = value;
-      next = stop + 1;
-    }
-    rows.push_back(std::move(row));
-  }
-  return rows;
-}
-
-auto air_of(const Row& row) -> EngineAir {
+auto read_air(const Row& row) -> EngineAir {
   return EngineAir{
       .mach = row.at("mach"),
       .density_altitude = row.at("density_altitude") * meter,
@@ -77,7 +45,7 @@ TEST_CASE("Turbine737") {
   auto aircraft = load_aircraft(AIRCRAFT);
   REQUIRE(aircraft);
   REQUIRE(aircraft->engines.size() == 2);
-  std::vector<Row> rows = load_reference();
+  std::vector<Row> rows = load_rows(REFERENCE);
   REQUIRE(rows.size() > 1000);
 
   SECTION("ShouldMatchJsbsimGivenRecordedAirAndThrottle") {
@@ -95,7 +63,7 @@ TEST_CASE("Turbine737") {
       for (std::size_t i = 1; i < rows.size(); ++i) {
         const Row& row = rows[i];
         state = run_turbine(turbine, state, row.at(column("throttle", engine)),
-                            air_of(row), DT * second);
+                            read_air(row), DT * second);
         worst_speed = std::max(
             {worst_speed, std::abs(state.n1 - row.at(column("n1", engine))),
              std::abs(state.n2 - row.at(column("n2", engine)))});
@@ -119,7 +87,7 @@ TEST_CASE("Turbine737") {
     // By the end, the second engine has held 0.9 for 13 s.
     const Row& last = rows.back();
     TurbineState steady =
-        steady_turbine(aircraft->engines[1], 0.9, air_of(last));
+        steady_turbine(aircraft->engines[1], 0.9, read_air(last));
     CHECK(std::abs(steady.n2 - last.at("n2_1")) < 1e-9);
     CHECK(std::abs(steady.thrust.numerical_value_in(newton) -
                    last.at("thrust_1")) /

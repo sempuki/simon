@@ -114,7 +114,7 @@ auto integrate(Body& body) -> void {
   }
 }
 
-// How many entities a step visited, with and without a sibling. Every layout
+// The entities a step visited, counted with and without a sibling. Every layout
 // must agree.
 struct Visits final {
   std::uint64_t with_sibling = 0;
@@ -144,7 +144,7 @@ struct Workload final {
   int measured = 200;            // Steps measured.
 };
 
-// Which siblings, as bits.
+// The siblings an entity has, as bits.
 constexpr std::uint8_t FIRST = 1;
 constexpr std::uint8_t SECOND = 2;
 
@@ -158,7 +158,7 @@ struct Operation final {
 // Every step's operations, in order. Step 0 creates the population.
 using Schedule = std::vector<std::vector<Operation>>;
 
-auto schedule_of(const Workload& workload) -> Schedule {
+auto generate_schedule(const Workload& workload) -> Schedule {
   std::mt19937_64 engine{7};
   auto unit = [&] { return static_cast<double>(engine() >> 11) * 0x1.0p-53; };
   int steps = 1 + workload.warm_up + workload.measured;
@@ -457,7 +457,7 @@ class GroupLayout final {
   auto position_of(Entity entity) const -> std::uint32_t {
     return position_[entity.index];
   }
-  // How many bodies swaps have moved, ever.
+  // The number of bodies swaps have moved, ever.
   auto moves() const -> std::uint64_t { return moves_; }
   auto owner(std::size_t position) const -> Entity { return owners_[position]; }
   auto body(std::size_t position) -> Body& { return bodies_[position]; }
@@ -1187,7 +1187,7 @@ auto measure(const Workload& workload, const Schedule& schedule) -> Result {
 template <std::size_t BYTES>
 auto compare(const Workload& workload) -> void {
   using SiblingType = Sibling<BYTES>;
-  Schedule schedule = schedule_of(workload);
+  Schedule schedule = generate_schedule(workload);
   std::size_t operations = 0;
   for (std::size_t step = 1; step < schedule.size(); ++step) {
     operations += schedule[step].size();
@@ -1229,7 +1229,7 @@ auto compare_competing(Workload workload) -> void {
   using FirstType = Sibling<BYTES>;
   using SecondType = Sibling<BYTES>;
   workload.second_share = 0.5;
-  Schedule schedule = schedule_of(workload);
+  Schedule schedule = generate_schedule(workload);
   std::println(
       "\n{} entities, two {}-byte siblings on {:.0f}% and {:.0f}% of entities, "
       "two systems",

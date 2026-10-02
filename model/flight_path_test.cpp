@@ -80,7 +80,7 @@ TEST_CASE("PointMassRate") {
 TEST_CASE("Fly") {
   SECTION("ShouldMoveAlongHeadingGivenSteadyFlight") {
     AirState state = level(100.0, PI / 2.0);  // East.
-    AirStateRate rate{.velocity = velocity_of(state)};
+    AirStateRate rate{.velocity = compute_velocity(state)};
 
     AirState next = fly(state, rate, 2s);
 
@@ -100,7 +100,7 @@ TEST_CASE("Fly") {
 
     AirState next = fly(state, rate, 20ms);
     QuantityVector expected =
-        (state.position + velocity_of(next) * (0.02 * second))
+        (state.position + compute_velocity(next) * (0.02 * second))
             .numerical_value_in(meter);
 
     CHECK(next.position.numerical_value_in(meter).is_approximately(expected,
@@ -118,7 +118,7 @@ TEST_CASE("Fly") {
 
   SECTION("ShouldMatchAdvanceGivenNoChangeInVelocity") {
     AirState state = level(100.0, 0.3);
-    AirStateRate rate{.velocity = velocity_of(state)};
+    AirStateRate rate{.velocity = compute_velocity(state)};
 
     AirState flown = fly(state, rate, 500ms);
     AirState advanced = advance(state, rate, 500ms);

@@ -1,14 +1,12 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
 #include <algorithm>
-#include <charconv>
 #include <cmath>
 #include <cstddef>
-#include <fstream>
-#include <map>
 #include <string>
 #include <vector>
 
+#include "application/flight/testing.hpp"
 #include "base/testing.hpp"
 #include "model/aerodynamics.hpp"
 #include "model/aircraft_data.hpp"
@@ -22,42 +20,12 @@ namespace simon::model {
 
 namespace {
 
-constexpr char AIRCRAFT[] = "application/flight/aircraft/737.aircraft";
+using namespace flight::testing;
+
 constexpr char REFERENCE[] = "application/flight/reference/jsbsim_737_aero.csv";
 
-// The reference as columns by name.
-using Row = std::map<std::string, double, std::less<>>;
-
-auto load_reference() -> std::vector<Row> {
-  std::ifstream file{REFERENCE};
-  REQUIRE(file);
-  std::string line;
-  std::getline(file, line);
-  std::vector<std::string> names;
-  for (std::size_t at = 0; at <= line.size();) {
-    std::size_t comma = std::min(line.find(',', at), line.size());
-    names.emplace_back(line.substr(at, comma - at));
-    at = comma + 1;
-  }
-
-  std::vector<Row> rows;
-  while (std::getline(file, line)) {
-    Row row;
-    const char* next = line.data();
-    const char* end = line.data() + line.size();
-    for (const std::string& name : names) {
-      double value = 0.0;
-      auto [stop, error] = std::from_chars(next, end, value);
-      REQUIRE(error == std::errc{});
-      row[name] = value;
-      next = stop + 1;
-    }
-    rows.push_back(std::move(row));
-  }
-  return rows;
-}
-
-auto inputs_of(const Row& row) -> AeroInputs {
+// The inputs `row` records, by their JSBSim names.
+auto read_inputs(const Row& row) -> AeroInputs {
   AeroInputs inputs;
   for (std::size_t i = 0; i < AERO_VARIABLE_COUNT; ++i) {
     auto variable = static_cast<AeroVariable>(i);
@@ -70,17 +38,12 @@ auto inputs_of(const Row& row) -> AeroInputs {
   return inputs;
 }
 
-// How far `actual` is from `expected`, relative to `scale`.
-auto relative(double actual, double expected, double scale) -> double {
-  return std::abs(actual - expected) / scale;
-}
-
 }  // namespace
 
 TEST_CASE("Aerodynamics737") {
   auto aircraft = load_aircraft(AIRCRAFT);
   REQUIRE(aircraft);
-  std::vector<Row> rows = load_reference();
+  std::vector<Row> rows = load_rows(REFERENCE);
   REQUIRE(rows.size() > 200);
 
   // They differ by rounding in JSBSim's sums and in the unit conversions:
@@ -90,11 +53,11 @@ TEST_CASE("Aerodynamics737") {
   SECTION("ShouldMatchJsbsimGivenWindAxisForces") {
     double worst = 0.0;
     for (const Row& row : rows) {
-      AeroSums sums = aircraft->aero(inputs_of(row));
+      AeroSums sums = aircraft->aero(read_inputs(row));
       double scale = std::max(std::abs(row.at("lift")), 1.0);
-      worst = std::max({worst, relative(sums[0], row.at("drag"), scale),
-                        relative(sums[1], row.at("side"), scale),
-                        relative(sums[2], row.at("lift"), scale)});
+      worst = worse(worst, sums[0], row.at("drag"), scale);
+      worst = worse(worst, sums[1], row.at("side"), scale);
+      worst = worse(worst, sums[2], row.at("lift"), scale);
     }
     CAPTURE(worst);
     CHECK(worst < TOLERANCE);
@@ -104,7 +67,7 @@ TEST_CASE("Aerodynamics737") {
     double worst_force = 0.0;
     double worst_moment = 0.0;
     for (const Row& row : rows) {
-      AeroSums sums = aircraft->aero(inputs_of(row));
+      AeroSums sums = aircraft->aero(read_inputs(row));
 
       // The reference point from the center of mass, from the structural
       // frame (x aft, z up) to body axes (x forward, z down).

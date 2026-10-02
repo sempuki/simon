@@ -1,17 +1,15 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
 #include <algorithm>
-#include <charconv>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <fstream>
-#include <map>
 #include <string>
 #include <vector>
 
 #include "application/flight/components.hpp"
 #include "application/flight/systems.hpp"
+#include "application/flight/testing.hpp"
 #include "base/testing.hpp"
 #include "framework/vocabulary.hpp"
 
@@ -24,8 +22,8 @@ namespace simon::flight {
 namespace {
 
 using namespace std::chrono_literals;
+using namespace testing;
 
-constexpr char AIRCRAFT[] = "application/flight/aircraft/737.aircraft";
 constexpr char INITIAL[] =
     "application/flight/reference/jsbsim_737_check_initial.csv";
 constexpr char CASES[] =
@@ -33,37 +31,7 @@ constexpr char CASES[] =
 
 enum class Case : std::uint8_t { HOLD, ELEVATOR, AILERON, RUDDER, THROTTLE };
 
-using Row = std::map<std::string, double, std::less<>>;
-
-auto load(const char* path) -> std::vector<Row> {
-  std::ifstream file{path};
-  REQUIRE(file);
-  std::string line;
-  std::getline(file, line);
-  std::vector<std::string> names;
-  for (std::size_t at = 0; at <= line.size();) {
-    std::size_t comma = std::min(line.find(',', at), line.size());
-    names.emplace_back(line.substr(at, comma - at));
-    at = comma + 1;
-  }
-  std::vector<Row> rows;
-  while (std::getline(file, line)) {
-    Row row;
-    const char* next = line.data();
-    const char* end = line.data() + line.size();
-    for (const std::string& name : names) {
-      double value = 0.0;
-      auto [stop, error] = std::from_chars(next, end, value);
-      REQUIRE(error == std::errc{});
-      row[name] = value;
-      next = stop + 1;
-    }
-    rows.push_back(std::move(row));
-  }
-  return rows;
-}
-
-// What a case adds to the trim at `microseconds`, as the script has it.
+// The offsets a case adds to the trim at `microseconds`, as the script has it.
 struct Offset final {
   double elevator = 0.0;
   double aileron = 0.0;
@@ -116,22 +84,7 @@ struct Pilot final            //
 using CheckSchedule = SystemList<Pilot, RunFlightControls, RunEngines, Rigid,
                                  BurnFuel, FollowRigidBody>;
 
-auto vector_of(const Row& row, const char* x, const char* y, const char* z)
-    -> model::QuantityVector {
-  return model::QuantityVector{row.at(x), row.at(y), row.at(z)};
-}
-
-auto body_of(const Row& row) -> RigidBody {
-  return RigidBody{
-      .position = vector_of(row, "x", "y", "z") * model::meter,
-      .velocity = vector_of(row, "vx", "vy", "vz") * model::meter_per_second,
-      .attitude =
-          Quaternion{row.at("qw"), row.at("qx"), row.at("qy"), row.at("qz")},
-      .rate = vector_of(row, "p", "q", "r") * model::radian_per_second,
-  };
-}
-
-// How far apart two bodies are: in position, velocity, attitude and rate.
+// The distance between two bodies: in position, velocity, attitude and rate.
 struct Apart final {
   double position = 0.0;  // m.
   double velocity = 0.0;  // m/s.
@@ -162,7 +115,7 @@ auto fly(Case flown, Duration dt, const model::AircraftData& data,
       World::set_up().numbered(1).holding<archetype::RigidAircraft>(1).build(
           Out(world)));
   model::Earth earth = model::Earth::round(model::wgs84::Geodetic{});
-  RigidBody body = body_of(trim);
+  RigidBody body = read_body(trim);
 
   FlightSignals signals;
   using enum model::FlightSignal;
@@ -180,7 +133,7 @@ auto fly(Case flown, Duration dt, const model::AircraftData& data,
   model::StandardAirTable air;
   Engines engines = model::settled_engines(
       data, controls,
-      model::engine_air_of(body, earth, air, 0.0 * model::second));
+      model::compute_engine_air(body, earth, air, 0.0 * model::second));
   FuelTanks tanks;
   for (std::size_t i = 0; i < 3; ++i) {
     tanks.contents[i] = trim.at("fuel_" + std::to_string(i)) * model::kilogram;
@@ -194,7 +147,7 @@ auto fly(Case flown, Duration dt, const model::AircraftData& data,
                       .with(controls)
                       .with(engines)
                       .with(tanks)
-                      .with(model::mass_balance_of(data, tanks))
+                      .with(model::compute_mass_balance(data, tanks))
                       .with(AircraftType{.data = &data})
                       .with(Autopilot{})
                       .with(Route{})
@@ -225,7 +178,7 @@ auto jsbsim(const std::vector<Row>& rows, Case flown, int frame)
   for (const Row& row : rows) {
     if (row.at("case") == static_cast<double>(flown) &&
         row.at("frame_us") == frame) {
-      bodies.push_back(body_of(row));
+      bodies.push_back(read_body(row));
     }
   }
   return bodies;
@@ -246,9 +199,9 @@ auto apart(const std::vector<RigidBody>& a, const std::vector<RigidBody>& b)
 TEST_CASE("CheckCases737") {
   auto data = model::load_aircraft(AIRCRAFT);
   REQUIRE(data);
-  std::vector<Row> initial = load(INITIAL);
+  std::vector<Row> initial = load_rows(INITIAL);
   REQUIRE(initial.size() == 1);
-  std::vector<Row> rows = load(CASES);
+  std::vector<Row> rows = load_rows(CASES);
 
   for (Case flown : {Case::HOLD, Case::ELEVATOR, Case::AILERON, Case::RUDDER,
                      Case::THROTTLE}) {

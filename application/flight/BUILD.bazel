@@ -34,6 +34,19 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "testing",
+    testonly = True,
+    hdrs = ["testing.hpp"],
+    copts = COPTS,
+    deps = [
+        "//framework:vocabulary",
+        "//model:rigid_body",
+        "//model:units",
+        "@lib//base:testing",
+    ],
+)
+
 cc_test(
     name = "flight_test",
     size = "medium",
@@ -48,8 +61,6 @@ cc_test(
     ],
 )
 
-# Replays JSBSim's 737 through Fly and Precise. reference/jsbsim_737.py
-# regenerates the reference.
 cc_test(
     name = "accuracy_test",
     size = "small",
@@ -57,14 +68,13 @@ cc_test(
     copts = COPTS,
     data = ["reference/jsbsim_737.csv"],
     deps = [
+        ":testing",
         "//framework:vocabulary",
         ":flight_library",
         "@lib//base:testing",
     ],
 )
 
-# Checks the 737's converted aerodynamics against JSBSim's at recorded
-# states. reference/jsbsim_737_aero.py regenerates the reference.
 cc_test(
     name = "aero_test",
     size = "small",
@@ -75,6 +85,7 @@ cc_test(
         "reference/jsbsim_737_aero.csv",
     ],
     deps = [
+        ":testing",
         "//model:aerodynamics",
         "//model:aircraft_data",
         "//model:units",
@@ -82,8 +93,6 @@ cc_test(
     ],
 )
 
-# Checks simon's equations of motion against JSBSim's 737 at recorded
-# states. reference/jsbsim_737_rigid_body.py regenerates the reference.
 cc_test(
     name = "rigid_body_test",
     size = "small",
@@ -94,6 +103,7 @@ cc_test(
         "reference/jsbsim_737_rigid_body.csv",
     ],
     deps = [
+        ":testing",
         "//model:aircraft_data",
         "//model:earth",
         "//model:rigid_aircraft",
@@ -103,8 +113,6 @@ cc_test(
     ],
 )
 
-# Checks the 737's converted turbines against JSBSim's, frame by frame.
-# reference/jsbsim_737_turbine.py regenerates the reference.
 cc_test(
     name = "turbine_test",
     size = "small",
@@ -115,6 +123,7 @@ cc_test(
         "reference/jsbsim_737_turbine.csv",
     ],
     deps = [
+        ":testing",
         "//model:aircraft_data",
         "//model:turbine",
         "//model:units",
@@ -122,8 +131,6 @@ cc_test(
     ],
 )
 
-# Checks the 737's converted flight controls against JSBSim's, frame by
-# frame. reference/jsbsim_737_flight_control.py regenerates the reference.
 cc_test(
     name = "flight_control_test",
     size = "small",
@@ -134,6 +141,7 @@ cc_test(
         "reference/jsbsim_737_flight_control.csv",
     ],
     deps = [
+        ":testing",
         "//model:aircraft_data",
         "//model:flight_control",
         "//model:units",
@@ -141,8 +149,6 @@ cc_test(
     ],
 )
 
-# Flies the whole 737 open loop through check cases, against JSBSim's.
-# reference/jsbsim_737_check_cases.py regenerates the reference.
 cc_test(
     name = "check_case_test",
     size = "medium",
@@ -154,13 +160,13 @@ cc_test(
         "reference/jsbsim_737_check_initial.csv",
     ],
     deps = [
+        ":testing",
         "//framework:vocabulary",
         ":flight_library",
         "@lib//base:testing",
     ],
 )
 
-# Flies one scenario as fast as possible and prints what it did.
 cc_binary(
     name = "flight",
     srcs = ["main.cpp"],
@@ -173,9 +179,6 @@ cc_binary(
     ],
 )
 
-# Times the simulation at growing populations, system by system, for the
-# single-pass model and for Runge-Kutta 4. Run with
-# bazel run -c opt //application/flight:flight_benchmark
 cc_binary(
     name = "flight_benchmark",
     srcs = ["flight_benchmark.cpp"],
@@ -190,9 +193,6 @@ cc_binary(
     ],
 )
 
-# Times rigid aircraft at growing populations, system by system, over a flat
-# and a round Earth. Run with
-# bazel run -c opt //application/flight:rigid_benchmark
 cc_binary(
     name = "rigid_benchmark",
     srcs = ["rigid_benchmark.cpp"],

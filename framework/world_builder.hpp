@@ -118,7 +118,7 @@ class [[nodiscard]] SetUpBuilder final {
   }
 
   std::uint32_t number_ = 0;
-  // How many of each archetype, by its position in ArchetypeList.
+  // The count of each archetype, by its position in ArchetypeList.
   std::array<std::size_t, ArchetypeList::size> holdings_{};
   std::optional<double> cell_size_;  // Sized at every rebuild unless given.
 };

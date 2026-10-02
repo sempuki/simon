@@ -34,7 +34,7 @@ struct ReadAnything final {
   static constexpr bool can_read = true;
 };
 
-// Which entities a query form selects. `each<ChosenType>()` chose them by
+// Selects the entities for a query form. `each<ChosenType>()` chose them by
 // archetype, if ChosenType is one, or else by component; `near`, `keep`,
 // `having` and `lacking` narrow them. Entities already planned for destruction
 // are never selected.
@@ -151,7 +151,7 @@ class Query final {
 
   std::optional<Near> near_;
   std::vector<std::function<bool(Entity)>> predicates_;
-  // What `having` and `lacking` ask of the world's planned state.
+  // The conditions `having` and `lacking` ask of the world's planned state.
   std::vector<bool (*)(const WorldType&, Entity)> conditions_;
 };
 

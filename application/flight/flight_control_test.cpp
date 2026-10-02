@@ -1,14 +1,12 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
 #include <algorithm>
-#include <charconv>
 #include <cmath>
 #include <cstddef>
-#include <fstream>
-#include <map>
 #include <string>
 #include <vector>
 
+#include "application/flight/testing.hpp"
 #include "base/testing.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/flight_control.hpp"
@@ -21,41 +19,11 @@ namespace simon::model {
 
 namespace {
 
-constexpr char AIRCRAFT[] = "application/flight/aircraft/737.aircraft";
+using namespace flight::testing;
+
 constexpr char REFERENCE[] =
     "application/flight/reference/jsbsim_737_flight_control.csv";
 constexpr double DT = 1.0 / 60.0;  // The reference's frame, seconds.
-
-using Row = std::map<std::string, double, std::less<>>;
-
-auto load_reference() -> std::vector<Row> {
-  std::ifstream file{REFERENCE};
-  REQUIRE(file);
-  std::string line;
-  std::getline(file, line);
-  std::vector<std::string> names;
-  for (std::size_t at = 0; at <= line.size();) {
-    std::size_t comma = std::min(line.find(',', at), line.size());
-    names.emplace_back(line.substr(at, comma - at));
-    at = comma + 1;
-  }
-
-  std::vector<Row> rows;
-  while (std::getline(file, line)) {
-    Row row;
-    const char* next = line.data();
-    const char* end = line.data() + line.size();
-    for (const std::string& name : names) {
-      double value = 0.0;
-      auto [stop, error] = std::from_chars(next, end, value);
-      REQUIRE(error == std::errc{});
-      row[name] = value;
-      next = stop + 1;
-    }
-    rows.push_back(std::move(row));
-  }
-  return rows;
-}
 
 constexpr std::array COMMANDS{
     FlightSignal::ELEVATOR_COMMAND,
@@ -90,7 +58,7 @@ TEST_CASE("FlightControl737") {
   REQUIRE(aircraft);
   const FlightControlData& controls = aircraft->flight_controls;
   REQUIRE(controls.blocks.size() > 10);
-  std::vector<Row> rows = load_reference();
+  std::vector<Row> rows = load_rows(REFERENCE);
   REQUIRE(rows.size() > 800);
 
   SECTION("ShouldMatchJsbsimGivenRecordedCommandsAndState") {

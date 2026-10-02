@@ -54,7 +54,7 @@ constexpr auto WALL_BUDGET = 30s;   // Per population, unless --steps is given.
 // benchmark: 10 radars, 50 launchers and 1,000 drones spawning 3 to 4 km from
 // its asset. The area grows with the population, so each radar and launcher
 // sees about as many drones at any size.
-auto scenario_of(int drones) -> Scenario {
+auto make_scenario(int drones) -> Scenario {
   constexpr int DRONES_PER_SITE = 1000;
   int sites = std::max(1, drones / DRONES_PER_SITE);
   int per_site = drones / sites;
@@ -82,7 +82,7 @@ auto names_of(framework::TypeList<SystemTypes...>)
   return {short_name(lib::to_type_string<SystemTypes>())...};
 }
 
-// What each system's per-entity loop can read for each entity; see
+// Counts the bytes each system's per-entity loop can read for each entity; see
 // framework::bytes_per_entity_v.
 template <typename... SystemTypes>
 auto bytes_of(framework::TypeList<SystemTypes...>)
@@ -95,7 +95,7 @@ auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
   using List = Scheduler::FlattenedSystemList;
   constexpr std::size_t SYSTEM_COUNT = List::size;
 
-  Scenario scenario = scenario_of(drones);
+  Scenario scenario = make_scenario(drones);
   scenario.radars_in_turn = in_turn;
   World world;
   std::expected<void, framework::Status> built =
@@ -166,7 +166,7 @@ auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
 namespace {
 
 // A whole positive number, or nothing.
-auto count_of(std::string_view text) -> std::optional<int> {
+auto parse_count(std::string_view text) -> std::optional<int> {
   int count = 0;
   auto [end, error] =
       std::from_chars(text.data(), text.data() + text.size(), count);
@@ -196,13 +196,13 @@ auto main(int argc, char** argv) -> int {
     if (argument == "--in-turn") {
       in_turn = true;
     } else if (argument == "--steps" && i + 1 < argc &&
-               (count = count_of(argv[i + 1]))) {
+               (count = parse_count(argv[i + 1]))) {
       steps = *count;
       budgeted = false;
       ++i;
     } else if (auto asked = Contention::threads_from(argument)) {
       threads = *asked;
-    } else if ((count = count_of(argument))) {
+    } else if ((count = parse_count(argument))) {
       populations.push_back(*count);
     } else {
       std::println(stderr, "unknown argument: {}", argument);

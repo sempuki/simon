@@ -14,7 +14,7 @@ using framework::Duration;
 using framework::Step;
 using framework::TimePoint;
 
-// What a gate does when a step spans more than one of its periods.
+// A gate's behavior when a step spans more than one of its periods.
 enum class CatchUp {
   SKIP,   // Fire once; the missed periods are dropped.
   EVERY,  // Fire once, reporting every period that fell in the step.

@@ -601,7 +601,7 @@ struct SystemRunner final {
             ... || false);
   }
 
-  // How a system reaches another component of an entity whose archetype
+  // The ways a system reaches another component of an entity whose archetype
   // requires the driving component.
   enum class Access { REQUIRED, ABSENT, ALLOWED };
 
@@ -743,7 +743,7 @@ class Scheduler final {
     for_each_type(FlattenedSystemList{}, [&]<typename SystemType>() {
       text += std::format(
           "{} {}\n  writes: {}\n  reads: {}\n  allowed: {}\n  excludes: {}\n",
-          identity_of(world, name_of<SystemType>()),
+          format_identity(world, name_of<SystemType>()),
           lib::to_type_string<SystemType>(),
           names(write_list_of_t<SystemType>{}),
           names(read_list_of_t<SystemType>{}),

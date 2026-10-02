@@ -87,7 +87,7 @@ class SpatialIndex final {
         highest_[axis] =
             first ? cell[axis] : std::max(highest_[axis], cell[axis]);
       }
-      std::uint32_t bucket = bucket_of(cell);
+      std::uint32_t bucket = hash_cell(cell);
       buckets_.push_back(bucket);
       ++starts_[bucket + 1];
     }
@@ -112,7 +112,7 @@ class SpatialIndex final {
   template <typename VisitorType>
   auto within(const Coordinates& center, double radius,
               VisitorType&& visit) const -> void {
-    std::optional<Box> box = box_of(center, radius);
+    std::optional<Box> box = find_box(center, radius);
     if (!box) {
       return;
     }
@@ -142,7 +142,7 @@ class SpatialIndex final {
   template <typename AcceptType>
   auto nearest(const Coordinates& center, double radius,
                AcceptType&& accept) const -> std::optional<std::uint32_t> {
-    std::optional<Box> box = box_of(center, radius);
+    std::optional<Box> box = find_box(center, radius);
     if (!box) {
       return std::nullopt;
     }
@@ -224,7 +224,7 @@ class SpatialIndex final {
     return static_cast<std::int64_t>(std::clamp(scaled, -LIMIT, LIMIT));
   }
 
-  auto bucket_of(const Cell& cell) const -> std::uint32_t {
+  auto hash_cell(const Cell& cell) const -> std::uint32_t {
     std::uint64_t hash =
         static_cast<std::uint64_t>(cell[0]) * 0x9E3779B97F4A7C15ULL ^
         static_cast<std::uint64_t>(cell[1]) * 0xC2B2AE3D27D4EB4FULL ^
@@ -241,7 +241,7 @@ class SpatialIndex final {
     return x * x + y * y + z * z;
   }
 
-  auto box_of(const Coordinates& center, double radius) const
+  auto find_box(const Coordinates& center, double radius) const
       -> std::optional<Box> {
     if (entries_.empty() || !(radius >= 0.0)) {  // Also refuses NaN.
       return std::nullopt;
@@ -287,7 +287,7 @@ class SpatialIndex final {
     if (squared_distance_to(cell, center) > limit) {
       return;
     }
-    std::uint32_t bucket = bucket_of(cell);
+    std::uint32_t bucket = hash_cell(cell);
     for (std::uint32_t i = starts_[bucket]; i < starts_[bucket + 1]; ++i) {
       if (cell_of(entries_[i].point) == cell) {
         consider(entries_[i]);
@@ -329,7 +329,6 @@ class SpatialIndex final {
 
   double cell_size_ = 1.0;
   double inverse_cell_size_ = 1.0;
-  bool adaptive_ = false;  // Whether rebuilds size the cells.
   std::size_t mask_ = 0;
   // starts_[b] is where bucket b begins in entries_; starts_[b + 1] where it
   // ends.
@@ -341,6 +340,7 @@ class SpatialIndex final {
   // The range of cells that hold points, per axis.
   Cell lowest_{0, 0, 0};
   Cell highest_{-1, -1, -1};
+  bool adaptive_ = false;  // Whether rebuilds size the cells.
 };
 
 }  // namespace simon::framework

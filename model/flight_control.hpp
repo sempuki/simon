@@ -60,7 +60,7 @@ enum class FlightSignal : std::uint8_t {
 inline constexpr std::size_t FLIGHT_SIGNAL_COUNT =
     static_cast<std::size_t>(FlightSignal::COUNT);
 
-// How many signals an aircraft may have, its blocks' included.
+// The most signals an aircraft may have, its blocks' included.
 inline constexpr std::size_t MAX_FLIGHT_SIGNALS = 64;
 
 // The fixed signal `name` names, if any, and the name of each.
@@ -124,10 +124,10 @@ struct FlightBlock final {
   std::optional<Table1<>> schedule;
   std::pair<double, double> domain{-1.0, 1.0};
   std::pair<double, double> range{-1.0, 1.0};
-  bool zero_centered = true;
-  bool scale = true;
   std::vector<double> detents;
   std::vector<double> times;
+  bool zero_centered = true;
+  bool scale = true;
 };
 
 struct FlightControlData final {

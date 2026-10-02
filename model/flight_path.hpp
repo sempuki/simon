@@ -26,7 +26,7 @@ namespace simon::model {
 
 struct AirStateRate;
 
-// Where an aircraft is and how it moves through the air. Its velocity follows
+// An aircraft's position and its motion through the air. Its velocity follows
 // from speed, flight-path angle and heading. A world of aircraft can use it as
 // its spatial component, and Continuous can integrate it.
 struct AirState final {
@@ -81,7 +81,7 @@ inline auto advance(const AirState& state, const AirStateRate& rate,
   };
 }
 
-inline auto velocity_of(const AirState& state) -> Velocity {
+inline auto compute_velocity(const AirState& state) -> Velocity {
   double horizontal = cos(state.flight_path_angle);
   return QuantityVector{horizontal * sin(state.heading),
                         horizontal * cos(state.heading),
@@ -119,17 +119,18 @@ inline auto pose(const AirState& state) -> Pose {
 
 //-- Dynamics -----------------------------------------------------------------
 
-// What the pilot or autopilot has actually set, after the airframe's lags and
-// limits: lift as a multiple of weight, bank, and the fraction of thrust.
+// The controls the pilot or autopilot has actually set, after the airframe's
+// lags and limits: lift as a multiple of weight, bank, and the fraction of
+// thrust.
 struct FlightControls final {
   double load_factor = 1.0;
   Angle bank = 0.0 * radian;
   double throttle = 0.0;
 };
 
-// What the dynamics read of an aircraft every step: mass, the drag polar
-// CD = CD0 + K * CL^2 over its wing area, and its sea-level thrust, which
-// falls with air density.
+// The properties of an aircraft the dynamics read every step: mass, the drag
+// polar CD = CD0 + K * CL^2 over its wing area, and its sea-level thrust,
+// which falls with air density.
 struct Airframe final {
   Mass mass = 1.0 * kilogram;
   Area wing_area = 1.0 * square_meter;
@@ -208,7 +209,7 @@ inline auto fly(const AirState& state, const AirStateRate& rate,
 
   // At rest there is no direction of flight to work from.
   if (state.speed <= 0.0 * meter_per_second) {
-    next.position += velocity_of(next) * seconds;
+    next.position += compute_velocity(next) * seconds;
     return next;
   }
 
@@ -220,8 +221,8 @@ inline auto fly(const AirState& state, const AirStateRate& rate,
   double sin_chi = cos_gamma > 0.0 ? along.x() / cos_gamma : 0.0;
   double cos_chi = cos_gamma > 0.0 ? along.y() / cos_gamma : 1.0;
 
-  // How the velocity changes: along the direction of flight with speed, and
-  // across it with flight-path angle and heading.
+  // The velocity changes along the direction of flight with speed, and across
+  // it with flight-path angle and heading.
   QuantityVector by_gamma{-sin_gamma * sin_chi, -sin_gamma * cos_chi,
                           cos_gamma};
   QuantityVector by_heading{cos_gamma * cos_chi, -cos_gamma * sin_chi, 0.0};

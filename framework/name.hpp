@@ -21,9 +21,9 @@
 //             Many-to-many.
 namespace simon::framework {
 
-// What a name names. Each component type is its own kind for its
-// entity-components: kind ENTITY_COMPONENT + c names entity-components of the
-// world's component number c.
+// The kinds of thing a name can name. Each component type is its own kind for
+// its entity-components: kind ENTITY_COMPONENT + c names entity-components of
+// the world's component number c.
 enum class Kind : std::uint32_t {
   NONE = 0,
   WORLD,
@@ -95,14 +95,15 @@ constexpr auto component_of(Name name) -> std::uint32_t {
 }
 
 // The canonical identity of `name` in world number `world`.
-auto identity_of(std::uint32_t world, Name name) -> Identity;
+auto format_identity(std::uint32_t world, Name name) -> Identity;
 
 struct ParsedIdentity final {
   std::uint32_t world = 0;
   Name name;
 };
 
-// Parses an identity made by identity_of. Returns nothing for anything else.
+// Parses an identity made by format_identity. Returns nothing for anything
+// else.
 auto parse_identity(const Identity& given) -> std::optional<ParsedIdentity>;
 
 }  // namespace simon::framework

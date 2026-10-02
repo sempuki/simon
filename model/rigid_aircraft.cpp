@@ -56,7 +56,7 @@ auto point_inertia(double mass, const Vector3& offset) -> Matrix3 {
 auto Earth::round(const wgs84::Geodetic& origin) -> Earth {
   Earth earth;
   earth.round_ = true;
-  earth.origin_fixed_ = wgs84::fixed_of(origin);
+  earth.origin_fixed_ = wgs84::geodetic_to_fixed(origin);
   // East, north and up, as rows.
   Matrix3 ned = north_east_down_to_fixed(origin.latitude, origin.longitude);
   earth.fixed_to_local_.row(0) = ned.col(1).transpose();
@@ -71,7 +71,7 @@ auto Earth::angle(Time time) const -> Angle {
              : 0.0 * radian;
 }
 
-auto Earth::fixed_of(const RigidBody& body, Time time) const -> Position {
+auto Earth::find_fixed(const RigidBody& body, Time time) const -> Position {
   if (!round_) {
     return body.position;
   }
@@ -94,7 +94,7 @@ auto Earth::place(const RigidBody& body, Time time) const -> Place {
   }
   Matrix3 to_fixed = wgs84::inertial_to_fixed(angle(time));
   Position fixed = QuantityVector{to_fixed * eigen(body.position)} * meter;
-  wgs84::Geodetic where = wgs84::geodetic_of(fixed);
+  wgs84::Geodetic where = wgs84::fixed_to_geodetic(fixed);
   return Place{
       .inertial_to_fixed = to_fixed,
       .fixed = fixed,
@@ -148,7 +148,7 @@ auto Earth::altitude(const RigidBody& body, Time time) const -> Length {
   if (!round_) {
     return altitude_of(body.position);
   }
-  return wgs84::geodetic_of(fixed_of(body, time)).altitude;
+  return wgs84::fixed_to_geodetic(find_fixed(body, time)).altitude;
 }
 
 auto Earth::north_east_down(const Position& fixed, Time time) const -> Matrix3 {
@@ -160,19 +160,19 @@ auto Earth::north_east_down(const Position& fixed, Time time) const -> Matrix3 {
         0.0, 0.0, -1.0;
     return basis;
   }
-  wgs84::Geodetic where = wgs84::geodetic_of(fixed);
+  wgs84::Geodetic where = wgs84::fixed_to_geodetic(fixed);
   return wgs84::inertial_to_fixed(angle(time)).transpose() *
          north_east_down_to_fixed(where.latitude, where.longitude);
 }
 
 auto Earth::body_to_north_east_down(const RigidBody& body, Time time) const
     -> Matrix3 {
-  return north_east_down(fixed_of(body, time), time).transpose() *
+  return north_east_down(find_fixed(body, time), time).transpose() *
          body.attitude.toRotationMatrix();
 }
 
 auto Earth::air_state(const RigidBody& body, Time time) const -> AirState {
-  Position fixed = fixed_of(body, time);
+  Position fixed = find_fixed(body, time);
   Position local = round_
                        ? QuantityVector{fixed_to_local_ *
                                         (eigen(fixed) - eigen(origin_fixed_))} *
@@ -204,7 +204,7 @@ auto Earth::body_at(const Position& position, Angle roll, Angle pitch,
   }
   Position where = QuantityVector{inertial} * meter;
   Position fixed =
-      round_ ? fixed_of(RigidBody{.position = where}, time) : where;
+      round_ ? find_fixed(RigidBody{.position = where}, time) : where;
 
   Quaternion body_to_local =
       Quaternion{AngleAxis{radians(yaw), Vector3::UnitZ()}} *
@@ -235,8 +235,8 @@ auto body_offset(const Displacement& structural,
   return meters(-apart.x(), apart.y(), -apart.z());
 }
 
-auto mass_balance_of(const AircraftData& aircraft,
-                     std::span<const Mass> contents) -> MassBalance {
+auto compute_mass_balance(const AircraftData& aircraft,
+                          std::span<const Mass> contents) -> MassBalance {
   CHECK_PRECONDITION(contents.size() == aircraft.tanks.size());
   double empty = aircraft.empty_mass.numerical_value_in(kilogram);
   double total = empty;
@@ -266,19 +266,19 @@ auto mass_balance_of(const AircraftData& aircraft,
   };
 }
 
-auto mass_balance_of(const AircraftData& aircraft) -> MassBalance {
-  return mass_balance_of(aircraft, fuel_tanks_of(aircraft));
+auto compute_mass_balance(const AircraftData& aircraft) -> MassBalance {
+  return compute_mass_balance(aircraft, fill_fuel_tanks(aircraft));
 }
 
-auto mass_balance_of(const AircraftData& aircraft, const FuelTanks& tanks)
+auto compute_mass_balance(const AircraftData& aircraft, const FuelTanks& tanks)
     -> MassBalance {
-  return mass_balance_of(
+  return compute_mass_balance(
       aircraft, std::span{tanks.contents.data(), aircraft.tanks.size()});
 }
 
 //-- Engines and fuel ----------------------------------------------------------
 
-auto fuel_tanks_of(const AircraftData& aircraft) -> FuelTanks {
+auto fill_fuel_tanks(const AircraftData& aircraft) -> FuelTanks {
   FuelTanks tanks;
   for (std::size_t i = 0; i < aircraft.tanks.size(); ++i) {
     tanks.contents[i] = aircraft.tanks[i].contents;
@@ -297,8 +297,8 @@ auto settled_engines(const AircraftData& aircraft,
   return engines;
 }
 
-auto engine_air_of(const RigidBody& body, const Earth& earth,
-                   const StandardAirTable& air, Time time) -> EngineAir {
+auto compute_engine_air(const RigidBody& body, const Earth& earth,
+                        const StandardAirTable& air, Time time) -> EngineAir {
   Length altitude = earth.altitude(body, time);
   Air here = air(altitude);
   double sound = here.speed_of_sound.numerical_value_in(meter_per_second);
@@ -366,18 +366,19 @@ auto burn_fuel(const AircraftData& aircraft, const Engines& engines,
 
 //-- Aerodynamics --------------------------------------------------------------
 
-auto aero_inputs_of(const RigidBody& body, const ControlSurfaces& surfaces,
-                    const AircraftData& aircraft, const Displacement& reference,
-                    const Earth& earth, const StandardAirTable& air, Time time)
-    -> AeroInputs {
-  return aero_inputs_of(body, surfaces, aircraft, reference, earth,
-                        earth.place(body, time), air);
+auto compute_aero_inputs(const RigidBody& body, const ControlSurfaces& surfaces,
+                         const AircraftData& aircraft,
+                         const Displacement& reference, const Earth& earth,
+                         const StandardAirTable& air, Time time) -> AeroInputs {
+  return compute_aero_inputs(body, surfaces, aircraft, reference, earth,
+                             earth.place(body, time), air);
 }
 
-auto aero_inputs_of(const RigidBody& body, const ControlSurfaces& surfaces,
-                    const AircraftData& aircraft, const Displacement& reference,
-                    const Earth& earth, const Place& place,
-                    const StandardAirTable& air) -> AeroInputs {
+auto compute_aero_inputs(const RigidBody& body, const ControlSurfaces& surfaces,
+                         const AircraftData& aircraft,
+                         const Displacement& reference, const Earth& earth,
+                         const Place& place, const StandardAirTable& air)
+    -> AeroInputs {
   Vector3 uvw = eigen(earth.air_velocity(body));
   Vector3 rates = eigen(earth.air_rate(body));
   Length altitude = place.altitude;
@@ -464,8 +465,8 @@ auto rigid_aircraft_rate(const RigidBody& body, const ControlSurfaces& surfaces,
   Displacement reference =
       body_offset(aircraft.aero_reference, mass.center_of_mass);
   Place place = earth.place(body, time);
-  AeroInputs inputs =
-      aero_inputs_of(body, surfaces, aircraft, reference, earth, place, air);
+  AeroInputs inputs = compute_aero_inputs(body, surfaces, aircraft, reference,
+                                          earth, place, air);
   Acceleration gravity = earth.gravity(place);
   Angle alpha = inputs[AeroVariable::ALPHA] * radian;
   Angle beta = inputs[AeroVariable::BETA] * radian;

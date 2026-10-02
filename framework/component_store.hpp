@@ -292,7 +292,7 @@ class ComponentStore final {
     std::size_t size = 0;
   };
 
-  // Where a pool chunk is: its segment, and its position in that segment.
+  // A pool chunk's place: its segment, and its position in that segment.
   struct Place final {
     std::uint32_t segment = 0;
     std::uint32_t ordinal = 0;

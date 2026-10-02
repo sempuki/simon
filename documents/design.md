@@ -560,7 +560,7 @@ which one:
 identity for logs, events and anything leaving the process.
 
 **An Identity** is a REST-like path computed from a Name, so the world stores
-no strings for it. `world.identity_of(name)` formats one and
+no strings for it. `world.format_identity(name)` formats one and
 `world.find_name_of(Identity{path})` parses one back, returning nothing for anything that does not exist in this
 world. `world.describe(name)` gives a one-line summary for a console:
 

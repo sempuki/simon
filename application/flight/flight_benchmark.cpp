@@ -76,8 +76,8 @@ auto bytes_of(framework::TypeList<SystemTypes...>)
   return {framework::bytes_per_entity_v<SystemTypes>...};
 }
 
-// How the aircraft fly: all single pass, all Runge-Kutta 4, or mixed, with
-// 1% on Runge-Kutta 4 and 0.1% rigid.
+// The models the aircraft fly: all single pass, all Runge-Kutta 4, or mixed,
+// with 1% on Runge-Kutta 4 and 0.1% rigid.
 enum class Fidelity { SINGLE_PASS, RUNGE_KUTTA, MIXED };
 
 auto measure(int aircraft, Fidelity fidelity, int steps,
@@ -147,7 +147,7 @@ auto measure(int aircraft, Fidelity fidelity, int steps,
 namespace {
 
 // A whole positive number, or nothing.
-auto count_of(std::string_view text) -> std::optional<int> {
+auto parse_count(std::string_view text) -> std::optional<int> {
   int count = 0;
   auto [end, error] =
       std::from_chars(text.data(), text.data() + text.size(), count);
@@ -169,12 +169,12 @@ auto main(int argc, char** argv) -> int {
     std::string_view argument{argv[i]};
     std::optional<int> count;
     if (argument == "--steps" && i + 1 < argc &&
-        (count = count_of(argv[i + 1]))) {
+        (count = parse_count(argv[i + 1]))) {
       steps = *count;
       ++i;
     } else if (auto asked = Contention::threads_from(argument)) {
       threads = *asked;
-    } else if ((count = count_of(argument))) {
+    } else if ((count = parse_count(argument))) {
       populations.push_back(*count);
     } else {
       std::println(stderr, "unknown argument: {}", argument);

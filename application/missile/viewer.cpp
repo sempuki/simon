@@ -92,7 +92,7 @@ auto plot_circle(const char* label, Point center, double radius, ImVec4 color,
   ImPlot::PlotLine(label, x.data(), y.data(), SEGMENTS + 1);
 }
 
-// How much to enlarge the interface on `display`: its height in screen
+// Computes the interface's scale on `display`: its height in screen
 // coordinates over 1080, to the nearest quarter, so a 4K display at 100% gives
 // 2 and a 2880x1800 one gives 1.75. Screen coordinates already include the
 // compositor's scale, so a 4K display set to 200% gives 1.
@@ -413,12 +413,12 @@ class Viewer final {
   };
 
   std::uint64_t seed_;
-  float scale_ = 1.0f;
-  bool quitting_ = false;
   float speed_ = 4.0f;
+  float scale_ = 1.0f;
   std::unique_ptr<Session> session_;
   std::unordered_map<Name, Sighting> last_seen_;
   std::vector<Explosion> explosions_;
+  bool quitting_ = false;
 };
 
 }  // namespace

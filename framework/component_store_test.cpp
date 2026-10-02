@@ -26,7 +26,7 @@ struct Counted final {
 };
 
 template <typename ComponentType>
-auto owners_of(const ComponentStore<ComponentType>& store)
+auto collect_owners(const ComponentStore<ComponentType>& store)
     -> std::vector<Entity> {
   std::vector<Entity> owners;
   store.for_each(
@@ -109,7 +109,7 @@ TEST_CASE("ComponentStore") {
     segmented.append(b, Mass{2.0}, 0);
     segmented.append(c, Mass{3.0}, 1);
 
-    CHECK(owners_of(segmented) == std::vector<Entity>{b, a, c});
+    CHECK(collect_owners(segmented) == std::vector<Entity>{b, a, c});
     CHECK(segmented.segment_size(0) == 1u);
     CHECK(segmented.segment_size(1) == 2u);
     CHECK(segmented.component_of(c).kilograms == 3.0);

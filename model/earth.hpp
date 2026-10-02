@@ -47,7 +47,7 @@ struct Geodetic final {
 };
 
 // The ECEF position of a geodetic one.
-inline auto fixed_of(const Geodetic& where) -> Position {
+inline auto geodetic_to_fixed(const Geodetic& where) -> Position {
   double sin_latitude = sin(where.latitude);
   double cos_latitude = cos(where.latitude);
   double normal = SEMIMAJOR_AXIS /
@@ -61,7 +61,7 @@ inline auto fixed_of(const Geodetic& where) -> Position {
 
 // The geodetic position of an ECEF one, by Heikkinen's closed form (1982),
 // exact to a few nanometers for any point not near the Earth's center.
-inline auto geodetic_of(const Position& fixed) -> Geodetic {
+inline auto fixed_to_geodetic(const Position& fixed) -> Geodetic {
   constexpr double a = SEMIMAJOR_AXIS;
   constexpr double b = SEMIMINOR_AXIS;
   constexpr double e2 = ECCENTRICITY_SQUARED;

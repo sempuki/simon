@@ -11,8 +11,8 @@ namespace simon::framework {
 
 using lib::Status;
 
-// Why a builder refused an utterance. `build()` returns one of these as a
-// Status and emits nothing. Compare with `status == lib::watch(error)`.
+// The reasons a builder refuses an utterance. `build()` returns one of these
+// as a Status and emits nothing. Compare with `status == lib::watch(error)`.
 enum class BuildError {
   ENTITY_CAPACITY_EXHAUSTED,
   COMPONENT_CAPACITY_EXHAUSTED,

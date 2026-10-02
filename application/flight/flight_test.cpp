@@ -334,7 +334,7 @@ TEST_CASE("RigidAircraft") {
     model::Earth earth = model::Earth::flat();
     Entity aircraft = rigid_737(earth, *data, InOut(world));
     Scheduler scheduler = scheduler_for(earth);
-    model::Mass start = model::mass_balance_of(*data).properties.mass;
+    model::Mass start = model::compute_mass_balance(*data).properties.mass;
 
     fly_rigid(10s, InOut(scheduler), InOut(world));
 

@@ -38,8 +38,8 @@ auto random_points(std::size_t count, double extent, std::uint64_t seed)
   return points;
 }
 
-auto index_of(const std::vector<Coordinates>& points, std::size_t capacity,
-              double cell_size) -> SpatialIndex {
+auto build_index(const std::vector<Coordinates>& points, std::size_t capacity,
+                 double cell_size) -> SpatialIndex {
   SpatialIndex index{capacity, cell_size};
   index.rebuild(points.size(), [&](std::size_t slot) { return points[slot]; });
   return index;
@@ -88,7 +88,7 @@ auto brute_nearest(const std::vector<Coordinates>& points,
 TEST_CASE("SpatialIndex") {
   SECTION("ShouldMatchBruteForceGivenRandomPointsAndRadii") {
     std::vector<Coordinates> points = random_points(2000, 500.0, 1);
-    SpatialIndex index = index_of(points, points.size(), 10.0);
+    SpatialIndex index = build_index(points, points.size(), 10.0);
     std::vector<Coordinates> centers = random_points(50, 600.0, 2);
     auto odd = [](std::uint32_t slot) { return slot % 2 == 1; };
 
@@ -107,7 +107,7 @@ TEST_CASE("SpatialIndex") {
     // A fine grid: a query covers thousands of cells, but there are only 512
     // buckets, so many cells share one.
     std::vector<Coordinates> points = random_points(500, 200.0, 3);
-    SpatialIndex index = index_of(points, points.size(), 1.0);
+    SpatialIndex index = build_index(points, points.size(), 1.0);
     auto any = [](std::uint32_t) { return true; };
 
     for (const Coordinates& center : random_points(20, 200.0, 4)) {
@@ -119,7 +119,7 @@ TEST_CASE("SpatialIndex") {
 
   SECTION("ShouldVisitEveryPointGivenInfiniteOrHugeRadius") {
     std::vector<Coordinates> points = random_points(50, 100.0, 5);
-    SpatialIndex index = index_of(points, points.size(), 10.0);
+    SpatialIndex index = build_index(points, points.size(), 10.0);
     auto any = [](std::uint32_t) { return true; };
     Coordinates center{0.0, 0.0, 0.0};
 
@@ -132,7 +132,7 @@ TEST_CASE("SpatialIndex") {
 
   SECTION("ShouldGiveTiesToLowestSlotGivenEqualDistances") {
     std::vector<Coordinates> points{{3.0, 0.0, 0.0}, {-3.0, 0.0, 0.0}};
-    SpatialIndex index = index_of(points, points.size(), 1.0);
+    SpatialIndex index = build_index(points, points.size(), 1.0);
     auto any = [](std::uint32_t) { return true; };
 
     CHECK(index.nearest({0.0, 0.0, 0.0}, 10.0, any) == 0u);
@@ -141,7 +141,7 @@ TEST_CASE("SpatialIndex") {
   SECTION("ShouldFindNothingGivenEmptyIndexOrNegativeRadius") {
     SpatialIndex empty{8, 1.0};
     std::vector<Coordinates> points{{0.0, 0.0, 0.0}};
-    SpatialIndex index = index_of(points, 8, 1.0);
+    SpatialIndex index = build_index(points, 8, 1.0);
     auto any = [](std::uint32_t) { return true; };
 
     CHECK(within(empty, {0.0, 0.0, 0.0}, 5.0).empty());
@@ -152,7 +152,7 @@ TEST_CASE("SpatialIndex") {
   SECTION("ShouldReplaceContentsGivenRebuild") {
     std::vector<Coordinates> before{{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
     std::vector<Coordinates> after{{100.0, 0.0, 0.0}};
-    SpatialIndex index = index_of(before, 4, 1.0);
+    SpatialIndex index = build_index(before, 4, 1.0);
     index.rebuild(after.size(), [&](std::size_t slot) { return after[slot]; });
 
     CHECK(index.size() == 1u);

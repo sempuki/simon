@@ -24,11 +24,11 @@ struct Scenario final {
   std::uint64_t seed = 1;
 
   int aircraft = 100;
-  // How many of them opt in to Runge-Kutta 4, and how many fly as rigid
+  // The number of them on Runge-Kutta 4, and the number flying as rigid
   // bodies. The rest fly the single-pass model.
   int precise = 0;
   int rigid = 0;
-  // What the rigid aircraft are, as tools/jsbsim/convert.py writes them.
+  // The rigid aircraft's data, as tools/jsbsim/convert.py writes it.
   std::string rigid_aircraft = "application/flight/aircraft/737.aircraft";
 
   Length spacing = 5000.0 * model::meter;  // Per aircraft, on average.
