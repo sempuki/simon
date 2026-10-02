@@ -449,10 +449,26 @@ auto rigid_aircraft_rate(const RigidBody& body, const ControlSurfaces& surfaces,
 
   // The rate of angle of attack follows from the body's acceleration, which
   // the forces set.
+  // The engines' thrust, along body x from where each is mounted.
+  Eigen::Vector3d thrust_force = Eigen::Vector3d::Zero();
+  Eigen::Vector3d thrust_moment = Eigen::Vector3d::Zero();
+  for (std::size_t i = 0; i < aircraft.engines.size(); ++i) {
+    Eigen::Vector3d thrust{
+        engines.turbines[i].thrust.numerical_value_in(newton), 0.0, 0.0};
+    Eigen::Vector3d arm =
+        eigen(body_offset(aircraft.engines[i].location, mass.center_of_mass));
+    thrust_force += thrust;
+    thrust_moment += arm.cross(thrust);
+  }
+
   auto alpha_rate = [&](const AeroSums& sums) {
-    ForceVector force = aero_loads(sums, alpha, beta, reference).force;
-    RigidBodyRate translation = rigid_body_rate(
-        body, force, Vector3d{} * newton_meter, mass.properties, gravity);
+    Eigen::Vector3d force = aero_loads(sums, alpha, beta, reference)
+                                .force.numerical_value_in(newton)
+                                .eigen() +
+                            thrust_force;
+    RigidBodyRate translation =
+        rigid_body_rate(body, Vector3d{force} * newton,
+                        Vector3d{} * newton_meter, mass.properties, gravity);
     Eigen::Vector3d uvw = eigen(earth.air_velocity(body));
     Eigen::Vector3d uvw_rate =
         eigen(earth.air_acceleration(body, translation.acceleration));
@@ -478,17 +494,10 @@ auto rigid_aircraft_rate(const RigidBody& body, const ControlSurfaces& surfaces,
   sums[index(AeroAxis::YAW)] = sum(model, AeroAxis::YAW, inputs);
 
   AeroLoads loads = aero_loads(sums, alpha, beta, reference);
-  Eigen::Vector3d force = loads.force.numerical_value_in(newton).eigen();
+  Eigen::Vector3d force =
+      loads.force.numerical_value_in(newton).eigen() + thrust_force;
   Eigen::Vector3d moment =
-      loads.moment.numerical_value_in(newton_meter).eigen();
-  for (std::size_t i = 0; i < aircraft.engines.size(); ++i) {
-    Eigen::Vector3d thrust{
-        engines.turbines[i].thrust.numerical_value_in(newton), 0.0, 0.0};
-    Eigen::Vector3d arm =
-        eigen(body_offset(aircraft.engines[i].location, mass.center_of_mass));
-    force += thrust;
-    moment += arm.cross(thrust);
-  }
+      loads.moment.numerical_value_in(newton_meter).eigen() + thrust_moment;
   return rigid_body_rate(body, Vector3d{force} * newton,
                          Vector3d{moment} * newton_meter, mass.properties,
                          gravity);
