@@ -13,8 +13,14 @@
 // with temperature, at least the idle flow, and following its target at
 // limited rates.
 //
+// A turbine with reheat lights it with a throttle past 1, as JSBSim's does
+// with its augmentation method 2: thrust runs from military to maximum as the
+// throttle goes from 1 to 2, and fuel flows at the thrust times the reheat's
+// specific consumption. A step after the reheat goes out, fuel flow and bleed
+// are as they were, as JSBSim's are for a frame.
+//
 // Thrust is held for a step, as JSBSim holds it for a frame. Starting,
-// stalling, reheat and water injection are left out.
+// stalling and water injection are left out.
 namespace simon::model {
 
 // The air a turbine breathes.
@@ -30,9 +36,11 @@ struct TurbineState final {
   double n2 = 0.0;         // Core speed, percent.
   double fuel_flow = 0.0;  // kg/s.
   Force thrust = 0.0 * newton;
+  bool reheat = false;  // Lit through the step.
 };
 
-// A turbine settled at `throttle` (from 0 to 1) in `air`.
+// A turbine settled at `throttle` (from 0 to 1, or to 2 with reheat) in
+// `air`.
 auto steady_turbine(const TurbineData& turbine, double throttle,
                     const EngineAir& air) -> TurbineState;
 

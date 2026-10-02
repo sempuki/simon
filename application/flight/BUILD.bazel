@@ -122,7 +122,9 @@ cc_test(
     copts = COPTS,
     data = [
         "aircraft/737.aircraft",
+        "aircraft/f16.aircraft",
         "reference/jsbsim_737_turbine.csv",
+        "reference/jsbsim_f16_turbine.csv",
     ],
     deps = [
         ":testing",
