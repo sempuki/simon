@@ -27,6 +27,7 @@ auto build_small_world(lib::Out<World> world) -> void {
           .numbered(1)
           .holding<archetype::Aircraft>(4)
           .holding<archetype::PreciseAircraft>(4)
+          .holding<archetype::RigidAircraft>(4)
           .build(world);
   CHECK_POSTCONDITION(built.has_value());
 }
@@ -206,6 +207,118 @@ TEST_CASE("Simulation") {
       CHECK(state.speed > 150.0 * model::meter_per_second);
     }
     CHECK(reached > 0);
+  }
+}
+
+namespace {
+
+constexpr char BOEING_737[] = "application/flight/aircraft/737.aircraft";
+
+// A 737 flying level at 6 km and 200 m/s, heading north at 2 degrees angle
+// of attack, from the world's origin.
+auto rigid_737(const model::Earth& earth, const model::AircraftData& data,
+               lib::InOut<World> world) -> Entity {
+  constexpr double ALPHA = 2.0 * PI / 180.0;
+  RigidBody body = earth.body_at(
+      model::meters(0.0, 0.0, 6000.0), 0.0 * model::radian,
+      ALPHA * model::radian, 0.0 * model::radian,
+      model::meters_per_second(200.0 * std::cos(ALPHA), 0.0,
+                               200.0 * std::sin(ALPHA)),
+      model::Vector3d{} * model::radian_per_second, 0.0 * model::second);
+  auto entity = world->create<archetype::RigidAircraft>()
+                    .with(earth.air_state(body, 0.0 * model::second))
+                    .with(body)
+                    .with(RigidBodyRate{})
+                    .with(ControlSurfaces{.elevator = -0.05})
+                    .with(model::mass_balance_of(data))
+                    .with(AircraftType{.data = &data})
+                    .build();
+  REQUIRE(entity);
+  return *entity;
+}
+
+auto scheduler_for(const model::Earth& earth) -> Scheduler {
+  return Scheduler{Schedule{
+      FollowRoute{}, FlyAutopilot{}, Actuate{}, Fly{}, Precise{},
+      Rigid{SystemList{RigidAircraftRates{earth}}}, FollowRigidBody{earth}}};
+}
+
+auto fly_rigid(Duration duration, lib::InOut<Scheduler> scheduler,
+               lib::InOut<World> world) -> void {
+  constexpr Duration STEP = 8ms;
+  world->sync();
+  for (TimePoint time{}; time < TimePoint{duration}; time += STEP) {
+    scheduler->step(framework::Step{.time = time, .dt = STEP}, world);
+  }
+}
+
+}  // namespace
+
+TEST_CASE("RigidAircraft") {
+  auto data = model::load_aircraft(BOEING_737);
+  REQUIRE(data);
+  World world;
+  build_small_world(lib::Out(world));
+
+  SECTION("ShouldFollowItsBodyGivenFlatEarth") {
+    model::Earth earth = model::Earth::flat();
+    Entity aircraft = rigid_737(earth, *data, lib::InOut(world));
+    Scheduler scheduler = scheduler_for(earth);
+
+    fly_rigid(10s, lib::InOut(scheduler), lib::InOut(world));
+
+    const RigidBody& body = world.store_of<RigidBody>().component_of(aircraft);
+    const AirState& state = state_of(world, aircraft);
+    AirState expected = earth.air_state(body, 10.0 * model::second);
+    CHECK(state.position == expected.position);
+    CHECK(state.speed == expected.speed);
+
+    // About 2 km north, without engines: gliding, not tumbling.
+    model::Vector3d where = state.position.numerical_value_in(model::meter);
+    CHECK(std::abs(where.eigen().y() - 1950.0) < 100.0);
+    CHECK(std::abs(where.eigen().z() - 6000.0) < 300.0);
+    CHECK(std::abs(model::radians(state.heading)) < 0.05);
+  }
+
+  SECTION("ShouldAgreeWithFlatEarthGivenRoundEarthOverShortFlight") {
+    // Over 10 s the Earth's rotation, curvature and gravity move a 737 a
+    // few meters from where a flat Earth puts it.
+    model::Earth flat = model::Earth::flat();
+    model::Earth round = model::Earth::round(model::wgs84::Geodetic{});
+    Entity on_flat = rigid_737(flat, *data, lib::InOut(world));
+    World round_world;
+    build_small_world(lib::Out(round_world));
+    Entity on_round = rigid_737(round, *data, lib::InOut(round_world));
+    Scheduler flat_scheduler = scheduler_for(flat);
+    Scheduler round_scheduler = scheduler_for(round);
+
+    fly_rigid(10s, lib::InOut(flat_scheduler), lib::InOut(world));
+    fly_rigid(10s, lib::InOut(round_scheduler), lib::InOut(round_world));
+
+    double apart = model::distance(state_of(world, on_flat),
+                                   state_of(round_world, on_round))
+                       .numerical_value_in(model::meter);
+    CHECK(apart > 0.01);
+    CHECK(apart < 5.0);
+  }
+
+  SECTION("ShouldLeavePointMassAircraftAloneGivenSharedWorld") {
+    AirState start = level(5000.0, 200.0, 0.0);
+    Route route = route_to(model::meters(0.0, 500000.0, 5000.0),
+                           200.0 * model::meter_per_second);
+    Entity point_mass = create(start, route, lib::InOut(world));
+    rigid_737(model::Earth::flat(), *data, lib::InOut(world));
+    World alone;
+    build_small_world(lib::Out(alone));
+    Entity by_itself = create(start, route, lib::InOut(alone));
+    Scheduler shared;
+    Scheduler single;
+
+    fly_rigid(10s, lib::InOut(shared), lib::InOut(world));
+    fly_rigid(10s, lib::InOut(single), lib::InOut(alone));
+
+    CHECK(state_of(world, point_mass).position ==
+          state_of(alone, by_itself).position);
   }
 }
 

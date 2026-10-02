@@ -12,6 +12,7 @@
 #include "model/atmosphere.hpp"
 #include "model/control.hpp"
 #include "model/flight_path.hpp"
+#include "model/rigid_aircraft.hpp"
 
 namespace simon::flight {
 
@@ -171,15 +172,16 @@ inline auto rate_of(const AirState& state, const FlightControls& controls,
 }
 
 // The default: each aircraft advances in one semi-implicit pass per step.
-// Aircraft that have an AirStateRate are Precise's, so Fly excludes them; the
-// runner skips the precise archetype's segment whole.
+// Aircraft that have an AirStateRate are Precise's, and those that have a
+// RigidBody are Rigid's, so Fly excludes them; the runner skips their
+// archetypes' segments whole.
 struct Fly final                    //
     : System<AirState,              //
              const FlightControls,  //
              const Airframe> {
   using SystemWorld = ProjectedWorld<Fly>;
   using SequenceAfterSystemList = SystemList<Actuate>;
-  using ExcludeComponentList = TypeList<AirStateRate>;
+  using ExcludeComponentList = TypeList<AirStateRate, RigidBody>;
 
   auto operator()(SystemWorld&, Entity,            //
                   AirState& state,                 //
@@ -224,9 +226,78 @@ using Precise =
     framework::Continuous<framework::RungeKutta4, TypeList<AirState>,
                           SystemList<PointMassRates>>;
 
+// The opt-in to six degrees of freedom: the rate of each rigid aircraft's
+// body, over a flat Earth unless constructed with a round one.
+struct RigidAircraftRates final      //
+    : System<RigidBodyRate,          //
+             const RigidBody,        //
+             const ControlSurfaces,  //
+             const MassBalance,      //
+             const AircraftType> {
+  using SystemWorld = ProjectedWorld<RigidAircraftRates>;
+
+  explicit RigidAircraftRates(model::Earth earth = model::Earth::flat())
+      : earth_{earth} {}
+
+  auto operator()(SystemWorld&, Entity,             //
+                  RigidBodyRate& rate,              //
+                  const RigidBody* body,            //
+                  const ControlSurfaces* surfaces,  //
+                  const MassBalance* mass,          //
+                  const AircraftType* type,         //
+                  Step step) const -> void {
+    if (!body || !surfaces || !mass || !type || !type->data) {
+      return;
+    }
+    rate = model::rigid_aircraft_rate(
+        *body, *surfaces, *mass, *type->data, earth_, air_,
+        model::seconds(step.time.time_since_epoch()));
+  }
+
+  auto earth() const -> const model::Earth& { return earth_; }
+
+ private:
+  model::Earth earth_;
+  model::StandardAirTable air_;
+};
+
+using Rigid = framework::Continuous<framework::RungeKutta4, TypeList<RigidBody>,
+                                    SystemList<RigidAircraftRates>>;
+
+// After Rigid, each rigid aircraft's AirState follows its body, so spatial
+// queries and the rest of the world see it as they see any aircraft. Aircraft
+// with FlightControls fly the point-mass model, so their segments are
+// skipped whole.
+struct FollowRigidBody final  //
+    : System<AirState,        //
+             const RigidBody> {
+  using SystemWorld = ProjectedWorld<FollowRigidBody>;
+  using SequenceAfterSystemList = SystemList<Rigid>;
+  using ExcludeComponentList = TypeList<FlightControls>;
+
+  explicit FollowRigidBody(model::Earth earth = model::Earth::flat())
+      : earth_{earth} {}
+
+  auto operator()(SystemWorld&, Entity,   //
+                  AirState& state,        //
+                  const RigidBody* body,  //
+                  Step step) const -> void {
+    if (!body) {
+      return;
+    }
+    // The body has moved on by the step.
+    state = earth_.air_state(
+        *body, model::seconds((step.time + step.dt).time_since_epoch()));
+  }
+
+ private:
+  model::Earth earth_;
+};
+
 //-- Schedule -----------------------------------------------------------------
 
-using Schedule = SystemList<FollowRoute, FlyAutopilot, Actuate, Fly, Precise>;
+using Schedule = SystemList<FollowRoute, FlyAutopilot, Actuate, Fly, Precise,
+                            Rigid, FollowRigidBody>;
 using Scheduler = framework::Scheduler<World, Schedule>;
 
 }  // namespace simon::flight

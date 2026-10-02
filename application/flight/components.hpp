@@ -9,12 +9,16 @@
 #include "framework/entity.hpp"
 #include "framework/step.hpp"
 #include "framework/world.hpp"
+#include "model/aircraft_data.hpp"
 #include "model/flight_path.hpp"
+#include "model/rigid_aircraft.hpp"
+#include "model/rigid_body.hpp"
 #include "model/units.hpp"
 
 // Aircraft fly routes of waypoints under an autopilot. Most fly a cheap,
 // single-pass point-mass model; aircraft whose archetype opts in are
-// integrated with Runge-Kutta 4 instead.
+// integrated with Runge-Kutta 4 instead. Rigid aircraft, the highest fidelity,
+// fly six degrees of freedom by their control surfaces.
 namespace simon::flight {
 
 using framework::Duration;
@@ -25,10 +29,14 @@ using model::Airframe;
 using model::AirState;
 using model::AirStateRate;
 using model::Angle;
+using model::ControlSurfaces;
 using model::FlightControls;
 using model::Length;
+using model::MassBalance;
 using model::Position;
 using model::Rate;
+using model::RigidBody;
+using model::RigidBodyRate;
 using model::Speed;
 using model::Time;
 
@@ -70,6 +78,12 @@ struct Route final {
   std::uint32_t reached = 0;  // Waypoints reached so far.
 };
 
+// The data a rigid aircraft flies by, which every aircraft of its type
+// shares. It outlives the world.
+struct AircraftType final {
+  const model::AircraftData* data = nullptr;
+};
+
 namespace archetype {
 
 using framework::Archetype;
@@ -88,12 +102,21 @@ struct PreciseAircraft final                                       //
                          Commands, Airframe, Handling, Autopilot,  //
                          Route>> {};                               //
 
+// Flies six degrees of freedom by its control surfaces, integrated with
+// Runge-Kutta 4. Its AirState follows its body, for the rest of the world.
+struct RigidAircraft final                                                 //
+    : Archetype<"rigid aircraft",                                          //
+                Requires<AirState, RigidBody, RigidBodyRate,               //
+                         ControlSurfaces, MassBalance, AircraftType>> {};  //
+
 }  // namespace archetype
 
 using World = framework::World<
     AirState,
     framework::TypeList<AirStateRate, FlightControls, Commands, Airframe,
-                        Handling, Autopilot, Route>,
-    framework::TypeList<archetype::Aircraft, archetype::PreciseAircraft>>;
+                        Handling, Autopilot, Route, RigidBody, RigidBodyRate,
+                        ControlSurfaces, MassBalance, AircraftType>,
+    framework::TypeList<archetype::Aircraft, archetype::PreciseAircraft,
+                        archetype::RigidAircraft>>;
 
 }  // namespace simon::flight
