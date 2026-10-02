@@ -2548,12 +2548,12 @@ stage's is left after `Rigid`. A step's own would need the surfaces the
 flight controls are about to set. JSBSim's flight controls read the frame
 before's air data and accelerations two frames old.
 
-Matching JSBSim's flight controls block by block turned up two of its
-behaviors. A kinematic block with an output starts each frame from the
-output's value, and the F-16's yaw PID writes the rudder's position just
-before its actuator moves it. And JSBSim's trim runs the PIDs before it has
-an airspeed, so they integrate, and their integral cannot be read; the
-references zero it after the trim, as simon starts. The F-16's PID triggers
+Two of JSBSim's behaviors are part of the model. A kinematic block with an
+output starts each frame from the output's value, and the F-16's yaw PID
+writes the rudder's position just before its actuator moves it. JSBSim's
+trim runs the PIDs before it has an airspeed, so they integrate, and their
+integral cannot be read; the references zero it after the trim, as simon
+starts. The F-16's PID triggers
 hold their integrals in flight, so in flight its PIDs are proportional and
 derivative.
 
@@ -2562,19 +2562,17 @@ states up to Mach 1.36, every one of the 60 flight control blocks to 2e-16
 on every frame of three flights, the engine to 1e-13 through reheat and out,
 and the mass balance to JSBSim's rounded slug.
 
-The check cases need the flight controls at a fixed rate. The F-16's control
-laws differentiate the pilot's commands and then clip them, so at every
-frame they change with the frame, and JSBSim does not converge: after the
-roll doublet it moves 38 cm between 0.5 and 0.125 ms. A digital flight
-control computer runs at its own rate whatever the dynamics do, so the
-F-16's run every 8 ms in simon (`RunFlightControls` given a period) and in
-the reference, which flies JSBSim at 0.125 ms with each channel run every
-64th frame. The throttle's channel still runs every frame, because JSBSim
-sets the throttle to its command each frame before the channels run; its
-command changes only on the computer's frames, so that is the same. Every
-flight starts from JSBSim's trim at 8 ms: its trim at 0.125 ms comes to the
-same state, but its pitch trim differs by 6e-5, which alone moves the F-16
-10 cm in 30 s.
+The F-16's flight controls run at a fixed rate. Its control laws
+differentiate the pilot's commands and then clip them, so run at every frame
+they change with the frame and do not converge. A digital flight control
+computer runs at its own rate whatever the dynamics do: the F-16's runs
+every 8 ms in simon (`RunFlightControls` given a period) and in the
+reference, which flies JSBSim at 0.125 ms with each channel run every 64th
+frame. The throttle's channel runs every frame, because JSBSim sets the
+throttle to its command each frame before the channels run; the command
+changes only on the computer's frames, so the result is the same. Every
+flight starts from JSBSim's trim at 8 ms, because JSBSim's trim depends on
+its frame: at 0.125 ms its pitch trim differs by 6e-5.
 
 The largest distance from JSBSim at 0.125 ms over 30 s:
 
@@ -2594,8 +2592,8 @@ The largest distance from JSBSim at 0.125 ms over 30 s:
   times, and the throttle step, by 4 times. In the hold and the rudder
   doublet JSBSim at 8 ms is closer, both being under simon's floor of 4 mm.
 
-Rigid aircraft cost what they did: 1.79 µs per aircraft-step flat and 2.86 µs
-round at 1,000, against 1.77 and 2.83 µs before.
+A rigid 737 costs 1.79 µs per aircraft-step flat and 2.86 µs round at 1,000;
+the F-16's sensing costs it nothing.
 
 #### Mixed fidelity
 
