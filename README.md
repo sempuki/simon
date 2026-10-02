@@ -110,8 +110,9 @@ That is 60 blocks: summers, gains, scheduled gains, surface scales and
 actuators, with 11 switches, 3 PIDs and a function. The controls read the
 state a real flight control computer senses: calibrated airspeed, by JSBSim's
 pitot formulas, ground speed, body velocity, attitude, and the accelerations
-the pilot feels at the eye point. The flight controls run at a fixed 8 ms, as
-a digital flight control computer does, whatever step the dynamics take.
+the pilot feels at the eye point. The flight controls can run at a fixed
+period, as a digital flight control computer does, whatever step the dynamics
+take; the check cases run them every 8 ms.
 
 Replayed through three recorded flights, every block's output agrees with
 JSBSim's to 2e-16 on every frame. The flights cruise while the stick, rudder
