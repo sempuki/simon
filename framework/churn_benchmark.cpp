@@ -9,8 +9,7 @@
 // (24, 256 or 1024 bytes), which one system reads beside the Body each step.
 //
 //   dense         one array per component with swap-erase, and no
-//                 reordering (the framework's store before archetype
-//                 segments). The sibling is found by maybe_component_of.
+//                 reordering. The sibling is found by maybe_component_of.
 //   sorted        the same, and each store is sorted by entity index at the
 //                 step's sync point once 1 in 8 of it is out of order. The
 //                 framework does not sort, so this uses DenseStore below.
@@ -232,10 +231,10 @@ auto generate_schedule(const Workload& workload) -> Schedule {
 
 //-- Layouts ------------------------------------------------------------------
 
-// The framework's store before archetype segments: one dense array with
-// swap-erase, plus what the sorted and hybrid layouts need, a count of appends
-// and erases that break entity order and an in-place sort. The framework chose
-// archetype segments instead; see documents/design.md.
+// One dense array with swap-erase, plus what the sorted and hybrid layouts
+// need: a count of appends and erases that break entity order, and an
+// in-place sort. The framework's own store uses archetype segments; see
+// documents/design.md.
 template <typename ComponentType>
 class DenseStore final {
  public:
