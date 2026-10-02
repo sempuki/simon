@@ -2,9 +2,8 @@
 
 """Converts a JSBSim aircraft into simon's aircraft format.
 
-JSBSim (https://github.com/JSBSim-Team/jsbsim, LGPL 2.1 or later) defines the
-aircraft format this reads; its aircraft and engine files have their own
-authors and licenses, which the output repeats in its header.
+An aircraft's authors, license and notes, and its engines' authors, are
+carried into the output's header.
 
   python tools/jsbsim/convert.py <aircraft.xml> <engine directory> <output>
 

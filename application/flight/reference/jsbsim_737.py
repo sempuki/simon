@@ -16,10 +16,6 @@ is and the controls a point mass needs to fly the same path:
   throttle           from the thrust along the velocity, per kilogram of the
                      fitted mass, so fuel burn does not count either.
 
-JSBSim (https://github.com/JSBSim-Team/jsbsim, LGPL 2.1 or later) does the
-flying; its 737 model is by Dave Culp and Aeromatic, under the GPL, and is
-meant for educational and entertainment purposes only.
-
 Drag is left to simon's drag polar, fitted to JSBSim's level and turning trims
 over the scenario's envelope. Run with JSBSim's Python package and NumPy:
 
