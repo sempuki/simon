@@ -21,8 +21,9 @@
 // The whole 737, and the whole F-16, against JSBSim's, open loop: from the
 // same trim, flown through the check cases reference/jsbsim_737_check_cases.py
 // and jsbsim_f16_check_cases.py flew, through simon's systems at its 8 ms step
-// and at 0.5 ms. JSBSim at 0.5 ms is the reference: its integrators and frame
-// lags have converged there.
+// and at 0.5 ms. The reference is JSBSim where its integrators and frame lags
+// have converged: at 0.5 ms for the 737, and at 0.125 ms for the F-16, whose
+// flight controls run every 8 ms in both.
 namespace simon::flight {
 
 namespace {
