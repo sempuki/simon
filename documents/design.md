@@ -2489,20 +2489,27 @@ at 8 ms steps, each on its own. GCC, per aircraft per step:
 
 | Aircraft | Flat Earth | Round Earth |
 |---:|---:|---:|
-| 100 | 1.83 µs | 2.80 µs |
-| 1,000 | 1.77 µs | 2.82 µs |
-| 10,000 | 1.77 µs | 2.80 µs |
+| 100 | 1.19 µs | 2.26 µs |
+| 1,000 | 1.18 µs | 2.27 µs |
+| 10,000 | 1.23 µs | 2.37 µs |
 
-- **The cost is flat with population,** so one thread flies about 4,500
-  rigid 737s in real time over a flat Earth, and 2,800 round one. `Rigid`
-  is three quarters to four fifths of it: four stages, each building up the
+- **The cost is flat with population,** so one thread flies about 6,700
+  rigid 737s in real time over a flat Earth, and 3,500 round one. `Rigid`
+  is two thirds to seven tenths of it: four stages, each building up the
   aerodynamics.
+- **A stage finds the body's motion once.** It turns the attitude into a
+  matrix and finds the air velocity and rate from it, takes the wind angles'
+  sines and cosines as ratios of the air velocity, and finds the rate of
+  angle of attack from the force per unit mass and a remainder the stage
+  fixes. Whether an aircraft's forces read that rate is found when it is
+  read.
 - **JSBSim takes 9.2 µs a frame** for one 737, timed through its Python
   module from its own trim, with one instance per aircraft. Its frame does
   work simon's does not, such as ground reactions and its property tree, so
   the comparison is rough; simon evaluates the aircraft four times a step to
-  JSBSim's once and is still 3.3 times faster round the Earth.
-- **The round Earth costs 60% more.** Each stage finds the body's place on
+  JSBSim's once and is still 4 times faster round the Earth, and 7.8 times
+  over a flat one.
+- **The round Earth costs 90% more.** Each stage finds the body's place on
   it once, its geodetic position, local frame and the Earth's turn, in
   `Earth::place`, which took the round Earth from 3.57 to 2.81 µs.
 
@@ -2592,7 +2599,7 @@ The largest distance from JSBSim at 0.125 ms over 30 s:
   times, and the throttle step, by 4 times. In the hold and the rudder
   doublet JSBSim at 8 ms is closer, both being under simon's floor of 4 mm.
 
-A rigid 737 costs 1.79 µs per aircraft-step flat and 2.86 µs round at 1,000;
+A rigid 737 costs 1.18 µs per aircraft-step flat and 2.27 µs round at 1,000;
 the F-16's sensing costs it nothing.
 
 #### Trim
@@ -2664,12 +2671,12 @@ rigid. At 100,000 aircraft, GCC, 20 ms steps:
 
 | Aircraft | Systems | ms per step | Share |
 |---|---|---:|---:|
-| 98,900 single pass | `FollowRoute`, `FlyAutopilot`, `Actuate`, `Fly` | 7.17 | 95.2% |
-| 1,000 Runge-Kutta 4 | `Continuous(AirState)` | 0.17 | 2.3% |
-| 100 rigid 737s | `FlySurfaces` to `FollowRigidBody` | 0.19 | 2.5% |
-| All | | 7.53 | |
+| 98,900 single pass | `FollowRoute`, `FlyAutopilot`, `Actuate`, `Fly` | 7.25 | 95.8% |
+| 1,000 Runge-Kutta 4 | `Continuous(AirState)` | 0.18 | 2.3% |
+| 100 rigid 737s | `FlySurfaces` to `FollowRigidBody` | 0.14 | 1.8% |
+| All | | 7.57 | |
 
-One thread runs it 2.7 times faster than real time. Each level costs what
+One thread runs it 2.6 times faster than real time. Each level costs what
 its own aircraft cost, and nothing more: the single-pass aircraft run as
 fast as they do alone (7.25 ms at 100,000), because each level's systems are
 driven by components only its aircraft have.

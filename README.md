@@ -121,16 +121,16 @@ bazel test //application/flight:check_case_test --test_arg=HoldsTrim
 
 | Rigid 737s | Flat Earth | Round Earth |
 |---:|---:|---:|
-| 100 | 1.83 µs | 2.80 µs |
-| 1,000 | 1.77 µs | 2.82 µs |
-| 10,000 | 1.77 µs | 2.80 µs |
+| 100 | 1.19 µs | 2.26 µs |
+| 1,000 | 1.18 µs | 2.27 µs |
+| 10,000 | 1.23 µs | 2.37 µs |
 
 The cost per aircraft-step stays flat with population. JSBSim takes 9.2 µs a
 frame for one 737, timed through its Python module. The comparison is rough,
 since JSBSim's frame also runs ground reactions and its property tree. Even so,
 the application evaluates the aircraft four times a step to JSBSim's once and
-is 3.3 times faster round the Earth. One thread flies about 4,500 rigid 737s
-in real time over a flat Earth.
+is 4 times faster round the Earth, and 7.8 times over a flat one. One thread
+flies about 6,700 rigid 737s in real time over a flat Earth.
 
 ```sh
 bazel run -c opt //application/flight:rigid_benchmark
@@ -161,10 +161,10 @@ level it doesn't use. One world at 100,000 aircraft:
 
 | Aircraft | ms per step | Share |
 |---|---:|---:|
-| 98,900 single pass | 7.17 | 95.2% |
-| 1,000 Runge-Kutta 4 | 0.17 | 2.3% |
-| 100 rigid 737s | 0.19 | 2.5% |
-| All | 7.53 | |
+| 98,900 single pass | 7.25 | 95.8% |
+| 1,000 Runge-Kutta 4 | 0.18 | 2.3% |
+| 100 rigid 737s | 0.14 | 1.8% |
+| All | 7.57 | |
 
 The single-pass aircraft cost the same per aircraft as they do alone. The
 rigid 737s fly the same routes as everyone else, under a deliberately small
