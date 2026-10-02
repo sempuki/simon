@@ -174,6 +174,10 @@ struct WindAngles final {
 
 auto compute_wind_angles(Angle alpha, Angle beta) -> WindAngles;
 
+// The same from the body's velocity through the air, in body axes, with no
+// trigonometry: the angles' sines and cosines are ratios of its components.
+auto compute_wind_angles(const Vector3& air_velocity) -> WindAngles;
+
 // The sums as body-axis loads, at angle of attack `alpha` and sideslip
 // `beta`, with the aerodynamic reference point `reference` from the center of
 // mass in body axes (x forward, y right, z down).

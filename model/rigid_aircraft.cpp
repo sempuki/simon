@@ -447,7 +447,7 @@ auto compute_aero_inputs(const RigidBody& body, const BodyMotion& motion,
   Air here = air(altitude);
 
   double speed = uvw.norm();
-  double along_and_down = std::hypot(uvw.x(), uvw.z());
+  double along_and_down = std::sqrt(uvw.x() * uvw.x() + uvw.z() * uvw.z());
   double density = here.density.numerical_value_in(kilogram_per_cubic_meter);
 
   AeroInputs inputs;
@@ -517,8 +517,7 @@ auto rigid_aircraft_rate(const RigidBody& body, const FlightSignals& signals,
   AeroInputs inputs = compute_aero_inputs(body, motion, signals, aircraft,
                                           reference, place, air);
   Acceleration gravity = earth.gravity(place);
-  WindAngles wind = compute_wind_angles(inputs[AeroVariable::ALPHA] * radian,
-                                        inputs[AeroVariable::BETA] * radian);
+  WindAngles wind = compute_wind_angles(motion.air_velocity);
   double kilograms = mass.properties.mass.numerical_value_in(kilogram);
 
   // Lift first, so the induced drag reads its coefficient.

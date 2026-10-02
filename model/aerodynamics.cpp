@@ -3,6 +3,7 @@
 #include "model/aerodynamics.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace simon::model {
@@ -106,6 +107,21 @@ auto compute_wind_angles(Angle alpha, Angle beta) -> WindAngles {
                     .cos_alpha = cos(alpha),
                     .sin_beta = sin(beta),
                     .cos_beta = cos(beta)};
+}
+
+auto compute_wind_angles(const Vector3& air_velocity) -> WindAngles {
+  double u = air_velocity.x();
+  double v = air_velocity.y();
+  double w = air_velocity.z();
+  double along_and_down = std::sqrt(u * u + w * w);
+  double speed = std::sqrt(u * u + v * v + w * w);
+  if (along_and_down == 0.0) {
+    return WindAngles{};
+  }
+  return WindAngles{.sin_alpha = w / along_and_down,
+                    .cos_alpha = u / along_and_down,
+                    .sin_beta = v / speed,
+                    .cos_beta = along_and_down / speed};
 }
 
 auto aero_loads(const AeroSums& sums, Angle alpha, Angle beta,
