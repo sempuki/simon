@@ -67,11 +67,11 @@ instead of an `if` per call:
 
 ```cpp
 RETURN_IF_UNEXPECTED(build_world(scenario_, lib::Out(world_)));
-ASSIGN_OR_RETURN(asset_, build_scenario(scenario_, lib::InOut(world_)));
+RETURN_OR_ASSIGN(asset_, build_scenario(scenario_, lib::InOut(world_)));
 ```
 
 `RETURN_IF_UNEXPECTED` returns the error, if any, from the enclosing function.
-`ASSIGN_OR_RETURN` does the same and otherwise moves the value into an existing
+`RETURN_OR_ASSIGN` does the same and otherwise moves the value into an existing
 variable or a new declaration (`Entity asset`).
 
 **Functions declare a trailing return type:** `auto f(X) -> Y`, `void` ones
@@ -758,7 +758,7 @@ undoes the whole utterance and leaves no capacity reserved:
 
 ```cpp
 auto transaction = world_->transaction();
-ASSIGN_OR_RETURN(Entity asset, world_->create<archetype::Asset>("asset")...build());
+RETURN_OR_ASSIGN(Entity asset, world_->create<archetype::Asset>("asset")...build());
 RETURN_IF_UNEXPECTED(world_->create<archetype::Radar>()...build());
 transaction.commit();
 ```
