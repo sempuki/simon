@@ -5,7 +5,8 @@
 Writes jsbsim_737_rigid_body.csv: at states through two maneuvering flights,
 one at the equator heading north and one at 60 degrees north heading east,
 the state in the Earth-centered inertial frame, the forces and moments that
-act on it, its mass properties, and the rates of change JSBSim found. All of
+act on it, its mass properties, the rates of change JSBSim found, and the
+air data it read. All of
 it is read after a frame: JSBSim starts each frame by moving the state on,
 then finds the forces and rates of the state it moved to.
 
@@ -59,7 +60,26 @@ DERIVED = [
     ('pdot', 'accelerations/pidot-rad_sec2', 1.0),
     ('qdot', 'accelerations/qidot-rad_sec2', 1.0),
     ('rdot', 'accelerations/ridot-rad_sec2', 1.0),
+    # Air data, and the center of mass and fuel it was found with.
+    ('alpha', 'aero/alpha-rad', 1.0),
+    ('beta', 'aero/beta-rad', 1.0),
+    ('airspeed', 'velocities/vt-fps', FT),
+    ('mach', 'velocities/mach', 1.0),
+    ('dynamic_pressure', 'aero/qbar-psf', LBF / FT**2),
+    ('p_air', 'velocities/p-aero-rad_sec', 1.0),
+    ('q_air', 'velocities/q-aero-rad_sec', 1.0),
+    ('r_air', 'velocities/r-aero-rad_sec', 1.0),
+    ('altitude', 'position/h-sl-meters', 1.0),
+    ('height_over_span', 'aero/h_b-mac-ft', 1.0),
+    ('alpha_rate', 'aero/alphadot-rad_sec', 1.0),
+    ('cg_x', 'inertia/cg-x-in', 0.0254),
+    ('cg_y', 'inertia/cg-y-in', 0.0254),
+    ('cg_z', 'inertia/cg-z-in', 0.0254),
 ]
+# The fuel the frame's mass balance used, which is read before the frame:
+# the engines burn after the mass balance is found.
+FUEL = [('fuel_%d' % i, 'propulsion/tank[%d]/contents-lbs' % i, 0.45359237)
+        for i in range(3)]
 
 
 def quaternion(matrix):
@@ -124,11 +144,12 @@ def fly(fdm, seconds, every, rows):
         fdm['fcs/rudder-cmd-norm'] = 0.3 * math.sin(0.6 * t)
         fdm['fcs/throttle-cmd-norm[0]'] = 0.8
         fdm['fcs/throttle-cmd-norm[1]'] = 0.6
+        fuel = [fdm[p] * scale for _, p, scale in FUEL]
         fdm.run()
         if i % every == 0:
             rows.append([fdm[p] * scale for _, p, scale in STATE] +
                         list(body_to_inertial(fdm)) +
-                        [fdm[p] * scale for _, p, scale in DERIVED])
+                        [fdm[p] * scale for _, p, scale in DERIVED] + fuel)
 
 
 def main():
@@ -138,7 +159,7 @@ def main():
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         'jsbsim_737_rigid_body.csv')
     names = ([name for name, _, _ in STATE] + ['qw', 'qx', 'qy', 'qz'] +
-             [name for name, _, _ in DERIVED])
+             [name for name, _, _ in DERIVED] + [name for name, _, _ in FUEL])
     with open(path, 'w') as table:
         table.write(','.join(names) + '\n')
         for row in rows:

@@ -132,6 +132,24 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "rigid_aircraft",
+    srcs = ["rigid_aircraft.cpp"],
+    hdrs = ["rigid_aircraft.hpp"],
+    copts = COPTS,
+    deps = [
+        ":aerodynamics",
+        ":aircraft_data",
+        ":atmosphere",
+        ":earth",
+        ":flight_path",
+        ":rigid_body",
+        ":units",
+        "@eigen",
+        "@lib//base:core",
+    ],
+)
+
 cc_test(
     name = "rigid_body_test",
     size = "small",

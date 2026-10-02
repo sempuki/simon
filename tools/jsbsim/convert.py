@@ -283,13 +283,19 @@ def convert(path, engine_directory, out):
             out.write('aero_reference %.17g %.17g %.17g\n' % tuple(location(point)))
 
     balance = root.find('mass_balance')
-    negated = balance.get('negated_crossproduct_inertia', 'true') == 'true'
-    sign = -1.0 if negated else 1.0
     inertia = [number(balance, axis, 0.0) * SLUG_FT2
                for axis in ['ixx', 'iyy', 'izz', 'ixy', 'ixz', 'iyz']]
-    for i in range(3, 6):
-        inertia[i] *= sign
-    # The tensor's elements, as JSBSim builds them: xx yy zz xy xz yz.
+    # The file gives the tensor in the structural frame: its elements if it
+    # says its products of inertia are negated, as it does by default, or
+    # the products themselves, which are the elements negated.
+    if balance.get('negated_crossproduct_inertia', 'true') != 'true':
+        for i in range(3, 6):
+            inertia[i] = -inertia[i]
+    # Into body axes, whose x and z point opposite the structural frame's:
+    # the xy and yz elements change sign, and the xz element does not.
+    inertia[3] = -inertia[3]
+    inertia[5] = -inertia[5]
+    # The tensor's elements in body axes: xx yy zz xy xz yz.
     out.write('empty_mass %.17g\n' % mass(balance, 'emptywt'))
     out.write('empty_inertia %s\n' % ' '.join('%.17g' % x for x in inertia))
     for point in balance.findall('location'):

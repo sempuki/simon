@@ -39,6 +39,32 @@ TEST_CASE("Geodetic") {
     }
   }
 
+  SECTION("ShouldMatchIterationGivenHighLatitude") {
+    // Bowring's fixed-point iteration, run to convergence, as an independent
+    // reference.
+    Vector3d xyz = fixed_of(Geodetic{.latitude = 60.0 * DEGREE * radian,
+                                     .longitude = 10.0 * DEGREE * radian,
+                                     .altitude = 6000.0 * meter})
+                       .numerical_value_in(meter);
+    double p = std::hypot(xyz.eigen().x(), xyz.eigen().y());
+    double z = xyz.eigen().z();
+    double latitude = std::atan2(z, p * (1.0 - ECCENTRICITY_SQUARED));
+    double height = 0.0;
+    for (int i = 0; i < 20; ++i) {
+      double sin_latitude = std::sin(latitude);
+      double normal =
+          SEMIMAJOR_AXIS /
+          std::sqrt(1.0 - ECCENTRICITY_SQUARED * sin_latitude * sin_latitude);
+      height = p / std::cos(latitude) - normal;
+      latitude = std::atan2(
+          z, p * (1.0 - ECCENTRICITY_SQUARED * normal / (normal + height)));
+    }
+    Geodetic found = geodetic_of(xyz * meter);
+    CHECK_THAT(found.altitude.numerical_value_in(meter),
+               WithinAbs(height, 1e-6));
+    CHECK_THAT(radians(found.latitude), WithinAbs(latitude, 1e-12));
+  }
+
   SECTION("ShouldLieOnAxesGivenEquatorAndPole") {
     Vector3d equator = fixed_of(Geodetic{}).numerical_value_in(meter);
     CHECK(equator.is_approximately(Vector3d{SEMIMAJOR_AXIS, 0.0, 0.0}));

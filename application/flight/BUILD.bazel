@@ -82,9 +82,14 @@ cc_test(
     size = "small",
     srcs = ["rigid_body_test.cpp"],
     copts = COPTS,
-    data = ["reference/jsbsim_737_rigid_body.csv"],
+    data = [
+        "aircraft/737.aircraft",
+        "reference/jsbsim_737_rigid_body.csv",
+    ],
     deps = [
+        "//model:aircraft_data",
         "//model:earth",
+        "//model:rigid_aircraft",
         "//model:rigid_body",
         "//model:units",
         "@lib//base:testing",
