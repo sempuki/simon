@@ -10,6 +10,7 @@
 #include "base/core.hpp"
 #include "engine/lifecycle.hpp"
 #include "framework/step.hpp"
+#include "framework/vocabulary.hpp"
 
 // A driver owns time and makes a simulation go. Every driver uses one
 // contract, `advance_to(target)`: step toward `target` at no more than the
@@ -34,7 +35,7 @@ template <Simulation SimulationType>
 class Driver final {
  public:
   // Keeps a reference to `simulation` for as long as the driver lives.
-  Driver(Timing timing, lib::Depend<SimulationType> simulation)
+  Driver(Timing timing, Depend<SimulationType> simulation)
       : simulation_{simulation.get()},
         now_{timing.start},
         max_step_{timing.max_step} {
@@ -112,7 +113,7 @@ class Driver final {
 template <Simulation SimulationType>
 class BatchDriver final {
  public:
-  BatchDriver(Timing timing, lib::Depend<SimulationType> simulation)
+  BatchDriver(Timing timing, Depend<SimulationType> simulation)
       : driver_{timing, simulation} {}
 
   // Runs the whole lifecycle. Returns the time the simulation reached.
@@ -142,8 +143,7 @@ template <Simulation SimulationType,
 class RealTimeDriver final {
  public:
   // Runs at `speed` times real time.
-  RealTimeDriver(Timing timing, double speed,
-                 lib::Depend<SimulationType> simulation)
+  RealTimeDriver(Timing timing, double speed, Depend<SimulationType> simulation)
       : driver_{timing, simulation}, start_{timing.start}, speed_{speed} {
     CHECK_PRECONDITION(speed_ > 0.0);
   }

@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "base/core.hpp"
+#include "framework/vocabulary.hpp"
 #include "model/units.hpp"
 
 // Control blocks: the pieces flight control laws are built from, as free
@@ -112,7 +113,7 @@ struct PiGains final {
 // in the error's direction, so it does not wind up.
 template <typename ErrorType, typename OutputType>
 auto pi_control(ErrorType error, const PiGains<ErrorType, OutputType>& gains,
-                Time dt, lib::InOut<OutputType> integral) -> OutputType {
+                Time dt, InOut<OutputType> integral) -> OutputType {
   constexpr ErrorType ZERO = internal::zero_of<ErrorType>();
   auto proportional =
       internal::output_of<OutputType>(gains.proportional * error);

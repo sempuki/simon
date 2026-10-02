@@ -14,6 +14,7 @@
 #include "base/core.hpp"
 #include "engine/event_queue.hpp"
 #include "engine/lifecycle.hpp"
+#include "framework/vocabulary.hpp"
 #include "model/random.hpp"
 
 namespace simon::missile {
@@ -87,7 +88,7 @@ enum class Outcome { UNDECIDED, BLUE_WINS, RED_WINS };
 // Builds in `world` the world a scenario needs: at every site, holding the
 // asset, radars and launchers, every drone with its track and blast, and every
 // interceptor with its blast.
-auto build_world(const Scenario& scenario, lib::Out<World> world)
+auto build_world(const Scenario& scenario, Out<World> world)
     -> std::expected<void, framework::Status>;
 
 // A point `radius` from the origin at `bearing` radians from east.
@@ -108,7 +109,7 @@ struct Ring final {
 class [[nodiscard]] SiteBuilder final {
  public:
   // Keeps a reference to `world` until the utterance is built.
-  SiteBuilder(Position origin, lib::Depend<World> world)
+  SiteBuilder(Position origin, Depend<World> world)
       : origin_{origin}, world_{world.get()} {}
 
   // The asset the site protects, and its health. 30 points unless given.
@@ -146,8 +147,7 @@ class [[nodiscard]] SiteBuilder final {
   // bearings within `ring` and flying at the asset at cruise speed. Draws
   // from `random`, which it keeps until the utterance is built.
   auto attacked_by(std::size_t count, RedDrone drone, Warhead warhead,
-                   Ring ring,
-                   lib::Depend<model::Random> random) && -> SiteBuilder {
+                   Ring ring, Depend<model::Random> random) && -> SiteBuilder {
     drones_ = count;
     drone_ = drone;
     warhead_ = warhead;
@@ -183,11 +183,11 @@ class [[nodiscard]] SiteBuilder final {
 };
 
 // Starts the utterance that builds a defended site at `origin` in `world`.
-auto create_site(Position origin, lib::Depend<World> world) -> SiteBuilder;
+auto create_site(Position origin, Depend<World> world) -> SiteBuilder;
 
 // Builds every site of a scenario on a square grid, the first at the origin,
 // and returns the first site's asset.
-auto build_scenario(const Scenario& scenario, lib::InOut<World> world)
+auto build_scenario(const Scenario& scenario, InOut<World> world)
     -> std::expected<Entity, framework::Status>;
 
 //-- Operator commands
@@ -199,18 +199,18 @@ auto build_scenario(const Scenario& scenario, lib::InOut<World> world)
 
 // Holds every launcher in `sector`, so none engages until freed. Launchers
 // already held, or held by a command still pending, are skipped.
-auto hold_weapons(const Sector& sector, lib::InOut<World> world)
+auto hold_weapons(const Sector& sector, InOut<World> world)
     -> std::expected<std::size_t, framework::Status>;
 
 // Frees every held launcher in `sector` to engage again, except those inside
 // any sector of `keeping`, which stay held without being freed and held again.
 auto free_weapons(const Sector& sector, std::span<const Sector> keeping,
-                  lib::InOut<World> world)
+                  InOut<World> world)
     -> std::expected<std::size_t, framework::Status>;
 
 // Destroys every interceptor in flight in `sector`. The tracks they were
 // engaging stay engaged until their engagements lapse.
-auto destruct_interceptors(const Sector& sector, lib::InOut<World> world)
+auto destruct_interceptors(const Sector& sector, InOut<World> world)
     -> std::expected<std::size_t, framework::Status>;
 
 // The missile simulation: builds the scenario when configured, and stops when

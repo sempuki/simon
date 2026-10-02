@@ -75,6 +75,7 @@
 #include "framework/benchmark_support.hpp"
 #include "framework/component_store.hpp"
 #include "framework/entity.hpp"
+#include "framework/vocabulary.hpp"
 
 namespace simon::framework {
 namespace {
@@ -696,8 +697,8 @@ class GenerationalLayout final {
 // Walks `size` bodies and looks each one's sibling up in `siblings`.
 template <typename StoreType, typename BodyOfType, typename OwnerOfType>
 auto walk(std::size_t size, BodyOfType&& body_of, OwnerOfType&& owner_of,
-          StoreType& siblings, lib::Out<std::uint64_t> with,
-          lib::Out<std::uint64_t> without) -> void {
+          StoreType& siblings, Out<std::uint64_t> with,
+          Out<std::uint64_t> without) -> void {
   for (std::size_t i = 0; i < size; ++i) {
     if (const auto* sibling = siblings.maybe_component_of(owner_of(i))) {
       integrate(body_of(i), *sibling);
@@ -739,16 +740,14 @@ class CompetingStoreLayout final {
 
   auto maintain(int) -> void {
     if constexpr (SORTED) {
-      sort_if_disordered(lib::InOut(bodies_));
-      sort_if_disordered(lib::InOut(first_));
-      sort_if_disordered(lib::InOut(second_));
+      sort_if_disordered(InOut(bodies_));
+      sort_if_disordered(InOut(first_));
+      sort_if_disordered(InOut(second_));
     }
   }
 
-  auto iterate_first() -> Visits { return iterate(true, lib::InOut(first_)); }
-  auto iterate_second() -> Visits {
-    return iterate(false, lib::InOut(second_));
-  }
+  auto iterate_first() -> Visits { return iterate(true, InOut(first_)); }
+  auto iterate_second() -> Visits { return iterate(false, InOut(second_)); }
 
   static constexpr auto bytes_per_entity() -> std::size_t {
     return 3 * (8 + sizeof(Entity)) + sizeof(Body) + sizeof(FirstType) +
@@ -757,7 +756,7 @@ class CompetingStoreLayout final {
 
  private:
   template <typename StoreType>
-  static auto sort_if_disordered(lib::InOut<StoreType> store) -> void {
+  static auto sort_if_disordered(InOut<StoreType> store) -> void {
     constexpr std::size_t DISORDER_SHARE = 8;
     if (store->disorder() * DISORDER_SHARE > store->size()) {
       store->sort_by_entity();
@@ -765,14 +764,14 @@ class CompetingStoreLayout final {
   }
 
   template <typename StoreType>
-  auto iterate(bool first, lib::InOut<StoreType> siblings) -> Visits {
+  auto iterate(bool first, InOut<StoreType> siblings) -> Visits {
     Visits visits;
     auto bodies = bodies_.values();
     walk(
         bodies.size(), [&](std::size_t i) -> Body& { return bodies[i]; },
         [&](std::size_t i) { return bodies_.owner(i); }, *siblings,
-        lib::Out(first ? visits.with_sibling : visits.with_second),
-        lib::Out(first ? visits.without_sibling : visits.without_second));
+        Out(first ? visits.with_sibling : visits.with_second),
+        Out(first ? visits.without_sibling : visits.without_second));
     return visits;
   }
 
@@ -835,7 +834,7 @@ class CompetingGroupLayout final {
     walk(
         group_.size(), [&](std::size_t i) -> Body& { return group_.body(i); },
         [&](std::size_t i) { return group_.owner(i); }, second_,
-        lib::Out(visits.with_second), lib::Out(visits.without_second));
+        Out(visits.with_second), Out(visits.without_second));
     return visits;
   }
 
@@ -888,19 +887,18 @@ class Segment final {
  public:
   explicit Segment(std::size_t chunks) { chunks_.reserve(chunks); }
 
-  auto at(std::uint32_t local, lib::InOut<ChunkPool<ComponentType>> pool)
+  auto at(std::uint32_t local, InOut<ChunkPool<ComponentType>> pool)
       -> ComponentType& {
     return pool->chunk(chunks_[local / CHUNK])[local % CHUNK];
   }
   // Makes room for local index `count` before it is used.
-  auto grow(std::uint32_t count, lib::InOut<ChunkPool<ComponentType>> pool)
-      -> void {
+  auto grow(std::uint32_t count, InOut<ChunkPool<ComponentType>> pool) -> void {
     if (count % CHUNK == 0) {
       chunks_.push_back(pool->take());
     }
   }
   // Returns the last chunk once `count` entries no longer reach it.
-  auto shrink(std::uint32_t count, lib::InOut<ChunkPool<ComponentType>> pool)
+  auto shrink(std::uint32_t count, InOut<ChunkPool<ComponentType>> pool)
       -> void {
     if (count % CHUNK == 0) {
       pool->give(chunks_.back());
@@ -945,17 +943,17 @@ class SegmentedLayout final {
   auto create(Entity entity, std::uint8_t siblings) -> void {
     Archetype& archetype = archetypes_[siblings];
     std::uint32_t local = archetype.count;
-    archetype.body.grow(local, lib::InOut(bodies_));
-    archetype.owner.grow(local, lib::InOut(owners_));
-    archetype.body.at(local, lib::InOut(bodies_)) = Body{};
-    archetype.owner.at(local, lib::InOut(owners_)) = entity;
+    archetype.body.grow(local, InOut(bodies_));
+    archetype.owner.grow(local, InOut(owners_));
+    archetype.body.at(local, InOut(bodies_)) = Body{};
+    archetype.owner.at(local, InOut(owners_)) = entity;
     if (siblings & FIRST) {
-      archetype.first.grow(local, lib::InOut(firsts_));
-      archetype.first.at(local, lib::InOut(firsts_)) = FirstType{};
+      archetype.first.grow(local, InOut(firsts_));
+      archetype.first.at(local, InOut(firsts_)) = FirstType{};
     }
     if (siblings & SECOND) {
-      archetype.second.grow(local, lib::InOut(seconds_));
-      archetype.second.at(local, lib::InOut(seconds_)) = SecondType{};
+      archetype.second.grow(local, InOut(seconds_));
+      archetype.second.at(local, InOut(seconds_)) = SecondType{};
     }
     ++archetype.count;
     location_[entity.index] = Location{.archetype = siblings, .local = local};
@@ -968,23 +966,23 @@ class SegmentedLayout final {
     std::uint32_t last = --archetype.count;
     if (location.local != last) {
       auto move = [&](auto& segment, auto& pool) {
-        segment.at(location.local, lib::InOut(pool)) =
-            std::move(segment.at(last, lib::InOut(pool)));
+        segment.at(location.local, InOut(pool)) =
+            std::move(segment.at(last, InOut(pool)));
       };
       move(archetype.body, bodies_);
       move(archetype.owner, owners_);
       if (location.archetype & FIRST) move(archetype.first, firsts_);
       if (location.archetype & SECOND) move(archetype.second, seconds_);
-      Entity moved = archetype.owner.at(location.local, lib::InOut(owners_));
+      Entity moved = archetype.owner.at(location.local, InOut(owners_));
       location_[moved.index].local = location.local;
     }
-    archetype.body.shrink(last, lib::InOut(bodies_));
-    archetype.owner.shrink(last, lib::InOut(owners_));
+    archetype.body.shrink(last, InOut(bodies_));
+    archetype.owner.shrink(last, InOut(owners_));
     if (location.archetype & FIRST) {
-      archetype.first.shrink(last, lib::InOut(firsts_));
+      archetype.first.shrink(last, InOut(firsts_));
     }
     if (location.archetype & SECOND) {
-      archetype.second.shrink(last, lib::InOut(seconds_));
+      archetype.second.shrink(last, InOut(seconds_));
     }
     if (allowed_first_.contains(entity)) allowed_first_.erase(entity);
     if (allowed_second_.contains(entity)) allowed_second_.erase(entity);
@@ -1003,17 +1001,16 @@ class SegmentedLayout final {
 
   auto iterate_first() -> Visits {
     Visits visits;
-    walk<FIRST>(&Archetype::first, allowed_first_, lib::InOut(firsts_),
-                lib::Out(visits.with_sibling),
-                lib::Out(visits.without_sibling));
+    walk<FIRST>(&Archetype::first, allowed_first_, InOut(firsts_),
+                Out(visits.with_sibling), Out(visits.without_sibling));
     return visits;
   }
   auto iterate_second() -> Visits
     requires COMPETING
   {
     Visits visits;
-    walk<SECOND>(&Archetype::second, allowed_second_, lib::InOut(seconds_),
-                 lib::Out(visits.with_second), lib::Out(visits.without_second));
+    walk<SECOND>(&Archetype::second, allowed_second_, InOut(seconds_),
+                 Out(visits.with_second), Out(visits.without_second));
     return visits;
   }
 
@@ -1054,9 +1051,8 @@ class SegmentedLayout final {
   template <std::uint8_t WHICH, typename SiblingType>
   auto walk(Segment<SiblingType> Archetype::* sibling_segment,
             const ComponentStore<SiblingType>& allowed,
-            lib::InOut<ChunkPool<SiblingType>> pool,
-            lib::Out<std::uint64_t> with, lib::Out<std::uint64_t> without)
-      -> void {
+            InOut<ChunkPool<SiblingType>> pool, Out<std::uint64_t> with,
+            Out<std::uint64_t> without) -> void {
     for (std::uint8_t id = 0; id < ARCHETYPES; ++id) {
       Archetype& archetype = archetypes_[id];
       for (std::size_t chunk = 0; chunk < archetype.body.chunks(); ++chunk) {

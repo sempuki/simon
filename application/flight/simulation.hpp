@@ -11,6 +11,7 @@
 #include "application/flight/systems.hpp"
 #include "base/core.hpp"
 #include "engine/lifecycle.hpp"
+#include "framework/vocabulary.hpp"
 
 namespace simon::flight {
 
@@ -68,18 +69,18 @@ struct RigidTrim final {
 auto create_rigid_aircraft(const model::AircraftData& data,
                            const model::Earth& earth, const RigidTrim& trim,
                            Length x, Length y, Angle heading,
-                           const Route& route, lib::InOut<World> world)
+                           const Route& route, InOut<World> world)
     -> std::expected<Entity, framework::Status>;
 
 // Builds in `world` the world a scenario needs.
-auto build_world(const Scenario& scenario, lib::Out<World> world)
+auto build_world(const Scenario& scenario, Out<World> world)
     -> std::expected<void, framework::Status>;
 
 // Creates every aircraft of a scenario, with its route, flying level toward
 // its first waypoint at its route's speed; rigid aircraft, of type `rigid`,
 // start at their trim's altitude and speed.
 auto build_scenario(const Scenario& scenario, const model::AircraftData* rigid,
-                    lib::InOut<World> world)
+                    InOut<World> world)
     -> std::expected<void, framework::Status>;
 
 // The flight simulation: builds the scenario when configured, and flies until

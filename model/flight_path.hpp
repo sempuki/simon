@@ -83,9 +83,9 @@ inline auto advance(const AirState& state, const AirStateRate& rate,
 
 inline auto velocity_of(const AirState& state) -> Velocity {
   double horizontal = cos(state.flight_path_angle);
-  return Vector3d{horizontal * sin(state.heading),
-                  horizontal * cos(state.heading),
-                  sin(state.flight_path_angle)} *
+  return QuantityVector{horizontal * sin(state.heading),
+                        horizontal * cos(state.heading),
+                        sin(state.flight_path_angle)} *
          state.speed;
 }
 
@@ -112,9 +112,8 @@ inline auto coordinate_length(const AirState&, Length length) -> double {
 inline auto pose(const AirState& state) -> Pose {
   double yaw = std::numbers::pi / 2.0 - radians(state.heading);
   double pitch = radians(state.flight_path_angle);
-  Quaternion orientation =
-      Quaternion{Eigen::AngleAxisd{yaw, Eigen::Vector3d::UnitZ()}} *
-      Quaternion{Eigen::AngleAxisd{-pitch, Eigen::Vector3d::UnitY()}};
+  Quaternion orientation = Quaternion{AngleAxis{yaw, Vector3::UnitZ()}} *
+                           Quaternion{AngleAxis{-pitch, Vector3::UnitY()}};
   return Pose{.position = state.position, .orientation = orientation};
 }
 
@@ -179,7 +178,7 @@ inline auto point_mass_rate(const AirState& state,
 
   return AirStateRate{
       .velocity =
-          Vector3d{cos_gamma * sin_chi, cos_gamma * cos_chi, sin_gamma} *
+          QuantityVector{cos_gamma * sin_chi, cos_gamma * cos_chi, sin_gamma} *
           state.speed,
       .acceleration = (thrust - drag) / airframe.mass - g * sin_gamma,
       .climb = g / v * (controls.load_factor * cos_mu - cos_gamma) * radian,
@@ -214,7 +213,7 @@ inline auto fly(const AirState& state, const AirStateRate& rate,
   }
 
   // The direction of flight, a unit vector, and its sines and cosines.
-  Vector3d along = number_of(rate.velocity / state.speed);
+  QuantityVector along = number_of(rate.velocity / state.speed);
 
   double sin_gamma = along.z();
   double cos_gamma = std::hypot(along.x(), along.y());
@@ -223,8 +222,9 @@ inline auto fly(const AirState& state, const AirStateRate& rate,
 
   // How the velocity changes: along the direction of flight with speed, and
   // across it with flight-path angle and heading.
-  Vector3d by_gamma{-sin_gamma * sin_chi, -sin_gamma * cos_chi, cos_gamma};
-  Vector3d by_heading{cos_gamma * cos_chi, -cos_gamma * sin_chi, 0.0};
+  QuantityVector by_gamma{-sin_gamma * sin_chi, -sin_gamma * cos_chi,
+                          cos_gamma};
+  QuantityVector by_heading{cos_gamma * cos_chi, -cos_gamma * sin_chi, 0.0};
   Acceleration acceleration =
       along * rate.acceleration +
       (by_gamma * (rate.climb / radian) + by_heading * (rate.turn / radian)) *
@@ -270,14 +270,14 @@ inline auto bank_command(const AirState& state, Angle heading, Rate response,
 // The heading from `from` to `to`, over the ground. The components are in
 // meters only to reach atan2.
 inline auto bearing(const Position& from, const Position& to) -> Angle {
-  Vector3d apart = (to - from).numerical_value_in(meter);
+  QuantityVector apart = (to - from).numerical_value_in(meter);
   return std::atan2(apart.x(), apart.y()) * radian;
 }
 
 // The distance from `from` to `to`, over the ground.
 inline auto ground_distance(const Position& from, const Position& to)
     -> Length {
-  Vector3d apart = (to - from).numerical_value_in(meter);
+  QuantityVector apart = (to - from).numerical_value_in(meter);
   return std::hypot(apart.x(), apart.y()) * meter;
 }
 

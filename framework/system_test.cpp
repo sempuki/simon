@@ -10,6 +10,7 @@
 
 #include "base/testing.hpp"
 #include "framework/test_world.hpp"
+#include "framework/vocabulary.hpp"
 
 namespace simon::framework {
 
@@ -86,7 +87,7 @@ struct Cull final  //
 struct Spawn final  //
     : System<const Position> {
   auto operator()(auto& world, Entity self, const Position& position) -> void {
-    REQUIRE(create<testing::Interceptor>(lib::InOut(world))
+    REQUIRE(create<testing::Interceptor>(InOut(world))
                 .under(self)
                 .with(Position{position.x})
                 .with(Velocity{})
@@ -166,7 +167,7 @@ TEST_CASE("BytesPerEntity") {
 
 TEST_CASE("System") {
   TestWorld world;
-  testing::build_small_world(lib::Out(world));
+  testing::build_small_world(Out(world));
 
   SECTION("ShouldRunForDriverWithOptionalPointerGivenMixedComponents") {
     // x holds (a), y holds (b), z holds (a, b).
@@ -176,7 +177,7 @@ TEST_CASE("System") {
     world.sync();
 
     Scheduler<TestWorld, SystemList<Record>> scheduler;
-    scheduler.step(STEP, lib::InOut(world));
+    scheduler.step(STEP, InOut(world));
 
     auto& seen = scheduler.system<Record>().seen;
     REQUIRE(seen.size() == 2u);
@@ -198,7 +199,7 @@ TEST_CASE("System") {
     world.sync();
 
     Scheduler<TestWorld, SystemList<RecordStill>> scheduler;
-    scheduler.step(STEP, lib::InOut(world));
+    scheduler.step(STEP, InOut(world));
 
     // The launcher's segment, then the segment of archetypes that only allow
     // Position.
@@ -211,10 +212,10 @@ TEST_CASE("System") {
     world.sync();
     Scheduler<TestWorld, SystemList<RecordStill>> scheduler;
 
-    scheduler.step(STEP, lib::InOut(world));
+    scheduler.step(STEP, InOut(world));
     REQUIRE(world.change(body).attach(Velocity{}).build());
     world.sync();
-    scheduler.step(STEP, lib::InOut(world));
+    scheduler.step(STEP, InOut(world));
 
     CHECK(scheduler.system<RecordStill>().seen == std::vector<Entity>{body});
   }
@@ -225,7 +226,7 @@ TEST_CASE("System") {
     world.sync();
 
     Scheduler<TestWorld, SystemList<Integrate>> scheduler;
-    scheduler.step(STEP, lib::InOut(world));
+    scheduler.step(STEP, InOut(world));
 
     CHECK(world.store_of<Position>().component_of(entity).x == 2.0);
   }
@@ -243,7 +244,7 @@ TEST_CASE("System") {
     REQUIRE(found_near(1.0) == std::vector<Entity>{entity});
 
     Scheduler<TestWorld, SystemList<Integrate>> scheduler;
-    scheduler.step(STEP, lib::InOut(world));
+    scheduler.step(STEP, InOut(world));
 
     CHECK(found_near(1.0).empty());
     CHECK(found_near(2.0) == std::vector<Entity>{entity});
@@ -272,7 +273,7 @@ TEST_CASE("System") {
     world.sync();
 
     Scheduler<TestWorld, SystemList<CheckSiblings>> scheduler;
-    scheduler.step(STEP, lib::InOut(world));
+    scheduler.step(STEP, InOut(world));
 
     const CheckSiblings& check = scheduler.system<CheckSiblings>();
     CHECK(check.with == 5);
@@ -286,12 +287,12 @@ TEST_CASE("System") {
     Scheduler<TestWorld, SystemList<Skippable>> scheduler;
 
     scheduler.system<Skippable>().run = false;
-    scheduler.step(STEP, lib::InOut(world));
+    scheduler.step(STEP, InOut(world));
     CHECK(scheduler.system<Skippable>().called == 0);
     CHECK(scheduler.system<Skippable>().resolved);
 
     scheduler.system<Skippable>().run = true;
-    scheduler.step(STEP, lib::InOut(world));
+    scheduler.step(STEP, InOut(world));
     CHECK(scheduler.system<Skippable>().called == 1);
   }
 
@@ -303,7 +304,7 @@ TEST_CASE("System") {
 
     Scheduler<TestWorld, SystemList<Chase>> scheduler;
     scheduler.system<Chase>().target = target;
-    scheduler.step(STEP, lib::InOut(world));
+    scheduler.step(STEP, InOut(world));
 
     CHECK(world.store_of<Velocity>().component_of(chaser).x == 6.0);
   }
@@ -314,7 +315,7 @@ TEST_CASE("System") {
     world.sync();
 
     Scheduler<TestWorld, SystemList<Cull, Count>> scheduler;
-    scheduler.step(STEP, lib::InOut(world));
+    scheduler.step(STEP, InOut(world));
 
     CHECK(scheduler.system<Count>().count == 1);
     CHECK(scheduler.system<Count>().resolved);
@@ -328,7 +329,7 @@ TEST_CASE("System") {
     world.sync();
 
     Scheduler<TestWorld, SystemList<ClearOrigin>> scheduler;
-    scheduler.step(STEP, lib::InOut(world));
+    scheduler.step(STEP, InOut(world));
 
     CHECK(scheduler.system<ClearOrigin>().destroyed == 2u);
     CHECK(world.size() == 1u);
@@ -340,7 +341,7 @@ TEST_CASE("System") {
     Entity placed = *world.create<Body>().with(Position{2.0}).build();
     world.sync();
 
-    ProjectedWorld<Chase, TestWorld> access{lib::Depend(world)};
+    ProjectedWorld<Chase, TestWorld> access{Depend(world)};
 
     CHECK(access.component_of<Position>(placed).x == 2.0);
     CHECK(access.maybe_component_of<Position>(bare) == nullptr);
@@ -356,8 +357,8 @@ TEST_CASE("System") {
         [seen = 0](auto&, Entity, const Health&) mutable { return ++seen; });
     Scheduler<TestWorld, SystemList<decltype(count)>> scheduler{
         SystemList{count}};
-    scheduler.step(STEP, lib::InOut(world));
-    scheduler.step(STEP, lib::InOut(world));
+    scheduler.step(STEP, InOut(world));
+    scheduler.step(STEP, InOut(world));
 
     // The capture persists across steps: two entities, two steps.
     auto& lambda = scheduler.system<decltype(count)>().callable();
@@ -379,7 +380,7 @@ TEST_CASE("System") {
         });
     Scheduler<TestWorld, SystemList<decltype(chase)>> scheduler{
         SystemList{chase}};
-    scheduler.step(STEP, lib::InOut(world));
+    scheduler.step(STEP, InOut(world));
 
     CHECK(world.store_of<Velocity>().component_of(chaser).x == 6.0);
   }
@@ -395,7 +396,7 @@ TEST_CASE("System") {
         SystemList<decltype(double_velocity), SystemList<Integrate>>;
     Scheduler<TestWorld, Schedule> scheduler{
         Schedule{double_velocity, SystemList<Integrate>{}}};
-    scheduler.step(STEP, lib::InOut(world));
+    scheduler.step(STEP, InOut(world));
 
     CHECK(world.store_of<Velocity>().component_of(entity).x == 2.0);
     CHECK(world.store_of<Position>().component_of(entity).x ==
@@ -408,7 +409,7 @@ TEST_CASE("System") {
     world.sync();
 
     Scheduler<TestWorld, SystemList<Spawn>> scheduler;
-    scheduler.step(STEP, lib::InOut(world));
+    scheduler.step(STEP, InOut(world));
 
     REQUIRE(world.store_of<Position>().size() == 2u);
     Entity child;

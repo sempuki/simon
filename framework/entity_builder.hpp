@@ -20,6 +20,7 @@
 #include "framework/entity.hpp"
 #include "framework/name.hpp"
 #include "framework/type_list.hpp"
+#include "framework/vocabulary.hpp"
 
 namespace simon::framework {
 
@@ -51,8 +52,7 @@ class [[nodiscard]] CreateBuilder final {
  public:
   // Keeps a reference to `world` until the utterance is built.
   CreateBuilder(Alias alias, std::optional<Entity> parent,
-                std::tuple<InitialTypes...> components,
-                lib::Depend<WorldType> world)
+                std::tuple<InitialTypes...> components, Depend<WorldType> world)
       : world_{world.get()},
         alias_{std::move(alias)},
         parent_{parent},
@@ -64,7 +64,7 @@ class [[nodiscard]] CreateBuilder final {
     requires CanParent
   {
     return CreateBuilder<WorldType, ArchetypeType, false>{
-        std::move(alias_), parent, {}, lib::Depend(*world_)};
+        std::move(alias_), parent, {}, Depend(*world_)};
   }
 
   // Declares a component the entity starts with.
@@ -88,7 +88,7 @@ class [[nodiscard]] CreateBuilder final {
         std::tuple_cat(
             std::move(components_),
             std::tuple<ComponentType>{std::forward<ArgumentType>(component)}),
-        lib::Depend(*world_)};
+        Depend(*world_)};
   }
 
   auto build() && -> std::expected<Entity, Status> {
@@ -125,7 +125,7 @@ ChangeBuilder<WorldType, TypeList<AttachedTypes...>, TypeList<DetachedTypes...>,
  public:
   // Keeps a reference to `world` until the utterance is built.
   ChangeBuilder(Entity entity, std::tuple<AttachedTypes...> components,
-                AliasChanges aliases, lib::Depend<WorldType> world)
+                AliasChanges aliases, Depend<WorldType> world)
       : world_{world.get()},
         entity_{entity},
         components_{std::move(components)},
@@ -142,7 +142,7 @@ ChangeBuilder<WorldType, TypeList<AttachedTypes...>, TypeList<DetachedTypes...>,
         std::tuple_cat(
             std::move(components_),
             std::tuple<ComponentType>{std::forward<ArgumentType>(component)}),
-        std::move(aliases_), lib::Depend(*world_)};
+        std::move(aliases_), Depend(*world_)};
   }
 
   // Detaches a component from the live entity.
@@ -151,8 +151,7 @@ ChangeBuilder<WorldType, TypeList<AttachedTypes...>, TypeList<DetachedTypes...>,
     check_component<ComponentType>();
     return ChangeBuilder<WorldType, TypeList<AttachedTypes...>,
                          TypeList<DetachedTypes..., ComponentType>, Aliasing>{
-        entity_, std::move(components_), std::move(aliases_),
-        lib::Depend(*world_)};
+        entity_, std::move(components_), std::move(aliases_), Depend(*world_)};
   }
 
   // Gives the entity an alias, such as "ego".
@@ -160,8 +159,7 @@ ChangeBuilder<WorldType, TypeList<AttachedTypes...>, TypeList<DetachedTypes...>,
     aliases_.given.push_back(std::move(alias));
     return ChangeBuilder<WorldType, TypeList<AttachedTypes...>,
                          TypeList<DetachedTypes...>, true>{
-        entity_, std::move(components_), std::move(aliases_),
-        lib::Depend(*world_)};
+        entity_, std::move(components_), std::move(aliases_), Depend(*world_)};
   }
 
   // Takes an alias away from the entity.
@@ -169,8 +167,7 @@ ChangeBuilder<WorldType, TypeList<AttachedTypes...>, TypeList<DetachedTypes...>,
     aliases_.taken.push_back(std::move(alias));
     return ChangeBuilder<WorldType, TypeList<AttachedTypes...>,
                          TypeList<DetachedTypes...>, true>{
-        entity_, std::move(components_), std::move(aliases_),
-        lib::Depend(*world_)};
+        entity_, std::move(components_), std::move(aliases_), Depend(*world_)};
   }
 
   auto build() && -> std::expected<void, Status> {
@@ -205,7 +202,7 @@ template <typename WorldType>
 class [[nodiscard]] DestroyBuilder final {
  public:
   // Keeps a reference to `world` until the utterance is built.
-  DestroyBuilder(Entity entity, lib::Depend<WorldType> world)
+  DestroyBuilder(Entity entity, Depend<WorldType> world)
       : world_{world.get()}, entity_{entity} {}
 
   auto build() && -> std::expected<void, Status> {

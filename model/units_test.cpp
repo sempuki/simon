@@ -19,7 +19,7 @@ TEST_CASE("Units") {
     Displacement moved = velocity * dt;
 
     CHECK(moved.numerical_value_in(meter).is_approximately(
-        Vector3d{2.0, 4.0, 6.0}));
+        QuantityVector{2.0, 4.0, 6.0}));
   }
 
   SECTION("ShouldConvertChronoDurationGivenNanoseconds") {
@@ -34,7 +34,7 @@ TEST_CASE("Units") {
     CHECK(dot(a, b) == 0.0 * units::square(meter));
     CHECK(cross(a, b)
               .numerical_value_in(units::square(meter))
-              .is_approximately(Vector3d{8.0, -6.0, 0.0}));
+              .is_approximately(QuantityVector{8.0, -6.0, 0.0}));
   }
 
   SECTION("ShouldCarryUnitsGivenAnglesAndForces") {

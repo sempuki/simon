@@ -25,6 +25,7 @@
 #include "application/missile/simulation.hpp"
 #include "base/core.hpp"
 #include "engine/driver.hpp"
+#include "framework/vocabulary.hpp"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_sdl2.h"
 #include "imgui/imgui_impl_sdlrenderer2.h"
@@ -51,7 +52,7 @@ struct Point final {
 };
 
 auto point_of(const Kinematics& kinematics) -> Point {
-  model::Vector3d position =
+  model::QuantityVector position =
       kinematics.position.numerical_value_in(model::meter);
   return Point{.x = position.x(), .y = position.y()};
 }
@@ -134,7 +135,7 @@ class Session final {
       : scenario_{scenario},
         simulation_{std::make_unique<Simulation>(scenario)},
         driver_{std::make_unique<Driver>(engine::Timing{.max_step = 10ms},
-                                         speed, lib::Depend(*simulation_))} {}
+                                         speed, Depend(*simulation_))} {}
 
   ~Session() {
     engine::Phase phase = driver_->driver().phase();
@@ -357,7 +358,7 @@ class Viewer final {
 
     Scatter tracks;
     world.store_of<Estimate>().for_each([&](Entity, const Estimate& estimate) {
-      model::Vector3d position =
+      model::QuantityVector position =
           estimate.position.numerical_value_in(model::meter);
       tracks.add(Point{.x = position.x(), .y = position.y()});
     });

@@ -5,6 +5,7 @@
 #include <chrono>
 
 #include "framework/system.hpp"
+#include "framework/vocabulary.hpp"
 #include "model/kinematics.hpp"
 
 namespace simon::model {
@@ -20,7 +21,7 @@ struct Integrate final               //
                   framework::Step step) const -> void {
     integrate_midpoint(
         control ? control->acceleration : meters_per_second_squared(0, 0, 0),
-        seconds(step.dt), lib::InOut(kinematics));
+        seconds(step.dt), InOut(kinematics));
   }
 };
 

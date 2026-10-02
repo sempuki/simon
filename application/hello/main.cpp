@@ -7,6 +7,7 @@
 
 #include "application/hello/hello.hpp"
 #include "engine/driver.hpp"
+#include "framework/vocabulary.hpp"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_sdl2.h"
 #include "imgui/imgui_impl_sdlrenderer2.h"
@@ -64,7 +65,7 @@ auto main(int, char**) -> int {
   hello::Simulation simulation;
   engine::RealTimeDriver driver{
       engine::Timing{.max_step = std::chrono::milliseconds{10}}, 5.0,
-      lib::Depend(simulation)};
+      Depend(simulation)};
 
   bool done = false;
 
@@ -114,7 +115,7 @@ auto main(int, char**) -> int {
           world.store_of<model::Kinematics>().component_of(entity);
       const hello::Collider& collider =
           world.store_of<hello::Collider>().component_of(entity);
-      model::Vector3d pixels =
+      model::QuantityVector pixels =
           kinematics.position.numerical_value_in(model::meter);
       draw_list->AddCircleFilled(
           ImVec2(static_cast<float>(pixels.x()),

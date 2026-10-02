@@ -13,6 +13,7 @@
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 #include "framework/archetype.hpp"
 #include "framework/system.hpp"
+#include "framework/vocabulary.hpp"
 #include "framework/world.hpp"
 
 namespace simon::framework {
@@ -77,7 +78,7 @@ struct Loose final : Archetype<"loose", Requires<>, Allows<Point, PointRate>> {
 using TestWorld = World<Point, TypeList<PointRate, Follow, Probe>,
                         TypeList<Mass, Follower, Rigid, Loose>>;
 
-auto build(lib::Out<TestWorld> world) -> void {
+auto build(Out<TestWorld> world) -> void {
   std::expected<void, Status> built = TestWorld::set_up()
                                           .numbered(1)
                                           .holding<Mass>(4)
@@ -168,7 +169,7 @@ using Oscillate = Continuous<MethodType, TypeList<Point>, SystemList<Spring>>;
 template <typename MethodType>
 auto period_error(int steps) -> double {
   TestWorld world;
-  build(lib::Out(world));
+  build(Out(world));
   REQUIRE(world.create<Mass>().with(Point{.x = 1.0}).with(PointRate{}).build());
   world.sync();
 
@@ -177,7 +178,7 @@ auto period_error(int steps) -> double {
       std::chrono::duration<double>(2.0 * std::numbers::pi / steps));
   TimePoint time{};
   for (int i = 0; i < steps; ++i) {
-    scheduler.step(Step{.time = time, .dt = dt}, lib::InOut(world));
+    scheduler.step(Step{.time = time, .dt = dt}, InOut(world));
     time += dt;
   }
   // The steps cover the period up to rounding of dt; compare against the
@@ -207,7 +208,7 @@ TEST_CASE("Continuous") {
 
   SECTION("ShouldShowEachStageOtherEntitiesTrialState") {
     TestWorld world;
-    build(lib::Out(world));
+    build(Out(world));
     auto leader = world.create<Mass>().with(Point{}).with(PointRate{}).build();
     REQUIRE(leader);
     REQUIRE(world.create<Follower>()
@@ -223,7 +224,7 @@ TEST_CASE("Continuous") {
         scheduler;
     TimePoint time{};
     for (int i = 0; i < 10; ++i) {
-      scheduler.step(Step{.time = time, .dt = 100ms}, lib::InOut(world));
+      scheduler.step(Step{.time = time, .dt = 100ms}, InOut(world));
       time += 100ms;
     }
 
@@ -239,7 +240,7 @@ TEST_CASE("Continuous") {
 
   SECTION("ShouldGiveDerivativeSystemsTheStagesTime") {
     TestWorld world;
-    build(lib::Out(world));
+    build(Out(world));
     REQUIRE(world.create<Mass>().with(Point{}).with(PointRate{}).build());
     world.sync();
 
@@ -249,7 +250,7 @@ TEST_CASE("Continuous") {
         scheduler;
     TimePoint time{};
     for (int i = 0; i < 4; ++i) {
-      scheduler.step(Step{.time = time, .dt = 250ms}, lib::InOut(world));
+      scheduler.step(Step{.time = time, .dt = 250ms}, InOut(world));
       time += 250ms;
     }
 
@@ -261,7 +262,7 @@ TEST_CASE("Continuous") {
 
   SECTION("ShouldKeepStateGivenEntityWithoutRate") {
     TestWorld world;
-    build(lib::Out(world));
+    build(Out(world));
     auto without =
         world.create<Loose>().with(Point{.x = 3.0, .v = 1.0}).build();
     auto with =
@@ -271,7 +272,7 @@ TEST_CASE("Continuous") {
     world.sync();
 
     Scheduler<TestWorld, SystemList<Oscillate<RungeKutta4>>> scheduler;
-    scheduler.step(Step{.time = TimePoint{}, .dt = 100ms}, lib::InOut(world));
+    scheduler.step(Step{.time = TimePoint{}, .dt = 100ms}, InOut(world));
 
     CHECK(world.store_of<Point>().component_of(*without).x == 3.0);
     CHECK(world.store_of<Point>().component_of(*with).x < 1.0);
@@ -279,27 +280,27 @@ TEST_CASE("Continuous") {
 
   SECTION("ShouldSkipArchetypeThatCannotHaveRate") {
     TestWorld world;
-    build(lib::Out(world));
+    build(Out(world));
     auto rigid = world.create<Rigid>().with(Point{.x = 2.0, .v = 1.0}).build();
     REQUIRE(rigid);
     world.sync();
 
     Scheduler<TestWorld, SystemList<Oscillate<RungeKutta4>>> scheduler;
-    scheduler.step(Step{.time = TimePoint{}, .dt = 100ms}, lib::InOut(world));
+    scheduler.step(Step{.time = TimePoint{}, .dt = 100ms}, InOut(world));
 
     CHECK(world.store_of<Point>().component_of(*rigid).x == 2.0);
   }
 
   SECTION("ShouldMatchEulerGivenOneStageMethod") {
     TestWorld world;
-    build(lib::Out(world));
+    build(Out(world));
     auto mass =
         world.create<Mass>().with(Point{.x = 1.0}).with(PointRate{}).build();
     REQUIRE(mass);
     world.sync();
 
     Scheduler<TestWorld, SystemList<Oscillate<Euler>>> scheduler;
-    scheduler.step(Step{.time = TimePoint{}, .dt = 500ms}, lib::InOut(world));
+    scheduler.step(Step{.time = TimePoint{}, .dt = 500ms}, InOut(world));
 
     const Point& point = world.store_of<Point>().component_of(*mass);
     CHECK(point.x == 1.0);
@@ -308,28 +309,28 @@ TEST_CASE("Continuous") {
 
   SECTION("ShouldFailContractGivenDerivativeSystemThatPlansChanges") {
     TestWorld world;
-    build(lib::Out(world));
+    build(Out(world));
     REQUIRE(world.create<Mass>().with(Point{}).with(PointRate{}).build());
     world.sync();
 
     Scheduler<TestWorld,
               SystemList<Continuous<Euler, TypeList<Point>, SystemList<Spawn>>>>
         scheduler;
-    CHECK_THROWS_AS(scheduler.step(Step{.time = TimePoint{}, .dt = 100ms},
-                                   lib::InOut(world)),
-                    std::logic_error);
+    CHECK_THROWS_AS(
+        scheduler.step(Step{.time = TimePoint{}, .dt = 100ms}, InOut(world)),
+        std::logic_error);
   }
 
   SECTION("ShouldQuerySpaceAtStagesState") {
     TestWorld world;
-    build(lib::Out(world));
+    build(Out(world));
     REQUIRE(world.create<Mass>().with(Point{}).with(PointRate{}).build());
     world.sync();
 
     using Dynamics =
         Continuous<RungeKutta4, TypeList<Point>, SystemList<Locate>>;
     Scheduler<TestWorld, SystemList<Dynamics>> scheduler;
-    scheduler.step(Step{.time = TimePoint{}, .dt = 100ms}, lib::InOut(world));
+    scheduler.step(Step{.time = TimePoint{}, .dt = 100ms}, InOut(world));
 
     CHECK(scheduler.system<Dynamics>().system<Locate>().located == 4);
   }

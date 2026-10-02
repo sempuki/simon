@@ -5,11 +5,10 @@
 #include "Eigen/Geometry"
 #include "base/core.hpp"
 #include "framework/spatial_index.hpp"
+#include "framework/vocabulary.hpp"
 #include "model/units.hpp"
 
 namespace simon::model {
-
-using Quaternion = Eigen::Quaterniond;
 
 struct Pose final {
   Position position = meters(0.0, 0.0, 0.0);
@@ -44,7 +43,7 @@ inline auto within_distance(const Kinematics& a, const Kinematics& b,
 
 // Coordinates for a spatial index, in meters.
 inline auto coordinates(const Position& position) -> framework::Coordinates {
-  const Vector3d& meters = position.numerical_value_ref_in(meter);
+  const QuantityVector& meters = position.numerical_value_ref_in(meter);
   return {meters.x(), meters.y(), meters.z()};
 }
 inline auto coordinates(const Kinematics& kinematics)
@@ -75,7 +74,7 @@ struct Control final {
 // Advances `kinematics` by `dt` under constant `acceleration`, using the
 // midpoint method (exact for constant acceleration).
 inline auto integrate_midpoint(const Acceleration& acceleration, Time dt,
-                               lib::InOut<Kinematics> kinematics) -> void {
+                               InOut<Kinematics> kinematics) -> void {
   Velocity mid_velocity = kinematics->velocity + acceleration * (dt * 0.5);
   kinematics->position += mid_velocity * dt;
   kinematics->velocity += acceleration * dt;

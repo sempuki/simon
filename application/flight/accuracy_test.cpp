@@ -17,6 +17,7 @@
 #include "application/flight/components.hpp"
 #include "application/flight/systems.hpp"
 #include "base/testing.hpp"
+#include "framework/vocabulary.hpp"
 
 // How far simon's point-mass model drifts from JSBSim's 737 flying the same
 // maneuvers. reference/jsbsim_737.py flew them and recorded the controls a
@@ -146,7 +147,7 @@ struct Drifts final {
 };
 
 template <typename ArchetypeType>
-auto create(const AirState& state, lib::InOut<World> world) -> Entity {
+auto create(const AirState& state, InOut<World> world) -> Entity {
   auto builder = world->create<ArchetypeType>()
                      .with(state)
                      .with(FlightControls{})
@@ -172,11 +173,11 @@ auto replay(const std::vector<Sample>& samples, Duration dt) -> Drifts {
               .numbered(1)
               .holding<archetype::Aircraft>(1)
               .holding<archetype::PreciseAircraft>(1)
-              .build(lib::Out(world)));
+              .build(Out(world)));
   Entity simple =
-      create<archetype::Aircraft>(samples.front().state(), lib::InOut(world));
-  Entity precise = create<archetype::PreciseAircraft>(samples.front().state(),
-                                                      lib::InOut(world));
+      create<archetype::Aircraft>(samples.front().state(), InOut(world));
+  Entity precise =
+      create<archetype::PreciseAircraft>(samples.front().state(), InOut(world));
   world.sync();
 
   framework::Scheduler<World, SystemList<Replay, Fly, Precise>> scheduler{
@@ -184,7 +185,7 @@ auto replay(const std::vector<Sample>& samples, Duration dt) -> Drifts {
   Drifts drifts;
   TimePoint end{SAMPLE * (samples.size() - 1)};
   for (TimePoint time{}; time < end; time += dt) {
-    scheduler.step(Step{.time = time, .dt = dt}, lib::InOut(world));
+    scheduler.step(Step{.time = time, .dt = dt}, InOut(world));
     Duration done = (time + dt).time_since_epoch();
     if (done % SAMPLE == Duration::zero()) {
       const Sample& sample = samples[static_cast<std::size_t>(done / SAMPLE)];

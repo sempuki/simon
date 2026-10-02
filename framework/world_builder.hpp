@@ -19,6 +19,7 @@
 #include "framework/build_error.hpp"
 #include "framework/spatial.hpp"
 #include "framework/type_list.hpp"
+#include "framework/vocabulary.hpp"
 
 namespace simon::framework {
 
@@ -34,7 +35,7 @@ namespace simon::framework {
 //           .numbered(1)
 //           .holding<archetype::RedDrone>(drones)
 //           .holding<archetype::Track>(drones)
-//           .build(lib::Out(world));
+//           .build(Out(world));
 template <typename WorldType>
 class [[nodiscard]] SetUpBuilder final {
  public:
@@ -72,7 +73,7 @@ class [[nodiscard]] SetUpBuilder final {
 
   // Fills `world` as planned, discarding everything it held. A refused plan
   // leaves `world` as it was.
-  auto build(lib::Out<WorldType> world) && -> std::expected<void, Status> {
+  auto build(Out<WorldType> world) && -> std::expected<void, Status> {
     if (cell_size_ && (!(*cell_size_ > 0.0) || !std::isfinite(*cell_size_))) {
       return std::unexpected(
           lib::raise(BuildError::CELL_SIZE_INVALID,

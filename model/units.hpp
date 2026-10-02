@@ -7,6 +7,7 @@
 #include <cmath>
 
 #include "Eigen/Dense"
+#include "framework/vocabulary.hpp"
 #include "mp-units/framework.h"
 #include "mp-units/systems/si.h"
 
@@ -24,80 +25,89 @@ namespace units = mp_units;
 
 // A 3-vector that mp-units accepts as a representation. Plain Eigen vectors do
 // not work: Eigen's operators return expression types, which mp-units rejects,
-// so every operation here evaluates back to a Vector3d.
-class Vector3d final {
+// so every operation here evaluates back to a QuantityVector.
+class QuantityVector final {
  public:
   using value_type = double;
 
-  Vector3d() : value_{Eigen::Vector3d::Zero()} {}
-  Vector3d(double x, double y, double z) : value_{x, y, z} {}
+  QuantityVector() : value_{Vector3::Zero()} {}
+  QuantityVector(double x, double y, double z) : value_{x, y, z} {}
   template <typename DerivedType>
-  explicit Vector3d(const Eigen::MatrixBase<DerivedType>& value)
+  explicit QuantityVector(const Eigen::MatrixBase<DerivedType>& value)
       : value_{value} {}
 
-  auto eigen() const -> const Eigen::Vector3d& { return value_; }
+  auto eigen() const -> const Vector3& { return value_; }
 
   auto x() const -> double { return value_.x(); }
   auto y() const -> double { return value_.y(); }
   auto z() const -> double { return value_.z(); }
 
-  auto is_approximately(const Vector3d& that, double precision = 1e-12) const
-      -> bool {
+  auto is_approximately(const QuantityVector& that,
+                        double precision = 1e-12) const -> bool {
     return value_.isApprox(that.value_, precision) ||
            (value_ - that.value_).norm() <= precision;
   }
 
-  friend auto operator-(const Vector3d& a) -> Vector3d {
-    return Vector3d{-a.value_};
+  friend auto operator-(const QuantityVector& a) -> QuantityVector {
+    return QuantityVector{-a.value_};
   }
-  friend auto operator+(const Vector3d& a, const Vector3d& b) -> Vector3d {
-    return Vector3d{a.value_ + b.value_};
+  friend auto operator+(const QuantityVector& a, const QuantityVector& b)
+      -> QuantityVector {
+    return QuantityVector{a.value_ + b.value_};
   }
-  friend auto operator-(const Vector3d& a, const Vector3d& b) -> Vector3d {
-    return Vector3d{a.value_ - b.value_};
+  friend auto operator-(const QuantityVector& a, const QuantityVector& b)
+      -> QuantityVector {
+    return QuantityVector{a.value_ - b.value_};
   }
-  friend auto operator*(const Vector3d& a, double scale) -> Vector3d {
-    return Vector3d{a.value_ * scale};
+  friend auto operator*(const QuantityVector& a, double scale)
+      -> QuantityVector {
+    return QuantityVector{a.value_ * scale};
   }
-  friend auto operator*(double scale, const Vector3d& a) -> Vector3d {
-    return Vector3d{scale * a.value_};
+  friend auto operator*(double scale, const QuantityVector& a)
+      -> QuantityVector {
+    return QuantityVector{scale * a.value_};
   }
-  friend auto operator/(const Vector3d& a, double scale) -> Vector3d {
-    return Vector3d{a.value_ / scale};
+  friend auto operator/(const QuantityVector& a, double scale)
+      -> QuantityVector {
+    return QuantityVector{a.value_ / scale};
   }
 
-  auto operator+=(const Vector3d& that) -> Vector3d& {
+  auto operator+=(const QuantityVector& that) -> QuantityVector& {
     value_ += that.value_;
     return *this;
   }
-  auto operator-=(const Vector3d& that) -> Vector3d& {
+  auto operator-=(const QuantityVector& that) -> QuantityVector& {
     value_ -= that.value_;
     return *this;
   }
-  auto operator*=(double scale) -> Vector3d& {
+  auto operator*=(double scale) -> QuantityVector& {
     value_ *= scale;
     return *this;
   }
-  auto operator/=(double scale) -> Vector3d& {
+  auto operator/=(double scale) -> QuantityVector& {
     value_ /= scale;
     return *this;
   }
 
-  friend auto operator==(const Vector3d& a, const Vector3d& b) -> bool {
+  friend auto operator==(const QuantityVector& a, const QuantityVector& b)
+      -> bool {
     return a.value_ == b.value_;
   }
 
   // Found by mp_units::magnitude through argument-dependent lookup.
-  friend auto magnitude(const Vector3d& a) -> double { return a.value_.norm(); }
-  friend auto dot(const Vector3d& a, const Vector3d& b) -> double {
+  friend auto magnitude(const QuantityVector& a) -> double {
+    return a.value_.norm();
+  }
+  friend auto dot(const QuantityVector& a, const QuantityVector& b) -> double {
     return a.value_.dot(b.value_);
   }
-  friend auto cross(const Vector3d& a, const Vector3d& b) -> Vector3d {
-    return Vector3d{a.value_.cross(b.value_)};
+  friend auto cross(const QuantityVector& a, const QuantityVector& b)
+      -> QuantityVector {
+    return QuantityVector{a.value_.cross(b.value_)};
   }
 
  private:
-  Eigen::Vector3d value_;
+  Vector3 value_;
 };
 
 inline constexpr auto meter = units::si::metre;
@@ -135,28 +145,28 @@ using Temperature = units::quantity<kelvin, double>;
 using Pressure = units::quantity<pascal, double>;
 
 // Vectors.
-using Displacement = units::quantity<meter, Vector3d>;
-using Velocity = units::quantity<meter_per_second, Vector3d>;
-using Acceleration = units::quantity<meter_per_second_squared, Vector3d>;
-using ForceVector = units::quantity<newton, Vector3d>;
-using Moment = units::quantity<newton_meter, Vector3d>;
-using AngularVelocity = units::quantity<radian_per_second, Vector3d>;
+using Displacement = units::quantity<meter, QuantityVector>;
+using Velocity = units::quantity<meter_per_second, QuantityVector>;
+using Acceleration = units::quantity<meter_per_second_squared, QuantityVector>;
+using ForceVector = units::quantity<newton, QuantityVector>;
+using Moment = units::quantity<newton_meter, QuantityVector>;
+using AngularVelocity = units::quantity<radian_per_second, QuantityVector>;
 using AngularAcceleration =
-    units::quantity<radian_per_second_squared, Vector3d>;
+    units::quantity<radian_per_second_squared, QuantityVector>;
 
 // Positions are displacements from the world origin, the origin of the local
 // Cartesian frame.
 using Position = Displacement;
 
 inline auto meters(double x, double y, double z) -> Displacement {
-  return Vector3d{x, y, z} * meter;
+  return QuantityVector{x, y, z} * meter;
 }
 inline auto meters_per_second(double x, double y, double z) -> Velocity {
-  return Vector3d{x, y, z} * meter_per_second;
+  return QuantityVector{x, y, z} * meter_per_second;
 }
 inline auto meters_per_second_squared(double x, double y, double z)
     -> Acceleration {
-  return Vector3d{x, y, z} * meter_per_second_squared;
+  return QuantityVector{x, y, z} * meter_per_second_squared;
 }
 
 // An angle in radians, as a plain number for the standard math functions.
@@ -215,23 +225,23 @@ auto seconds(std::chrono::duration<RepresentationType, PeriodType> duration)
 // Vector algebra on quantities. mp-units 2.5 has none for custom
 // representations, so these unwrap, operate, and rewrap with the product unit.
 template <auto A, auto B>
-auto dot(const units::quantity<A, Vector3d>& a,
-         const units::quantity<B, Vector3d>& b) {
+auto dot(const units::quantity<A, QuantityVector>& a,
+         const units::quantity<B, QuantityVector>& b) {
   return dot(a.numerical_value_ref_in(a.unit),
              b.numerical_value_ref_in(b.unit)) *
          (A * B);
 }
 
 template <auto A, auto B>
-auto cross(const units::quantity<A, Vector3d>& a,
-           const units::quantity<B, Vector3d>& b) {
+auto cross(const units::quantity<A, QuantityVector>& a,
+           const units::quantity<B, QuantityVector>& b) {
   return cross(a.numerical_value_ref_in(a.unit),
                b.numerical_value_ref_in(b.unit)) *
          (A * B);
 }
 
 template <auto A>
-auto norm(const units::quantity<A, Vector3d>& a) {
+auto norm(const units::quantity<A, QuantityVector>& a) {
   return magnitude(a.numerical_value_ref_in(a.unit)) * A;
 }
 

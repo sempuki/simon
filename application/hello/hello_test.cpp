@@ -9,6 +9,7 @@
 
 #include "base/testing.hpp"
 #include "engine/driver.hpp"
+#include "framework/vocabulary.hpp"
 
 namespace simon::hello {
 
@@ -18,9 +19,9 @@ const framework::Duration DT = std::chrono::milliseconds{10};
 
 TEST_CASE("Hello") {
   World world;
-  REQUIRE(build_world(8, lib::Out(world)));
+  REQUIRE(build_world(8, Out(world)));
   Scheduler scheduler;
-  Balls balls = build_balls(lib::InOut(world));
+  Balls balls = build_balls(InOut(world));
 
   SECTION("ShouldFindBallsByAliasGivenScenario") {
     CHECK(world.find_name_of(framework::Alias{"red"}) ==
@@ -35,17 +36,17 @@ TEST_CASE("Hello") {
     REQUIRE(world.change(balls.red).detach<Drag>().build());
     world.sync();
 
-    scheduler.step(framework::Step{.time = {}, .dt = DT}, lib::InOut(world));
+    scheduler.step(framework::Step{.time = {}, .dt = DT}, InOut(world));
 
     const Kinematics& red =
         world.store_of<Kinematics>().component_of(balls.red);
-    CHECK(
-        red.velocity.numerical_value_in(model::meter_per_second)
-            .is_approximately(model::Vector3d{10.0, -10.0 + 9.8 * 0.01, 0.0}));
+    CHECK(red.velocity.numerical_value_in(model::meter_per_second)
+              .is_approximately(
+                  model::QuantityVector{10.0, -10.0 + 9.8 * 0.01, 0.0}));
   }
 
   SECTION("ShouldNotCollideGivenBallsFarApart") {
-    scheduler.step(framework::Step{.time = {}, .dt = DT}, lib::InOut(world));
+    scheduler.step(framework::Step{.time = {}, .dt = DT}, InOut(world));
     CHECK_FALSE(any_collision(world));
   }
 
@@ -53,8 +54,7 @@ TEST_CASE("Hello") {
     framework::TimePoint time{};
     int steps = 0;
     while (!any_collision(world) && steps < 100'000) {
-      scheduler.step(framework::Step{.time = time, .dt = DT},
-                     lib::InOut(world));
+      scheduler.step(framework::Step{.time = time, .dt = DT}, InOut(world));
       time += DT;
       ++steps;
     }
@@ -82,7 +82,7 @@ TEST_CASE("HelloSimulation") {
 
   SECTION("ShouldStopAtFirstCollisionGivenBatchRun") {
     Simulation simulation;
-    engine::BatchDriver driver{timing, lib::Depend(simulation)};
+    engine::BatchDriver driver{timing, Depend(simulation)};
 
     auto reached = driver.run(framework::TimePoint{60s});
 
@@ -94,8 +94,8 @@ TEST_CASE("HelloSimulation") {
   SECTION("ShouldEndAtSameTimeAndPlaceGivenTwoRuns") {
     Simulation first;
     Simulation second;
-    engine::BatchDriver first_driver{timing, lib::Depend(first)};
-    engine::BatchDriver second_driver{timing, lib::Depend(second)};
+    engine::BatchDriver first_driver{timing, Depend(first)};
+    engine::BatchDriver second_driver{timing, Depend(second)};
 
     auto first_end = first_driver.run(framework::TimePoint{60s});
     auto second_end = second_driver.run(framework::TimePoint{60s});

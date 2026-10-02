@@ -34,15 +34,15 @@ struct RigidBody final {
   Position position = meters(0.0, 0.0, 0.0);
   Velocity velocity = meters_per_second(0.0, 0.0, 0.0);
   Quaternion attitude = Quaternion::Identity();           // Body to inertial.
-  AngularVelocity rate = Vector3d{} * radian_per_second;  // Body axes.
+  AngularVelocity rate = QuantityVector{} * radian_per_second;  // Body axes.
 };
 
 struct RigidBodyRate final {
   Velocity velocity = meters_per_second(0.0, 0.0, 0.0);
   Acceleration acceleration = meters_per_second_squared(0.0, 0.0, 0.0);
-  Eigen::Vector4d attitude = Eigen::Vector4d::Zero();  // Of q's (x, y, z, w).
+  Vector4 attitude = Vector4::Zero();  // Of q's (x, y, z, w).
   AngularAcceleration angular_acceleration =
-      Vector3d{} * radian_per_second_squared;
+      QuantityVector{} * radian_per_second_squared;
 };
 
 inline auto operator+(const RigidBodyRate& a, const RigidBodyRate& b)
@@ -80,10 +80,10 @@ inline auto advance(const RigidBody& body, const RigidBodyRate& rate,
 // axes, in kg m^2.
 struct MassProperties final {
   Mass mass = 1.0 * kilogram;
-  Eigen::Matrix3d inertia = Eigen::Matrix3d::Identity();
-  Eigen::Matrix3d inverse = Eigen::Matrix3d::Identity();
+  Matrix3 inertia = Matrix3::Identity();
+  Matrix3 inverse = Matrix3::Identity();
 
-  static auto of(Mass mass, const Eigen::Matrix3d& inertia) -> MassProperties {
+  static auto of(Mass mass, const Matrix3& inertia) -> MassProperties {
     return {.mass = mass, .inertia = inertia, .inverse = inertia.inverse()};
   }
 };
@@ -94,23 +94,22 @@ struct MassProperties final {
 inline auto rigid_body_rate(const RigidBody& body, const ForceVector& force,
                             const Moment& moment, const MassProperties& mass,
                             const Acceleration& gravity) -> RigidBodyRate {
-  Eigen::Vector3d w = body.rate.numerical_value_in(radian_per_second).eigen();
-  Eigen::Vector3d f = force.numerical_value_in(newton).eigen();
-  Eigen::Vector3d m = moment.numerical_value_in(newton_meter).eigen();
+  Vector3 w = body.rate.numerical_value_in(radian_per_second).eigen();
+  Vector3 f = force.numerical_value_in(newton).eigen();
+  Vector3 m = moment.numerical_value_in(newton_meter).eigen();
 
-  Eigen::Vector3d specific_force =
+  Vector3 specific_force =
       body.attitude * (f / mass.mass.numerical_value_in(kilogram));
-  Eigen::Vector3d angular_acceleration =
-      mass.inverse * (m - w.cross(mass.inertia * w));
+  Vector3 angular_acceleration = mass.inverse * (m - w.cross(mass.inertia * w));
   Quaternion spin = body.attitude * Quaternion{0.0, w.x(), w.y(), w.z()};
 
   return RigidBodyRate{
       .velocity = body.velocity,
       .acceleration =
-          Vector3d{specific_force} * meter_per_second_squared + gravity,
+          QuantityVector{specific_force} * meter_per_second_squared + gravity,
       .attitude = 0.5 * spin.coeffs(),
       .angular_acceleration =
-          Vector3d{angular_acceleration} * radian_per_second_squared,
+          QuantityVector{angular_acceleration} * radian_per_second_squared,
   };
 }
 

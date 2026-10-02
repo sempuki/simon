@@ -10,6 +10,7 @@
 #include "engine/rate_gate.hpp"
 #include "framework/continuous.hpp"
 #include "framework/system.hpp"
+#include "framework/vocabulary.hpp"
 #include "model/atmosphere.hpp"
 #include "model/control.hpp"
 #include "model/flight_path.hpp"
@@ -122,9 +123,8 @@ struct FlyAutopilot final           //
     commands.load_factor = std::clamp(
         model::load_factor_command(*state, climb, controls->bank, gains_.climb),
         handling->min_load_factor, handling->max_load_factor);
-    commands.throttle =
-        model::pi_control(speed_error, gains_.speed, elapsed_,
-                          lib::InOut(autopilot->throttle_integral));
+    commands.throttle = model::pi_control(speed_error, gains_.speed, elapsed_,
+                                          InOut(autopilot->throttle_integral));
   }
 
  private:
@@ -267,12 +267,12 @@ struct FlySurfaces final       //
     if (!state || !body || !autopilot || !controls || !trim) {
       return;
     }
-    Eigen::Matrix3d attitude = earth_.body_to_north_east_down(
+    Matrix3 attitude = earth_.body_to_north_east_down(
         *body, model::seconds(step.time.time_since_epoch()));
     double bank = std::atan2(attitude(2, 1), attitude(2, 2));
-    Eigen::Vector3d rates = earth_.air_rate(*body)
-                                .numerical_value_in(model::radian_per_second)
-                                .eigen();
+    Vector3 rates = earth_.air_rate(*body)
+                        .numerical_value_in(model::radian_per_second)
+                        .eigen();
 
     // Up to 45 degrees of bank: a 737 turns on a radius of about 4 km at
     // 200 m/s, near the 3 km FollowRoute captures a waypoint at, so it seldom
@@ -344,12 +344,12 @@ struct RunFlightControls final    //
       return;
     }
     model::Time time = model::seconds(step.time.time_since_epoch());
-    Eigen::Vector3d uvw = earth_.air_velocity(*body)
-                              .numerical_value_in(model::meter_per_second)
-                              .eigen();
-    Eigen::Vector3d rates = earth_.air_rate(*body)
-                                .numerical_value_in(model::radian_per_second)
-                                .eigen();
+    Vector3 uvw = earth_.air_velocity(*body)
+                      .numerical_value_in(model::meter_per_second)
+                      .eigen();
+    Vector3 rates = earth_.air_rate(*body)
+                        .numerical_value_in(model::radian_per_second)
+                        .eigen();
     using enum model::FlightSignal;
     signals[MACH] = uvw.norm() / air_(earth_.altitude(*body, time))
                                      .speed_of_sound.numerical_value_in(

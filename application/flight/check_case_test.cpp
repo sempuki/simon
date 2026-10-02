@@ -13,6 +13,7 @@
 #include "application/flight/components.hpp"
 #include "application/flight/systems.hpp"
 #include "base/testing.hpp"
+#include "framework/vocabulary.hpp"
 
 // The whole 737 against JSBSim's, open loop: from the same trim, flown
 // through the check cases reference/jsbsim_737_check_cases.py flew, through
@@ -116,16 +117,16 @@ using CheckSchedule = SystemList<Pilot, RunFlightControls, RunEngines, Rigid,
                                  BurnFuel, FollowRigidBody>;
 
 auto vector_of(const Row& row, const char* x, const char* y, const char* z)
-    -> model::Vector3d {
-  return model::Vector3d{row.at(x), row.at(y), row.at(z)};
+    -> model::QuantityVector {
+  return model::QuantityVector{row.at(x), row.at(y), row.at(z)};
 }
 
 auto body_of(const Row& row) -> RigidBody {
   return RigidBody{
       .position = vector_of(row, "x", "y", "z") * model::meter,
       .velocity = vector_of(row, "vx", "vy", "vz") * model::meter_per_second,
-      .attitude = model::Quaternion{row.at("qw"), row.at("qx"), row.at("qy"),
-                                    row.at("qz")},
+      .attitude =
+          Quaternion{row.at("qw"), row.at("qx"), row.at("qy"), row.at("qz")},
       .rate = vector_of(row, "p", "q", "r") * model::radian_per_second,
   };
 }
@@ -159,7 +160,7 @@ auto fly(Case flown, Duration dt, const model::AircraftData& data,
   World world;
   REQUIRE(
       World::set_up().numbered(1).holding<archetype::RigidAircraft>(1).build(
-          lib::Out(world)));
+          Out(world)));
   model::Earth earth = model::Earth::round(model::wgs84::Geodetic{});
   RigidBody body = body_of(trim);
 
@@ -209,7 +210,7 @@ auto fly(Case flown, Duration dt, const model::AircraftData& data,
   std::vector<RigidBody> samples{body};
   constexpr Duration SAMPLE = 200ms;
   for (TimePoint time{}; time < TimePoint{30s}; time += dt) {
-    scheduler.step(Step{.time = time, .dt = dt}, lib::InOut(world));
+    scheduler.step(Step{.time = time, .dt = dt}, InOut(world));
     if ((time + dt).time_since_epoch() % SAMPLE == Duration::zero()) {
       samples.push_back(world.store_of<RigidBody>().component_of(*aircraft));
     }

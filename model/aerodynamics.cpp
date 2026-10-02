@@ -106,7 +106,7 @@ auto aero_loads(const AeroSums& sums, Angle alpha, Angle beta,
   double cos_alpha = cos(alpha);
   double sin_beta = sin(beta);
   double cos_beta = cos(beta);
-  Vector3d force{
+  QuantityVector force{
       -cos_alpha * cos_beta * drag - cos_alpha * sin_beta * side +
           sin_alpha * lift,
       -sin_beta * drag + cos_beta * side,
@@ -114,10 +114,11 @@ auto aero_loads(const AeroSums& sums, Angle alpha, Angle beta,
           cos_alpha * lift,
   };
 
-  Vector3d about_reference{sums[static_cast<std::size_t>(AeroAxis::ROLL)],
-                           sums[static_cast<std::size_t>(AeroAxis::PITCH)],
-                           sums[static_cast<std::size_t>(AeroAxis::YAW)]};
-  Vector3d arm = reference.numerical_value_in(meter);
+  QuantityVector about_reference{
+      sums[static_cast<std::size_t>(AeroAxis::ROLL)],
+      sums[static_cast<std::size_t>(AeroAxis::PITCH)],
+      sums[static_cast<std::size_t>(AeroAxis::YAW)]};
+  QuantityVector arm = reference.numerical_value_in(meter);
   return AeroLoads{
       .force = force * newton,
       .moment = (about_reference + cross(arm, force)) * newton_meter,

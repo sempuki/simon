@@ -19,6 +19,7 @@
 #include "base/core.hpp"
 #include "framework/component_store.hpp"
 #include "framework/entity.hpp"
+#include "framework/vocabulary.hpp"
 
 namespace simon::framework {
 namespace {
@@ -103,9 +104,8 @@ struct Population final {
   std::vector<Entity> destroyed;
 };
 
-auto make_population(std::size_t count, double churn,
-                     lib::InOut<EntityTable> table,
-                     lib::InOut<std::mt19937> random) -> Population {
+auto make_population(std::size_t count, double churn, InOut<EntityTable> table,
+                     InOut<std::mt19937> random) -> Population {
   Population population;
   for (std::size_t i = 0; i < count; ++i) {
     population.live.push_back(table->create());
@@ -120,8 +120,7 @@ auto make_population(std::size_t count, double churn,
 
 template <typename StoreType, typename IterateType>
 auto measure(const Population& population, IterateType&& iterate,
-             lib::InOut<StoreType> store, lib::InOut<std::mt19937> random)
-    -> Result {
+             InOut<StoreType> store, InOut<std::mt19937> random) -> Result {
   constexpr double DT = 0.01;
   int repetitions = population.live.size() < 50'000 ? 200 : 40;
 
@@ -154,8 +153,7 @@ auto measure(const Population& population, IterateType&& iterate,
 
 // Appends every entity in creation order, then erases the destroyed ones.
 template <typename StoreType>
-auto populate(const Population& population, lib::InOut<StoreType> store)
-    -> void {
+auto populate(const Population& population, InOut<StoreType> store) -> void {
   std::vector<Entity> all = population.live;
   all.insert(all.end(), population.destroyed.begin(),
              population.destroyed.end());
@@ -168,31 +166,29 @@ auto populate(const Population& population, lib::InOut<StoreType> store)
   }
 }
 
-auto measure_dense(std::size_t count, double churn,
-                   lib::InOut<std::mt19937> random) -> Result {
+auto measure_dense(std::size_t count, double churn, InOut<std::mt19937> random)
+    -> Result {
   EntityTable table{count};
-  Population population =
-      make_population(count, churn, lib::InOut(table), random);
+  Population population = make_population(count, churn, InOut(table), random);
   ComponentStore<Body> store{count, count};
-  populate(population, lib::InOut(store));
+  populate(population, InOut(store));
   return measure(
       population,
       [](auto& dense, auto&& visit) {
         dense.for_each([&](Entity, Body& body) { visit(body); });
       },
-      lib::InOut(store), random);
+      InOut(store), random);
 }
 
-auto measure_stable(std::size_t count, double churn,
-                    lib::InOut<std::mt19937> random) -> Result {
+auto measure_stable(std::size_t count, double churn, InOut<std::mt19937> random)
+    -> Result {
   EntityTable table{count};
-  Population population =
-      make_population(count, churn, lib::InOut(table), random);
+  Population population = make_population(count, churn, InOut(table), random);
   StableSlotStore<Body> store{count};
-  populate(population, lib::InOut(store));
+  populate(population, InOut(store));
   return measure(
       population, [](auto& stable, auto&& visit) { stable.for_each(visit); },
-      lib::InOut(store), random);
+      InOut(store), random);
 }
 
 }  // namespace
@@ -208,8 +204,8 @@ auto main() -> int {
                "ns/entity", "ns/entity", "ns/lookup", "ns/lookup");
   for (std::size_t count : {1'000uz, 10'000uz, 100'000uz, 1'000'000uz}) {
     for (double churn : {0.0, 0.25, 0.5, 0.75}) {
-      Result dense = measure_dense(count, churn, lib::InOut(random));
-      Result stable = measure_stable(count, churn, lib::InOut(random));
+      Result dense = measure_dense(count, churn, simon::InOut(random));
+      Result stable = measure_stable(count, churn, simon::InOut(random));
       std::println(
           "{:>8} {:>5.0f}% | {:>14.2f} {:>14.2f} | {:>14.2f} {:>14.2f}", count,
           churn * 100.0, dense.iterate, stable.iterate, dense.lookup,

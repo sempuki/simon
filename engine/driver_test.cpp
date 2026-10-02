@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "base/testing.hpp"
+#include "framework/vocabulary.hpp"
 
 namespace simon::engine {
 
@@ -79,7 +80,7 @@ auto step_lengths(const Recorder& recorder) -> std::vector<Duration> {
 
 TEST_CASE("Driver") {
   Recorder recorder;
-  Driver driver{Timing{.max_step = 30ms}, lib::Depend(recorder)};
+  Driver driver{Timing{.max_step = 30ms}, Depend(recorder)};
 
   SECTION("ShouldLandExactlyOnTargetGivenStepNotDividingIt") {
     REQUIRE(driver.start());
@@ -107,7 +108,7 @@ TEST_CASE("Driver") {
 
 TEST_CASE("BatchDriver") {
   Recorder recorder;
-  BatchDriver driver{Timing{.max_step = 10ms}, lib::Depend(recorder)};
+  BatchDriver driver{Timing{.max_step = 10ms}, Depend(recorder)};
 
   SECTION("ShouldRunLifecycleInOrderGivenRunToEnd") {
     auto reached = driver.run(TimePoint{50ms});
@@ -155,7 +156,7 @@ TEST_CASE("RealTimeDriver") {
   Recorder recorder;
   FakeClock::current = FakeClock::time_point{};
   RealTimeDriver<Recorder, FakeClock> driver{Timing{.max_step = 20ms}, 2.0,
-                                             lib::Depend(recorder)};
+                                             Depend(recorder)};
 
   SECTION("ShouldTakeOnlyWholeStepsGivenWallTimeBetweenSteps") {
     REQUIRE(driver.tick() == Flow::CONTINUE);  // Starts; nothing due yet.
@@ -176,7 +177,7 @@ TEST_CASE("RealTimeDriver") {
     // floating-point product lands at 109.999999 ms, one step short.
     Recorder fast_recorder;
     RealTimeDriver<Recorder, FakeClock> fast{Timing{.max_step = 10ms}, 5.0,
-                                             lib::Depend(fast_recorder)};
+                                             Depend(fast_recorder)};
     REQUIRE(fast.tick() == Flow::CONTINUE);
 
     FakeClock::current += 22ms;
@@ -192,7 +193,7 @@ TEST_CASE("RealTimeDriver") {
       REQUIRE(driver.tick() == Flow::CONTINUE);
     }
     Recorder batch_recorder;
-    BatchDriver batch{Timing{.max_step = 20ms}, lib::Depend(batch_recorder)};
+    BatchDriver batch{Timing{.max_step = 20ms}, Depend(batch_recorder)};
     REQUIRE(batch.run(driver.driver().now()));
 
     REQUIRE(recorder.steps.size() == batch_recorder.steps.size());

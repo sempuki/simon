@@ -11,6 +11,7 @@
 
 #include "application/missile/simulation.hpp"
 #include "engine/driver.hpp"
+#include "framework/vocabulary.hpp"
 
 auto main(int argc, char** argv) -> int {
   using namespace simon;
@@ -22,7 +23,7 @@ auto main(int argc, char** argv) -> int {
   }
   missile::Simulation simulation{scenario};
   engine::BatchDriver driver{engine::Timing{.max_step = 10ms},
-                             lib::Depend(simulation)};
+                             Depend(simulation)};
 
   auto reached = driver.run(framework::TimePoint{10min});
   if (!reached) {

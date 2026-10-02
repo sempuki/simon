@@ -31,6 +31,7 @@
 #include "base/core.hpp"
 #include "framework/benchmark_support.hpp"
 #include "framework/type_list.hpp"
+#include "framework/vocabulary.hpp"
 
 namespace simon::flight {
 namespace {
@@ -93,9 +94,9 @@ auto measure(int aircraft, Fidelity fidelity, int steps,
   }
   World world;
   std::expected<void, framework::Status> built =
-      build_world(scenario, lib::Out(world));
+      build_world(scenario, Out(world));
   CHECK_POSTCONDITION(built.has_value());
-  built = build_scenario(scenario, &rigid, lib::InOut(world));
+  built = build_scenario(scenario, &rigid, InOut(world));
   CHECK_POSTCONDITION(built.has_value());
   world.sync();
 
@@ -108,7 +109,7 @@ auto measure(int aircraft, Fidelity fidelity, int steps,
         [&](auto&... scheduler) {
           (([&] {
              auto start = WallClock::now();
-             scheduler.step(step, lib::InOut(world));
+             scheduler.step(step, InOut(world));
              seconds[index++] +=
                  std::chrono::duration<double>(WallClock::now() - start)
                      .count();

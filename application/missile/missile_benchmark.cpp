@@ -38,6 +38,7 @@
 #include "base/core.hpp"
 #include "framework/benchmark_support.hpp"
 #include "framework/type_list.hpp"
+#include "framework/vocabulary.hpp"
 
 namespace simon::missile {
 namespace {
@@ -98,10 +99,10 @@ auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
   scenario.radars_in_turn = in_turn;
   World world;
   std::expected<void, framework::Status> built =
-      build_world(scenario, lib::Out(world));
+      build_world(scenario, Out(world));
   CHECK_POSTCONDITION(built.has_value());
   std::expected<Entity, framework::Status> built_asset =
-      build_scenario(scenario, lib::InOut(world));
+      build_scenario(scenario, InOut(world));
   CHECK_POSTCONDITION(built_asset.has_value());
   Entity asset = *built_asset;
   auto schedulers = schedulers_of(List{});
@@ -123,7 +124,7 @@ auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
         [&](auto&... scheduler) {
           (([&] {
              auto start = WallClock::now();
-             scheduler.step(step, lib::InOut(world));
+             scheduler.step(step, InOut(world));
              double elapsed =
                  std::chrono::duration<double>(WallClock::now() - start)
                      .count();

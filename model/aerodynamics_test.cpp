@@ -63,7 +63,7 @@ TEST_CASE("AeroLoads") {
     AeroLoads loads =
         aero_loads(sums, 0.0 * radian, 0.0 * radian, meters(0.0, 0.0, 0.0));
     CHECK(loads.force.numerical_value_in(newton).is_approximately(
-        Vector3d{-1.0, 0.0, -10.0}));
+        QuantityVector{-1.0, 0.0, -10.0}));
   }
 
   SECTION("ShouldTiltLiftForwardGivenAngleOfAttack") {
@@ -72,7 +72,7 @@ TEST_CASE("AeroLoads") {
         aero_loads(sums, alpha * radian, 0.0 * radian, meters(0.0, 0.0, 0.0));
     // The air comes from below: drag pushes up, lift pushes forward.
     CHECK(loads.force.numerical_value_in(newton).is_approximately(
-        Vector3d{10.0, 0.0, -1.0}));
+        QuantityVector{10.0, 0.0, -1.0}));
   }
 
   SECTION("ShouldPitchUpGivenLiftAheadOfCenterOfMass") {

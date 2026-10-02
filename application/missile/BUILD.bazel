@@ -17,6 +17,7 @@ cc_library(
     ],
     copts = COPTS,
     deps = [
+        "//framework:vocabulary",
         "//engine:event_queue",
         "//engine:lifecycle",
         "//engine:rate_gate",
@@ -36,6 +37,7 @@ cc_test(
     srcs = ["missile_test.cpp"],
     copts = COPTS,
     deps = [
+        "//framework:vocabulary",
         ":missile_library",
         "//engine:driver",
         "@lib//base:testing",
@@ -48,6 +50,7 @@ cc_binary(
     srcs = ["main.cpp"],
     copts = COPTS,
     deps = [
+        "//framework:vocabulary",
         ":missile_library",
         "//engine:driver",
     ],
@@ -59,6 +62,7 @@ cc_binary(
     srcs = ["viewer.cpp"],
     copts = COPTS,
     deps = [
+        "//framework:vocabulary",
         ":missile_library",
         "//engine:driver",
         "@imgui",
@@ -77,6 +81,7 @@ cc_binary(
     srcs = ["missile_benchmark.cpp"],
     copts = COPTS,
     deps = [
+        "//framework:vocabulary",
         ":missile_library",
         "//framework",
         "//framework:benchmark_support",

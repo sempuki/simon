@@ -1,6 +1,7 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
 #include "application/missile/simulation.hpp"
+#include "framework/vocabulary.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -11,7 +12,7 @@
 
 namespace simon::missile {
 
-auto build_world(const Scenario& scenario, lib::Out<World> world)
+auto build_world(const Scenario& scenario, Out<World> world)
     -> std::expected<void, framework::Status> {
   auto count = [](int value) {
     return static_cast<std::size_t>(std::max(value, 0));
@@ -94,11 +95,11 @@ auto SiteBuilder::build() && -> std::expected<Entity, framework::Status> {
   return asset;
 }
 
-auto create_site(Position origin, lib::Depend<World> world) -> SiteBuilder {
+auto create_site(Position origin, Depend<World> world) -> SiteBuilder {
   return SiteBuilder{origin, world};
 }
 
-auto build_scenario(const Scenario& scenario, lib::InOut<World> world)
+auto build_scenario(const Scenario& scenario, InOut<World> world)
     -> std::expected<Entity, framework::Status> {
   if (scenario.sites < 1) {
     return std::unexpected(lib::raise(framework::BuildError::ENTITY_NOT_ALIVE,
@@ -115,7 +116,7 @@ auto build_scenario(const Scenario& scenario, lib::InOut<World> world)
     Position origin =
         model::meters(spacing * (site % side), spacing * (site / side), 0.0);
     SiteBuilder watched =
-        create_site(origin, lib::Depend(*world))
+        create_site(origin, Depend(*world))
             .protecting(Health{.points = scenario.asset_health})
             .watched_by(count(scenario.radars),
                         Radar{.range = scenario.radar_range,
@@ -138,7 +139,7 @@ auto build_scenario(const Scenario& scenario, lib::InOut<World> world)
                          scenario.drone_warhead,
                          Ring{.radius = scenario.spawn_distance,
                               .width = scenario.spawn_spread},
-                         lib::Depend(random))
+                         Depend(random))
             .build());
     if (!first) {
       first = asset;
@@ -150,8 +151,8 @@ auto build_scenario(const Scenario& scenario, lib::InOut<World> world)
 }
 
 auto Simulation::configure() -> engine::PhaseResult {
-  RETURN_IF_UNEXPECTED(build_world(scenario_, lib::Out(world_)));
-  ASSIGN_OR_RETURN(asset_, build_scenario(scenario_, lib::InOut(world_)));
+  RETURN_IF_UNEXPECTED(build_world(scenario_, Out(world_)));
+  ASSIGN_OR_RETURN(asset_, build_scenario(scenario_, InOut(world_)));
   stock_ = remaining_interceptors();
   for (std::size_t hold = 0; hold < scenario_.holds.size(); ++hold) {
     events_.start_timer(scenario_.holds[hold].from,
@@ -166,7 +167,7 @@ auto Simulation::configure() -> engine::PhaseResult {
 
 auto Simulation::step(const framework::Step& step) -> engine::PhaseResult {
   events_.process_until(step.time);
-  scheduler_.step(step, lib::InOut(world_));
+  scheduler_.step(step, InOut(world_));
   if (!world_.alive(asset_)) {
     outcome_ = Outcome::RED_WINS;
   } else if (world_.store_of<RedDrone>().size() == 0) {
@@ -176,7 +177,7 @@ auto Simulation::step(const framework::Step& step) -> engine::PhaseResult {
                                         : engine::Flow::STOP;
 }
 
-auto hold_weapons(const Sector& sector, lib::InOut<World> world)
+auto hold_weapons(const Sector& sector, InOut<World> world)
     -> std::expected<std::size_t, framework::Status> {
   return world->change()
       .each<archetype::Launcher>()
@@ -187,7 +188,7 @@ auto hold_weapons(const Sector& sector, lib::InOut<World> world)
 }
 
 auto free_weapons(const Sector& sector, std::span<const Sector> keeping,
-                  lib::InOut<World> world)
+                  InOut<World> world)
     -> std::expected<std::size_t, framework::Status> {
   const auto& kinematics = world->store_of<Kinematics>();
   return world->change()
@@ -204,7 +205,7 @@ auto free_weapons(const Sector& sector, std::span<const Sector> keeping,
       .build();
 }
 
-auto destruct_interceptors(const Sector& sector, lib::InOut<World> world)
+auto destruct_interceptors(const Sector& sector, InOut<World> world)
     -> std::expected<std::size_t, framework::Status> {
   return world->destroy()
       .each<archetype::Interceptor>()
@@ -214,17 +215,17 @@ auto destruct_interceptors(const Sector& sector, lib::InOut<World> world)
 
 auto Simulation::hold_weapons(const Sector& sector)
     -> std::expected<std::size_t, framework::Status> {
-  return missile::hold_weapons(sector, lib::InOut(world_));
+  return missile::hold_weapons(sector, InOut(world_));
 }
 
 auto Simulation::free_weapons(const Sector& sector)
     -> std::expected<std::size_t, framework::Status> {
-  return missile::free_weapons(sector, {}, lib::InOut(world_));
+  return missile::free_weapons(sector, {}, InOut(world_));
 }
 
 auto Simulation::destruct_interceptors(const Sector& sector)
     -> std::expected<std::size_t, framework::Status> {
-  return missile::destruct_interceptors(sector, lib::InOut(world_));
+  return missile::destruct_interceptors(sector, InOut(world_));
 }
 
 // Holds and frees cannot be refused: launchers allow WeaponsHold, the store
@@ -232,7 +233,7 @@ auto Simulation::destruct_interceptors(const Sector& sector)
 // held or freed.
 auto Simulation::start_hold(TimePoint now, std::size_t hold) -> void {
   const TimedHold& order = scenario_.holds[hold];
-  auto held = missile::hold_weapons(order.sector, lib::InOut(world_));
+  auto held = missile::hold_weapons(order.sector, InOut(world_));
   CHECK_INVARIANT(held.has_value());
   events_.start_timer(now + order.lasting, [this, hold](TimePoint expiry) {
     events_.publish<WeaponsHoldExpired>(expiry,
@@ -249,7 +250,7 @@ auto Simulation::end_hold(TimePoint now, const WeaponsHoldExpired& expired)
     }
   }
   auto freed = missile::free_weapons(scenario_.holds[expired.hold].sector,
-                                     in_force, lib::InOut(world_));
+                                     in_force, InOut(world_));
   CHECK_INVARIANT(freed.has_value());
 }
 

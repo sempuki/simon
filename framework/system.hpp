@@ -19,6 +19,7 @@
 #include "framework/name.hpp"
 #include "framework/step.hpp"
 #include "framework/type_list.hpp"
+#include "framework/vocabulary.hpp"
 #include "framework/world.hpp"
 
 namespace simon::framework {
@@ -239,7 +240,7 @@ class ProjectedWorld final {
   using SpatialComponent = typename WorldType::SpatialComponent;
 
   // Keeps a reference to `world` for as long as the access lives.
-  explicit ProjectedWorld(lib::Depend<WorldType> world) : world_{world.get()} {}
+  explicit ProjectedWorld(Depend<WorldType> world) : world_{world.get()} {}
 
   // Another entity's `ComponentType`, or null if it is gone or lacks one.
   template <typename ComponentType>
@@ -319,11 +320,10 @@ class ProjectedWorld final {
   // from the per-entity call.
   auto change() {
     return ChangeQueryBuilder<WorldType, ReadAllowed, void, TypeList<>,
-                              TypeList<>, false>{lib::Depend(*world_)};
+                              TypeList<>, false>{Depend(*world_)};
   }
   auto destroy() {
-    return DestroyQueryBuilder<WorldType, ReadAllowed, void>{
-        lib::Depend(*world_)};
+    return DestroyQueryBuilder<WorldType, ReadAllowed, void>{Depend(*world_)};
   }
 
  private:
@@ -361,12 +361,11 @@ auto store_of(const ProjectedWorld<SystemType, WorldType>& access)
 }
 
 template <Archetypal ArchetypeType, typename SystemType, typename WorldType>
-auto create(Alias alias,
-            lib::InOut<ProjectedWorld<SystemType, WorldType>> access) {
+auto create(Alias alias, InOut<ProjectedWorld<SystemType, WorldType>> access) {
   return access->template create<ArchetypeType>(std::move(alias));
 }
 template <Archetypal ArchetypeType, typename SystemType, typename WorldType>
-auto create(lib::InOut<ProjectedWorld<SystemType, WorldType>> access) {
+auto create(InOut<ProjectedWorld<SystemType, WorldType>> access) {
   return access->template create<ArchetypeType>();
 }
 
@@ -374,8 +373,8 @@ auto create(lib::InOut<ProjectedWorld<SystemType, WorldType>> access) {
 
 struct SystemRunner final {
   template <typename SystemType, typename WorldType>
-  static auto run(const Step& step, lib::InOut<SystemType> system,
-                  lib::InOut<WorldType> world) -> void {
+  static auto run(const Step& step, InOut<SystemType> system,
+                  InOut<WorldType> world) -> void {
     using ComponentList = component_list_of_t<SystemType>;
     using AllowComponentList = allow_component_list_of_t<SystemType>;
     using WriteList = write_list_of_t<SystemType>;
@@ -400,7 +399,7 @@ struct SystemRunner final {
                   "A system cannot both name a component and exclude its "
                   "owners; the component would never be there.");
 
-    ProjectedWorld<SystemType, WorldType> access{lib::Depend(*world)};
+    ProjectedWorld<SystemType, WorldType> access{Depend(*world)};
     // A prepare stage that returns false skips the per-entity loop, for steps
     // with nothing to do.
     bool proceed = stage(
@@ -409,10 +408,10 @@ struct SystemRunner final {
            auto&... arguments) -> decltype(target.prepare(arguments...)) {
           return target.prepare(arguments...);
         },
-        system, lib::InOut(access));
+        system, InOut(access));
     if (proceed) {
       loop(step, typename SystemType::OtherComponentList{}, system, world,
-           lib::InOut(access));
+           InOut(access));
     }
     stage(
         step,
@@ -420,12 +419,12 @@ struct SystemRunner final {
            auto&... arguments) -> decltype(target.resolve(arguments...)) {
           return target.resolve(arguments...);
         },
-        system, lib::InOut(access));
+        system, InOut(access));
   }
 
  private:
   template <typename ComponentType, typename WorldType>
-  static auto store_for(lib::InOut<WorldType> world) -> decltype(auto) {
+  static auto store_for(InOut<WorldType> world) -> decltype(auto) {
     if constexpr (std::is_const_v<ComponentType>) {
       return std::as_const(*world)
           .template store_of<std::remove_const_t<ComponentType>>();
@@ -438,9 +437,8 @@ struct SystemRunner final {
   // stage(world), whichever the system declares. Returns what a stage that
   // returns bool returned, and true otherwise.
   template <typename SystemType, typename ProjectedWorldType, typename CallType>
-  static auto stage(const Step& step, CallType call,
-                    lib::InOut<SystemType> system,
-                    lib::InOut<ProjectedWorldType> access) -> bool {
+  static auto stage(const Step& step, CallType call, InOut<SystemType> system,
+                    InOut<ProjectedWorldType> access) -> bool {
     Step copy = step;
     auto outcome = [](auto&& invoke) {
       if constexpr (std::is_same_v<decltype(invoke()), bool>) {
@@ -464,8 +462,8 @@ struct SystemRunner final {
   template <typename SystemType, typename WorldType,
             typename ProjectedWorldType, typename... OtherComponentTypes>
   static auto loop(const Step& step, TypeList<OtherComponentTypes...>,
-                   lib::InOut<SystemType> system, lib::InOut<WorldType> world,
-                   lib::InOut<ProjectedWorldType> access) -> void {
+                   InOut<SystemType> system, InOut<WorldType> world,
+                   InOut<ProjectedWorldType> access) -> void {
     using DrivingComponentType = typename SystemType::DrivingComponent;
     constexpr bool TAKES_STEP =
         std::is_invocable_v<SystemType&, ProjectedWorldType&, Entity,
@@ -580,7 +578,7 @@ struct SystemRunner final {
   // nothing reads none of the world.
   template <typename WorldType, typename... ExcludedTypes>
   static auto excluded_stores(TypeList<ExcludedTypes...>,
-                              [[maybe_unused]] lib::InOut<WorldType> world) {
+                              [[maybe_unused]] InOut<WorldType> world) {
     return std::forward_as_tuple(
         std::as_const(*world).template store_of<ExcludedTypes>()...);
   }
@@ -691,7 +689,7 @@ auto flatten_systems(ScheduleType&& schedule) {
 // as Continuous. It declares what it reads and writes as a system does.
 template <typename Type, typename WorldType>
 concept RunsItself =
-    requires(Type& element, const Step& step, lib::InOut<WorldType> world) {
+    requires(Type& element, const Step& step, InOut<WorldType> world) {
       element.run(step, world);
     };
 
@@ -715,7 +713,7 @@ class Scheduler final {
   explicit Scheduler(ScheduleType schedule)
       : systems_{flatten_systems(std::move(schedule))} {}
 
-  auto step(const Step& step, lib::InOut<WorldType> world) -> void {
+  auto step(const Step& step, InOut<WorldType> world) -> void {
     std::apply(
         [&](auto&... system) {
           ((run(step, system, world), world->sync()), ...);
@@ -758,12 +756,12 @@ class Scheduler final {
  private:
   // A schedule element that runs itself, such as Continuous, or a system.
   template <typename SystemType>
-  static auto run(const Step& step, SystemType& system,
-                  lib::InOut<WorldType> world) -> void {
+  static auto run(const Step& step, SystemType& system, InOut<WorldType> world)
+      -> void {
     if constexpr (RunsItself<SystemType, WorldType>) {
       system.run(step, world);
     } else {
-      SystemRunner::run(step, lib::InOut(system), world);
+      SystemRunner::run(step, InOut(system), world);
     }
   }
 

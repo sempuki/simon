@@ -20,6 +20,7 @@
 #include "framework/name.hpp"
 #include "framework/spatial.hpp"
 #include "framework/type_list.hpp"
+#include "framework/vocabulary.hpp"
 
 namespace simon::framework {
 
@@ -83,7 +84,7 @@ class Query final {
   // The selected entities, in a deterministic order: the archetype's segment
   // or the component's store, or the spatial index's order when narrowed by
   // `near`.
-  auto select(lib::InOut<WorldType> world) const -> std::vector<Entity> {
+  auto select(InOut<WorldType> world) const -> std::vector<Entity> {
     std::vector<Entity> selected;
     auto consider = [&](Entity entity) {
       if (world->will_be_alive(entity) &&
@@ -171,8 +172,7 @@ class [[nodiscard]] DestroyQueryBuilder final {
   using DistanceType = distance_of_t<SpatialType>;
 
   // Keeps a reference to `world` until the utterance is built.
-  explicit DestroyQueryBuilder(lib::Depend<WorldType> world)
-      : world_{world.get()} {}
+  explicit DestroyQueryBuilder(Depend<WorldType> world) : world_{world.get()} {}
 
   // Selects every entity of archetype `NextType`, or every entity with
   // component `NextType`.
@@ -184,7 +184,7 @@ class [[nodiscard]] DestroyQueryBuilder final {
         "Declare this component in the system's AllowComponentList "
         "to select by it.");
     return DestroyQueryBuilder<WorldType, ReadPolicyType, NextType>{
-        lib::Depend(*world_)};
+        Depend(*world_)};
   }
 
   // Keeps only entities whose spatial component is within `radius` of
@@ -234,7 +234,7 @@ class [[nodiscard]] DestroyQueryBuilder final {
   auto build() && -> std::expected<std::size_t, Status>
     requires(!std::is_void_v<ChosenType>)
   {
-    std::vector<Entity> selected = query_.select(lib::InOut(*world_));
+    std::vector<Entity> selected = query_.select(InOut(*world_));
     auto transaction = world_->transaction();
     for (Entity entity : selected) {
       RETURN_IF_UNEXPECTED(world_->destroy(entity).build());
@@ -296,8 +296,7 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
   using DistanceType = distance_of_t<SpatialType>;
 
   // Keeps a reference to `world` until the utterance is built.
-  explicit ChangeQueryBuilder(lib::Depend<WorldType> world)
-      : world_{world.get()} {}
+  explicit ChangeQueryBuilder(Depend<WorldType> world) : world_{world.get()} {}
 
   // Selects every entity of archetype `NextType`, or every entity with
   // component `NextType`.
@@ -309,7 +308,7 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
         "Declare this component in the system's AllowComponentList "
         "to select by it.");
     return ChangeQueryBuilder<WorldType, ReadPolicyType, NextType, TypeList<>,
-                              TypeList<>, false>{lib::Depend(*world_)};
+                              TypeList<>, false>{Depend(*world_)};
   }
 
   // Keeps only entities whose spatial component is within `radius` of
@@ -366,7 +365,7 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
     return ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
                               TypeList<AttachedTypes..., ComponentType>,
                               TypeList<DetachedTypes...>, Aliasing>{
-        lib::Depend(*world_), std::move(query_),
+        Depend(*world_), std::move(query_),
         std::tuple_cat(
             std::move(components_),
             std::tuple<ComponentType>{std::forward<ArgumentType>(component)}),
@@ -382,7 +381,7 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
     return ChangeQueryBuilder<
         WorldType, ReadPolicyType, ChosenType, TypeList<AttachedTypes...>,
         TypeList<DetachedTypes..., ComponentType>, Aliasing>{
-        lib::Depend(*world_), std::move(query_), std::move(components_),
+        Depend(*world_), std::move(query_), std::move(components_),
         std::move(aliases_)};
   }
 
@@ -394,7 +393,7 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
     return ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
                               TypeList<AttachedTypes...>,
                               TypeList<DetachedTypes...>, true>{
-        lib::Depend(*world_), std::move(query_), std::move(components_),
+        Depend(*world_), std::move(query_), std::move(components_),
         std::move(aliases_)};
   }
 
@@ -406,7 +405,7 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
     return ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
                               TypeList<AttachedTypes...>,
                               TypeList<DetachedTypes...>, true>{
-        lib::Depend(*world_), std::move(query_), std::move(components_),
+        Depend(*world_), std::move(query_), std::move(components_),
         std::move(aliases_)};
   }
 
@@ -416,14 +415,13 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
     static_assert(
         sizeof...(AttachedTypes) + sizeof...(DetachedTypes) > 0 || Aliasing,
         "A change must attach, detach, alias or unalias something.");
-    std::vector<Entity> selected = query_.select(lib::InOut(*world_));
+    std::vector<Entity> selected = query_.select(InOut(*world_));
     auto transaction = world_->transaction();
     for (Entity entity : selected) {
-      RETURN_IF_UNEXPECTED(
-          (ChangeBuilder<WorldType, TypeList<AttachedTypes...>,
-                         TypeList<DetachedTypes...>, Aliasing>{
-               entity, components_, aliases_, lib::Depend(*world_)})
-              .build());
+      RETURN_IF_UNEXPECTED((ChangeBuilder<WorldType, TypeList<AttachedTypes...>,
+                                          TypeList<DetachedTypes...>, Aliasing>{
+                                entity, components_, aliases_, Depend(*world_)})
+                               .build());
     }
     transaction.commit();
     return selected.size();
@@ -446,7 +444,7 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
   using QueryType = std::conditional_t<std::is_void_v<ChosenType>, Unchosen,
                                        Query<WorldType, ChosenType>>;
 
-  ChangeQueryBuilder(lib::Depend<WorldType> world, QueryType query,
+  ChangeQueryBuilder(Depend<WorldType> world, QueryType query,
                      std::tuple<AttachedTypes...> components,
                      AliasChanges aliases)
       : world_{world.get()},

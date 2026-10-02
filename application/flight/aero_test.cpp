@@ -108,20 +108,22 @@ TEST_CASE("Aerodynamics737") {
 
       // The reference point from the center of mass, from the structural
       // frame (x aft, z up) to body axes (x forward, z down).
-      Vector3d apart = aircraft->aero_reference.numerical_value_in(meter) -
-                       Vector3d{row.at("cg_x"), row.at("cg_y"), row.at("cg_z")};
+      QuantityVector apart =
+          aircraft->aero_reference.numerical_value_in(meter) -
+          QuantityVector{row.at("cg_x"), row.at("cg_y"), row.at("cg_z")};
       Displacement reference =
-          Vector3d{-apart.eigen().x(), apart.eigen().y(), -apart.eigen().z()} *
+          QuantityVector{-apart.eigen().x(), apart.eigen().y(),
+                         -apart.eigen().z()} *
           meter;
       AeroLoads loads = aero_loads(sums, row.at("alpha") * radian,
                                    row.at("beta") * radian, reference);
 
-      Vector3d force = loads.force.numerical_value_in(newton);
-      Vector3d moment = loads.moment.numerical_value_in(newton_meter);
-      Vector3d expected_force{row.at("force_x"), row.at("force_y"),
-                              row.at("force_z")};
-      Vector3d expected_moment{row.at("moment_x"), row.at("moment_y"),
-                               row.at("moment_z")};
+      QuantityVector force = loads.force.numerical_value_in(newton);
+      QuantityVector moment = loads.moment.numerical_value_in(newton_meter);
+      QuantityVector expected_force{row.at("force_x"), row.at("force_y"),
+                                    row.at("force_z")};
+      QuantityVector expected_moment{row.at("moment_x"), row.at("moment_y"),
+                                     row.at("moment_z")};
       double force_scale = std::max(magnitude(expected_force), 1.0);
       double moment_scale =
           std::max(magnitude(expected_moment), force_scale * 1.0);

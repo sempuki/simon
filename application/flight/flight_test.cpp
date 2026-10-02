@@ -11,6 +11,7 @@
 #include "application/flight/simulation.hpp"
 #include "base/testing.hpp"
 #include "engine/driver.hpp"
+#include "framework/vocabulary.hpp"
 
 namespace simon::flight {
 
@@ -21,7 +22,7 @@ using namespace std::chrono_literals;
 constexpr Duration DT = 20ms;
 constexpr double PI = std::numbers::pi;
 
-auto build_small_world(lib::Out<World> world) -> void {
+auto build_small_world(Out<World> world) -> void {
   std::expected<void, framework::Status> built =
       World::set_up()
           .numbered(1)
@@ -46,7 +47,7 @@ auto level(double altitude, double speed, double heading) -> AirState {
 }
 
 template <typename ArchetypeType = archetype::Aircraft>
-auto create(const AirState& state, const Route& route, lib::InOut<World> world)
+auto create(const AirState& state, const Route& route, InOut<World> world)
     -> Entity {
   Scenario scenario;
   auto builder = world->create<ArchetypeType>()
@@ -71,8 +72,8 @@ auto create(const AirState& state, const Route& route, lib::InOut<World> world)
 }
 
 // Steps `world` for `duration`, DT at a time.
-auto fly_for(Duration duration, lib::InOut<Scheduler> scheduler,
-             lib::InOut<World> world) -> void {
+auto fly_for(Duration duration, InOut<Scheduler> scheduler, InOut<World> world)
+    -> void {
   world->sync();
   for (TimePoint time{}; time < TimePoint{duration}; time += DT) {
     scheduler->step(framework::Step{.time = time, .dt = DT}, world);
@@ -87,16 +88,16 @@ auto state_of(const World& world, Entity entity) -> const AirState& {
 
 TEST_CASE("Autopilot") {
   World world;
-  build_small_world(lib::Out(world));
+  build_small_world(Out(world));
   Scheduler scheduler;
 
   SECTION("ShouldHoldAltitudeAndSpeedGivenTargetsAhead") {
     Entity aircraft = create(level(5000.0, 200.0, 0.0),
                              route_to(model::meters(0.0, 500000.0, 6000.0),
                                       220.0 * model::meter_per_second),
-                             lib::InOut(world));
+                             InOut(world));
 
-    fly_for(3min, lib::InOut(scheduler), lib::InOut(world));
+    fly_for(3min, InOut(scheduler), InOut(world));
 
     const AirState& state = state_of(world, aircraft);
     CHECK(std::abs(model::altitude_of(state).numerical_value_in(model::meter) -
@@ -110,9 +111,9 @@ TEST_CASE("Autopilot") {
     Entity aircraft = create(level(5000.0, 200.0, 0.0),
                              route_to(model::meters(0.0, -500000.0, 5000.0),
                                       200.0 * model::meter_per_second),
-                             lib::InOut(world));
+                             InOut(world));
 
-    fly_for(90s, lib::InOut(scheduler), lib::InOut(world));
+    fly_for(90s, InOut(scheduler), InOut(world));
 
     const AirState& state = state_of(world, aircraft);
     double heading = model::radians(state.heading);
@@ -124,7 +125,7 @@ TEST_CASE("Autopilot") {
 
 TEST_CASE("Route") {
   World world;
-  build_small_world(lib::Out(world));
+  build_small_world(Out(world));
   Scheduler scheduler;
 
   SECTION("ShouldReachEveryWaypointGivenClosedRoute") {
@@ -133,10 +134,9 @@ TEST_CASE("Route") {
                        model::meters(30000.0, 30000.0, 6000.0),
                        model::meters(30000.0, 0.0, 5000.0),
                        model::meters(0.0, 0.0, 4000.0)};
-    Entity aircraft =
-        create(level(5000.0, 200.0, 0.0), route, lib::InOut(world));
+    Entity aircraft = create(level(5000.0, 200.0, 0.0), route, InOut(world));
 
-    fly_for(15min, lib::InOut(scheduler), lib::InOut(world));
+    fly_for(15min, InOut(scheduler), InOut(world));
 
     CHECK(world.store_of<Route>().component_of(aircraft).reached >= 4);
   }
@@ -145,7 +145,7 @@ TEST_CASE("Route") {
 TEST_CASE("Fidelity") {
   SECTION("ShouldAgreeGivenSinglePassAndRungeKutta") {
     World world;
-    build_small_world(lib::Out(world));
+    build_small_world(Out(world));
     Scheduler scheduler;
     Route route{.speed = 220.0 * model::meter_per_second};
     route.waypoints = {model::meters(0.0, 30000.0, 6000.0),
@@ -153,11 +153,11 @@ TEST_CASE("Fidelity") {
                        model::meters(30000.0, 0.0, 6000.0),
                        model::meters(0.0, 0.0, 5000.0)};
     AirState start = level(5000.0, 200.0, 0.0);
-    Entity simple = create(start, route, lib::InOut(world));
+    Entity simple = create(start, route, InOut(world));
     Entity precise =
-        create<archetype::PreciseAircraft>(start, route, lib::InOut(world));
+        create<archetype::PreciseAircraft>(start, route, InOut(world));
 
-    fly_for(5min, lib::InOut(scheduler), lib::InOut(world));
+    fly_for(5min, InOut(scheduler), InOut(world));
 
     // The two fly the same route by different integrators: close, but not
     // the same.
@@ -173,7 +173,7 @@ TEST_CASE("Simulation") {
   auto run = [](const Scenario& scenario) {
     Simulation simulation{scenario};
     engine::BatchDriver driver{engine::Timing{.max_step = DT},
-                               lib::Depend(simulation)};
+                               Depend(simulation)};
     REQUIRE(driver.run(TimePoint{2min}));
     std::vector<AirState> states;
     simulation.world().store_of<AirState>().for_each(
@@ -252,7 +252,7 @@ constexpr char BOEING_737[] = "application/flight/aircraft/737.aircraft";
 // A 737 trimmed in cruise at 6 km and 200 m/s, heading north from the
 // world's origin toward a waypoint 500 km ahead.
 auto rigid_737(const model::Earth& earth, const model::AircraftData& data,
-               lib::InOut<World> world) -> Entity {
+               InOut<World> world) -> Entity {
   Route route{.speed = 200.0 * model::meter_per_second};
   route.waypoints.fill(model::meters(0.0, 500000.0, 6000.0));
   auto entity = create_rigid_aircraft(data, earth, RigidTrim{},
@@ -270,8 +270,8 @@ auto scheduler_for(const model::Earth& earth) -> Scheduler {
                             BurnFuel{}, FollowRigidBody{earth}}};
 }
 
-auto fly_rigid(Duration duration, lib::InOut<Scheduler> scheduler,
-               lib::InOut<World> world) -> void {
+auto fly_rigid(Duration duration, InOut<Scheduler> scheduler,
+               InOut<World> world) -> void {
   constexpr Duration STEP = 8ms;
   world->sync();
   for (TimePoint time{}; time < TimePoint{duration}; time += STEP) {
@@ -285,14 +285,14 @@ TEST_CASE("RigidAircraft") {
   auto data = model::load_aircraft(BOEING_737);
   REQUIRE(data);
   World world;
-  build_small_world(lib::Out(world));
+  build_small_world(Out(world));
 
   SECTION("ShouldFollowItsBodyGivenFlatEarth") {
     model::Earth earth = model::Earth::flat();
-    Entity aircraft = rigid_737(earth, *data, lib::InOut(world));
+    Entity aircraft = rigid_737(earth, *data, InOut(world));
     Scheduler scheduler = scheduler_for(earth);
 
-    fly_rigid(10s, lib::InOut(scheduler), lib::InOut(world));
+    fly_rigid(10s, InOut(scheduler), InOut(world));
 
     const RigidBody& body = world.store_of<RigidBody>().component_of(aircraft);
     const AirState& state = state_of(world, aircraft);
@@ -301,7 +301,8 @@ TEST_CASE("RigidAircraft") {
     CHECK(state.speed == expected.speed);
 
     // About 2 km north, without engines: gliding, not tumbling.
-    model::Vector3d where = state.position.numerical_value_in(model::meter);
+    model::QuantityVector where =
+        state.position.numerical_value_in(model::meter);
     CHECK(std::abs(where.eigen().y() - 1950.0) < 100.0);
     CHECK(std::abs(where.eigen().z() - 6000.0) < 300.0);
     CHECK(std::abs(model::radians(state.heading)) < 0.05);
@@ -312,15 +313,15 @@ TEST_CASE("RigidAircraft") {
     // few meters from where a flat Earth puts it.
     model::Earth flat = model::Earth::flat();
     model::Earth round = model::Earth::round(model::wgs84::Geodetic{});
-    Entity on_flat = rigid_737(flat, *data, lib::InOut(world));
+    Entity on_flat = rigid_737(flat, *data, InOut(world));
     World round_world;
-    build_small_world(lib::Out(round_world));
-    Entity on_round = rigid_737(round, *data, lib::InOut(round_world));
+    build_small_world(Out(round_world));
+    Entity on_round = rigid_737(round, *data, InOut(round_world));
     Scheduler flat_scheduler = scheduler_for(flat);
     Scheduler round_scheduler = scheduler_for(round);
 
-    fly_rigid(10s, lib::InOut(flat_scheduler), lib::InOut(world));
-    fly_rigid(10s, lib::InOut(round_scheduler), lib::InOut(round_world));
+    fly_rigid(10s, InOut(flat_scheduler), InOut(world));
+    fly_rigid(10s, InOut(round_scheduler), InOut(round_world));
 
     double apart = model::distance(state_of(world, on_flat),
                                    state_of(round_world, on_round))
@@ -331,11 +332,11 @@ TEST_CASE("RigidAircraft") {
 
   SECTION("ShouldBurnFuelGivenEnginesRunning") {
     model::Earth earth = model::Earth::flat();
-    Entity aircraft = rigid_737(earth, *data, lib::InOut(world));
+    Entity aircraft = rigid_737(earth, *data, InOut(world));
     Scheduler scheduler = scheduler_for(earth);
     model::Mass start = model::mass_balance_of(*data).properties.mass;
 
-    fly_rigid(10s, lib::InOut(scheduler), lib::InOut(world));
+    fly_rigid(10s, InOut(scheduler), InOut(world));
 
     // Two engines at about 0.5 kg/s each, for 10 s.
     model::Mass burned =
@@ -351,16 +352,16 @@ TEST_CASE("RigidAircraft") {
     AirState start = level(5000.0, 200.0, 0.0);
     Route route = route_to(model::meters(0.0, 500000.0, 5000.0),
                            200.0 * model::meter_per_second);
-    Entity point_mass = create(start, route, lib::InOut(world));
-    rigid_737(model::Earth::flat(), *data, lib::InOut(world));
+    Entity point_mass = create(start, route, InOut(world));
+    rigid_737(model::Earth::flat(), *data, InOut(world));
     World alone;
-    build_small_world(lib::Out(alone));
-    Entity by_itself = create(start, route, lib::InOut(alone));
+    build_small_world(Out(alone));
+    Entity by_itself = create(start, route, InOut(alone));
     Scheduler shared;
     Scheduler single;
 
-    fly_rigid(10s, lib::InOut(shared), lib::InOut(world));
-    fly_rigid(10s, lib::InOut(single), lib::InOut(alone));
+    fly_rigid(10s, InOut(shared), InOut(world));
+    fly_rigid(10s, InOut(single), InOut(alone));
 
     CHECK(state_of(world, point_mass).position ==
           state_of(alone, by_itself).position);

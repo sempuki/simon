@@ -44,7 +44,7 @@ TEST_CASE("PointMassRate") {
     CHECK_THAT(rate.turn.numerical_value_in(radian_per_second),
                WithinAbs(0.0, 1e-12));
     CHECK(rate.velocity.numerical_value_in(meter_per_second)
-              .is_approximately(Vector3d{0.0, 200.0, 0.0}));
+              .is_approximately(QuantityVector{0.0, 200.0, 0.0}));
     // With no thrust, drag decelerates.
     CHECK(rate.acceleration < 0.0 * meter_per_second_squared);
   }
@@ -85,7 +85,7 @@ TEST_CASE("Fly") {
     AirState next = fly(state, rate, 2s);
 
     CHECK(next.position.numerical_value_in(meter).is_approximately(
-        Vector3d{200.0, 0.0, 5000.0}, 1e-9));
+        QuantityVector{200.0, 0.0, 5000.0}, 1e-9));
   }
 
   SECTION("ShouldMoveAlongNewVelocityGivenClimbingTurn") {
@@ -99,8 +99,9 @@ TEST_CASE("Fly") {
         point_mass_rate(state, controls, JET, standard_air(5000.0 * meter));
 
     AirState next = fly(state, rate, 20ms);
-    Vector3d expected = (state.position + velocity_of(next) * (0.02 * second))
-                            .numerical_value_in(meter);
+    QuantityVector expected =
+        (state.position + velocity_of(next) * (0.02 * second))
+            .numerical_value_in(meter);
 
     CHECK(next.position.numerical_value_in(meter).is_approximately(expected,
                                                                    1e-3));

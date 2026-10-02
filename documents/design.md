@@ -87,7 +87,7 @@ returns a reference.
 
 **Headers hold what must be inline; `.cpp` files hold the rest.** Templates,
 and code on hot paths that the inliner must see (a system's call operator,
-`Vector3d`, the spatial index's per-query helpers), stay in headers. Setup,
+`Vector3`, the spatial index's per-query helpers), stay in headers. Setup,
 string formatting and once-a-step code (`build_scenario`, the site builder's
 `build()`, `Simulation`, name parsing) go in `.cpp` files.
 
@@ -1842,7 +1842,7 @@ linear algebra do not mix easily:
   #175831, mp-units #798). Quantities in plain SI units (`quantity<m/s, Vec3>`)
   compile on both compilers.
 
-**Decision: plain SI units, over a `Vector3d` wrapper, everywhere.**
+**Decision: plain SI units, over a `Vector3` wrapper, everywhere.**
 `model/units.hpp` holds the wrapper, the vector algebra (`dot`, `cross`,
 `norm`), a `seconds()` conversion from `std::chrono`, and every quantity type as
 an alias:
@@ -1851,9 +1851,9 @@ an alias:
 using Length = quantity<meter, double>;
 using Time = quantity<second, double>;
 using Rate = quantity<one / second, double>;
-using Displacement = quantity<meter, Vector3d>;
-using Velocity = quantity<meter / second, Vector3d>;
-using Acceleration = quantity<meter / square(second), Vector3d>;
+using Displacement = quantity<meter, Vector3>;
+using Velocity = quantity<meter / second, Vector3>;
+using Acceleration = quantity<meter / square(second), Vector3>;
 using Position = Displacement;   // From the world origin.
 ```
 

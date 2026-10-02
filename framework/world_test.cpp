@@ -1,6 +1,7 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
 #include "framework/world.hpp"
+#include "framework/vocabulary.hpp"
 
 #include <expected>
 #include <limits>
@@ -32,7 +33,7 @@ TEST_CASE("SetUpBuilder") {
             .holding<Body>(5)
             .holding<testing::Launcher>(2)
             .holding<testing::Launcher>(1)  // Holdings add up.
-            .build(lib::Out(world));
+            .build(Out(world));
 
     REQUIRE(built.has_value());
     CHECK(world.number() == 3u);
@@ -45,8 +46,8 @@ TEST_CASE("SetUpBuilder") {
 
   SECTION("ShouldRefuseGivenCellSizeNotPositive") {
     TestWorld world;
-    auto built = TestWorld::set_up().holding<Body>(1).cells_of(0.0).build(
-        lib::Out(world));
+    auto built =
+        TestWorld::set_up().holding<Body>(1).cells_of(0.0).build(Out(world));
 
     REQUIRE_FALSE(built.has_value());
     CHECK(built.error() == lib::watch(BuildError::CELL_SIZE_INVALID));
@@ -56,7 +57,7 @@ TEST_CASE("SetUpBuilder") {
     TestWorld world;
     auto built = TestWorld::set_up()
                      .holding<Body>(std::size_t{1} << 40)
-                     .build(lib::Out(world));
+                     .build(Out(world));
 
     REQUIRE_FALSE(built.has_value());
     CHECK(built.error() == lib::watch(BuildError::CAPACITY_TOO_LARGE));
@@ -67,7 +68,7 @@ TEST_CASE("SetUpBuilder") {
     auto built = TestWorld::set_up()
                      .holding<Body>(std::numeric_limits<std::size_t>::max())
                      .holding<testing::Launcher>(2)
-                     .build(lib::Out(world));
+                     .build(Out(world));
 
     REQUIRE_FALSE(built.has_value());
     CHECK(built.error() == lib::watch(BuildError::CAPACITY_TOO_LARGE));
@@ -84,11 +85,11 @@ TEST_CASE("SetUpBuilder") {
 
   SECTION("ShouldDiscardEverythingGivenWorldBuiltAgain") {
     TestWorld world;
-    testing::build_small_world(lib::Out(world));
+    testing::build_small_world(Out(world));
     Entity entity = *world.create<Body>("ego").with(Position{}).build();
     world.sync();
 
-    testing::build_small_world(lib::Out(world));
+    testing::build_small_world(Out(world));
 
     CHECK_FALSE(world.alive(entity));
     CHECK(world.size() == 0u);
@@ -98,11 +99,11 @@ TEST_CASE("SetUpBuilder") {
 
   SECTION("ShouldKeepTheWorldGivenRefusedPlan") {
     TestWorld world;
-    testing::build_small_world(lib::Out(world));
+    testing::build_small_world(Out(world));
     Entity entity = *world.create<Body>().build();
     world.sync();
 
-    auto built = TestWorld::set_up().cells_of(-1.0).build(lib::Out(world));
+    auto built = TestWorld::set_up().cells_of(-1.0).build(Out(world));
 
     REQUIRE_FALSE(built.has_value());
     CHECK(world.alive(entity));
@@ -116,7 +117,7 @@ TEST_CASE("SetUpBuilder") {
 
 TEST_CASE("Transaction") {
   TestWorld world;
-  testing::build_small_world(lib::Out(world));
+  testing::build_small_world(Out(world));
   Entity kept = *world.create<Body>("kept").with(Position{1.0}).build();
   world.sync();
 
@@ -222,7 +223,7 @@ TEST_CASE("Transaction") {
 
 TEST_CASE("DestroyQueryBuilder") {
   TestWorld world;
-  testing::build_small_world(lib::Out(world));
+  testing::build_small_world(Out(world));
   Entity near = *world.create<testing::Launcher>().with(Position{1.0}).build();
   Entity far = *world.create<testing::Launcher>().with(Position{9.0}).build();
   Entity body =
@@ -290,7 +291,7 @@ TEST_CASE("DestroyQueryBuilder") {
 
 TEST_CASE("ChangeQueryBuilder") {
   TestWorld world;
-  testing::build_small_world(lib::Out(world));
+  testing::build_small_world(Out(world));
   Entity wounded =
       *world.create<Body>().with(Position{1.0}).with(Health{1.0}).build();
   Entity healthy = *world.create<Body>().with(Position{1.5}).build();
@@ -381,7 +382,7 @@ TEST_CASE("ChangeQueryBuilder") {
 
 TEST_CASE("World") {
   TestWorld world;
-  testing::build_small_world(lib::Out(world));
+  testing::build_small_world(Out(world));
 
   SECTION("ShouldDeferComponentsUntilSyncGivenCreate") {
     auto entity =
@@ -408,8 +409,7 @@ TEST_CASE("World") {
 
   SECTION("ShouldNeverReuseNameGivenIndexReused") {
     TestWorld tiny;
-    REQUIRE(
-        TestWorld::set_up().numbered(1).holding<Body>(1).build(lib::Out(tiny)));
+    REQUIRE(TestWorld::set_up().numbered(1).holding<Body>(1).build(Out(tiny)));
     Entity first = *tiny.create<Body>().build();
     tiny.sync();
     REQUIRE(tiny.destroy(first).build());
@@ -656,7 +656,7 @@ TEST_CASE("World") {
                 .numbered(1)
                 .holding<Body>(2)
                 .holding<testing::Launcher>(6)
-                .build(lib::Out(small)));
+                .build(Out(small)));
     REQUIRE(small.create<Body>().with(Health{}).build());
     REQUIRE(small.create<Body>()
                 .with(Health{})
@@ -683,7 +683,7 @@ TEST_CASE("World") {
                 .numbered(1)
                 .holding<Body>(2)
                 .holding<testing::Launcher>(6)
-                .build(lib::Out(small)));
+                .build(Out(small)));
     Entity detached = *small.create<Body>().with(Health{}).build();
     Entity destroyed = *small.create<Body>().with(Health{}).build();
     Entity first = *small.create<Body>().build();
@@ -708,7 +708,7 @@ TEST_CASE("World") {
                 .numbered(1)
                 .holding<Body>(1)
                 .holding<testing::Launcher>(3)
-                .build(lib::Out(small)));
+                .build(Out(small)));
     Entity holder = *small.create<Body>().with(Health{}).build();
     small.sync();
     {

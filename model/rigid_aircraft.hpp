@@ -29,11 +29,11 @@ namespace simon::model {
 // Where a body is on the Earth at a time, found once for what the frames,
 // gravity and the air need.
 struct Place final {
-  Eigen::Matrix3d inertial_to_fixed = Eigen::Matrix3d::Identity();
+  Matrix3 inertial_to_fixed = Matrix3::Identity();
   Position fixed = meters(0.0, 0.0, 0.0);
   Length altitude = 0.0 * meter;
   // From the local north-east-down frame to the inertial frame.
-  Eigen::Matrix3d north_east_down = Eigen::Matrix3d::Identity();
+  Matrix3 north_east_down = Matrix3::Identity();
 };
 
 class Earth final {
@@ -69,7 +69,7 @@ class Earth final {
 
   // The rotation from body axes to the local north-east-down frame.
   auto body_to_north_east_down(const RigidBody& body, Time time) const
-      -> Eigen::Matrix3d;
+      -> Matrix3;
 
   // Where the body is in the world's local frame, and its flight path
   // relative to the air: speed, flight-path angle above the local horizon,
@@ -86,12 +86,11 @@ class Earth final {
 
  private:
   // From the local north-east-down frame at `fixed` to the inertial frame.
-  auto north_east_down(const Position& fixed, Time time) const
-      -> Eigen::Matrix3d;
+  auto north_east_down(const Position& fixed, Time time) const -> Matrix3;
   auto fixed_of(const RigidBody& body, Time time) const -> Position;
 
   Position origin_fixed_ = meters(0.0, 0.0, 0.0);
-  Eigen::Matrix3d fixed_to_local_ = Eigen::Matrix3d::Identity();
+  Matrix3 fixed_to_local_ = Matrix3::Identity();
   bool round_ = false;
 };
 

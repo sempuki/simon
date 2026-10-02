@@ -35,6 +35,7 @@
 #include "framework/spatial.hpp"
 #include "framework/spatial_index.hpp"
 #include "framework/type_list.hpp"
+#include "framework/vocabulary.hpp"
 #include "framework/world_builder.hpp"
 
 namespace simon::framework {
@@ -63,7 +64,7 @@ class SchedulerKey final {
 //                       TypeList<archetype::Drone, archetype::Blast>>;
 //   World world;  // Empty until built.
 //   std::expected<void, Status> built = World::set_up().numbered(1)
-//       .holding<archetype::Drone>(1000).build(lib::Out(world));
+//       .holding<archetype::Drone>(1000).build(Out(world));
 //
 // A world never moves. Builders and ProjectedWorld keep a pointer to it, and
 // its stores never reallocate, so nothing that refers to a world can dangle
@@ -131,23 +132,23 @@ class World<SpatialType,                  //
     static_assert(contains_v<ArchetypeList, ArchetypeType>,
                   "This archetype is not in the world's archetype list.");
     return CreateBuilder<World, ArchetypeType, true>{
-        std::move(alias), std::nullopt, {}, lib::Depend(*this)};
+        std::move(alias), std::nullopt, {}, Depend(*this)};
   }
   auto change(Entity entity) {
-    return ChangeBuilder<World>{entity, {}, {}, lib::Depend(*this)};
+    return ChangeBuilder<World>{entity, {}, {}, Depend(*this)};
   }
   // Makes the same change to every entity a query selects. See
   // ChangeQueryBuilder.
   auto change() {
     return ChangeQueryBuilder<World, ReadAnything, void, TypeList<>, TypeList<>,
-                              false>{lib::Depend(*this)};
+                              false>{Depend(*this)};
   }
   auto destroy(Entity entity) {
-    return DestroyBuilder<World>{entity, lib::Depend(*this)};
+    return DestroyBuilder<World>{entity, Depend(*this)};
   }
   // Destroys every entity a query selects. See DestroyQueryBuilder.
   auto destroy() {
-    return DestroyQueryBuilder<World, ReadAnything, void>{lib::Depend(*this)};
+    return DestroyQueryBuilder<World, ReadAnything, void>{Depend(*this)};
   }
 
   // Applies every pending command, in the order it was recorded. Builders
@@ -157,7 +158,7 @@ class World<SpatialType,                  //
     CHECK_PRECONDITION(transaction_depth_ == 0);  // Commit or roll back first.
     std::vector<Command> commands = std::exchange(commands_, {});
     for (Command& command : commands) {
-      std::visit([&](auto& operation) { this->apply(lib::InOut(operation)); },
+      std::visit([&](auto& operation) { this->apply(InOut(operation)); },
                  command);
     }
     std::apply([](auto&... plan) { (plan.clear(), ...); }, plans_);
@@ -938,7 +939,7 @@ class World<SpatialType,                  //
   //-- Applying commands -------------------------------------------------------
 
   template <typename ComponentType>
-  auto apply(lib::InOut<AttachCommand<ComponentType>> command) -> void {
+  auto apply(InOut<AttachCommand<ComponentType>> command) -> void {
     CHECK_INVARIANT(alive(command->entity));
     spatial_index_current_ =
         spatial_index_current_ && !std::is_same_v<ComponentType, SpatialType>;
@@ -947,14 +948,14 @@ class World<SpatialType,                  //
   }
 
   template <typename ComponentType>
-  auto apply(lib::InOut<DetachCommand<ComponentType>> command) -> void {
+  auto apply(InOut<DetachCommand<ComponentType>> command) -> void {
     CHECK_INVARIANT(alive(command->entity));
     spatial_index_current_ =
         spatial_index_current_ && !std::is_same_v<ComponentType, SpatialType>;
     std::get<ComponentStore<ComponentType>>(stores_).erase(command->entity);
   }
 
-  auto apply(lib::InOut<DestroyCommand> command) -> void {
+  auto apply(InOut<DestroyCommand> command) -> void {
     Entity entity = command->entity;
     CHECK_INVARIANT(alive(entity));
     Name name = name_of(entity);

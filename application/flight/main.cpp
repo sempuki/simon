@@ -11,6 +11,7 @@
 
 #include "application/flight/simulation.hpp"
 #include "engine/driver.hpp"
+#include "framework/vocabulary.hpp"
 
 auto main(int argc, char** argv) -> int {
   using namespace simon;
@@ -31,7 +32,7 @@ auto main(int argc, char** argv) -> int {
   }
   flight::Simulation simulation{scenario};
   engine::BatchDriver driver{engine::Timing{.max_step = 20ms},
-                             lib::Depend(simulation)};
+                             Depend(simulation)};
 
   auto wall_start = std::chrono::steady_clock::now();
   auto reached = driver.run(framework::TimePoint{10min});

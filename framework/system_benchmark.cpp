@@ -45,6 +45,7 @@
 #include "framework/archetype.hpp"
 #include "framework/benchmark_support.hpp"
 #include "framework/system.hpp"
+#include "framework/vocabulary.hpp"
 #include "framework/world.hpp"
 
 namespace simon::framework {
@@ -131,7 +132,7 @@ struct Result final {
   double baseline = 0.0;
 };
 
-auto measure(std::size_t count, bool shuffled, lib::InOut<std::mt19937> random)
+auto measure(std::size_t count, bool shuffled, InOut<std::mt19937> random)
     -> Result {
   std::vector<std::size_t> order(count);
   std::iota(order.begin(), order.end(), 0);
@@ -144,9 +145,9 @@ auto measure(std::size_t count, bool shuffled, lib::InOut<std::mt19937> random)
   BenchmarkWorld allowed;
   BenchmarkWorld required;
   auto allowed_built =
-      BenchmarkWorld::set_up().holding<Craft>(count).build(lib::Out(allowed));
+      BenchmarkWorld::set_up().holding<Craft>(count).build(Out(allowed));
   auto required_built =
-      BenchmarkWorld::set_up().holding<Rocket>(count).build(lib::Out(required));
+      BenchmarkWorld::set_up().holding<Rocket>(count).build(Out(required));
   CHECK_POSTCONDITION(allowed_built.has_value() && required_built.has_value());
   std::vector<Entity> crafts;
   for (std::size_t i = 0; i < count; ++i) {
@@ -182,15 +183,15 @@ auto measure(std::size_t count, bool shuffled, lib::InOut<std::mt19937> random)
 
   Result result;
   result.allowed =
-      per_entity([&] { allowed_scheduler.step(step, lib::InOut(allowed)); });
+      per_entity([&] { allowed_scheduler.step(step, InOut(allowed)); });
   result.handle = per_entity([&] {
     for (std::size_t i = 0; i < count; ++i) {
       integrate(bodies[i], *handles[i]);
     }
   });
   if (!shuffled) {
-    result.required = per_entity(
-        [&] { required_scheduler.step(step, lib::InOut(required)); });
+    result.required =
+        per_entity([&] { required_scheduler.step(step, InOut(required)); });
     result.structural = per_entity([&] {
       for (std::size_t i = 0; i < count; ++i) {
         integrate(bodies[i], thrusts[i]);
@@ -233,7 +234,7 @@ auto main(int argc, char** argv) -> int {
   };
   for (std::size_t count : {1'000uz, 10'000uz, 100'000uz, 1'000'000uz}) {
     for (bool shuffled : {false, true}) {
-      Result result = measure(count, shuffled, lib::InOut(random));
+      Result result = measure(count, shuffled, simon::InOut(random));
       std::println("{:>8} {:>9} | {:>10.2f} {:>10} {:>10.2f} {:>10} {:>10.2f}",
                    count, shuffled ? "shuffled" : "aligned", result.allowed,
                    aligned_only(shuffled, result.required), result.handle,

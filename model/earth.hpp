@@ -31,14 +31,13 @@ inline constexpr double ECCENTRICITY_SQUARED = FLATTENING * (2.0 - FLATTENING);
 
 // The Earth's rotation, in ECI and in ECEF alike.
 inline auto rotation() -> AngularVelocity {
-  return Vector3d{0.0, 0.0, ROTATION_RATE} * radian_per_second;
+  return QuantityVector{0.0, 0.0, ROTATION_RATE} * radian_per_second;
 }
 
 // The rotation from ECI to ECEF at `earth_angle`, how far the Earth has
 // turned.
-inline auto inertial_to_fixed(Angle earth_angle) -> Eigen::Matrix3d {
-  return Eigen::AngleAxisd{-radians(earth_angle), Eigen::Vector3d::UnitZ()}
-      .toRotationMatrix();
+inline auto inertial_to_fixed(Angle earth_angle) -> Matrix3 {
+  return AngleAxis{-radians(earth_angle), Vector3::UnitZ()}.toRotationMatrix();
 }
 
 struct Geodetic final {
@@ -68,7 +67,7 @@ inline auto geodetic_of(const Position& fixed) -> Geodetic {
   constexpr double e2 = ECCENTRICITY_SQUARED;
   constexpr double second_e2 = (a * a - b * b) / (b * b);
 
-  Vector3d xyz = fixed.numerical_value_in(meter);
+  QuantityVector xyz = fixed.numerical_value_in(meter);
   double x = xyz.eigen().x();
   double y = xyz.eigen().y();
   double z = xyz.eigen().z();
@@ -100,7 +99,7 @@ inline auto geodetic_of(const Position& fixed) -> Geodetic {
 // leaves out the centrifugal acceleration of the Earth's rotation, which
 // comes from the equations of motion.
 inline auto gravitation(const Position& fixed) -> Acceleration {
-  Vector3d xyz = fixed.numerical_value_in(meter);
+  QuantityVector xyz = fixed.numerical_value_in(meter);
   double r = magnitude(xyz);
   double sin_latitude = xyz.eigen().z() / r;  // Geocentric.
   double ratio = SEMIMAJOR_AXIS / r;
@@ -108,9 +107,9 @@ inline auto gravitation(const Position& fixed) -> Acceleration {
   double equatorial = 1.0 + j2 * (1.0 - 5.0 * sin_latitude * sin_latitude);
   double polar = 1.0 + j2 * (3.0 - 5.0 * sin_latitude * sin_latitude);
   double scale = -GRAVITATIONAL_PARAMETER / (r * r * r);
-  return Vector3d{scale * equatorial * xyz.eigen().x(),
-                  scale * equatorial * xyz.eigen().y(),
-                  scale * polar * xyz.eigen().z()} *
+  return QuantityVector{scale * equatorial * xyz.eigen().x(),
+                        scale * equatorial * xyz.eigen().y(),
+                        scale * polar * xyz.eigen().z()} *
          meter_per_second_squared;
 }
 

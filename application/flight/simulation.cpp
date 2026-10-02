@@ -8,6 +8,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "framework/vocabulary.hpp"
 #include "model/random.hpp"
 
 namespace simon::flight {
@@ -35,7 +36,7 @@ auto split(const Scenario& scenario) -> Split {
 
 template <typename ArchetypeType>
 auto create_aircraft(const Scenario& scenario, const AirState& state,
-                     const Route& route, lib::InOut<World> world)
+                     const Route& route, InOut<World> world)
     -> std::expected<void, framework::Status> {
   // Roughly trimmed for level flight, so the autopilot starts near its work.
   constexpr double TRIM_THROTTLE = 0.3;
@@ -64,7 +65,7 @@ auto create_aircraft(const Scenario& scenario, const AirState& state,
 auto create_rigid_aircraft(const model::AircraftData& data,
                            const model::Earth& earth, const RigidTrim& trim,
                            Length x, Length y, Angle heading,
-                           const Route& route, lib::InOut<World> world)
+                           const Route& route, InOut<World> world)
     -> std::expected<Entity, framework::Status> {
   double speed = trim.speed.numerical_value_in(model::meter_per_second);
   RigidBody body = earth.body_at(
@@ -74,7 +75,7 @@ auto create_rigid_aircraft(const model::AircraftData& data,
       0.0 * model::radian, trim.alpha, heading,
       model::meters_per_second(speed * model::cos(trim.alpha), 0.0,
                                speed * model::sin(trim.alpha)),
-      model::Vector3d{} * model::radian_per_second, 0.0 * model::second);
+      model::QuantityVector{} * model::radian_per_second, 0.0 * model::second);
 
   FlightSignals signals;
   signals[model::FlightSignal::PITCH_TRIM_COMMAND] = trim.pitch_trim;
@@ -108,7 +109,7 @@ auto create_rigid_aircraft(const model::AircraftData& data,
       .build();
 }
 
-auto build_world(const Scenario& scenario, lib::Out<World> world)
+auto build_world(const Scenario& scenario, Out<World> world)
     -> std::expected<void, framework::Status> {
   auto [simple, precise, rigid] = split(scenario);
   return World::set_up()
@@ -120,8 +121,7 @@ auto build_world(const Scenario& scenario, lib::Out<World> world)
 }
 
 auto build_scenario(const Scenario& scenario,
-                    const model::AircraftData* rigid_type,
-                    lib::InOut<World> world)
+                    const model::AircraftData* rigid_type, InOut<World> world)
     -> std::expected<void, framework::Status> {
   auto [simple, precise, rigid] = split(scenario);
   CHECK_PRECONDITION(rigid == 0 || rigid_type);
@@ -176,15 +176,14 @@ auto Simulation::configure() -> engine::PhaseResult {
     }
     rigid_ = std::make_unique<model::AircraftData>(std::move(*loaded));
   }
-  RETURN_IF_UNEXPECTED(build_world(scenario_, lib::Out(world_)));
-  RETURN_IF_UNEXPECTED(
-      build_scenario(scenario_, rigid_.get(), lib::InOut(world_)));
+  RETURN_IF_UNEXPECTED(build_world(scenario_, Out(world_)));
+  RETURN_IF_UNEXPECTED(build_scenario(scenario_, rigid_.get(), InOut(world_)));
   world_.sync();
   return engine::Flow::CONTINUE;
 }
 
 auto Simulation::step(const framework::Step& step) -> engine::PhaseResult {
-  scheduler_.step(step, lib::InOut(world_));
+  scheduler_.step(step, InOut(world_));
   return engine::Flow::CONTINUE;
 }
 

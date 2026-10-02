@@ -17,6 +17,7 @@ cc_library(
     ],
     copts = COPTS,
     deps = [
+        "//framework:vocabulary",
         "//engine:lifecycle",
         "//engine:rate_gate",
         "//framework",
@@ -40,6 +41,7 @@ cc_test(
     copts = COPTS,
     data = ["aircraft/737.aircraft"],
     deps = [
+        "//framework:vocabulary",
         ":flight_library",
         "//engine:driver",
         "@lib//base:testing",
@@ -55,6 +57,7 @@ cc_test(
     copts = COPTS,
     data = ["reference/jsbsim_737.csv"],
     deps = [
+        "//framework:vocabulary",
         ":flight_library",
         "@lib//base:testing",
     ],
@@ -151,6 +154,7 @@ cc_test(
         "reference/jsbsim_737_check_initial.csv",
     ],
     deps = [
+        "//framework:vocabulary",
         ":flight_library",
         "@lib//base:testing",
     ],
@@ -163,6 +167,7 @@ cc_binary(
     copts = COPTS,
     data = ["aircraft/737.aircraft"],
     deps = [
+        "//framework:vocabulary",
         ":flight_library",
         "//engine:driver",
     ],
@@ -177,6 +182,7 @@ cc_binary(
     copts = COPTS,
     data = ["aircraft/737.aircraft"],
     deps = [
+        "//framework:vocabulary",
         ":flight_library",
         "//framework",
         "//framework:benchmark_support",
@@ -193,6 +199,7 @@ cc_binary(
     copts = COPTS,
     data = ["aircraft/737.aircraft"],
     deps = [
+        "//framework:vocabulary",
         ":flight_library",
         "@lib//base:core",
     ],

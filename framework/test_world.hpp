@@ -6,6 +6,7 @@
 #include <expected>
 
 #include "framework/archetype.hpp"
+#include "framework/vocabulary.hpp"
 #include "framework/world.hpp"
 
 // A small world for framework tests: a one-dimensional position and two
@@ -47,7 +48,7 @@ using TestWorld = World<Position, TypeList<Velocity, Health>,
 
 // Builds a world holding 16 entities: 8 bodies, 4 launchers and 4
 // interceptors.
-inline auto build_small_world(lib::Out<TestWorld> world) -> void {
+inline auto build_small_world(Out<TestWorld> world) -> void {
   std::expected<void, Status> built = TestWorld::set_up()
                                           .numbered(1)
                                           .holding<Body>(8)

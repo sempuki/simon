@@ -61,8 +61,8 @@ auto load_reference() -> std::vector<Row> {
 }
 
 auto vector_of(const Row& row, const char* x, const char* y, const char* z)
-    -> Vector3d {
-  return Vector3d{row.at(x), row.at(y), row.at(z)};
+    -> QuantityVector {
+  return QuantityVector{row.at(x), row.at(y), row.at(z)};
 }
 
 auto body_of(const Row& row) -> RigidBody {
@@ -95,7 +95,7 @@ TEST_CASE("RigidBody737") {
       RigidBody body = body_of(row);
       // JSBSim reports the tensor's xz element as it is, but its xy and yz
       // elements negated (FGMassBalance's GetIxz, GetIxy and GetIyz).
-      Eigen::Matrix3d inertia;
+      Matrix3 inertia;
       inertia << row.at("ixx"), -row.at("ixy"), row.at("ixz"),  //
           -row.at("ixy"), row.at("iyy"), -row.at("iyz"),        //
           row.at("ixz"), -row.at("iyz"), row.at("izz");
@@ -103,30 +103,31 @@ TEST_CASE("RigidBody737") {
           MassProperties::of(row.at("mass") * kilogram, inertia);
 
       // Gravitation, found where the body is on the turning Earth.
-      Eigen::Matrix3d to_fixed =
+      Matrix3 to_fixed =
           wgs84::inertial_to_fixed(row.at("earth_angle") * radian);
       Position fixed =
-          Vector3d{to_fixed * body.position.numerical_value_in(meter).eigen()} *
+          QuantityVector{to_fixed *
+                         body.position.numerical_value_in(meter).eigen()} *
           meter;
-      Vector3d gravity{to_fixed.transpose() *
-                       wgs84::gravitation(fixed)
-                           .numerical_value_in(meter_per_second_squared)
-                           .eigen()};
+      QuantityVector gravity{to_fixed.transpose() *
+                             wgs84::gravitation(fixed)
+                                 .numerical_value_in(meter_per_second_squared)
+                                 .eigen()};
 
       RigidBodyRate rate = rigid_body_rate(
           body, vector_of(row, "force_x", "force_y", "force_z") * newton,
           vector_of(row, "moment_x", "moment_y", "moment_z") * newton_meter,
           mass, gravity * meter_per_second_squared);
 
-      Vector3d acceleration =
+      QuantityVector acceleration =
           rate.acceleration.numerical_value_in(meter_per_second_squared);
-      Vector3d expected = vector_of(row, "ax", "ay", "az");
+      QuantityVector expected = vector_of(row, "ax", "ay", "az");
       worst_acceleration = std::max(worst_acceleration,
                                     magnitude(acceleration - expected) / 9.8);
 
-      Vector3d angular = rate.angular_acceleration.numerical_value_in(
+      QuantityVector angular = rate.angular_acceleration.numerical_value_in(
           radian_per_second_squared);
-      Vector3d expected_angular = vector_of(row, "pdot", "qdot", "rdot");
+      QuantityVector expected_angular = vector_of(row, "pdot", "qdot", "rdot");
       worst_angular = std::max(worst_angular,
                                magnitude(angular - expected_angular) /
                                    std::max(magnitude(expected_angular), 1e-3));
@@ -153,11 +154,11 @@ TEST_CASE("RigidBody737") {
       worst_mass = worse(worst_mass,
                          balance.properties.mass.numerical_value_in(kilogram),
                          row.at("mass"), row.at("mass"));
-      Vector3d center = balance.center_of_mass.numerical_value_in(meter);
+      QuantityVector center = balance.center_of_mass.numerical_value_in(meter);
       worst_center =
           std::max(worst_center,
                    magnitude(center - vector_of(row, "cg_x", "cg_y", "cg_z")));
-      const Eigen::Matrix3d& j = balance.properties.inertia;
+      const Matrix3& j = balance.properties.inertia;
       double scale = row.at("izz");
       worst_inertia = worse(worst_inertia, j(0, 0), row.at("ixx"), scale);
       worst_inertia = worse(worst_inertia, j(1, 1), row.at("iyy"), scale);

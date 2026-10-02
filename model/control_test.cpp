@@ -1,6 +1,7 @@
 // Copyright 2022 -- CONTRIBUTORS. See LICENSE.
 
 #include "model/control.hpp"
+#include "framework/vocabulary.hpp"
 
 #include <cmath>
 
@@ -66,7 +67,7 @@ TEST_CASE("PiControl") {
   SECTION("ShouldAddProportionalAndIntegralGivenSmallError") {
     double integral = 0.2;
     double output =
-        pi_control(speed(0.4), gains, 1.0 * second, lib::InOut(integral));
+        pi_control(speed(0.4), gains, 1.0 * second, InOut(integral));
     CHECK_THAT(integral, WithinAbs(0.24, 1e-12));
     CHECK_THAT(output, WithinAbs(0.44, 1e-12));
   }
@@ -74,14 +75,14 @@ TEST_CASE("PiControl") {
   SECTION("ShouldHoldIntegralGivenOutputAtLimit") {
     double integral = 0.9;
     double output =
-        pi_control(speed(2.0), gains, 1.0 * second, lib::InOut(integral));
+        pi_control(speed(2.0), gains, 1.0 * second, InOut(integral));
     CHECK(output == 1.0);
     CHECK(integral == 0.9);
   }
 
   SECTION("ShouldUnwindGivenErrorAwayFromLimit") {
     double integral = 0.9;
-    pi_control(speed(-1.0), gains, 1.0 * second, lib::InOut(integral));
+    pi_control(speed(-1.0), gains, 1.0 * second, InOut(integral));
     CHECK_THAT(integral, WithinAbs(0.8, 1e-12));
   }
 
@@ -95,7 +96,7 @@ TEST_CASE("PiControl") {
     AccelerationMagnitude integral = 0.0 * meter_per_second_squared;
 
     AccelerationMagnitude output =
-        pi_control(speed(1.0), accelerate, 2.0 * second, lib::InOut(integral));
+        pi_control(speed(1.0), accelerate, 2.0 * second, InOut(integral));
 
     CHECK(integral == 1.0 * meter_per_second_squared);
     CHECK(output == 3.0 * meter_per_second_squared);

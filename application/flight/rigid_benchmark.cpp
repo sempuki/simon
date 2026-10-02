@@ -29,6 +29,7 @@
 #include "application/flight/simulation.hpp"
 #include "application/flight/systems.hpp"
 #include "base/core.hpp"
+#include "framework/vocabulary.hpp"
 
 namespace simon::flight {
 namespace {
@@ -42,8 +43,7 @@ constexpr int DEFAULT_STEPS = 250;  // 2 s simulated.
 
 // Creates `count` 737s in cruise, 2 km apart, each at 6 km and 200 m/s.
 auto populate(int count, const model::Earth& earth,
-              const model::AircraftData& data, lib::InOut<World> world)
-    -> void {
+              const model::AircraftData& data, InOut<World> world) -> void {
   auto side = static_cast<int>(std::ceil(std::sqrt(count)));
   auto transaction = world->transaction();
   for (int i = 0; i < count; ++i) {
@@ -65,9 +65,9 @@ auto measure(int aircraft, bool round, int steps,
       World::set_up()
           .numbered(1)
           .holding<archetype::RigidAircraft>(static_cast<std::size_t>(aircraft))
-          .build(lib::Out(world));
+          .build(Out(world));
   CHECK_POSTCONDITION(built.has_value());
-  populate(aircraft, earth, data, lib::InOut(world));
+  populate(aircraft, earth, data, InOut(world));
   world.sync();
 
   std::tuple schedulers{
@@ -92,7 +92,7 @@ auto measure(int aircraft, bool round, int steps,
         [&](auto&... scheduler) {
           (([&] {
              auto start = WallClock::now();
-             scheduler.step(step, lib::InOut(world));
+             scheduler.step(step, InOut(world));
              seconds[index++] +=
                  std::chrono::duration<double>(WallClock::now() - start)
                      .count();

@@ -31,8 +31,8 @@ auto runge_kutta(const RigidBody& body, RateFunction rate_of) -> RigidBody {
       DT);
 }
 
-auto zero_force() -> ForceVector { return Vector3d{} * newton; }
-auto zero_moment() -> Moment { return Vector3d{} * newton_meter; }
+auto zero_force() -> ForceVector { return QuantityVector{} * newton; }
+auto zero_moment() -> Moment { return QuantityVector{} * newton_meter; }
 auto no_gravity() -> Acceleration { return meters_per_second_squared(0, 0, 0); }
 
 }  // namespace
@@ -44,19 +44,19 @@ TEST_CASE("RigidBody") {
   SECTION("ShouldConserveAngularMomentumGivenNoTorque") {
     // An asymmetric body spinning about no principal axis tumbles, but its
     // angular momentum is fixed in the inertial frame, and so is its energy.
-    Eigen::Matrix3d inertia = Eigen::Vector3d{1.0, 2.0, 3.0}.asDiagonal();
+    Matrix3 inertia = Vector3{1.0, 2.0, 3.0}.asDiagonal();
     MassProperties mass = MassProperties::of(1.0 * kilogram, inertia);
-    RigidBody body{.rate = Vector3d{1.0, 0.1, 0.5} * radian_per_second};
+    RigidBody body{.rate = QuantityVector{1.0, 0.1, 0.5} * radian_per_second};
     auto momentum = [&](const RigidBody& b) {
-      return Eigen::Vector3d{
+      return Vector3{
           b.attitude *
           (inertia * b.rate.numerical_value_in(radian_per_second).eigen())};
     };
     auto energy = [&](const RigidBody& b) {
-      Eigen::Vector3d w = b.rate.numerical_value_in(radian_per_second).eigen();
+      Vector3 w = b.rate.numerical_value_in(radian_per_second).eigen();
       return 0.5 * w.dot(inertia * w);
     };
-    Eigen::Vector3d start = momentum(body);
+    Vector3 start = momentum(body);
     double start_energy = energy(body);
 
     for (int i = 0; i < 120 * 60; ++i) {
@@ -72,7 +72,7 @@ TEST_CASE("RigidBody") {
 
   SECTION("ShouldFallFreelyGivenOnlyGravity") {
     MassProperties mass =
-        MassProperties::of(10.0 * kilogram, Eigen::Matrix3d::Identity());
+        MassProperties::of(10.0 * kilogram, Matrix3::Identity());
     RigidBody body;
     Acceleration gravity = meters_per_second_squared(0.0, 0.0, -9.8);
     for (int i = 0; i < 120; ++i) {
@@ -89,13 +89,14 @@ TEST_CASE("RigidBody") {
   SECTION("ShouldPushAlongBodyAxesGivenAttitude") {
     // Nose pointing along the inertial y axis: a forward force pushes along y.
     MassProperties mass =
-        MassProperties::of(2.0 * kilogram, Eigen::Matrix3d::Identity());
-    RigidBody body{.attitude = Quaternion{Eigen::AngleAxisd{
-                       std::numbers::pi / 2.0, Eigen::Vector3d::UnitZ()}}};
-    RigidBodyRate rate = rigid_body_rate(body, Vector3d{4.0, 0.0, 0.0} * newton,
-                                         zero_moment(), mass, no_gravity());
+        MassProperties::of(2.0 * kilogram, Matrix3::Identity());
+    RigidBody body{.attitude = Quaternion{
+                       AngleAxis{std::numbers::pi / 2.0, Vector3::UnitZ()}}};
+    RigidBodyRate rate =
+        rigid_body_rate(body, QuantityVector{4.0, 0.0, 0.0} * newton,
+                        zero_moment(), mass, no_gravity());
     CHECK(rate.acceleration.numerical_value_in(meter_per_second_squared)
-              .is_approximately(Vector3d{0.0, 2.0, 0.0}));
+              .is_approximately(QuantityVector{0.0, 2.0, 0.0}));
   }
 }
 

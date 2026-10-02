@@ -15,6 +15,7 @@
 #include "framework/step.hpp"
 #include "framework/system.hpp"
 #include "framework/type_list.hpp"
+#include "framework/vocabulary.hpp"
 
 // Continuous state, integrated by an explicit Runge-Kutta method. Opt in by
 // scheduling a Continuous element; a simulation that does not pays nothing.
@@ -90,7 +91,7 @@ struct ContinuousRunner final {
   // counts entities in walk order and `rate` is null if the entity has none.
   // The order is the same on every call until the next sync.
   template <typename StateType, typename WorldType, typename VisitorType>
-  static auto walk(lib::InOut<WorldType> world, VisitorType&& visit) -> void {
+  static auto walk(InOut<WorldType> world, VisitorType&& visit) -> void {
     using RateType = rate_of_t<StateType>;
     auto& states = world->template mutable_store_of<StateType>(SchedulerKey{});
     const auto& rates = std::as_const(*world).template store_of<RateType>();
@@ -254,7 +255,7 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
 
   // Advances every state by `step.dt`.
   template <typename WorldType>
-  auto run(const Step& step, lib::InOut<WorldType> world) -> void {
+  auto run(const Step& step, InOut<WorldType> world) -> void {
     static_assert(
         (contains_v<typename WorldType::ComponentList, StateTypes> && ...),
         "A continuous state is not in the world.");
@@ -302,12 +303,12 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
 
   // Runs the derivative systems once, with no sync point after any of them.
   template <typename WorldType>
-  auto derive(const Step& step, lib::InOut<WorldType> world) -> void {
+  auto derive(const Step& step, InOut<WorldType> world) -> void {
     std::size_t pending = world->pending();
 
     std::apply(
         [&](auto&... system) {
-          (SystemRunner::run(step, lib::InOut(system), world), ...);
+          (SystemRunner::run(step, InOut(system), world), ...);
         },
         systems_);
 
@@ -315,7 +316,7 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
   }
 
   template <typename StateType, typename WorldType>
-  static auto advance_each(Duration dt, lib::InOut<WorldType> world) -> void {
+  static auto advance_each(Duration dt, InOut<WorldType> world) -> void {
     ContinuousRunner::walk<StateType>(
         world,
         [&](std::size_t, StateType& state, const rate_of_t<StateType>* rate) {
@@ -326,7 +327,7 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
   }
 
   template <typename StateType, typename WorldType>
-  auto keep_start(lib::InOut<WorldType> world) -> void {
+  auto keep_start(InOut<WorldType> world) -> void {
     Scratch<StateType>& scratch = std::get<Scratch<StateType>>(scratch_);
 
     // Sized once, to the store's capacity, on the first step.
@@ -358,7 +359,7 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
   }
 
   template <std::size_t STAGE, typename WorldType>
-  auto stage(const Step& step, lib::InOut<WorldType> world) -> void {
+  auto stage(const Step& step, InOut<WorldType> world) -> void {
     derive(stage_step<STAGE>(step), world);
     (after_stage<StateTypes, STAGE>(step.dt, world), ...);
   }
@@ -367,7 +368,7 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
   // stage's trial state, or past the last stage to the end of the step. One
   // pass over the state per stage.
   template <typename StateType, std::size_t STAGE, typename WorldType>
-  auto after_stage(Duration dt, lib::InOut<WorldType> world) -> void {
+  auto after_stage(Duration dt, InOut<WorldType> world) -> void {
     Scratch<StateType>& scratch = std::get<Scratch<StateType>>(scratch_);
     ContinuousRunner::walk<StateType>(
         world,

@@ -11,6 +11,7 @@ cc_library(
     hdrs = ["units.hpp"],
     copts = COPTS,
     deps = [
+        "//framework:vocabulary",
         "@eigen",
         "@mp-units",
     ],
@@ -32,6 +33,7 @@ cc_library(
     hdrs = ["kinematics.hpp"],
     copts = COPTS,
     deps = [
+        "//framework:vocabulary",
         ":units",
         "//framework",
         "@eigen",
@@ -44,6 +46,7 @@ cc_library(
     hdrs = ["motion.hpp"],
     copts = COPTS,
     deps = [
+        "//framework:vocabulary",
         ":kinematics",
         "//framework",
     ],
@@ -55,6 +58,7 @@ cc_test(
     srcs = ["kinematics_test.cpp"],
     copts = COPTS,
     deps = [
+        "//framework:vocabulary",
         ":kinematics",
         "@lib//base:testing",
     ],
@@ -82,6 +86,7 @@ cc_library(
     hdrs = ["control.hpp"],
     copts = COPTS,
     deps = [
+        "//framework:vocabulary",
         ":units",
         "@lib//base:core",
     ],

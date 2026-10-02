@@ -11,33 +11,32 @@ namespace simon::model {
 
 namespace {
 
-auto eigen(const Displacement& d) -> Eigen::Vector3d {
+auto eigen(const Displacement& d) -> Vector3 {
   return d.numerical_value_in(meter).eigen();
 }
-auto eigen(const Velocity& v) -> Eigen::Vector3d {
+auto eigen(const Velocity& v) -> Vector3 {
   return v.numerical_value_in(meter_per_second).eigen();
 }
-auto eigen(const Acceleration& a) -> Eigen::Vector3d {
+auto eigen(const Acceleration& a) -> Vector3 {
   return a.numerical_value_in(meter_per_second_squared).eigen();
 }
-auto eigen(const AngularVelocity& w) -> Eigen::Vector3d {
+auto eigen(const AngularVelocity& w) -> Vector3 {
   return w.numerical_value_in(radian_per_second).eigen();
 }
 
 // The Earth's rotation, in the inertial frame, or none.
-auto spin(bool round) -> Eigen::Vector3d {
-  return round ? eigen(wgs84::rotation()) : Eigen::Vector3d::Zero();
+auto spin(bool round) -> Vector3 {
+  return round ? eigen(wgs84::rotation()) : Vector3::Zero();
 }
 
 // From the north-east-down frame at a geodetic latitude and longitude to
 // ECEF: its columns are north, east and down.
-auto north_east_down_to_fixed(Angle latitude, Angle longitude)
-    -> Eigen::Matrix3d {
+auto north_east_down_to_fixed(Angle latitude, Angle longitude) -> Matrix3 {
   double sin_lat = sin(latitude);
   double cos_lat = cos(latitude);
   double sin_lon = sin(longitude);
   double cos_lon = cos(longitude);
-  Eigen::Matrix3d basis;
+  Matrix3 basis;
   basis << -sin_lat * cos_lon, -sin_lon, -cos_lat * cos_lon,  //
       -sin_lat * sin_lon, cos_lon, -cos_lat * sin_lon,        //
       cos_lat, 0.0, -sin_lat;
@@ -45,9 +44,8 @@ auto north_east_down_to_fixed(Angle latitude, Angle longitude)
 }
 
 // The point mass inertia of `mass` at `offset` from the center of mass.
-auto point_inertia(double mass, const Eigen::Vector3d& offset)
-    -> Eigen::Matrix3d {
-  return mass * (offset.squaredNorm() * Eigen::Matrix3d::Identity() -
+auto point_inertia(double mass, const Vector3& offset) -> Matrix3 {
+  return mass * (offset.squaredNorm() * Matrix3::Identity() -
                  offset * offset.transpose());
 }
 
@@ -60,8 +58,7 @@ auto Earth::round(const wgs84::Geodetic& origin) -> Earth {
   earth.round_ = true;
   earth.origin_fixed_ = wgs84::fixed_of(origin);
   // East, north and up, as rows.
-  Eigen::Matrix3d ned =
-      north_east_down_to_fixed(origin.latitude, origin.longitude);
+  Matrix3 ned = north_east_down_to_fixed(origin.latitude, origin.longitude);
   earth.fixed_to_local_.row(0) = ned.col(1).transpose();
   earth.fixed_to_local_.row(1) = ned.col(0).transpose();
   earth.fixed_to_local_.row(2) = -ned.col(2).transpose();
@@ -78,8 +75,8 @@ auto Earth::fixed_of(const RigidBody& body, Time time) const -> Position {
   if (!round_) {
     return body.position;
   }
-  return Vector3d{wgs84::inertial_to_fixed(angle(time)) *
-                  eigen(body.position)} *
+  return QuantityVector{wgs84::inertial_to_fixed(angle(time)) *
+                        eigen(body.position)} *
          meter;
 }
 
@@ -95,8 +92,8 @@ auto Earth::place(const RigidBody& body, Time time) const -> Place {
         0.0, 0.0, -1.0;
     return flat;
   }
-  Eigen::Matrix3d to_fixed = wgs84::inertial_to_fixed(angle(time));
-  Position fixed = Vector3d{to_fixed * eigen(body.position)} * meter;
+  Matrix3 to_fixed = wgs84::inertial_to_fixed(angle(time));
+  Position fixed = QuantityVector{to_fixed * eigen(body.position)} * meter;
   wgs84::Geodetic where = wgs84::geodetic_of(fixed);
   return Place{
       .inertial_to_fixed = to_fixed,
@@ -118,30 +115,32 @@ auto Earth::gravity(const Place& place) const -> Acceleration {
         0.0, 0.0,
         -STANDARD_GRAVITY.numerical_value_in(meter_per_second_squared));
   }
-  return Vector3d{place.inertial_to_fixed.transpose() *
-                  eigen(wgs84::gravitation(place.fixed))} *
+  return QuantityVector{place.inertial_to_fixed.transpose() *
+                        eigen(wgs84::gravitation(place.fixed))} *
          meter_per_second_squared;
 }
 auto Earth::air_velocity(const RigidBody& body) const -> Velocity {
-  Eigen::Vector3d relative =
+  Vector3 relative =
       eigen(body.velocity) - spin(round_).cross(eigen(body.position));
-  return Vector3d{body.attitude.conjugate() * relative} * meter_per_second;
+  return QuantityVector{body.attitude.conjugate() * relative} *
+         meter_per_second;
 }
 
 auto Earth::air_acceleration(const RigidBody& body,
                              const Acceleration& acceleration) const
     -> Acceleration {
   // d/dt R^T (v - W x r) = R^T (a - W x v) - w x R^T (v - W x r).
-  Eigen::Vector3d along =
+  Vector3 along =
       body.attitude.conjugate() *
       (eigen(acceleration) - spin(round_).cross(eigen(body.velocity)));
-  Eigen::Vector3d uvw = eigen(air_velocity(body));
-  return Vector3d{along - eigen(body.rate).cross(uvw)} *
+  Vector3 uvw = eigen(air_velocity(body));
+  return QuantityVector{along - eigen(body.rate).cross(uvw)} *
          meter_per_second_squared;
 }
 
 auto Earth::air_rate(const RigidBody& body) const -> AngularVelocity {
-  return Vector3d{eigen(body.rate) - body.attitude.conjugate() * spin(round_)} *
+  return QuantityVector{eigen(body.rate) -
+                        body.attitude.conjugate() * spin(round_)} *
          radian_per_second;
 }
 
@@ -152,11 +151,10 @@ auto Earth::altitude(const RigidBody& body, Time time) const -> Length {
   return wgs84::geodetic_of(fixed_of(body, time)).altitude;
 }
 
-auto Earth::north_east_down(const Position& fixed, Time time) const
-    -> Eigen::Matrix3d {
+auto Earth::north_east_down(const Position& fixed, Time time) const -> Matrix3 {
   if (!round_) {
     // North is y, east x, and down -z.
-    Eigen::Matrix3d basis;
+    Matrix3 basis;
     basis << 0.0, 1.0, 0.0,  //
         1.0, 0.0, 0.0,       //
         0.0, 0.0, -1.0;
@@ -168,22 +166,22 @@ auto Earth::north_east_down(const Position& fixed, Time time) const
 }
 
 auto Earth::body_to_north_east_down(const RigidBody& body, Time time) const
-    -> Eigen::Matrix3d {
+    -> Matrix3 {
   return north_east_down(fixed_of(body, time), time).transpose() *
          body.attitude.toRotationMatrix();
 }
 
 auto Earth::air_state(const RigidBody& body, Time time) const -> AirState {
   Position fixed = fixed_of(body, time);
-  Position local =
-      round_
-          ? Vector3d{fixed_to_local_ * (eigen(fixed) - eigen(origin_fixed_))} *
-                meter
-          : body.position;
+  Position local = round_
+                       ? QuantityVector{fixed_to_local_ *
+                                        (eigen(fixed) - eigen(origin_fixed_))} *
+                             meter
+                       : body.position;
 
-  Eigen::Vector3d relative =
+  Vector3 relative =
       eigen(body.velocity) - spin(round_).cross(eigen(body.position));
-  Eigen::Vector3d ned = north_east_down(fixed, time).transpose() * relative;
+  Vector3 ned = north_east_down(fixed, time).transpose() * relative;
   double speed = ned.norm();
   return AirState{
       .position = local,
@@ -198,31 +196,32 @@ auto Earth::body_at(const Position& position, Angle roll, Angle pitch,
                     Angle yaw, const Velocity& air_velocity,
                     const AngularVelocity& air_rate, Time time) const
     -> RigidBody {
-  Eigen::Vector3d inertial = eigen(position);
+  Vector3 inertial = eigen(position);
   if (round_) {
-    Eigen::Vector3d fixed =
+    Vector3 fixed =
         eigen(origin_fixed_) + fixed_to_local_.transpose() * eigen(position);
     inertial = wgs84::inertial_to_fixed(angle(time)).transpose() * fixed;
   }
-  Position where = Vector3d{inertial} * meter;
+  Position where = QuantityVector{inertial} * meter;
   Position fixed =
       round_ ? fixed_of(RigidBody{.position = where}, time) : where;
 
   Quaternion body_to_local =
-      Quaternion{Eigen::AngleAxisd{radians(yaw), Eigen::Vector3d::UnitZ()}} *
-      Quaternion{Eigen::AngleAxisd{radians(pitch), Eigen::Vector3d::UnitY()}} *
-      Quaternion{Eigen::AngleAxisd{radians(roll), Eigen::Vector3d::UnitX()}};
+      Quaternion{AngleAxis{radians(yaw), Vector3::UnitZ()}} *
+      Quaternion{AngleAxis{radians(pitch), Vector3::UnitY()}} *
+      Quaternion{AngleAxis{radians(roll), Vector3::UnitX()}};
   Quaternion attitude =
       Quaternion{north_east_down(fixed, time)} * body_to_local;
   attitude.normalize();
 
   return RigidBody{
       .position = where,
-      .velocity = Vector3d{attitude * eigen(air_velocity) +
-                           spin(round_).cross(inertial)} *
+      .velocity = QuantityVector{attitude * eigen(air_velocity) +
+                                 spin(round_).cross(inertial)} *
                   meter_per_second,
       .attitude = attitude,
-      .rate = Vector3d{eigen(air_rate) + attitude.conjugate() * spin(round_)} *
+      .rate = QuantityVector{eigen(air_rate) +
+                             attitude.conjugate() * spin(round_)} *
               radian_per_second,
   };
 }
@@ -231,7 +230,7 @@ auto Earth::body_at(const Position& position, Angle roll, Angle pitch,
 
 auto body_offset(const Displacement& structural,
                  const Displacement& center_of_mass) -> Displacement {
-  Eigen::Vector3d apart = eigen(structural) - eigen(center_of_mass);
+  Vector3 apart = eigen(structural) - eigen(center_of_mass);
   // Structural x aft and z up; body x forward and z down.
   return meters(-apart.x(), apart.y(), -apart.z());
 }
@@ -241,16 +240,16 @@ auto mass_balance_of(const AircraftData& aircraft,
   CHECK_PRECONDITION(contents.size() == aircraft.tanks.size());
   double empty = aircraft.empty_mass.numerical_value_in(kilogram);
   double total = empty;
-  Eigen::Vector3d moment = empty * eigen(aircraft.empty_center_of_mass);
+  Vector3 moment = empty * eigen(aircraft.empty_center_of_mass);
   for (std::size_t i = 0; i < contents.size(); ++i) {
     double fuel = contents[i].numerical_value_in(kilogram);
     total += fuel;
     moment += fuel * eigen(aircraft.tanks[i].location);
   }
-  Displacement center = Vector3d{moment / total} * meter;
+  Displacement center = QuantityVector{moment / total} * meter;
 
   const std::array<double, 6>& j = aircraft.empty_inertia;
-  Eigen::Matrix3d inertia;
+  Matrix3 inertia;
   inertia << j[0], j[3], j[4],  //
       j[3], j[1], j[5],         //
       j[4], j[5], j[2];
@@ -379,8 +378,8 @@ auto aero_inputs_of(const RigidBody& body, const ControlSurfaces& surfaces,
                     const AircraftData& aircraft, const Displacement& reference,
                     const Earth& earth, const Place& place,
                     const StandardAirTable& air) -> AeroInputs {
-  Eigen::Vector3d uvw = eigen(earth.air_velocity(body));
-  Eigen::Vector3d rates = eigen(earth.air_rate(body));
+  Vector3 uvw = eigen(earth.air_velocity(body));
+  Vector3 rates = eigen(earth.air_rate(body));
   Length altitude = place.altitude;
   Air here = air(altitude);
 
@@ -487,27 +486,27 @@ auto rigid_aircraft_rate(const RigidBody& body, const ControlSurfaces& surfaces,
   // The rate of angle of attack follows from the body's acceleration, which
   // the forces set.
   // The engines' thrust, along body x from where each is mounted.
-  Eigen::Vector3d thrust_force = Eigen::Vector3d::Zero();
-  Eigen::Vector3d thrust_moment = Eigen::Vector3d::Zero();
+  Vector3 thrust_force = Vector3::Zero();
+  Vector3 thrust_moment = Vector3::Zero();
   for (std::size_t i = 0; i < aircraft.engines.size(); ++i) {
-    Eigen::Vector3d thrust{
-        engines.turbines[i].thrust.numerical_value_in(newton), 0.0, 0.0};
-    Eigen::Vector3d arm =
+    Vector3 thrust{engines.turbines[i].thrust.numerical_value_in(newton), 0.0,
+                   0.0};
+    Vector3 arm =
         eigen(body_offset(aircraft.engines[i].location, mass.center_of_mass));
     thrust_force += thrust;
     thrust_moment += arm.cross(thrust);
   }
 
   auto alpha_rate = [&](const AeroSums& sums) {
-    Eigen::Vector3d force = aero_loads(sums, alpha, beta, reference)
-                                .force.numerical_value_in(newton)
-                                .eigen() +
-                            thrust_force;
-    RigidBodyRate translation =
-        rigid_body_rate(body, Vector3d{force} * newton,
-                        Vector3d{} * newton_meter, mass.properties, gravity);
-    Eigen::Vector3d uvw = eigen(earth.air_velocity(body));
-    Eigen::Vector3d uvw_rate =
+    Vector3 force = aero_loads(sums, alpha, beta, reference)
+                        .force.numerical_value_in(newton)
+                        .eigen() +
+                    thrust_force;
+    RigidBodyRate translation = rigid_body_rate(
+        body, QuantityVector{force} * newton, QuantityVector{} * newton_meter,
+        mass.properties, gravity);
+    Vector3 uvw = eigen(earth.air_velocity(body));
+    Vector3 uvw_rate =
         eigen(earth.air_acceleration(body, translation.acceleration));
     double along_and_down = uvw.x() * uvw.x() + uvw.z() * uvw.z();
     return along_and_down > 0.0
@@ -531,12 +530,11 @@ auto rigid_aircraft_rate(const RigidBody& body, const ControlSurfaces& surfaces,
   sums[index(AeroAxis::YAW)] = sum(model, AeroAxis::YAW, inputs);
 
   AeroLoads loads = aero_loads(sums, alpha, beta, reference);
-  Eigen::Vector3d force =
-      loads.force.numerical_value_in(newton).eigen() + thrust_force;
-  Eigen::Vector3d moment =
+  Vector3 force = loads.force.numerical_value_in(newton).eigen() + thrust_force;
+  Vector3 moment =
       loads.moment.numerical_value_in(newton_meter).eigen() + thrust_moment;
-  return rigid_body_rate(body, Vector3d{force} * newton,
-                         Vector3d{moment} * newton_meter, mass.properties,
+  return rigid_body_rate(body, QuantityVector{force} * newton,
+                         QuantityVector{moment} * newton_meter, mass.properties,
                          gravity);
 }
 

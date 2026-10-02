@@ -10,6 +10,7 @@
 #include "engine/lifecycle.hpp"
 #include "framework/archetype.hpp"
 #include "framework/system.hpp"
+#include "framework/vocabulary.hpp"
 #include "framework/world.hpp"
 #include "model/kinematics.hpp"
 #include "model/motion.hpp"
@@ -138,10 +139,10 @@ struct Balls final {
 };
 
 // Builds the two balls. One meter is drawn as one screen pixel.
-auto build_balls(lib::InOut<World> world) -> Balls;
+auto build_balls(InOut<World> world) -> Balls;
 
 // Builds in `world` a world holding `balls` balls.
-auto build_world(std::size_t balls, lib::Out<World> world)
+auto build_world(std::size_t balls, Out<World> world)
     -> std::expected<void, framework::Status>;
 
 // Whether any ball has collided.
