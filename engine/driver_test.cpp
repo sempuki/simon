@@ -223,6 +223,21 @@ TEST_CASE("RealTimeDriver") {
     CHECK(driver.driver().now() == TimePoint{60ms});
   }
 
+  SECTION("ShouldCatchUpAtMostMaxLagGivenSlowFrames") {
+    REQUIRE(driver.tick() == Flow::CONTINUE);
+    // A second behind at 2x is 2 s simulated; a tick takes only 100 ms of
+    // wall time's worth, 200 ms in ten steps, and drops the rest.
+    FakeClock::current += 1s;
+    REQUIRE(driver.tick() == Flow::CONTINUE);
+    CHECK(recorder.steps.size() == 10u);
+    CHECK(driver.driver().now() == TimePoint{200ms});
+
+    FakeClock::current += 10ms;  // 20 ms simulated from there: one step.
+    REQUIRE(driver.tick() == Flow::CONTINUE);
+    CHECK(recorder.steps.size() == 11u);
+    CHECK(driver.driver().now() == TimePoint{220ms});
+  }
+
   SECTION("ShouldChangeRateWithoutJumpGivenNewSpeed") {
     REQUIRE(driver.tick() == Flow::CONTINUE);
     FakeClock::current += 20ms;  // 40 ms simulated at 2x.

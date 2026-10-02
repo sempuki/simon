@@ -150,6 +150,10 @@ class RealTimeDriver final {
 
   // Advances to the step the wall clock has reached. Call it from an
   // application's frame loop. The first call starts the simulation.
+  //
+  // A tick catches up at most MAX_LAG of wall time, at the current speed. A
+  // simulation that cannot keep up drops the rest, and runs slower than its
+  // speed, so the frame loop keeps drawing; each tick still takes whole steps.
   auto tick() -> PhaseResult {
     if (driver_.phase() == Phase::NEW) {
       wall_start_ = WallClockType::now();
@@ -164,8 +168,18 @@ class RealTimeDriver final {
     if (paused_) {
       return Flow::CONTINUE;
     }
-    return driver_.advance_to(target_at(WallClockType::now()));
+    TimePoint target = target_at(WallClockType::now());
+    TimePoint most = driver_.now() + most_steps();
+    if (target <= most) {
+      return driver_.advance_to(target);
+    }
+    PhaseResult result = driver_.advance_to(most);
+    rebase();  // The dropped time is not owed.
+    return result;
   }
+
+  // The most wall time a tick catches up.
+  static constexpr std::chrono::milliseconds MAX_LAG{100};
 
   // Stops simulated time until `resume`. Wall time that passes while paused is
   // never caught up.
@@ -218,6 +232,14 @@ class RealTimeDriver final {
         std::chrono::duration<double>(wall - wall_start_) * speed_);
     Duration step = driver_.max_step();
     return start_ + (simulated / step) * step;
+  }
+
+  // MAX_LAG at the current speed, in whole steps, and at least one.
+  auto most_steps() const -> Duration {
+    auto simulated = std::chrono::round<Duration>(
+        std::chrono::duration<double>(MAX_LAG) * speed_);
+    Duration step = driver_.max_step();
+    return std::max<Duration::rep>(simulated / step, 1) * step;
   }
 
   // Anchors the wall clock to the simulation's current time, so targets are
