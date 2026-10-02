@@ -14,8 +14,8 @@
 // troposphere whose temperature falls linearly to 11 km, then an isothermal
 // lower stratosphere. Its layers are in geopotential altitude, which counts
 // height by the work done against gravity as it weakens with height, so
-// geometric altitudes are converted first, as the 1976 standard and JSBSim
-// do.
+// geometric altitudes are converted first, as the 1976 standard (see
+// model/REFERENCES.md) and JSBSim do.
 namespace simon::model {
 
 struct Air final {

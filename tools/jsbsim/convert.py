@@ -27,7 +27,7 @@ FT = 0.3048  # m.
 IN = 0.0254  # m.
 LBF = 4.4482216152605  # N.
 LBM = 0.45359237  # kg.
-SLUG = 14.593902937  # kg.
+SLUG = LBF / FT  # kg: a slug is a pound-force second squared per foot.
 SLUG_FT2 = SLUG * FT * FT  # kg m^2.
 PSF = LBF / (FT * FT)  # Pa.
 

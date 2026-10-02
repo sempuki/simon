@@ -139,7 +139,8 @@ struct Airframe final {
   Force thrust = 0.0 * newton;   // At full throttle, at sea level.
 };
 
-// The rate of `state` under `controls`, for the point-mass equations:
+// The rate of `state` under `controls`, for the point-mass equations (Stevens
+// and Lewis; see model/REFERENCES.md):
 //
 //   dV/dt     = (T - D) / m - g sin(gamma)
 //   dgamma/dt = g / V * (n cos(mu) - cos(gamma))

@@ -31,7 +31,7 @@ import numpy as np
 
 FT = 0.3048  # m.
 LBF = 4.4482216152605  # N.
-SLUG = 14.593902937  # kg.
+SLUG = LBF / FT  # kg: a slug is a pound-force second squared per foot.
 G0 = 9.80665  # m/s^2.
 
 # The sea-level thrust at full throttle. It only scales the throttle.

@@ -24,7 +24,8 @@ namespace simon::model {
 //   value += (input - value) * (1 - e^(-dt / time_constant))
 //
 // Stable at any step: it never overshoots `input`. A zero time constant
-// follows the input at once.
+// follows the input at once. It is the lag's zero-order-hold equivalent (see
+// model/REFERENCES.md).
 template <typename ValueType>
 auto lag(const ValueType& value, const ValueType& input, Time time_constant,
          Time dt) -> ValueType {
