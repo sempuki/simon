@@ -50,8 +50,8 @@ constexpr std::array<double, 6> START{0.05, 0.35, 0.0, 0.0, 0.0, 0.0};
 constexpr double BALANCED = 1e-9;
 
 // The pitch at which a body at angle of attack `alpha` and bank `bank`, with
-// no sideslip, climbs at `gamma` (Stevens and Lewis, eq. 3.6-3, with no
-// sideslip).
+// no sideslip, climbs at `gamma`: the rate-of-climb constraint of steady
+// flight (Stevens and Lewis; see model/REFERENCES.md).
 auto pitch_of(double alpha, double bank, double gamma) -> double {
   double a = std::cos(alpha);
   double b = std::sin(alpha) * std::cos(bank);
