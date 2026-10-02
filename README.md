@@ -91,6 +91,32 @@ throttle step.
 bazel test //application/flight:check_case_test   # about 3 minutes
 ```
 
+### It trims its own aircraft
+
+simon finds its own trim. Angle of attack, throttle, pitch trim, bank, aileron
+and rudder balance every acceleration, solved together by Newton's method to
+1e-13, with the F-16's fly-by-wire settled in the balance. Trimmed straight in
+space, as JSBSim trims, simon's controls agree with JSBSim's to a few parts in
+10^5, the tolerance JSBSim's trim stops at. By default simon trims level over
+the round Earth instead, turning with the horizon, so the aircraft holds its
+altitude where a straight path climbs as the Earth curves away.
+
+The largest change in altitude and airspeed in 30 s, at 6 km and 200 m/s:
+
+| Trim | 737 | F-16 |
+|---|---:|---:|
+| JSBSim's | 4.0 m, 0.19 m/s | 2.1 m, 0.081 m/s |
+| simon's | 2.0 m, 0.10 m/s | 16 cm, 0.013 m/s |
+| simon's, mass held | 3.7 mm, 0.2 mm/s | 2.4 mm, 0.1 mm/s |
+
+Burning fuel lightens the aircraft, which climbs and speeds up. With the mass
+held, the trim alone is measured.
+
+```sh
+bazel test //application/flight:trim_test
+bazel test //application/flight:check_case_test --test_arg=HoldsTrim
+```
+
 ### It runs faster than JSBSim
 
 | Rigid 737s | Flat Earth | Round Earth |
@@ -159,7 +185,6 @@ regenerate a table, run its script after `pip install jsbsim numpy`.
 
 ### What it does not show yet
 
-- **A trim of simon's own.** Both aircraft start from JSBSim's trims.
 - **Point-mass accuracy.** The point-mass model drifts 1.8 km from JSBSim
   over a 130 km flight (`accuracy_test`). Its fitted drag polar causes most of
   that drift. The model suits traffic at scale, and the rigid model suits

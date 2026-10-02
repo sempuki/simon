@@ -2595,6 +2595,43 @@ The largest distance from JSBSim at 0.125 ms over 30 s:
 A rigid 737 costs 1.79 µs per aircraft-step flat and 2.86 µs round at 1,000;
 the F-16's sensing costs it nothing.
 
+#### Trim
+
+`model/trim` finds the attitude, controls and throttle at which a rigid
+aircraft flies a steady, straight path. Six unknowns balance six
+accelerations, paired as JSBSim's full trim pairs them: angle of attack the
+acceleration along body z, throttle along body x, pitch trim the pitch, bank
+the acceleration along body y, aileron the roll and rudder the yaw. There is
+no sideslip. Newton's method solves them together, with a numerical Jacobian
+and a line search, to residual accelerations of 1e-13. A trim that needs a
+control past its limit fails as saturated.
+
+Each evaluation settles the flight controls with the airframe.
+`settle_flight_controls` runs every block as it stands when its inputs hold
+still, kinematic blocks at their inputs and PIDs seeing no rate. The F-16's
+flight controls feel the accelerations their own surfaces make, so the blocks
+and the airframe are settled in turn until they agree.
+
+Round the Earth a trim is level over the Earth: the body turns as the local
+north-east-down frame turns under it as it moves (`Earth::level_rate`), so
+its altitude and speed hold. Straight in space, as JSBSim's trim is, the path
+climbs as the Earth curves away, 2.8 m in 6 km. A `FlightCondition` asks for
+either.
+
+Trimmed straight in space at the check cases' condition, simon's controls
+agree with JSBSim's to a few parts in 10^5, the tolerance JSBSim's trim stops
+at (`trim_test`). Flown level for 30 s at 8 ms, the largest change in
+altitude and airspeed (`check_case_test`):
+
+| Trim | 737 | F-16 |
+|---|---:|---:|
+| JSBSim's | 4.0 m, 0.19 m/s | 2.1 m, 0.081 m/s |
+| simon's | 2.0 m, 0.10 m/s | 16 cm, 0.013 m/s |
+| simon's, mass held | 3.7 mm, 0.2 mm/s | 2.4 mm, 0.1 mm/s |
+
+Burning fuel lightens the aircraft, which climbs and speeds up; with the mass
+held, the trim alone is measured.
+
 #### Mixed fidelity
 
 Every level flies in one world. A scenario's `rigid` count makes some of
@@ -2603,7 +2640,9 @@ its aircraft rigid 737s, and they fly the same kind of routes as the rest:
 `bazel run //application/flight -- <aircraft> <precise> <rigid> <seed>` flies
 one, over a flat Earth so that every level shares the world's frame.
 
-Rigid aircraft start from JSBSim's trim in cruise (`RigidTrim`) and fly their
+Rigid aircraft start from simon's trim in cruise (`trim_in_cruise`; see
+[Trim](#trim)), one for them all, since over a flat Earth a trim holds
+wherever an aircraft is and whichever way it heads. They fly their
 surfaces with `FlySurfaces`, an autopilot kept small on purpose. It takes the
 point-mass autopilot's laws for the bank a heading needs, the flight-path
 angle an altitude needs and putting speed first, and flies them with three
@@ -2709,8 +2748,9 @@ Each step ends with a working application and passing tests.
    - Done: a second, very different aircraft, JSBSim's F-16, with
      fly-by-wire flight controls and reheat, converted by the same code and
      checked the same way (see [The F-16](#the-f-16)).
-   - Next for rigid aircraft: a trim of simon's own, and many rigid aircraft
-     batched in one segment.
+   - Done: a trim of simon's own, level over the round Earth (see
+     [Trim](#trim)).
+   - Next for rigid aircraft: many rigid aircraft batched in one segment.
    - Later: Adams-Bashforth with rate history, many replicas of a scenario
      in one world, world snapshots, and trim tables computed offline. JSBSim,
      run offline, stays the reference each level's accuracy is measured
