@@ -30,7 +30,11 @@ using model::AirState;
 using model::AirStateRate;
 using model::Angle;
 using model::ControlSurfaces;
+using model::EngineControls;
+using model::Engines;
 using model::FlightControls;
+using model::FlightSignals;
+using model::FuelTanks;
 using model::Length;
 using model::MassBalance;
 using model::Position;
@@ -102,12 +106,16 @@ struct PreciseAircraft final                                       //
                          Commands, Airframe, Handling, Autopilot,  //
                          Route>> {};                               //
 
-// Flies six degrees of freedom by its control surfaces, integrated with
-// Runge-Kutta 4. Its AirState follows its body, for the rest of the world.
-struct RigidAircraft final                                                 //
-    : Archetype<"rigid aircraft",                                          //
-                Requires<AirState, RigidBody, RigidBodyRate,               //
-                         ControlSurfaces, MassBalance, AircraftType>> {};  //
+// Flies six degrees of freedom, integrated with Runge-Kutta 4: its flight
+// controls turn the pilot's commands, in its FlightSignals, into control
+// surface positions, and its engines make thrust from its throttles and burn
+// its fuel. Its AirState follows its body, for the rest of the world.
+struct RigidAircraft final                                    //
+    : Archetype<"rigid aircraft",                             //
+                Requires<AirState, RigidBody, RigidBodyRate,  //
+                         FlightSignals, ControlSurfaces,      //
+                         EngineControls, Engines, FuelTanks,  //
+                         MassBalance, AircraftType>> {};      //
 
 }  // namespace archetype
 
@@ -115,7 +123,8 @@ using World = framework::World<
     AirState,
     framework::TypeList<AirStateRate, FlightControls, Commands, Airframe,
                         Handling, Autopilot, Route, RigidBody, RigidBodyRate,
-                        ControlSurfaces, MassBalance, AircraftType>,
+                        FlightSignals, ControlSurfaces, EngineControls, Engines,
+                        FuelTanks, MassBalance, AircraftType>,
     framework::TypeList<archetype::Aircraft, archetype::PreciseAircraft,
                         archetype::RigidAircraft>>;
 

@@ -168,6 +168,7 @@ cc_library(
         ":earth",
         ":flight_path",
         ":rigid_body",
+        ":turbine",
         ":units",
         "@eigen",
         "@lib//base:core",

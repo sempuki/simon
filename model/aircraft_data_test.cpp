@@ -34,6 +34,12 @@ engine turbine small
       0 0.1 0.2
       1 0.3 0.4
     end
+  military_thrust_factor
+    table mach density_altitude
+      columns 0 1000
+      0 1 0.8
+      1 1.1 0.9
+    end
 end
 term lift CLalpha
   constant 10
@@ -79,7 +85,7 @@ TEST_CASE("ParseAircraft") {
     auto data = parse_aircraft(text);
     REQUIRE_FALSE(data);
     CHECK_THAT(std::string{data.error().message()},
-               ContainsSubstring("line 23") && ContainsSubstring("wind"));
+               ContainsSubstring("line 29") && ContainsSubstring("wind"));
   }
 
   SECTION("ShouldRefuseGivenBreakpointsOutOfOrder") {
@@ -89,6 +95,17 @@ TEST_CASE("ParseAircraft") {
     REQUIRE_FALSE(data);
     CHECK_THAT(std::string{data.error().message()},
                ContainsSubstring("increasing"));
+  }
+
+  SECTION("ShouldRefuseGivenEngineWithoutThrustTable") {
+    std::string text = GLIDER;
+    std::size_t from = text.find("  military_thrust_factor");
+    std::size_t to = text.find("    end\n", from) + 8;
+    text.erase(from, to - from);
+    auto data = parse_aircraft(text);
+    REQUIRE_FALSE(data);
+    CHECK_THAT(std::string{data.error().message()},
+               ContainsSubstring("both thrust tables"));
   }
 
   SECTION("ShouldRefuseGivenNoHeader") {

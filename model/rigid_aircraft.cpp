@@ -2,6 +2,7 @@
 
 #include "model/rigid_aircraft.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <vector>
@@ -240,11 +241,101 @@ auto mass_balance_of(const AircraftData& aircraft,
 }
 
 auto mass_balance_of(const AircraftData& aircraft) -> MassBalance {
-  std::vector<Mass> contents;
-  for (const FuelTank& tank : aircraft.tanks) {
-    contents.push_back(tank.contents);
+  return mass_balance_of(aircraft, fuel_tanks_of(aircraft));
+}
+
+auto mass_balance_of(const AircraftData& aircraft, const FuelTanks& tanks)
+    -> MassBalance {
+  return mass_balance_of(
+      aircraft, std::span{tanks.contents.data(), aircraft.tanks.size()});
+}
+
+//-- Engines and fuel ----------------------------------------------------------
+
+auto fuel_tanks_of(const AircraftData& aircraft) -> FuelTanks {
+  FuelTanks tanks;
+  for (std::size_t i = 0; i < aircraft.tanks.size(); ++i) {
+    tanks.contents[i] = aircraft.tanks[i].contents;
   }
-  return mass_balance_of(aircraft, contents);
+  return tanks;
+}
+
+auto settled_engines(const AircraftData& aircraft,
+                     const EngineControls& controls, const EngineAir& air)
+    -> Engines {
+  Engines engines;
+  for (std::size_t i = 0; i < aircraft.engines.size(); ++i) {
+    engines.turbines[i] =
+        steady_turbine(aircraft.engines[i], controls.throttle[i], air);
+  }
+  return engines;
+}
+
+auto engine_air_of(const RigidBody& body, const Earth& earth,
+                   const StandardAirTable& air, Time time) -> EngineAir {
+  Length altitude = earth.altitude(body, time);
+  Air here = air(altitude);
+  double sound = here.speed_of_sound.numerical_value_in(meter_per_second);
+  double speed =
+      magnitude(earth.air_velocity(body).numerical_value_in(meter_per_second));
+  // The speed of sound is sqrt(gamma R T).
+  double temperature =
+      sound * sound /
+      (internal::HEAT_RATIO *
+       internal::GAS_CONSTANT.numerical_value_in(joule_per_kilogram_kelvin));
+  return EngineAir{
+      .mach = speed / sound,
+      .density_altitude = altitude,
+      .density_ratio =
+          number_of(here.density / standard_air(0.0 * meter).density),
+      .temperature = units::delta<kelvin>(temperature),
+  };
+}
+
+namespace {
+
+auto has_fuel(const TurbineData& turbine, const FuelTanks& tanks) -> bool {
+  return std::ranges::any_of(turbine.feeds, [&](std::size_t tank) {
+    return tanks.contents[tank] > 0.0 * kilogram;
+  });
+}
+
+}  // namespace
+
+auto run_engines(const AircraftData& aircraft, Engines& engines,
+                 const EngineControls& controls, const FuelTanks& tanks,
+                 const EngineAir& air, Time dt) -> void {
+  for (std::size_t i = 0; i < aircraft.engines.size(); ++i) {
+    const TurbineData& turbine = aircraft.engines[i];
+    TurbineState& state = engines.turbines[i];
+    if (!has_fuel(turbine, tanks)) {
+      state.thrust = 0.0 * newton;
+      state.fuel_flow = 0.0;
+      continue;
+    }
+    state = run_turbine(turbine, state, controls.throttle[i], air, dt);
+  }
+}
+
+auto burn_fuel(const AircraftData& aircraft, const Engines& engines,
+               FuelTanks& tanks, Time dt) -> void {
+  for (std::size_t i = 0; i < aircraft.engines.size(); ++i) {
+    const TurbineData& turbine = aircraft.engines[i];
+    auto feeding = std::ranges::count_if(turbine.feeds, [&](std::size_t tank) {
+      return tanks.contents[tank] > 0.0 * kilogram;
+    });
+    if (feeding == 0) {
+      continue;
+    }
+    Mass share = engines.turbines[i].fuel_flow * dt.numerical_value_in(second) /
+                 static_cast<double>(feeding) * kilogram;
+    for (std::size_t tank : turbine.feeds) {
+      if (tanks.contents[tank] > 0.0 * kilogram) {
+        tanks.contents[tank] =
+            max(tanks.contents[tank] - share, 0.0 * kilogram);
+      }
+    }
+  }
 }
 
 //-- Aerodynamics --------------------------------------------------------------
@@ -330,9 +421,10 @@ auto reads(const AeroModel& model, AeroAxis axis, AeroVariable variable)
 }  // namespace
 
 auto rigid_aircraft_rate(const RigidBody& body, const ControlSurfaces& surfaces,
-                         const MassBalance& mass, const AircraftData& aircraft,
-                         const Earth& earth, const StandardAirTable& air,
-                         Time time) -> RigidBodyRate {
+                         const Engines& engines, const MassBalance& mass,
+                         const AircraftData& aircraft, const Earth& earth,
+                         const StandardAirTable& air, Time time)
+    -> RigidBodyRate {
   const AeroModel& model = aircraft.aero;
   Displacement reference =
       body_offset(aircraft.aero_reference, mass.center_of_mass);
@@ -386,7 +478,19 @@ auto rigid_aircraft_rate(const RigidBody& body, const ControlSurfaces& surfaces,
   sums[index(AeroAxis::YAW)] = sum(model, AeroAxis::YAW, inputs);
 
   AeroLoads loads = aero_loads(sums, alpha, beta, reference);
-  return rigid_body_rate(body, loads.force, loads.moment, mass.properties,
+  Eigen::Vector3d force = loads.force.numerical_value_in(newton).eigen();
+  Eigen::Vector3d moment =
+      loads.moment.numerical_value_in(newton_meter).eigen();
+  for (std::size_t i = 0; i < aircraft.engines.size(); ++i) {
+    Eigen::Vector3d thrust{
+        engines.turbines[i].thrust.numerical_value_in(newton), 0.0, 0.0};
+    Eigen::Vector3d arm =
+        eigen(body_offset(aircraft.engines[i].location, mass.center_of_mass));
+    force += thrust;
+    moment += arm.cross(thrust);
+  }
+  return rigid_body_rate(body, Vector3d{force} * newton,
+                         Vector3d{moment} * newton_meter, mass.properties,
                          gravity);
 }
 

@@ -11,6 +11,7 @@
 #include "model/earth.hpp"
 #include "model/flight_path.hpp"
 #include "model/rigid_body.hpp"
+#include "model/turbine.hpp"
 #include "model/units.hpp"
 
 // An aircraft as a rigid body (see rigid_body.hpp), flown by its control
@@ -93,6 +94,45 @@ struct ControlSurfaces final {
   double spoilers = 0.0;
 };
 
+// Each engine's state, in the aircraft data's order.
+struct Engines final {
+  std::array<TurbineState, MAX_ENGINES> turbines{};
+};
+
+// Each engine's throttle command, from 0 to 1.
+struct EngineControls final {
+  std::array<double, MAX_ENGINES> throttle{};
+};
+
+// The fuel in each tank, in the aircraft data's order.
+struct FuelTanks final {
+  std::array<Mass, MAX_TANKS> contents{};
+};
+
+// The tanks as the aircraft data fills them.
+auto fuel_tanks_of(const AircraftData& aircraft) -> FuelTanks;
+
+// The engines settled at `controls` in `air`.
+auto settled_engines(const AircraftData& aircraft,
+                     const EngineControls& controls, const EngineAir& air)
+    -> Engines;
+
+// The air the engines breathe at `body`. Over the standard atmosphere the
+// density altitude is the altitude.
+auto engine_air_of(const RigidBody& body, const Earth& earth,
+                   const StandardAirTable& air, Time time) -> EngineAir;
+
+// Advances each engine by `dt` at its throttle. An engine whose tanks are
+// empty makes no thrust and burns nothing.
+auto run_engines(const AircraftData& aircraft, Engines& engines,
+                 const EngineControls& controls, const FuelTanks& tanks,
+                 const EngineAir& air, Time dt) -> void;
+
+// Burns each engine's fuel flow for `dt`, from its feed tanks that have fuel,
+// in equal shares, as JSBSim does.
+auto burn_fuel(const AircraftData& aircraft, const Engines& engines,
+               FuelTanks& tanks, Time dt) -> void;
+
 // An aircraft's mass properties as loaded: its mass, its inertia about its
 // center of mass in body axes, and where that center is, in the structural
 // frame (x aft, y right, z up).
@@ -107,22 +147,27 @@ struct MassBalance final {
 auto mass_balance_of(const AircraftData& aircraft,
                      std::span<const Mass> contents) -> MassBalance;
 
-// The same, with each tank as the aircraft data fills it.
+// The same, with each tank as the aircraft data fills it, or as `tanks`
+// holds.
 auto mass_balance_of(const AircraftData& aircraft) -> MassBalance;
+auto mass_balance_of(const AircraftData& aircraft, const FuelTanks& tanks)
+    -> MassBalance;
 
 // A point in the structural frame, from the center of mass, in body axes.
 auto body_offset(const Displacement& structural,
                  const Displacement& center_of_mass) -> Displacement;
 
-// The rate of a rigid aircraft's body, under its aerodynamics and gravity
-// (engines come later). Lift is summed first, so induced drag reads this
+// The rate of a rigid aircraft's body, under its aerodynamics, its engines'
+// thrust, along body x from where each is mounted, and gravity. Lift is summed
+// first, so induced drag reads this
 // step's lift coefficient, and the forces before the moments, so the rate of
 // angle of attack that the moments read is this step's exact one, as long as
 // no force reads it; if one does, the forces are found again with it.
 auto rigid_aircraft_rate(const RigidBody& body, const ControlSurfaces& surfaces,
-                         const MassBalance& mass, const AircraftData& aircraft,
-                         const Earth& earth, const StandardAirTable& air,
-                         Time time) -> RigidBodyRate;
+                         const Engines& engines, const MassBalance& mass,
+                         const AircraftData& aircraft, const Earth& earth,
+                         const StandardAirTable& air, Time time)
+    -> RigidBodyRate;
 
 // What the aerodynamics read at `body`, before the rate of angle of attack,
 // which needs the body's acceleration. `reference` is the aerodynamic

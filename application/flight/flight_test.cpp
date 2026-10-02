@@ -215,9 +215,10 @@ namespace {
 constexpr char BOEING_737[] = "application/flight/aircraft/737.aircraft";
 
 // A 737 flying level at 6 km and 200 m/s, heading north at 2 degrees angle
-// of attack, from the world's origin.
+// of attack, from the world's origin, with its engines settled at
+// `throttle`.
 auto rigid_737(const model::Earth& earth, const model::AircraftData& data,
-               lib::InOut<World> world) -> Entity {
+               lib::InOut<World> world, double throttle = 0.0) -> Entity {
   constexpr double ALPHA = 2.0 * PI / 180.0;
   RigidBody body = earth.body_at(
       model::meters(0.0, 0.0, 6000.0), 0.0 * model::radian,
@@ -225,12 +226,30 @@ auto rigid_737(const model::Earth& earth, const model::AircraftData& data,
       model::meters_per_second(200.0 * std::cos(ALPHA), 0.0,
                                200.0 * std::sin(ALPHA)),
       model::Vector3d{} * model::radian_per_second, 0.0 * model::second);
+
+  FlightSignals signals;
+  // The elevator surface scale turns a command of -1/6 into -0.05 rad.
+  signals[model::FlightSignal::ELEVATOR_COMMAND] = -0.05 / 0.3;
+  model::run_flight_controls(data.flight_controls, signals,
+                             0.0 * model::second);
+  ControlSurfaces surfaces{.elevator = signals[model::FlightSignal::ELEVATOR]};
+  EngineControls controls{.throttle = {throttle, throttle}};
+  model::StandardAirTable air;
+  Engines engines = model::settled_engines(
+      data, controls,
+      model::engine_air_of(body, earth, air, 0.0 * model::second));
+  FuelTanks tanks = model::fuel_tanks_of(data);
+
   auto entity = world->create<archetype::RigidAircraft>()
                     .with(earth.air_state(body, 0.0 * model::second))
                     .with(body)
                     .with(RigidBodyRate{})
-                    .with(ControlSurfaces{.elevator = -0.05})
-                    .with(model::mass_balance_of(data))
+                    .with(signals)
+                    .with(surfaces)
+                    .with(controls)
+                    .with(engines)
+                    .with(tanks)
+                    .with(model::mass_balance_of(data, tanks))
                     .with(AircraftType{.data = &data})
                     .build();
   REQUIRE(entity);
@@ -238,9 +257,11 @@ auto rigid_737(const model::Earth& earth, const model::AircraftData& data,
 }
 
 auto scheduler_for(const model::Earth& earth) -> Scheduler {
-  return Scheduler{Schedule{
-      FollowRoute{}, FlyAutopilot{}, Actuate{}, Fly{}, Precise{},
-      Rigid{SystemList{RigidAircraftRates{earth}}}, FollowRigidBody{earth}}};
+  return Scheduler{Schedule{FollowRoute{}, FlyAutopilot{}, Actuate{}, Fly{},
+                            Precise{}, RunFlightControls{earth},
+                            RunEngines{earth},
+                            Rigid{SystemList{RigidAircraftRates{earth}}},
+                            BurnFuel{}, FollowRigidBody{earth}}};
 }
 
 auto fly_rigid(Duration duration, lib::InOut<Scheduler> scheduler,
@@ -300,6 +321,24 @@ TEST_CASE("RigidAircraft") {
                        .numerical_value_in(model::meter);
     CHECK(apart > 0.01);
     CHECK(apart < 5.0);
+  }
+
+  SECTION("ShouldBurnFuelGivenEnginesRunning") {
+    model::Earth earth = model::Earth::flat();
+    Entity aircraft = rigid_737(earth, *data, lib::InOut(world), 0.7);
+    Scheduler scheduler = scheduler_for(earth);
+    model::Mass start = model::mass_balance_of(*data).properties.mass;
+
+    fly_rigid(10s, lib::InOut(scheduler), lib::InOut(world));
+
+    // Two engines at about 0.5 kg/s each, for 10 s.
+    model::Mass burned =
+        start -
+        world.store_of<MassBalance>().component_of(aircraft).properties.mass;
+    CHECK(burned > 5.0 * model::kilogram);
+    CHECK(burned < 20.0 * model::kilogram);
+    // With thrust it holds its speed better than gliding.
+    CHECK(state_of(world, aircraft).speed > 195.0 * model::meter_per_second);
   }
 
   SECTION("ShouldLeavePointMassAircraftAloneGivenSharedWorld") {

@@ -102,6 +102,21 @@ class Parser final {
         return Failure{read.error()};
       }
     }
+    if (data.engines.size() > MAX_ENGINES || data.tanks.size() > MAX_TANKS) {
+      return fail("an aircraft has at most " + std::to_string(MAX_ENGINES) +
+                  " engines and " + std::to_string(MAX_TANKS) + " tanks");
+    }
+    for (const TurbineData& turbine : data.engines) {
+      if (!turbine.idle_thrust || !turbine.military_thrust_factor) {
+        return fail("engine `" + turbine.name + "` needs both thrust tables");
+      }
+      for (std::size_t feed : turbine.feeds) {
+        if (feed >= data.tanks.size()) {
+          return fail("engine `" + turbine.name + "` feeds from tank " +
+                      std::to_string(feed) + ", which is not there");
+        }
+      }
+    }
     return data;
   }
 

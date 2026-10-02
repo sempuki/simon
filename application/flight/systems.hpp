@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 
 #include "application/flight/components.hpp"
 #include "engine/rate_gate.hpp"
@@ -226,12 +227,105 @@ using Precise =
     framework::Continuous<framework::RungeKutta4, TypeList<AirState>,
                           SystemList<PointMassRates>>;
 
-// The opt-in to six degrees of freedom: the rate of each rigid aircraft's
-// body, over a flat Earth unless constructed with a round one.
+// Each step, each rigid aircraft's flight controls read its state and its
+// pilot's commands, and set its control surfaces.
+struct RunFlightControls final    //
+    : System<FlightSignals,       //
+             const RigidBody,     //
+             const AircraftType,  //
+             ControlSurfaces> {
+  using SystemWorld = ProjectedWorld<RunFlightControls>;
+
+  explicit RunFlightControls(model::Earth earth = model::Earth::flat())
+      : earth_{earth} {}
+
+  auto operator()(SystemWorld&, Entity,       //
+                  FlightSignals& signals,     //
+                  const RigidBody* body,      //
+                  const AircraftType* type,   //
+                  ControlSurfaces* surfaces,  //
+                  Step step) const -> void {
+    if (!body || !type || !type->data || !surfaces) {
+      return;
+    }
+    model::Time time = model::seconds(step.time.time_since_epoch());
+    Eigen::Vector3d uvw = earth_.air_velocity(*body)
+                              .numerical_value_in(model::meter_per_second)
+                              .eigen();
+    Eigen::Vector3d rates = earth_.air_rate(*body)
+                                .numerical_value_in(model::radian_per_second)
+                                .eigen();
+    using enum model::FlightSignal;
+    signals[MACH] = uvw.norm() / air_(earth_.altitude(*body, time))
+                                     .speed_of_sound.numerical_value_in(
+                                         model::meter_per_second);
+    signals[ROLL_RATE] = rates.x();
+    signals[PITCH_RATE] = rates.y();
+    signals[YAW_RATE] = rates.z();
+    signals[ALPHA] = std::atan2(uvw.z(), uvw.x());
+    signals[BETA] = std::atan2(uvw.y(), std::hypot(uvw.x(), uvw.z()));
+
+    model::run_flight_controls(type->data->flight_controls, signals,
+                               model::seconds(step.dt));
+    *surfaces = ControlSurfaces{
+        .elevator = signals[ELEVATOR],
+        .left_aileron = signals[LEFT_AILERON],
+        .right_aileron = signals[RIGHT_AILERON],
+        .rudder = signals[RUDDER],
+        .flaps = signals[FLAPS],
+        .gear = signals[GEAR],
+        .speedbrake = signals[SPEEDBRAKE],
+        .spoilers = signals[SPOILERS],
+    };
+  }
+
+ private:
+  model::Earth earth_;
+  model::StandardAirTable air_;
+};
+
+// Each step, each rigid aircraft's engines run at their throttles in the air
+// they breathe, and set the thrust and fuel flow the step holds.
+struct RunEngines final             //
+    : System<Engines,               //
+             const RigidBody,       //
+             const EngineControls,  //
+             const FuelTanks,       //
+             const AircraftType> {
+  using SystemWorld = ProjectedWorld<RunEngines>;
+  using SequenceAfterSystemList = SystemList<RunFlightControls>;
+
+  explicit RunEngines(model::Earth earth = model::Earth::flat())
+      : earth_{earth} {}
+
+  auto operator()(SystemWorld&, Entity,            //
+                  Engines& engines,                //
+                  const RigidBody* body,           //
+                  const EngineControls* controls,  //
+                  const FuelTanks* tanks,          //
+                  const AircraftType* type,        //
+                  Step step) const -> void {
+    if (!body || !controls || !tanks || !type || !type->data) {
+      return;
+    }
+    model::EngineAir air = model::engine_air_of(
+        *body, earth_, air_, model::seconds(step.time.time_since_epoch()));
+    model::run_engines(*type->data, engines, *controls, *tanks, air,
+                       model::seconds(step.dt));
+  }
+
+ private:
+  model::Earth earth_;
+  model::StandardAirTable air_;
+};
+
+// The rate of each rigid aircraft's body, over a flat Earth unless
+// constructed with a round one.
 struct RigidAircraftRates final      //
     : System<RigidBodyRate,          //
              const RigidBody,        //
              const ControlSurfaces,  //
+             const Engines,          //
              const MassBalance,      //
              const AircraftType> {
   using SystemWorld = ProjectedWorld<RigidAircraftRates>;
@@ -243,18 +337,17 @@ struct RigidAircraftRates final      //
                   RigidBodyRate& rate,              //
                   const RigidBody* body,            //
                   const ControlSurfaces* surfaces,  //
+                  const Engines* engines,           //
                   const MassBalance* mass,          //
                   const AircraftType* type,         //
                   Step step) const -> void {
-    if (!body || !surfaces || !mass || !type || !type->data) {
+    if (!body || !surfaces || !engines || !mass || !type || !type->data) {
       return;
     }
     rate = model::rigid_aircraft_rate(
-        *body, *surfaces, *mass, *type->data, earth_, air_,
+        *body, *surfaces, *engines, *mass, *type->data, earth_, air_,
         model::seconds(step.time.time_since_epoch()));
   }
-
-  auto earth() const -> const model::Earth& { return earth_; }
 
  private:
   model::Earth earth_;
@@ -263,6 +356,30 @@ struct RigidAircraftRates final      //
 
 using Rigid = framework::Continuous<framework::RungeKutta4, TypeList<RigidBody>,
                                     SystemList<RigidAircraftRates>>;
+
+// After Rigid, each rigid aircraft's engines burn the step's fuel, and its
+// mass balance follows.
+struct BurnFuel final             //
+    : System<FuelTanks,           //
+             const Engines,       //
+             const AircraftType,  //
+             MassBalance> {
+  using SystemWorld = ProjectedWorld<BurnFuel>;
+  using SequenceAfterSystemList = SystemList<Rigid>;
+
+  auto operator()(SystemWorld&, Entity,      //
+                  FuelTanks& tanks,          //
+                  const Engines* engines,    //
+                  const AircraftType* type,  //
+                  MassBalance* mass,         //
+                  Step step) const -> void {
+    if (!engines || !type || !type->data || !mass) {
+      return;
+    }
+    model::burn_fuel(*type->data, *engines, tanks, model::seconds(step.dt));
+    *mass = model::mass_balance_of(*type->data, tanks);
+  }
+};
 
 // After Rigid, each rigid aircraft's AirState follows its body, so spatial
 // queries and the rest of the world see it as they see any aircraft. Aircraft
@@ -296,8 +413,9 @@ struct FollowRigidBody final  //
 
 //-- Schedule -----------------------------------------------------------------
 
-using Schedule = SystemList<FollowRoute, FlyAutopilot, Actuate, Fly, Precise,
-                            Rigid, FollowRigidBody>;
+using Schedule =
+    SystemList<FollowRoute, FlyAutopilot, Actuate, Fly, Precise,
+               RunFlightControls, RunEngines, Rigid, BurnFuel, FollowRigidBody>;
 using Scheduler = framework::Scheduler<World, Schedule>;
 
 }  // namespace simon::flight

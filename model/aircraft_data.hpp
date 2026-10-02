@@ -20,6 +20,10 @@
 // y right, z up), in meters.
 namespace simon::model {
 
+// The most engines and tanks an aircraft may have.
+inline constexpr std::size_t MAX_ENGINES = 4;
+inline constexpr std::size_t MAX_TANKS = 8;
+
 struct FuelTank final {
   Displacement location;
   Mass capacity = 0.0 * kilogram;
