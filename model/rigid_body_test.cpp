@@ -45,7 +45,7 @@ TEST_CASE("RigidBody") {
     // An asymmetric body spinning about no principal axis tumbles, but its
     // angular momentum is fixed in the inertial frame, and so is its energy.
     Matrix3 inertia = Vector3{1.0, 2.0, 3.0}.asDiagonal();
-    MassProperties mass = MassProperties::of(1.0 * kilogram, inertia);
+    MassProperties mass = compute_mass_properties(1.0 * kilogram, inertia);
     RigidBody body{.rate = QuantityVector{1.0, 0.1, 0.5} * radian_per_second};
     auto momentum = [&](const RigidBody& b) {
       return Vector3{
@@ -72,7 +72,7 @@ TEST_CASE("RigidBody") {
 
   SECTION("ShouldFallFreelyGivenOnlyGravity") {
     MassProperties mass =
-        MassProperties::of(10.0 * kilogram, Matrix3::Identity());
+        compute_mass_properties(10.0 * kilogram, Matrix3::Identity());
     RigidBody body;
     Acceleration gravity = meters_per_second_squared(0.0, 0.0, -9.8);
     for (int i = 0; i < 120; ++i) {
@@ -89,7 +89,7 @@ TEST_CASE("RigidBody") {
   SECTION("ShouldPushAlongBodyAxesGivenAttitude") {
     // Nose pointing along the inertial y axis: a forward force pushes along y.
     MassProperties mass =
-        MassProperties::of(2.0 * kilogram, Matrix3::Identity());
+        compute_mass_properties(2.0 * kilogram, Matrix3::Identity());
     RigidBody body{.attitude = Quaternion{
                        AngleAxis{std::numbers::pi / 2.0, Vector3::UnitZ()}}};
     RigidBodyRate rate =

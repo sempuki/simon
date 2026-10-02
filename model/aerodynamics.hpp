@@ -147,8 +147,14 @@ using AeroSums = std::array<double, AERO_AXIS_COUNT>;
 struct AeroModel final {
   std::array<std::vector<AeroTerm>, AERO_AXIS_COUNT> axes;
   std::vector<AeroSignal> signals;  // The signals the terms read, in order.
+  // Whether drag, side force or lift read the rate of angle of attack, which
+  // follows from the forces; found once, when the aircraft is read.
+  bool forces_read_alpha_rate = false;
 
   auto operator()(const AeroInputs& inputs) const -> AeroSums;
+
+  // Whether a term on `axis` reads `variable`, as a factor or in a table.
+  auto reads(AeroAxis axis, AeroVariable variable) const -> bool;
 };
 
 // Body-axis aerodynamic force, and moment about the center of mass.
@@ -157,9 +163,22 @@ struct AeroLoads final {
   Moment moment;
 };
 
+// Angle of attack and sideslip, as the turn from wind axes to body axes takes
+// them: found once for the loads of a state, however often they are summed.
+struct WindAngles final {
+  double sin_alpha = 0.0;
+  double cos_alpha = 1.0;
+  double sin_beta = 0.0;
+  double cos_beta = 1.0;
+};
+
+auto compute_wind_angles(Angle alpha, Angle beta) -> WindAngles;
+
 // The sums as body-axis loads, at angle of attack `alpha` and sideslip
 // `beta`, with the aerodynamic reference point `reference` from the center of
 // mass in body axes (x forward, y right, z down).
+auto aero_loads(const AeroSums& sums, const WindAngles& wind,
+                const Displacement& reference) -> AeroLoads;
 auto aero_loads(const AeroSums& sums, Angle alpha, Angle beta,
                 const Displacement& reference) -> AeroLoads;
 

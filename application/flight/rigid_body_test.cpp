@@ -47,7 +47,7 @@ TEST_CASE("RigidBody737") {
           -row.at("ixy"), row.at("iyy"), -row.at("iyz"),        //
           row.at("ixz"), -row.at("iyz"), row.at("izz");
       MassProperties mass =
-          MassProperties::of(row.at("mass") * kilogram, inertia);
+          compute_mass_properties(row.at("mass") * kilogram, inertia);
 
       // Gravitation, found where the body is on the turning Earth.
       Matrix3 to_fixed =

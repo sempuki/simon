@@ -86,17 +86,41 @@ auto AeroModel::operator()(const AeroInputs& inputs) const -> AeroSums {
   return sums;
 }
 
+auto AeroModel::reads(AeroAxis axis, AeroVariable variable) const -> bool {
+  auto is = [&](AeroInput input) { return input == aero_input(variable); };
+  for (const AeroTerm& term : axes[static_cast<std::size_t>(axis)]) {
+    if (std::ranges::any_of(term.factors, is)) {
+      return true;
+    }
+    for (const AeroTable& table : term.tables) {
+      if (is(table.row) || (table.column && is(*table.column))) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+auto compute_wind_angles(Angle alpha, Angle beta) -> WindAngles {
+  return WindAngles{.sin_alpha = sin(alpha),
+                    .cos_alpha = cos(alpha),
+                    .sin_beta = sin(beta),
+                    .cos_beta = cos(beta)};
+}
+
 auto aero_loads(const AeroSums& sums, Angle alpha, Angle beta,
+                const Displacement& reference) -> AeroLoads {
+  return aero_loads(sums, compute_wind_angles(alpha, beta), reference);
+}
+
+auto aero_loads(const AeroSums& sums, const WindAngles& wind,
                 const Displacement& reference) -> AeroLoads {
   double drag = sums[static_cast<std::size_t>(AeroAxis::DRAG)];
   double side = sums[static_cast<std::size_t>(AeroAxis::SIDE)];
   double lift = sums[static_cast<std::size_t>(AeroAxis::LIFT)];
 
   // From wind axes, where drag and lift point back and up, to body axes.
-  double sin_alpha = sin(alpha);
-  double cos_alpha = cos(alpha);
-  double sin_beta = sin(beta);
-  double cos_beta = cos(beta);
+  auto [sin_alpha, cos_alpha, sin_beta, cos_beta] = wind;
   QuantityVector force{
       -cos_alpha * cos_beta * drag - cos_alpha * sin_beta * side +
           sin_alpha * lift,

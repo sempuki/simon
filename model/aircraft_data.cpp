@@ -111,6 +111,10 @@ class Parser final {
                   " engines and " + std::to_string(MAX_TANKS) + " tanks");
     }
     append_throttles(InOut(data.flight_controls), data.engines.size());
+    data.aero.forces_read_alpha_rate =
+        data.aero.reads(AeroAxis::LIFT, AeroVariable::ALPHA_RATE) ||
+        data.aero.reads(AeroAxis::DRAG, AeroVariable::ALPHA_RATE) ||
+        data.aero.reads(AeroAxis::SIDE, AeroVariable::ALPHA_RATE);
     if (data.flight_controls.signals.size() > MAX_FLIGHT_SIGNALS) {
       return fail("the flight controls have more than " +
                   std::to_string(MAX_FLIGHT_SIGNALS) + " signals");
