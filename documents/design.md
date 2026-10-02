@@ -2485,21 +2485,22 @@ at 8 ms steps, each on its own. GCC, per aircraft per step:
 
 | Aircraft | Flat Earth | Round Earth |
 |---:|---:|---:|
-| 100 | 1.78 µs | 3.57 µs |
-| 1,000 | 1.74 µs | 3.57 µs |
-| 10,000 | 1.75 µs | 3.57 µs |
+| 100 | 1.83 µs | 2.80 µs |
+| 1,000 | 1.77 µs | 2.82 µs |
+| 10,000 | 1.77 µs | 2.80 µs |
 
 - **The cost is flat with population,** so one thread flies about 4,500
-  rigid 737s in real time over a flat Earth, and 2,200 round one. `Rigid`
-  is four fifths of it: four stages, each building up the aerodynamics.
+  rigid 737s in real time over a flat Earth, and 2,800 round one. `Rigid`
+  is three quarters to four fifths of it: four stages, each building up the
+  aerodynamics.
 - **JSBSim takes 9.2 µs a frame** for one 737, timed through its Python
   module from its own trim, with one instance per aircraft. Its frame does
   work simon's does not, such as ground reactions and its property tree, so
   the comparison is rough; simon evaluates the aircraft four times a step to
-  JSBSim's once and is still 2.6 times faster round the Earth.
-- **The round Earth doubles the cost.** The geodetic conversion and the
-  local frame are found several times a stage; finding them once would be
-  the first thing to try.
+  JSBSim's once and is still 3.3 times faster round the Earth.
+- **The round Earth costs 60% more.** Each stage finds the body's place on
+  it once, its geodetic position, local frame and the Earth's turn, in
+  `Earth::place`, which took the round Earth from 3.57 to 2.81 µs.
 
 Building it turned up JSBSim behaviors that a comparison has to allow for,
 all noted where they matter: a frame starts by moving the state on, so

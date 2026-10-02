@@ -83,18 +83,45 @@ auto Earth::fixed_of(const RigidBody& body, Time time) const -> Position {
          meter;
 }
 
+auto Earth::place(const RigidBody& body, Time time) const -> Place {
+  if (!round_) {
+    Place flat{
+        .fixed = body.position,
+        .altitude = altitude_of(body.position),
+    };
+    // North is y, east x, and down -z.
+    flat.north_east_down << 0.0, 1.0, 0.0,  //
+        1.0, 0.0, 0.0,                      //
+        0.0, 0.0, -1.0;
+    return flat;
+  }
+  Eigen::Matrix3d to_fixed = wgs84::inertial_to_fixed(angle(time));
+  Position fixed = Vector3d{to_fixed * eigen(body.position)} * meter;
+  wgs84::Geodetic where = wgs84::geodetic_of(fixed);
+  return Place{
+      .inertial_to_fixed = to_fixed,
+      .fixed = fixed,
+      .altitude = where.altitude,
+      .north_east_down =
+          to_fixed.transpose() *
+          north_east_down_to_fixed(where.latitude, where.longitude),
+  };
+}
+
 auto Earth::gravity(const RigidBody& body, Time time) const -> Acceleration {
+  return gravity(place(body, time));
+}
+
+auto Earth::gravity(const Place& place) const -> Acceleration {
   if (!round_) {
     return meters_per_second_squared(
         0.0, 0.0,
         -STANDARD_GRAVITY.numerical_value_in(meter_per_second_squared));
   }
-  Eigen::Matrix3d to_fixed = wgs84::inertial_to_fixed(angle(time));
-  return Vector3d{to_fixed.transpose() *
-                  eigen(wgs84::gravitation(fixed_of(body, time)))} *
+  return Vector3d{place.inertial_to_fixed.transpose() *
+                  eigen(wgs84::gravitation(place.fixed))} *
          meter_per_second_squared;
 }
-
 auto Earth::air_velocity(const RigidBody& body) const -> Velocity {
   Eigen::Vector3d relative =
       eigen(body.velocity) - spin(round_).cross(eigen(body.position));
@@ -344,9 +371,17 @@ auto aero_inputs_of(const RigidBody& body, const ControlSurfaces& surfaces,
                     const AircraftData& aircraft, const Displacement& reference,
                     const Earth& earth, const StandardAirTable& air, Time time)
     -> AeroInputs {
+  return aero_inputs_of(body, surfaces, aircraft, reference, earth,
+                        earth.place(body, time), air);
+}
+
+auto aero_inputs_of(const RigidBody& body, const ControlSurfaces& surfaces,
+                    const AircraftData& aircraft, const Displacement& reference,
+                    const Earth& earth, const Place& place,
+                    const StandardAirTable& air) -> AeroInputs {
   Eigen::Vector3d uvw = eigen(earth.air_velocity(body));
   Eigen::Vector3d rates = eigen(earth.air_rate(body));
-  Length altitude = earth.altitude(body, time);
+  Length altitude = place.altitude;
   Air here = air(altitude);
 
   double speed = uvw.norm();
@@ -380,7 +415,8 @@ auto aero_inputs_of(const RigidBody& body, const ControlSurfaces& surfaces,
   // The reference point's height: the body's, less how far down from it the
   // point lies.
   double below =
-      (earth.body_to_north_east_down(body, time) * eigen(reference)).z();
+      (place.north_east_down.transpose() * (body.attitude * eigen(reference)))
+          .z();
   inputs[HEIGHT_OVER_SPAN] = (altitude.numerical_value_in(meter) - below) /
                              aircraft.wing_span.numerical_value_in(meter);
   return inputs;
@@ -428,9 +464,10 @@ auto rigid_aircraft_rate(const RigidBody& body, const ControlSurfaces& surfaces,
   const AeroModel& model = aircraft.aero;
   Displacement reference =
       body_offset(aircraft.aero_reference, mass.center_of_mass);
+  Place place = earth.place(body, time);
   AeroInputs inputs =
-      aero_inputs_of(body, surfaces, aircraft, reference, earth, air, time);
-  Acceleration gravity = earth.gravity(body, time);
+      aero_inputs_of(body, surfaces, aircraft, reference, earth, place, air);
+  Acceleration gravity = earth.gravity(place);
   Angle alpha = inputs[AeroVariable::ALPHA] * radian;
   Angle beta = inputs[AeroVariable::BETA] * radian;
 

@@ -26,6 +26,16 @@ namespace simon::model {
 // with ECEF at time zero, and the world's local frame is the plane tangent to
 // the ellipsoid at `origin`, so the rest of a world can treat the aircraft as
 // it treats any other. There is no wind: the air turns with the Earth.
+// Where a body is on the Earth at a time, found once for what the frames,
+// gravity and the air need.
+struct Place final {
+  Eigen::Matrix3d inertial_to_fixed = Eigen::Matrix3d::Identity();
+  Position fixed = meters(0.0, 0.0, 0.0);
+  Length altitude = 0.0 * meter;
+  // From the local north-east-down frame to the inertial frame.
+  Eigen::Matrix3d north_east_down = Eigen::Matrix3d::Identity();
+};
+
 class Earth final {
  public:
   static auto flat() -> Earth { return Earth{}; }
@@ -36,8 +46,12 @@ class Earth final {
   // How far the Earth has turned at `time`.
   auto angle(Time time) const -> Angle;
 
+  // Where `body` is at `time`.
+  auto place(const RigidBody& body, Time time) const -> Place;
+
   // The gravitational acceleration at `body`, in the inertial frame.
   auto gravity(const RigidBody& body, Time time) const -> Acceleration;
+  auto gravity(const Place& place) const -> Acceleration;
 
   // The body's velocity through the air, in body axes.
   auto air_velocity(const RigidBody& body) const -> Velocity;
@@ -177,5 +191,9 @@ auto aero_inputs_of(const RigidBody& body, const ControlSurfaces& surfaces,
                     const AircraftData& aircraft, const Displacement& reference,
                     const Earth& earth, const StandardAirTable& air, Time time)
     -> AeroInputs;
+auto aero_inputs_of(const RigidBody& body, const ControlSurfaces& surfaces,
+                    const AircraftData& aircraft, const Displacement& reference,
+                    const Earth& earth, const Place& place,
+                    const StandardAirTable& air) -> AeroInputs;
 
 }  // namespace simon::model
