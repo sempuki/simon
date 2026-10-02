@@ -2313,7 +2313,8 @@ The test checks the autopilot (holding altitude, speed and heading, and
 turning the short way to a waypoint behind), that a closed route is flown,
 that a single-pass and a Runge-Kutta aircraft flying the same route end within
 100 m of each other after five minutes, and that a scenario repeats exactly
-from its seed.
+from its seed. `accuracy_test` compares the model with JSBSim (see
+[Accuracy against JSBSim](#accuracy-against-jsbsim)).
 
 `bazel run -c opt //application/flight:flight_benchmark` flies 500 steps of
 20 ms at each population, once with every aircraft on the single-pass model
@@ -2342,6 +2343,63 @@ and once with every aircraft on Runge-Kutta 4. GCC, ms per step:
   `standard_air`; it saved 6% of `Fly`, and 20% of Runge-Kutta 4, which
   evaluates the air four times.
 - **Clang is about 13% slower** (8.3 and 22.7 ms at 100,000).
+
+#### Accuracy against JSBSim
+
+`accuracy_test` measures how far the point-mass model drifts from JSBSim's
+737. `reference/jsbsim_737.py` trims the 737 at 6000 m and 200 m/s and flies
+it for 640 s under a small autopilot of its own. It flies level, turns at 30°
+of bank, climbs at 3°, makes a descending turn at 25° and accelerates to
+220 m/s. Every 0.2 s it records where the 737 is, and the load factor, bank
+and throttle a point mass needs to fly the same path. The test replays those
+controls through `Fly` and `Precise` and compares the paths. Both see the same
+controls, so simon's autopilot and actuators play no part, and the drift
+belongs to the model and the integrator.
+
+The replay keeps three effects out of the comparison:
+
+- **The Earth.** Load factor and bank come from the rates of flight-path angle
+  and heading that the 737 flew, so simon's flat, non-rotating Earth sees the
+  same turns. Taken from JSBSim's forces instead, they need 0.056 m/s² less
+  lift on average than a flat Earth expects. Gravity falling with altitude is
+  0.012 m/s² of that, and the Earth's rotation and curvature most of the
+  rest. Replayed open loop, that error puts the aircraft 10 km off in
+  altitude after 640 s. In a running simulation the autopilot closes the loop
+  and absorbs it.
+- **Fuel.** The 737 burns 1.2% of its mass, and `Airframe` has a fixed one,
+  so the throttle replays thrust per kilogram of the starting mass.
+- **The engine.** The throttle is JSBSim's thrust along the velocity, scaled
+  to simon's thrust law, so drag is the only force left to simon.
+
+The airframe is the 737's mass and wing area, with a drag polar fitted to 100
+JSBSim trims over the scenario's envelope (3 to 9 km, 160 to 240 m/s, level
+and in turns up to 45° of bank). CD0 is 0.0224 and K is 0.0807, and the worst
+trim is 9.7% off. The largest drift over the flight, which covers 130 km:
+
+| Step | Model | Position | Altitude | Speed | Heading |
+|---:|---|---:|---:|---:|---:|
+| 20 ms | Single pass | 1.82 km | 51 m | 3.3 m/s | 1.3° |
+| 20 ms | Runge-Kutta 4 | 1.81 km | 50 m | 3.3 m/s | 1.3° |
+| 200 ms | Single pass | 1.89 km | 62 m | 3.6 m/s | 1.3° |
+| 200 ms | Runge-Kutta 4 | 1.80 km | 50 m | 3.3 m/s | 1.3° |
+| 1 s | Single pass | 2.09 km | 94 m | 4.6 m/s | 1.9° |
+| 1 s | Runge-Kutta 4 | 1.70 km | 52 m | 3.2 m/s | 1.9° |
+
+- **The drag polar is most of the drift.** Its speed error changes the turn
+  rate, which bends the path away. In a turn the 737 holds more elevator
+  against its pitch rate, and its elevator drag rises from 0.0027 to 0.0038 at
+  30° of bank. A polar in CL alone cannot follow that. A polar fitted to level
+  trims alone drifts 4.8 km. A Python copy of the replay that takes JSBSim's
+  own drag drifts 55 m, so the equations and integrators are not the limit.
+- **Runge-Kutta 4 buys little at the steps simon runs.** At 20 ms the two
+  models differ by 10 m against a drift of 1.8 km. At 1 s Runge-Kutta 4 holds
+  altitude to 52 m against 94 m. A better drag model would be worth more than
+  either integrator.
+
+The test holds the drift at 20 ms and 1 s with about 25% headroom. To
+regenerate the reference, install JSBSim's Python package and NumPy, and run
+`python application/flight/reference/jsbsim_737.py`. It prints the fitted
+airframe, which the test keeps as constants.
 
 ## Libraries
 
@@ -2406,10 +2464,12 @@ Each step ends with a working application and passing tests.
      [flight](#flight) application flying it at two fidelity levels.
    - Done: `flight_benchmark`, idle and contended, for both levels (see
      [flight](#flight)).
+   - Done: accuracy against JSBSim's 737 (see
+     [Accuracy against JSBSim](#accuracy-against-jsbsim)).
    - Later: 6-DOF rigid bodies, Adams-Bashforth
      with rate history, many replicas of a scenario in one world, world
-     snapshots, and trim tables computed offline. JSBSim, run offline, is the
-     reference each level's accuracy is measured against.
+     snapshots, and trim tables computed offline. JSBSim, run offline, stays
+     the reference each level's accuracy is measured against.
 
 Later: `LockstepDriver` and a second process, scenario files with two-phase
 loading, parent-child transforms (a radar mounted on a vehicle), and DIS or HLA

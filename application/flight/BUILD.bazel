@@ -42,6 +42,20 @@ cc_test(
     ],
 )
 
+# Replays JSBSim's 737 through Fly and Precise. reference/jsbsim_737.py
+# regenerates the reference.
+cc_test(
+    name = "accuracy_test",
+    size = "small",
+    srcs = ["accuracy_test.cpp"],
+    copts = COPTS,
+    data = ["reference/jsbsim_737.csv"],
+    deps = [
+        ":flight_library",
+        "@lib//base:testing",
+    ],
+)
+
 # Flies one scenario as fast as possible and prints what it did.
 cc_binary(
     name = "flight",
