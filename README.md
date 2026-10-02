@@ -91,6 +91,30 @@ throttle step.
 bazel test //application/flight:check_case_test   # about 3 minutes
 ```
 
+### It flies the 737 through its flight controls
+
+The 737's flight controls are JSBSim's model of the airliner's, converted
+block for block. They move the surfaces where the pilot's controls and trims put them,
+with one loop, a yaw damper:
+
+| Channel | What the controls do |
+|---|---|
+| Pitch | Stick and pitch trim, together, move the elevator up to 17° each way |
+| Roll | Wheel and roll trim move the ailerons up to 20°, one up as the other goes down |
+| Yaw | Pedals, yaw trim and a yaw damper, which feeds back the yaw rate above Mach 0.11, move the rudder up to 20° |
+| Flaps | An actuator moves them through eight detents, taking 2 to 5 s for each |
+| Gear | An actuator takes 5 s to lower or raise it |
+| Spoilers | Actuators move the flight and ground spoilers, each fully in 0.6 s |
+
+That is 18 blocks: summers, scheduled gains, surface scales and actuators.
+Replayed through 15 s of recorded commands, which sweep the stick, wheel and
+pedals, step the trims, and move the flaps, gear, speedbrake and spoilers,
+every surface agrees with JSBSim's to 4e-15 on every frame.
+
+```sh
+bazel test //application/flight:flight_control_test
+```
+
 ### It flies the F-16 through its fly-by-wire
 
 The F-16's flight controls are JSBSim's model of its fly-by-wire, converted
