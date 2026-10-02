@@ -1,4 +1,4 @@
-// Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+// Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 // Flies one flight scenario as fast as possible and prints what it did:
 //

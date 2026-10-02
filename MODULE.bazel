@@ -1,4 +1,4 @@
-# Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+# Copyright 2025 -- CONTRIBUTORS. See LICENSE.
 
 module(
     name = "simon",

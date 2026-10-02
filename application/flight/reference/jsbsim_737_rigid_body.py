@@ -1,4 +1,4 @@
-# Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+# Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 """Records JSBSim's 737 equations of motion, for rigid_body_test.
 

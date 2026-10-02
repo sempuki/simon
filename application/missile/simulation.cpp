@@ -1,4 +1,4 @@
-// Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+// Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "application/missile/simulation.hpp"
 #include "framework/vocabulary.hpp"

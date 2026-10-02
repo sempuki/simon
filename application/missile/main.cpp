@@ -1,4 +1,4 @@
-// Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+// Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 // Runs one missile scenario as fast as possible and prints the outcome:
 //

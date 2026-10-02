@@ -1,4 +1,4 @@
-// Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+// Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "framework/world.hpp"
 #include "framework/vocabulary.hpp"

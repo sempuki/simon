@@ -1,4 +1,4 @@
-// Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+// Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 // Compares store layouts under churn: entities are born and die every step,
 // some within a few steps and some after hundreds, and some gain or lose a
@@ -72,7 +72,7 @@
 #include <vector>
 
 #include "base/core.hpp"
-#include "framework/benchmark_support.hpp"
+#include "framework/benchmarking.hpp"
 #include "framework/component_store.hpp"
 #include "framework/entity.hpp"
 #include "framework/vocabulary.hpp"

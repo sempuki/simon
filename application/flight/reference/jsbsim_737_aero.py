@@ -1,4 +1,4 @@
-# Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+# Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 """Records JSBSim's 737 aerodynamics, for aero_test to check simon's against.
 

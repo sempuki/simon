@@ -1,4 +1,4 @@
-// Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+// Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 // Measures the cost of reaching a sibling, another component of the same
 // entity.
@@ -44,7 +44,7 @@
 
 #include "base/core.hpp"
 #include "framework/archetype.hpp"
-#include "framework/benchmark_support.hpp"
+#include "framework/benchmarking.hpp"
 #include "framework/system.hpp"
 #include "framework/vocabulary.hpp"
 #include "framework/world.hpp"

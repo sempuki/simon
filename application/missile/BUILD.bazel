@@ -1,4 +1,4 @@
-# Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+# Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 load("@lib//bazel:copts.bzl", "COPTS")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
@@ -80,7 +80,7 @@ cc_binary(
         "//framework:vocabulary",
         ":missile_library",
         "//framework",
-        "//framework:benchmark_support",
+        "//framework:benchmarking",
         "@lib//base:core",
     ],
 )

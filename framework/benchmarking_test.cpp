@@ -1,6 +1,6 @@
-// Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+// Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-#include "framework/benchmark_support.hpp"
+#include "framework/benchmarking.hpp"
 
 #include <optional>
 
@@ -30,6 +30,21 @@ TEST_CASE("Contention") {
     CHECK(Contention::describe(0) == "uncontended");
     CHECK(Contention::describe(1) == "contended by 1 thread");
     CHECK(Contention::describe(4) == "contended by 4 threads");
+  }
+}
+
+TEST_CASE("parse_count") {
+  SECTION("ShouldReadTheNumberGivenWholePositiveNumber") {
+    CHECK(parse_count("1") == 1);
+    CHECK(parse_count("100000") == 100'000);
+  }
+
+  SECTION("ShouldReadNothingGivenZeroNegativeOrMalformedText") {
+    CHECK(parse_count("0") == std::nullopt);
+    CHECK(parse_count("-3") == std::nullopt);
+    CHECK(parse_count("") == std::nullopt);
+    CHECK(parse_count("12x") == std::nullopt);
+    CHECK(parse_count("--steps") == std::nullopt);
   }
 }
 

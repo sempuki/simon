@@ -1,4 +1,4 @@
-// Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+// Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 // Times the missile simulation at growing populations, system by system.
 //
@@ -21,7 +21,6 @@
 
 #include <algorithm>
 #include <array>
-#include <charconv>
 #include <chrono>
 #include <cstddef>
 #include <cstdio>
@@ -30,13 +29,12 @@
 #include <print>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <tuple>
 #include <vector>
 
 #include "application/missile/simulation.hpp"
 #include "base/core.hpp"
-#include "framework/benchmark_support.hpp"
+#include "framework/benchmarking.hpp"
 #include "framework/type_list.hpp"
 #include "framework/vocabulary.hpp"
 
@@ -163,21 +161,6 @@ auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
 }  // namespace
 }  // namespace simon::missile
 
-namespace {
-
-// A whole positive number, or nothing.
-auto parse_count(std::string_view text) -> std::optional<int> {
-  int count = 0;
-  auto [end, error] =
-      std::from_chars(text.data(), text.data() + text.size(), count);
-  if (error != std::errc{} || end != text.data() + text.size() || count <= 0) {
-    return std::nullopt;
-  }
-  return count;
-}
-
-}  // namespace
-
 // missile_benchmark [--steps N] [--contend[=N]] [--in-turn] [drones...]
 //
 // Without --steps, each population runs up to 500 steps or 30 s of wall time,
@@ -185,6 +168,7 @@ auto parse_count(std::string_view text) -> std::optional<int> {
 // the same number of steps.
 auto main(int argc, char** argv) -> int {
   using simon::framework::benchmark::Contention;
+  using simon::framework::benchmark::parse_count;
   int steps = simon::missile::DEFAULT_STEPS;
   bool budgeted = true;
   bool in_turn = false;

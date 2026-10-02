@@ -1,4 +1,4 @@
-// Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+// Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 // Compares framework::ComponentStore (dense arrays with an entity index)
 // against a stable-slot store at several populations and churn levels. Churn

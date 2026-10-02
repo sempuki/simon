@@ -1,4 +1,4 @@
-# Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+# Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 """Flies JSBSim's 737 as the reference for the flight model's accuracy.
 

@@ -1,4 +1,4 @@
-// Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+// Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #pragma once
 
@@ -11,7 +11,7 @@
 
 #include "base/core.hpp"
 
-// Shared by the framework's benchmarks.
+// Shared by simon's benchmarks.
 namespace simon::framework::benchmark {
 
 // While alive, runs `threads` threads that stream over buffers much larger
@@ -41,5 +41,8 @@ class Contention final {
   std::atomic<bool> stop_ = false;
   std::vector<std::thread> threads_;
 };
+
+// A whole positive number, or nothing.
+auto parse_count(std::string_view text) -> std::optional<int>;
 
 }  // namespace simon::framework::benchmark

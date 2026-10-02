@@ -1,6 +1,6 @@
-// Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+// Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-#include "framework/benchmark_support.hpp"
+#include "framework/benchmarking.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -61,6 +61,17 @@ auto Contention::describe(unsigned threads) -> std::string {
   return threads == 0 ? std::string{"uncontended"}
                       : std::format("contended by {} thread{}", threads,
                                     threads == 1 ? "" : "s");
+}
+
+// A whole positive number, or nothing.
+auto parse_count(std::string_view text) -> std::optional<int> {
+  int count = 0;
+  auto [end, error] =
+      std::from_chars(text.data(), text.data() + text.size(), count);
+  if (error != std::errc{} || end != text.data() + text.size() || count <= 0) {
+    return std::nullopt;
+  }
+  return count;
 }
 
 }  // namespace simon::framework::benchmark

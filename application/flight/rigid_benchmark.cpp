@@ -1,4 +1,4 @@
-// Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+// Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 // Times rigid aircraft at growing populations, system by system, over a flat
 // Earth and round a turning one: 737s converted from JSBSim, trimmed roughly
@@ -12,7 +12,6 @@
 
 #include <algorithm>
 #include <array>
-#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -21,7 +20,6 @@
 #include <print>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <tuple>
 #include <vector>
 
@@ -29,6 +27,7 @@
 #include "application/flight/simulation.hpp"
 #include "application/flight/systems.hpp"
 #include "base/core.hpp"
+#include "framework/benchmarking.hpp"
 #include "framework/vocabulary.hpp"
 
 namespace simon::flight {
@@ -116,32 +115,22 @@ auto measure(int aircraft, bool round, int steps,
   }
 }
 
-// A whole positive number, or nothing.
-auto parse_count(std::string_view text) -> std::optional<int> {
-  int count = 0;
-  auto [end, error] =
-      std::from_chars(text.data(), text.data() + text.size(), count);
-  if (error != std::errc{} || end != text.data() + text.size() || count <= 0) {
-    return std::nullopt;
-  }
-  return count;
-}
-
 }  // namespace
 }  // namespace simon::flight
 
 // rigid_benchmark [--steps N] [aircraft...]
 auto main(int argc, char** argv) -> int {
+  using simon::framework::benchmark::parse_count;
   int steps = simon::flight::DEFAULT_STEPS;
   std::vector<int> populations;
   for (int i = 1; i < argc; ++i) {
     std::string_view argument{argv[i]};
     std::optional<int> count;
     if (argument == "--steps" && i + 1 < argc &&
-        (count = simon::flight::parse_count(argv[i + 1]))) {
+        (count = parse_count(argv[i + 1]))) {
       steps = *count;
       ++i;
-    } else if ((count = simon::flight::parse_count(argument))) {
+    } else if ((count = parse_count(argument))) {
       populations.push_back(*count);
     } else {
       std::println(stderr, "unknown argument: {}", argument);

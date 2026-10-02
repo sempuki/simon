@@ -1,4 +1,4 @@
-// Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+// Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 // Times the flight simulation at growing populations, system by system: with
 // every aircraft on the single-pass model, with every aircraft opted in to
@@ -15,7 +15,6 @@
 
 #include <algorithm>
 #include <array>
-#include <charconv>
 #include <chrono>
 #include <cstddef>
 #include <expected>
@@ -23,13 +22,12 @@
 #include <print>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <tuple>
 #include <vector>
 
 #include "application/flight/simulation.hpp"
 #include "base/core.hpp"
-#include "framework/benchmark_support.hpp"
+#include "framework/benchmarking.hpp"
 #include "framework/type_list.hpp"
 #include "framework/vocabulary.hpp"
 
@@ -144,24 +142,10 @@ auto measure(int aircraft, Fidelity fidelity, int steps,
 }  // namespace
 }  // namespace simon::flight
 
-namespace {
-
-// A whole positive number, or nothing.
-auto parse_count(std::string_view text) -> std::optional<int> {
-  int count = 0;
-  auto [end, error] =
-      std::from_chars(text.data(), text.data() + text.size(), count);
-  if (error != std::errc{} || end != text.data() + text.size() || count <= 0) {
-    return std::nullopt;
-  }
-  return count;
-}
-
-}  // namespace
-
 // flight_benchmark [--steps N] [--contend[=N]] [aircraft...]
 auto main(int argc, char** argv) -> int {
   using simon::framework::benchmark::Contention;
+  using simon::framework::benchmark::parse_count;
   int steps = simon::flight::DEFAULT_STEPS;
   unsigned threads = 0;
   std::vector<int> populations;

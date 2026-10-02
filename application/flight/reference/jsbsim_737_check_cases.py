@@ -1,4 +1,4 @@
-# Copyright 2022 -- CONTRIBUTORS. See LICENSE.
+# Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 """Flies JSBSim's 737 through open-loop check cases, for check_case_test.
 
