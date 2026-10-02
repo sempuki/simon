@@ -6,24 +6,22 @@ The F-16 is trimmed in cruise at 6 km and 200 m/s, 30 degrees north, heading
 northeast, and from there flown for 30 s in each of five cases: holding the
 trim, and a stick doublet in pitch and in roll, a rudder doublet, and a
 throttle step into reheat on top of it (see `command`). The pilot's commands
-are open loop; the fly-by-wire flight controls close their own loops on
-rate and load factor. Each case is flown at 8 ms, and at 0.125 ms, where
-JSBSim has converged to a millimeter or so, and to 5 cm after the roll
-doublet. The flight controls run every 8 ms at both, as a digital flight
-control computer runs at its own rate: at 0.125 ms each channel but the
-throttle's runs every 64th frame. The F-16's
-control laws differentiate the pilot's commands and then clip them, so at
-JSBSim's own frame they change with the frame and never converge. JSBSim's trim at 0.125 ms comes to
-the same state as at 8 ms, but its pitch trim differs by a few parts in 10^5,
-which the F-16 feels; so every flight takes its commands from the trim at
-8 ms.
+are open loop; the fly-by-wire flight controls close their own loops on rate
+and load factor. Each case is flown at 8 ms, and at 0.125 ms, where JSBSim has
+converged to a millimeter or so, and to 5 cm after the roll doublet. The flight
+controls run every 8 ms at both, as a digital flight control computer runs at
+its own rate: at 0.125 ms each channel but the throttle's runs every 64th
+frame. The F-16's control laws differentiate the pilot's commands and then clip
+them, so at JSBSim's own frame they change with the frame and never converge.
+JSBSim's trim at 0.125 ms comes to the same state as at 8 ms, but its pitch
+trim differs by a few parts in 10^5, which the F-16 feels; so every flight
+takes its commands from the trim at 8 ms.
 
 Writes jsbsim_f16_check_initial.csv, the trimmed state and controls and the
-mass properties; jsbsim_f16_check_signals.csv, every flight control signal
-the trim leaves; and jsbsim_f16_check_cases.csv, every 0.2 s of every case at
-both frames. After
-the trim each PID's integral is zeroed, as simon's start, because JSBSim
-does not show it.
+mass properties; jsbsim_f16_check_signals.csv, every flight control signal the
+trim leaves; and jsbsim_f16_check_cases.csv, every 0.2 s of every case at both
+frames. After the trim each PID's integral is zeroed, as simon's start, because
+JSBSim does not show it.
 
   pip install jsbsim numpy
   python application/flight/reference/jsbsim_f16_check_cases.py
@@ -122,8 +120,9 @@ def aircraft_path(frame):
         with open(path, 'w') as target:
             # Not the throttle's: JSBSim sets the throttle to its command
             # every frame before the channels run, and the channel, a gain,
-            # would double it only on the computer's frames. Its command changes only on
-            # the computer's frames, so running it every frame is the same.
+            # would double it only on the computer's frames. Its command
+            # changes only on the computer's frames, so running it every
+            # frame is the same.
             target.write(re.sub(r'<channel name="(?!Throttle")',
                                 '<channel execrate="%d" name="' % rate, text))
     return directory

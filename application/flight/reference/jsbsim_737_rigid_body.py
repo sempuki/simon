@@ -3,12 +3,11 @@
 """Records JSBSim's 737 equations of motion, for rigid_body_test.
 
 Writes jsbsim_737_rigid_body.csv: at states through two maneuvering flights,
-one at the equator heading north and one at 60 degrees north heading east,
-the state in the Earth-centered inertial frame, the forces and moments that
-act on it, its mass properties, the rates of change JSBSim found, and the
-air data it read. All of
-it is read after a frame: JSBSim starts each frame by moving the state on,
-then finds the forces and rates of the state it moved to.
+one at the equator heading north and one at 60 degrees north heading east, the
+state in the Earth-centered inertial frame, the forces and moments that act on
+it, its mass properties, the rates of change JSBSim found, and the air data it
+read. All of it is read after a frame: JSBSim starts each frame by moving the
+state on, then finds the forces and rates of the state it moved to.
 
   pip install jsbsim numpy
   python application/flight/reference/jsbsim_737_rigid_body.py

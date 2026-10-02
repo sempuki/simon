@@ -3,12 +3,12 @@
 """Records JSBSim's F-16 turbine, for turbine_test.
 
 Writes jsbsim_f16_turbine.csv: every frame of 30 s at 120 Hz, the air the
-engine breathes, its throttle, and its spool speeds, thrust and fuel flow.
-The engine starts settled; then the throttle steps into reheat part way and
-fully, back out, and in again, while the F-16 climbs, so the air changes
-too. The flight controls double the pilot's throttle, so a throttle past 1
-lights the reheat. Every column is read after its frame, which finds the engines'
-air, runs them, and burns their fuel.
+engine breathes, its throttle, and its spool speeds, thrust and fuel flow. The
+engine starts settled; then the throttle steps into reheat part way and fully,
+back out, and in again, while the F-16 climbs, so the air changes too. The
+flight controls double the pilot's throttle, so a throttle past 1 lights the
+reheat. Every column is read after its frame, which finds the engines' air,
+runs them, and burns their fuel.
 
   pip install jsbsim
   python application/flight/reference/jsbsim_f16_turbine.py

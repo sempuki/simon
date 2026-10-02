@@ -4,9 +4,10 @@
 
 Writes jsbsim_f16_aero.csv: at states through three short flights, what the
 aerodynamics read and what JSBSim made of them. The flights are low and slow
-with the gear down, in ground effect; at cruise; slow with the stick full
-aft, to high angle of attack; and supersonic, with the speedbrake out. The stick moves throughout, and the fly-by-wire flight
-controls move the surfaces, the leading-edge flaps and the flaperons.
+with the gear down, in ground effect; at cruise; slow with the stick full aft,
+to high angle of attack; and supersonic, with the speedbrake out. The stick
+moves throughout, and the fly-by-wire flight controls move the surfaces, the
+leading-edge flaps and the flaperons.
 
 Every column is read after a frame: JSBSim derives angle of attack, dynamic
 pressure and the rest from the state at the frame's start, then runs the

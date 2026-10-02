@@ -8,15 +8,17 @@ carried into the output's header.
   python tools/jsbsim/convert.py <aircraft.xml> <engine directory> <output>
 
 The output is plain text in SI units, read by model/aircraft_data.hpp. It
-holds the aircraft's metrics, mass balance, fuel tanks, engines and
-aerodynamics. Locations stay in JSBSim's structural frame (x aft, y right,
-z up) but in meters.
+holds the aircraft's metrics and eye point, its mass balance and point
+masses, fuel tanks, engines, flight controls and aerodynamics. Locations stay
+in JSBSim's structural frame (x aft, y right, z up) but in meters.
 
-Each aerodynamic function becomes a term: a constant, times state variables,
-times tables of state variables. Functions that other functions name, such as
-ground effect factors, are inlined, and metrics are folded into the constant.
-Anything JSBSim can express that this subset cannot, such as a sum inside a
-product, stops the conversion with the function's name.
+Each aerodynamic function becomes a term: a constant, times inputs, times
+tables of inputs, where an input is a state variable or a flight control
+signal. Functions that other functions name, such as ground effect factors,
+are inlined, and metrics are folded into the constant. Each flight control
+component becomes a block, in the order JSBSim runs them. Anything JSBSim can
+express that this subset cannot, such as a sum inside a product, stops the
+conversion and names what stopped it.
 """
 
 import math
