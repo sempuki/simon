@@ -2480,6 +2480,27 @@ measured:
   1.4e-8 off, and keeps its atmosphere's constants in English units, 8.5e-6
   off in density. simon uses the definitions and the 1976 standard.
 
+`bazel run -c opt //application/flight:rigid_benchmark` flies rigid 737s
+at 8 ms steps, each on its own. GCC, per aircraft per step:
+
+| Aircraft | Flat Earth | Round Earth |
+|---:|---:|---:|
+| 100 | 1.78 µs | 3.57 µs |
+| 1,000 | 1.74 µs | 3.57 µs |
+| 10,000 | 1.75 µs | 3.57 µs |
+
+- **The cost is flat with population,** so one thread flies about 4,500
+  rigid 737s in real time over a flat Earth, and 2,200 round one. `Rigid`
+  is four fifths of it: four stages, each building up the aerodynamics.
+- **JSBSim takes 9.2 µs a frame** for one 737, timed through its Python
+  module from its own trim, with one instance per aircraft. Its frame does
+  work simon's does not, such as ground reactions and its property tree, so
+  the comparison is rough; simon evaluates the aircraft four times a step to
+  JSBSim's once and is still 2.6 times faster round the Earth.
+- **The round Earth doubles the cost.** The geodetic conversion and the
+  local frame are found several times a stage; finding them once would be
+  the first thing to try.
+
 Building it turned up JSBSim behaviors that a comparison has to allow for,
 all noted where they matter: a frame starts by moving the state on, so
 everything read after a frame belongs together; its mass balance runs

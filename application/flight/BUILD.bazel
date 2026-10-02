@@ -181,3 +181,17 @@ cc_binary(
         "@lib//base:core",
     ],
 )
+
+# Times rigid aircraft at growing populations, system by system, over a flat
+# and a round Earth. Run with
+# bazel run -c opt //application/flight:rigid_benchmark
+cc_binary(
+    name = "rigid_benchmark",
+    srcs = ["rigid_benchmark.cpp"],
+    copts = COPTS,
+    data = ["aircraft/737.aircraft"],
+    deps = [
+        ":flight_library",
+        "@lib//base:core",
+    ],
+)
