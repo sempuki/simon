@@ -232,6 +232,19 @@ bazel run -c opt //application/flight:flight_benchmark   # the mixed population
 bazel run -c opt //application/flight -- 10000 100 10 10 # and 10 F-16s: 10 min in 25 s
 ```
 
+### You can watch it
+
+![The flight viewer](documents/images/flight_viewer.png)
+
+The viewer flies a mixed world in real time: 2,000 point-mass aircraft, 20 of
+them on Runge-Kutta 4, with four rigid 737s and four rigid F-16s among them.
+Its panel follows one rigid aircraft, with its route, air data, attitude,
+engine and surfaces, and charts of its altitude and airspeed.
+
+```sh
+bazel run -c opt //application/flight:viewer
+```
+
 ### Anyone can regenerate the references
 
 Each JSBSim table comes from a script in
@@ -262,6 +275,7 @@ git submodule update --init
 bazel test //...
 bazel run //application/hello
 bazel run //application/missile:viewer   # watch a missile scenario
+bazel run -c opt //application/flight:viewer   # watch the flight world
 bazel run //application/missile -- 7    # run seed 7 headless
 bazel run //application/flight -- 1000 100   # 1,000 aircraft, 100 on RK4
 bazel run -c opt //application/flight:flight_benchmark

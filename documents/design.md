@@ -1906,8 +1906,11 @@ simulation's time and phase. The other drivers wrap it:
 - **`BatchDriver::run(end)`** runs the whole lifecycle to `end`, or until the
   simulation stops, and returns the time reached. `finalize` runs even after an
   error.
-- **`RealTimeDriver::tick()`** advances to wherever the wall clock has reached;
-  an application calls it once per frame. `run()` ticks and sleeps until the
+- **`RealTimeDriver::tick()`** advances to wherever the wall clock has reached,
+  catching up at most 100 ms of wall time at the current speed; an application
+  calls it once per frame. A simulation slower than its speed then runs
+  slower than asked, and the time it drops is not owed, so each frame stays
+  as long as the last and a viewer keeps drawing. `run()` ticks and sleeps until the
   simulation stops, for headless use. The wall clock is a template parameter,
   so tests drive it by hand.
 - **`RealTimeDriver` can pause, resume and change speed** (`pause()`,
@@ -2683,6 +2686,16 @@ its own aircraft cost, and nothing more: the single-pass aircraft run as
 fast as they do alone (7.25 ms at 100,000), because each level's systems are
 driven by components only its aircraft have.
 
+`bazel run -c opt //application/flight:viewer` watches a mixed world under
+`RealTimeDriver`, by default 2,000 aircraft with 20 on Runge-Kutta 4, four
+rigid 737s and four rigid F-16s, at ten times real time. An ImPlot map draws
+each level its own way, rigid aircraft with trails, and the route of the
+rigid aircraft the panel follows. The panel shows that aircraft's air data,
+attitude, load factor, engine and surfaces, and strip charts of its altitude
+and airspeed sit under the map. Both viewers share their window in
+`application/viewing.hpp`, which takes `--scale`, and `--frames` and
+`--screenshot` for running a viewer with nobody watching.
+
 ## Libraries
 
 | Need | Library |
@@ -2691,7 +2704,7 @@ driven by components only its aircraft have.
 | Units | `std::chrono` for time; mp-units in plain SI units for everything else |
 | Tests | Catch2 (have) |
 | Benchmarks | A small `std::chrono` harness per benchmark, printing one table per question. Benchmarks sit beside what they measure, like tests; only ones that measure several things go in a common directory. |
-| UI | Dear ImGui, and ImPlot (0.17) for the missile viewer's map |
+| UI | Dear ImGui, and ImPlot (0.17) for the viewers' maps and charts |
 | Window and input | SDL2 now; SDL3 when it is in the Bazel Central Registry |
 | Profiling, later | Tracy |
 
@@ -2759,6 +2772,8 @@ Each step ends with a working application and passing tests.
      checked the same way (see [The F-16](#the-f-16)).
    - Done: a trim of simon's own, level over the round Earth (see
      [Trim](#trim)).
+   - Done: a flight viewer for the mixed world (see
+     [Mixed fidelity](#mixed-fidelity)).
    - Next for rigid aircraft: many rigid aircraft batched in one segment.
    - Later: Adams-Bashforth with rate history, many replicas of a scenario
      in one world, world snapshots, and trim tables computed offline. JSBSim,
