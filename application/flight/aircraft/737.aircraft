@@ -1,5 +1,17 @@
 simon-aircraft 1
 # Converted from JSBSim's 737.xml by tools/jsbsim/convert.py.
+# Authors: Dave Culp, Aeromatic.
+# License: GPL (General Public License), http://www.gnu.org/licenses/gpl.html.
+# Note: This model was created using publicly available data, publicly
+#   available technical reports, textbooks, and guesses. It contains no
+#   proprietary or restricted data. If this model has been validated at all,
+#   it would be only to the extent that it seems to "fly right", and that it
+#   possibly complies with published, publicly known, performance data
+#   (maximum speed, endurance, etc.). Thus, this model is meant for
+#   educational and entertainment purposes only. This simulation model is not
+#   endorsed by the manufacturer. This model is not to be sold.
+# filecreationdate: 2006-01-04
+# version: $Revision: 1.43 $
 # SI units. Locations are in JSBSim's structural frame, x aft, y right, z up.
 name 737
 metrics 108.78945984000001 28.864560000000001 3.7520880000000005
@@ -10,6 +22,7 @@ empty_center_of_mass 16.230599999999999 0 -1.016
 tank 13.208 -2.032 -0.4572 4626.6421740000005 4535.9237000000003
 tank 13.208 2.032 -0.4572 4626.6421740000005 4535.9237000000003
 tank 12.192 0 -0.4572 6803.88555 1814.3694800000001
+# Engine CFM56, from JSBSim's CFM56.xml, by Aero-Matic v 0.8.
 engine turbine CFM56
   location 13.715999999999999 -4.9021999999999997 -1.016
   feeds 0 2
@@ -43,6 +56,7 @@ engine turbine CFM56
       1.2 0 0 0 0 0 0 0 0
     end
 end
+# Engine CFM56, from JSBSim's CFM56.xml, by Aero-Matic v 0.8.
 engine turbine CFM56
   location 13.715999999999999 4.9021999999999997 -1.016
   feeds 1 2

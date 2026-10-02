@@ -2,6 +2,10 @@
 
 """Converts a JSBSim aircraft into simon's aircraft format.
 
+JSBSim (https://github.com/JSBSim-Team/jsbsim, LGPL 2.1 or later) defines the
+aircraft format this reads; its aircraft and engine files have their own
+authors and licenses, which the output repeats in its header.
+
   python tools/jsbsim/convert.py <aircraft.xml> <engine directory> <output>
 
 The output is plain text in SI units, read by model/aircraft_data.hpp. It
@@ -209,6 +213,49 @@ def body(function):
     return children[0]
 
 
+def provenance(root):
+    """Who wrote the aircraft, and under what license, from its file header,
+    to carry into the conversion."""
+    header = root.find('fileheader')
+    if header is None:
+        return ['The source file names no author or license.']
+    lines = []
+    authors = [a.text.strip() for a in header.findall('author') if a.text]
+    if authors:
+        lines.append('Authors: %s.' % ', '.join(authors))
+    license = header.find('license')
+    if license is not None:
+        lines.append('License: %s, %s.' % (license.get('licenseName', '?'),
+                                         license.get('licenseURL', '?')))
+    else:
+        lines.append('The source file names no license.')
+    for note in header.findall('note'):
+        if note.text:
+            words = note.text.split()
+            line = 'Note:'
+            for word in words:
+                if len(line) + len(word) > 74:
+                    lines.append(line)
+                    line = ' '
+                line += ' ' + word
+            lines.append(line)
+    for tag in ['filecreationdate', 'version']:
+        element = header.find(tag)
+        if element is not None and element.text:
+            lines.append('%s: %s' % (tag, element.text.strip()))
+    return lines
+
+
+def engine_provenance(path):
+    """The author an engine file names in its leading comment, if any."""
+    with open(path) as source:
+        text = source.read(2000)
+    for line in text.splitlines():
+        if 'Author:' in line:
+            return line.split('Author:', 1)[1].strip()
+    return 'unnamed'
+
+
 def convert(path, engine_directory, out):
     root = ElementTree.parse(path).getroot()
 
@@ -221,6 +268,8 @@ def convert(path, engine_directory, out):
     out.write('simon-aircraft 1\n')
     out.write('# Converted from JSBSim\'s %s by tools/jsbsim/convert.py.\n'
               % os.path.basename(path))
+    for line in provenance(root):
+        out.write('# %s\n' % line)
     out.write('# SI units. Locations are in JSBSim\'s structural frame, '
               'x aft, y right, z up.\n')
     out.write('name %s\n' % root.get('name'))
@@ -291,6 +340,8 @@ def convert_engine(engine, engine_directory, out):
     if int(number(turbine, 'augmented', 0)) or int(number(turbine, 'injected', 0)):
         raise ConversionError('augmented or injected turbines are unsupported')
 
+    out.write('# Engine %s, from JSBSim\'s %s, by %s.\n' % (
+        turbine.get('name'), os.path.basename(path), engine_provenance(path)))
     out.write('engine turbine %s\n' % turbine.get('name'))
     out.write('  location %.17g %.17g %.17g\n' % tuple(location(thruster.find('location'))))
     out.write('  feeds %s\n' % ' '.join(f.text.strip() for f in engine.findall('feed')))

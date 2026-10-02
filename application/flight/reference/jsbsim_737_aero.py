@@ -7,6 +7,10 @@ aerodynamics read and what JSBSim made of them. The flights are low and slow
 with flaps, gear and spoilers out, in ground effect; at cruise; and fast,
 above the drag rise, with the speedbrake out. The controls move throughout.
 
+JSBSim (https://github.com/JSBSim-Team/jsbsim, LGPL 2.1 or later) does the
+flying; its 737 model is by Dave Culp and Aeromatic, under the GPL, and is
+meant for educational and entertainment purposes only.
+
 Every column is read after a frame: JSBSim derives angle of attack, dynamic
 pressure and the rest from the state at the frame's start, then runs the
 flight control system and the aerodynamics, then moves the state on. JSBSim's
