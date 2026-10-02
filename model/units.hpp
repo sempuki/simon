@@ -185,7 +185,7 @@ auto number_of(const units::quantity<UNIT, RepresentationType>& quantity)
 // The larger, the smaller, or the clamp of quantities of one type. Use these
 // instead of std::max, std::min and std::clamp on hot paths: those compare
 // through mp-units' <=>, which GCC 16 compiles to branches and spills instead
-// of maxsd and minsd. std::max on a speed cost the flight model's Fly 8%.
+// of maxsd and minsd.
 template <auto UNIT>
 auto max(const units::quantity<UNIT, double>& a,
          const units::quantity<UNIT, double>& b)

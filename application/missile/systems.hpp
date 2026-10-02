@@ -277,7 +277,7 @@ struct ResolveEngagements final  //
 
   // Indexes this step's proposals by track, once, so each track finds its
   // proposers without scanning every launcher. Launchers are indexed in store
-  // order, so ties still go to the launcher that comes first. Steps without
+  // order, so ties go to the launcher that comes first. Steps without
   // proposals have nothing to resolve.
   auto prepare(SystemWorld& world) -> bool {
     proposals_.clear();

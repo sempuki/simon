@@ -1,9 +1,9 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-// Compares framework::ComponentStore (dense arrays with an entity index)
-// against a stable-slot store at several populations and churn levels. Churn
-// destroys a random fraction of the population, as when drones are shot down,
-// so the stable-slot store is left with holes.
+// Compares framework::ComponentStore (dense segments of pooled chunks, with an
+// entity index) against a stable-slot store at several populations and churn
+// levels. Churn destroys a random fraction of the population, as when drones
+// are shot down, so the stable-slot store is left with holes.
 //
 //   bazel run -c opt //framework:component_store_benchmark
 
