@@ -183,6 +183,25 @@ cc_test(
 )
 
 cc_binary(
+    name = "viewer",
+    srcs = ["viewer.cpp"],
+    copts = COPTS,
+    data = [
+        "aircraft/737.aircraft",
+        "aircraft/f16.aircraft",
+    ],
+    deps = [
+        "//framework:vocabulary",
+        ":flight_library",
+        "//application:viewing",
+        "//engine:driver",
+        "@imgui",
+        "@implot",
+        "@lib//base:core",
+    ],
+)
+
+cc_binary(
     name = "flight",
     srcs = ["main.cpp"],
     copts = COPTS,

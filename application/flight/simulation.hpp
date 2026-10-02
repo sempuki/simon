@@ -113,6 +113,12 @@ class Simulation final {
   // The world: empty until configured.
   auto world() const -> const World& { return world_; }
 
+  // The rigid aircraft types it flies: null until configured, and where it
+  // flies none of a type.
+  auto rigid_types() const -> RigidTypes {
+    return RigidTypes{.airliner = airliner_.get(), .fighter = fighter_.get()};
+  }
+
   // Waypoints reached so far, by every aircraft, and by the rigid ones.
   auto waypoints_reached() const -> std::uint64_t;
   auto rigid_waypoints_reached() const -> std::uint64_t;

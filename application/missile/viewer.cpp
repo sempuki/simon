@@ -3,12 +3,12 @@
 // Watches a missile scenario in real time:
 //
 //   bazel run //application/missile:viewer -- [seed] [--scale=N]
+//       [--frames=N] [--screenshot=PATH]
 //
 // Space pauses and resumes; Esc or Ctrl+Q quits. The map pans with the left
 // mouse button and zooms with the wheel. The interface scales with the
-// display, 2x on a 4K screen at 100%; --scale overrides it.
-
-#include <SDL2/SDL.h>
+// display, 2x on a 4K screen at 100%; --scale overrides it. See
+// application/viewing.hpp for the window's options.
 
 #include <algorithm>
 #include <chrono>
@@ -18,17 +18,17 @@
 #include <iostream>
 #include <memory>
 #include <numbers>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
 #include "application/missile/simulation.hpp"
+#include "application/viewing.hpp"
 #include "base/core.hpp"
 #include "engine/driver.hpp"
 #include "framework/vocabulary.hpp"
 #include "imgui/imgui.h"
-#include "imgui/imgui_impl_sdl2.h"
-#include "imgui/imgui_impl_sdlrenderer2.h"
 #include "implot/implot.h"
 
 namespace simon::missile {
@@ -90,42 +90,6 @@ auto plot_circle(const char* label, Point center, double radius, ImVec4 color,
   }
   ImPlot::SetNextLineStyle(color, weight);
   ImPlot::PlotLine(label, x.data(), y.data(), SEGMENTS + 1);
-}
-
-// Computes the interface's scale on `display`: its height in screen
-// coordinates over 1080, to the nearest quarter, so a 4K display at 100% gives
-// 2 and a 2880x1800 one gives 1.75. Screen coordinates already include the
-// compositor's scale, so a 4K display set to 200% gives 1.
-auto ui_scale(int display) -> float {
-  SDL_Rect bounds{};
-  if (SDL_GetDisplayBounds(display, &bounds) != 0 || bounds.h <= 0) {
-    return 1.0f;
-  }
-  return std::clamp(std::round(bounds.h / 1080.0f * 4.0f) / 4.0f, 1.0f, 4.0f);
-}
-
-// Enlarges ImGui's and ImPlot's fonts, spacing and lines by `scale`. Fonts are
-// rasterized at the scaled size, so text stays sharp.
-auto scale_styles(float scale) -> void {
-  ImGuiStyle& style = ImGui::GetStyle();
-  style.ScaleAllSizes(scale);
-  style.FontScaleDpi = scale;
-  ImPlotStyle& plot = ImPlot::GetStyle();
-  for (float* size :
-       {&plot.LineWeight, &plot.MarkerSize, &plot.MarkerWeight,
-        &plot.ErrorBarSize, &plot.ErrorBarWeight, &plot.DigitalBitHeight,
-        &plot.DigitalBitGap, &plot.PlotBorderSize}) {
-    *size *= scale;
-  }
-  for (ImVec2* size :
-       {&plot.MajorTickLen, &plot.MinorTickLen, &plot.MajorTickSize,
-        &plot.MinorTickSize, &plot.MajorGridSize, &plot.MinorGridSize,
-        &plot.PlotPadding, &plot.LabelPadding, &plot.LegendPadding,
-        &plot.LegendInnerPadding, &plot.LegendSpacing, &plot.MousePosPadding,
-        &plot.AnnotationPadding, &plot.PlotDefaultSize, &plot.PlotMinSize}) {
-    size->x *= scale;
-    size->y *= scale;
-  }
 }
 
 // One run of a scenario, paced to the wall clock.
@@ -426,97 +390,13 @@ class Viewer final {
 
 auto main(int argc, char** argv) -> int {
   using namespace simon;
+  viewing::WindowOptions options{.title = "Missile"};
+  std::vector<std::string_view> arguments =
+      viewing::parse_window_options(argc, argv, InOut(options));
   std::uint64_t seed = 1;
-  float scale = 0.0f;  // Chosen from the display unless given.
-  for (int i = 1; i < argc; ++i) {
-    std::string_view argument = argv[i];
-    if (argument.starts_with("--scale=")) {
-      scale = std::strtof(argv[i] + 8, nullptr);
-    } else {
-      seed = std::strtoull(argv[i], nullptr, 10);
-    }
+  if (!arguments.empty()) {
+    seed = std::strtoull(std::string{arguments[0]}.c_str(), nullptr, 10);
   }
-
-  // Prefer Wayland: SDL2 defaults to X11, where this SDL build has no GPU
-  // renderer (it ships GLES2 over EGL, not GLX).
-  SDL_SetHint(SDL_HINT_VIDEODRIVER, "wayland,x11,windows,cocoa");
-  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
-    std::cerr << "Error: " << SDL_GetError() << "\n";
-    return EXIT_FAILURE;
-  }
-  if (!(scale > 0.0f)) {
-    scale = missile::ui_scale(0);
-  }
-  // 1280 by 900 at scale 1, and never more than most of the display.
-  SDL_Rect usable{.x = 0, .y = 0, .w = 1280, .h = 900};
-  SDL_GetDisplayUsableBounds(0, &usable);
-  int width = std::min(static_cast<int>(1280 * scale), usable.w * 9 / 10);
-  int height = std::min(static_cast<int>(900 * scale), usable.h * 9 / 10);
-  SDL_Window* window = SDL_CreateWindow(
-      "Missile", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height,
-      static_cast<SDL_WindowFlags>(SDL_WINDOW_RESIZABLE |
-                                   SDL_WINDOW_ALLOW_HIGHDPI));
-  SDL_Renderer* renderer = SDL_CreateRenderer(
-      window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
-  if (renderer == nullptr) {
-    SDL_Log("No accelerated renderer (%s); falling back to software.",
-            SDL_GetError());
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
-  }
-  if (renderer == nullptr) {
-    SDL_Log("Error creating SDL_Renderer: %s", SDL_GetError());
-    return EXIT_FAILURE;
-  }
-
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImPlot::CreateContext();
-  ImGui::GetIO().IniFilename = nullptr;  // Nothing to save between runs.
-  ImGui::StyleColorsDark();
-  missile::scale_styles(scale);
-  ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
-  ImGui_ImplSDLRenderer2_Init(renderer);
-
-  {
-    missile::Viewer viewer{seed, scale};
-    bool done = false;
-    while (!done) {
-      SDL_Event event;
-      while (SDL_PollEvent(&event)) {
-        ImGui_ImplSDL2_ProcessEvent(&event);
-        if (event.type == SDL_QUIT ||
-            (event.type == SDL_WINDOWEVENT &&
-             event.window.event == SDL_WINDOWEVENT_CLOSE &&
-             event.window.windowID == SDL_GetWindowID(window))) {
-          done = true;
-        }
-        // Esc or Ctrl+Q quits, unless a text field has the keyboard.
-        if (event.type == SDL_KEYDOWN && !ImGui::GetIO().WantTextInput &&
-            (event.key.keysym.sym == SDLK_ESCAPE ||
-             (event.key.keysym.sym == SDLK_q &&
-              (event.key.keysym.mod & KMOD_CTRL) != 0))) {
-          done = true;
-        }
-      }
-      ImGui_ImplSDLRenderer2_NewFrame();
-      ImGui_ImplSDL2_NewFrame();
-      ImGui::NewFrame();
-      viewer.frame();
-      ImGui::Render();
-      SDL_SetRenderDrawColor(renderer, 20, 24, 28, 255);
-      SDL_RenderClear(renderer);
-      ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
-      SDL_RenderPresent(renderer);
-      done = done || viewer.quitting();
-    }
-  }
-
-  ImGui_ImplSDLRenderer2_Shutdown();
-  ImGui_ImplSDL2_Shutdown();
-  ImPlot::DestroyContext();
-  ImGui::DestroyContext();
-  SDL_DestroyRenderer(renderer);
-  SDL_DestroyWindow(window);
-  SDL_Quit();
-  return EXIT_SUCCESS;
+  return viewing::run(
+      options, [&](float scale) { return missile::Viewer{seed, scale}; });
 }

@@ -62,13 +62,11 @@ cc_binary(
     deps = [
         "//framework:vocabulary",
         ":missile_library",
+        "//application:viewing",
         "//engine:driver",
         "@imgui",
-        "@imgui//backends:platform-sdl2",
-        "@imgui//backends:renderer-sdl2",
         "@implot",
         "@lib//base:core",
-        "@sdl2",
     ],
 )
 

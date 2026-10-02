@@ -1,0 +1,20 @@
+# Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+
+load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "viewing",
+    hdrs = ["viewing.hpp"],
+    copts = COPTS,
+    deps = [
+        "//framework:vocabulary",
+        "@imgui",
+        "@imgui//backends:platform-sdl2",
+        "@imgui//backends:renderer-sdl2",
+        "@implot",
+        "@sdl2",
+    ],
+)
