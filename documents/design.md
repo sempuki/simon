@@ -2403,6 +2403,90 @@ regenerate the reference, install JSBSim's Python package and NumPy, and run
 `python application/flight/reference/jsbsim_737.py`. It prints the fitted
 airframe, which the test keeps as constants.
 
+#### Rigid aircraft
+
+The rigid aircraft archetype is the highest fidelity level: six degrees of
+freedom, flown by control surfaces, engines and fuel, from an aircraft
+described as data. It is opt in. Point-mass aircraft in the same world cost
+the same as before (7.32 against 7.27 ms per step at 100,000), because each
+rigid system is driven by a component only rigid aircraft have, and `Fly`
+excludes rigid bodies.
+
+An aircraft comes from JSBSim. `tools/jsbsim/convert.py` turns a JSBSim
+aircraft's XML into simon's aircraft format, in SI units, and
+`model/aircraft_data` reads it back, refusing bad files with the line at
+fault. A converted aircraft holds its metrics, mass balance, fuel tanks,
+turbines, flight control system and aerodynamics. The 737 is
+`application/flight/aircraft/737.aircraft`.
+
+| Layer | Holds |
+|---|---|
+| `model/aerodynamics` | The coefficient build-up: terms of a constant, state variables and tables, summed by axis, and turned into body loads about the center of mass |
+| `model/flight_control` | Flight control blocks over named signals: summers, gains, scheduled gains, surface scales and kinematic actuators |
+| `model/turbine` | JSBSim's turbine: spools, thrust from idle to military, fuel flow |
+| `model/earth` | The WGS84 ellipsoid, J2 gravitation, the Earth's rotation, geodetic conversion |
+| `model/rigid_body` | Stevens and Lewis's equations of motion in an inertial frame, as a `ContinuousState` |
+| `model/rigid_aircraft` | The flat or round Earth, air data, mass balance, engines and fuel, and the body's rate |
+| `application/flight` | The archetype and its systems |
+
+Each step a rigid aircraft runs `RunFlightControls`, `RunEngines`, then
+`Rigid` (Runge-Kutta 4 over `RigidAircraftRates`), then `BurnFuel` and
+`FollowRigidBody`, which keeps its `AirState` on its body for the rest of
+the world. The Earth is flat unless the systems are built with a round
+one; round, the inertial frame is ECI and the world's local frame is the
+plane tangent to the ellipsoid at an origin.
+
+Each layer is checked against JSBSim's 737 (see
+`application/flight/reference/README.md`):
+
+| Test | Checks | Agreement |
+|---|---|---|
+| `aero_test` | Aerodynamic forces and moments at 240 states, from ground effect to Mach 0.94 | 5e-14 |
+| `rigid_body_test` | Equations of motion, air data and mass balance at 480 states, at the equator and 60° north | 7e-16 to 5e-13; see below |
+| `turbine_test` | Spools, thrust and fuel flow, frame by frame through throttle steps | 1e-13 |
+| `flight_control_test` | Surface positions, frame by frame through command sweeps and extensions | 4e-15 |
+| `check_case_test` | The whole aircraft, open loop for 30 s from JSBSim's trim | See below |
+
+The check cases fly from JSBSim's trim at 6 km, 30° north, through a trim
+hold, elevator, aileron and rudder doublets, and a throttle step, round the
+turning Earth. The reference is JSBSim at 0.5 ms, where its integrators and
+frame lags have converged. The largest distance from it over 30 s:
+
+| Case | simon at 0.5 ms | simon at 8 ms | JSBSim at 8 ms |
+|---|---:|---:|---:|
+| Trim hold | 2.1 mm | 2.8 mm | 1.6 mm |
+| Elevator doublet | 0.9 mm | 1.3 mm | 8.9 mm |
+| Aileron doublet | 2.2 mm | 6.1 mm | 11.7 mm |
+| Rudder doublet | 2.4 cm | 3.8 cm | 41.5 cm |
+| Throttle step | 3.9 mm | 6.0 cm | 11.9 cm |
+
+simon's physics and JSBSim's agree to millimeters, the first column. At the
+same step, simon's Runge-Kutta 4 is closer to the converged answer than
+JSBSim's mixed Euler and Adams-Bashforth integrators in every case with an
+input, by 11 times after the rudder doublet.
+
+Matching JSBSim is how simon's physics is checked, and it is the starting
+point. Where JSBSim takes a shortcut, simon does not, and the difference is
+measured:
+
+- **No frame lags.** JSBSim's induced drag reads the frame before's lift
+  coefficient, its rate of angle of attack the frame before's acceleration,
+  and its flight controls the frame before's air data. simon sums lift
+  before drag and forces before moments, so all three are the step's own.
+- **Exact geodetic altitude.** JSBSim's is a one-step approximation, 2.5 cm
+  off at 60° north and 6 km up. simon's is Heikkinen's closed form, which
+  agrees with an iteration run to convergence.
+- **Exact units.** JSBSim turns pounds into slugs by a rounded 32.174049,
+  1.4e-8 off, and keeps its atmosphere's constants in English units, 8.5e-6
+  off in density. simon uses the definitions and the 1976 standard.
+
+Building it turned up JSBSim behaviors that a comparison has to allow for,
+all noted where they matter: a frame starts by moving the state on, so
+everything read after a frame belongs together; its mass balance runs
+before its engines burn; its `inertia/ixy` and `iyz` properties are the
+tensor's elements negated but `ixz` is not; and its kinematic actuators keep
+the frame time the model loaded with.
+
 ## Libraries
 
 | Need | Library |
@@ -2468,10 +2552,17 @@ Each step ends with a working application and passing tests.
      [flight](#flight)).
    - Done: accuracy against JSBSim's 737 (see
      [Accuracy against JSBSim](#accuracy-against-jsbsim)).
-   - Later: 6-DOF rigid bodies, Adams-Bashforth
-     with rate history, many replicas of a scenario in one world, world
-     snapshots, and trim tables computed offline. JSBSim, run offline, stays
-     the reference each level's accuracy is measured against.
+   - Done: rigid aircraft, six degrees of freedom from JSBSim aircraft
+     converted to data, round a WGS84 Earth or over a flat one, checked
+     against JSBSim layer by layer and whole (see
+     [Rigid aircraft](#rigid-aircraft)).
+   - Next for rigid aircraft: a trim of simon's own, an autopilot that flies
+     them by their surfaces, more JSBSim aircraft and the flight control
+     components they need, and many rigid aircraft batched in one segment.
+   - Later: Adams-Bashforth with rate history, many replicas of a scenario
+     in one world, world snapshots, and trim tables computed offline. JSBSim,
+     run offline, stays the reference each level's accuracy is measured
+     against.
 
 Later: `LockstepDriver` and a second process, scenario files with two-phase
 loading, parent-child transforms (a radar mounted on a vehicle), and DIS or HLA
