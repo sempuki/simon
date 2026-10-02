@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "application/flight/testing.hpp"
@@ -25,7 +26,7 @@ namespace {
 
 using namespace flight::testing;
 
-constexpr char REFERENCE[] =
+constexpr std::string_view REFERENCE =
     "application/flight/reference/jsbsim_737_rigid_body.csv";
 
 }  // namespace
@@ -84,7 +85,7 @@ TEST_CASE("RigidBody737") {
     CHECK(worst_angular < 1e-12);
   }
 
-  auto aircraft = load_aircraft(BOEING_737);
+  auto aircraft = load_aircraft(std::string{BOEING_737});
   REQUIRE(aircraft);
   Earth earth = Earth::round(wgs84::Geodetic{});
   StandardAirTable air;

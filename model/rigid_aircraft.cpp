@@ -23,6 +23,9 @@ auto eigen(const Acceleration& a) -> Vector3 {
 auto eigen(const AngularVelocity& w) -> Vector3 {
   return w.numerical_value_in(radian_per_second).eigen();
 }
+auto eigen(const AngularAcceleration& w) -> Vector3 {
+  return w.numerical_value_in(radian_per_second_squared).eigen();
+}
 
 // The Earth's rotation, in the inertial frame, or none.
 auto spin(bool round) -> Vector3 {
@@ -295,13 +298,13 @@ auto fill_fuel_tanks(const AircraftData& aircraft) -> FuelTanks {
   return tanks;
 }
 
-auto settled_engines(const AircraftData& aircraft,
-                     const EngineControls& controls, const EngineAir& air)
-    -> Engines {
+auto settled_engines(const AircraftData& aircraft, const FlightSignals& signals,
+                     const EngineAir& air) -> Engines {
   Engines engines;
   for (std::size_t i = 0; i < aircraft.engines.size(); ++i) {
-    engines.turbines[i] =
-        steady_turbine(aircraft.engines[i], controls.throttle[i], air);
+    engines.turbines[i] = steady_turbine(
+        aircraft.engines[i],
+        signals.values[aircraft.flight_controls.throttles[i]], air);
   }
   return engines;
 }
@@ -338,7 +341,7 @@ auto has_fuel(const TurbineData& turbine, const FuelTanks& tanks) -> bool {
 }  // namespace
 
 auto run_engines(const AircraftData& aircraft, InOut<Engines> engines,
-                 const EngineControls& controls, const FuelTanks& tanks,
+                 const FlightSignals& signals, const FuelTanks& tanks,
                  const EngineAir& air, Time dt) -> void {
   for (std::size_t i = 0; i < aircraft.engines.size(); ++i) {
     const TurbineData& turbine = aircraft.engines[i];
@@ -348,7 +351,9 @@ auto run_engines(const AircraftData& aircraft, InOut<Engines> engines,
       state.fuel_flow = 0.0;
       continue;
     }
-    state = run_turbine(turbine, state, controls.throttle[i], air, dt);
+    state = run_turbine(turbine, state,
+                        signals.values[aircraft.flight_controls.throttles[i]],
+                        air, dt);
   }
 }
 
@@ -459,8 +464,8 @@ auto reads(const AeroModel& model, AeroAxis axis, AeroVariable variable)
 auto rigid_aircraft_rate(const RigidBody& body, const FlightSignals& signals,
                          const Engines& engines, const MassBalance& mass,
                          const AircraftData& aircraft, const Earth& earth,
-                         const StandardAirTable& air, Time time)
-    -> RigidBodyRate {
+                         const StandardAirTable& air, Time time,
+                         Out<BodyAcceleration> felt) -> RigidBodyRate {
   const AeroModel& model = aircraft.aero;
   Displacement reference =
       body_offset(aircraft.aero_reference, mass.center_of_mass);
@@ -534,9 +539,85 @@ auto rigid_aircraft_rate(const RigidBody& body, const FlightSignals& signals,
   Vector3 force = loads.force.numerical_value_in(newton).eigen() + thrust_force;
   Vector3 moment =
       loads.moment.numerical_value_in(newton_meter).eigen() + thrust_moment;
-  return rigid_body_rate(body, QuantityVector{force} * newton,
-                         QuantityVector{moment} * newton_meter, mass.properties,
-                         gravity);
+  RigidBodyRate rate = rigid_body_rate(body, QuantityVector{force} * newton,
+                                       QuantityVector{moment} * newton_meter,
+                                       mass.properties, gravity);
+  if (felt) {
+    *felt = BodyAcceleration{
+        .specific_force =
+            QuantityVector{force /
+                           mass.properties.mass.numerical_value_in(kilogram)} *
+            meter_per_second_squared,
+        .angular = rate.angular_acceleration,
+    };
+  }
+  return rate;
+}
+
+auto sense_flight_state(const RigidBody& body, const BodyAcceleration& felt,
+                        const MassBalance& mass, const AircraftData& aircraft,
+                        const Earth& earth, const StandardAirTable& air,
+                        Time time, InOut<FlightSignals> signals) -> void {
+  const FlightControlData& controls = aircraft.flight_controls;
+  using enum FlightSignal;
+  FlightSignals& values = *signals;
+
+  Vector3 uvw = eigen(earth.air_velocity(body));
+  values[BODY_VELOCITY_X] = uvw.x();
+  values[BODY_VELOCITY_Y] = uvw.y();
+  values[ALPHA] = std::atan2(uvw.z(), uvw.x());
+  values[BETA] = std::atan2(uvw.y(), std::hypot(uvw.x(), uvw.z()));
+  if (controls.reads(ROLL_RATE) || controls.reads(PITCH_RATE) ||
+      controls.reads(YAW_RATE)) {
+    Vector3 rates = eigen(earth.air_rate(body));
+    values[ROLL_RATE] = rates.x();
+    values[PITCH_RATE] = rates.y();
+    values[YAW_RATE] = rates.z();
+  }
+
+  // The body's place on the Earth, found once, if anything needs it.
+  bool air_data = controls.reads(MACH) || controls.reads(CALIBRATED_AIRSPEED);
+  bool attitude = controls.reads(PITCH) || controls.reads(ROLL) ||
+                  controls.reads(GROUND_SPEED);
+  if (air_data || attitude) {
+    Place place = earth.place(body, time);
+    if (air_data) {
+      Air here = air(place.altitude);
+      double mach =
+          uvw.norm() / here.speed_of_sound.numerical_value_in(meter_per_second);
+      values[MACH] = mach;
+      if (controls.reads(CALIBRATED_AIRSPEED)) {
+        values[CALIBRATED_AIRSPEED] = calibrated_airspeed(mach, here)
+                                          .numerical_value_in(meter_per_second);
+      }
+    }
+    if (attitude) {
+      Matrix3 to_north_east_down =
+          place.north_east_down.transpose() * body.attitude.toRotationMatrix();
+      Vector3 north_east_down = to_north_east_down * uvw;
+      values[GROUND_SPEED] =
+          std::hypot(north_east_down.x(), north_east_down.y());
+      values[PITCH] =
+          -std::asin(std::clamp(to_north_east_down(2, 0), -1.0, 1.0));
+      values[ROLL] =
+          std::atan2(to_north_east_down(2, 1), to_north_east_down(2, 2));
+    }
+  }
+
+  // The pilot's acceleration: the body's, and the eye point's about the
+  // center of mass, in g.
+  if (controls.reads(PILOT_ACCELERATION_Y) ||
+      controls.reads(PILOT_ACCELERATION_Z)) {
+    Vector3 eye = eigen(body_offset(aircraft.eye_point, mass.center_of_mass));
+    Vector3 turning = eigen(body.rate);
+    Vector3 pilot = eigen(felt.specific_force) +
+                    eigen(felt.angular).cross(eye) +
+                    turning.cross(turning.cross(eye));
+    pilot /= STANDARD_GRAVITY.numerical_value_in(meter_per_second_squared);
+    values[PILOT_ACCELERATION_Y] = pilot.y();
+    values[PILOT_ACCELERATION_Z] = pilot.z();
+  }
+  values[WEIGHT_ON_WHEELS] = 0.0;
 }
 
 }  // namespace simon::model

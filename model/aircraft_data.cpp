@@ -110,6 +110,11 @@ class Parser final {
       return fail("an aircraft has at most " + std::to_string(MAX_ENGINES) +
                   " engines and " + std::to_string(MAX_TANKS) + " tanks");
     }
+    append_throttles(InOut(data.flight_controls), data.engines.size());
+    if (data.flight_controls.signals.size() > MAX_FLIGHT_SIGNALS) {
+      return fail("the flight controls have more than " +
+                  std::to_string(MAX_FLIGHT_SIGNALS) + " signals");
+    }
     for (const TurbineData& turbine : data.engines) {
       if (!turbine.idle_thrust || !turbine.military_thrust_factor) {
         return fail("engine `" + turbine.name + "` needs both thrust tables");
@@ -616,7 +621,7 @@ class Parser final {
 
     // Then what each block reads.
     for (NamedBlock& each : named) {
-      auto resolved = resolve(controls, InOut(each));
+      auto resolved = resolve(InOut(controls), InOut(each));
       if (!resolved) {
         return Failure{resolved.error()};
       }
@@ -625,15 +630,39 @@ class Parser final {
     return {};
   }
 
-  // Finds each signal `each` reads by name.
-  static auto resolve(const FlightControlData& controls, InOut<NamedBlock> each)
+  // Appends each of `engines` engines' throttle to `controls`, and the fixed
+  // signals first if there are no flight controls.
+  static auto append_throttles(InOut<FlightControlData> controls,
+                               std::size_t engines) -> void {
+    if (controls->signals.empty()) {
+      for (std::size_t i = 0; i < FLIGHT_SIGNAL_COUNT; ++i) {
+        controls->signals.emplace_back(
+            flight_signal_name(static_cast<FlightSignal>(i)));
+      }
+    }
+    for (std::size_t i = 0; i < engines; ++i) {
+      std::string name = "throttle_" + std::to_string(i);
+      std::optional<std::size_t> found = find_signal(*controls, name);
+      if (!found) {
+        controls->signals.push_back(name);
+        found = controls->signals.size() - 1;
+      }
+      controls->throttles.push_back(*found);
+    }
+  }
+
+  // Finds each signal `each` reads by name, and marks the fixed ones read.
+  static auto resolve(InOut<FlightControlData> controls, InOut<NamedBlock> each)
       -> std::expected<void, lib::Status> {
     std::string missing;
     auto signal = [&](const std::string& name) -> std::size_t {
-      std::optional<std::size_t> found = find_signal(controls, name);
+      std::optional<std::size_t> found = find_signal(*controls, name);
       if (!found) {
         missing = name;
         return 0;
+      }
+      if (*found < FLIGHT_SIGNAL_COUNT) {
+        controls->read.set(*found);
       }
       return *found;
     };

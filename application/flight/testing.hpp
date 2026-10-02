@@ -10,6 +10,7 @@
 #include <functional>
 #include <map>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -22,15 +23,17 @@
 // Shared by the flight tests.
 namespace simon::flight::testing {
 
-inline constexpr char BOEING_737[] = "application/flight/aircraft/737.aircraft";
-inline constexpr char F16[] = "application/flight/aircraft/f16.aircraft";
+inline constexpr std::string_view BOEING_737 =
+    "application/flight/aircraft/737.aircraft";
+inline constexpr std::string_view F16 =
+    "application/flight/aircraft/f16.aircraft";
 
 // One row of a recording, as columns by name.
 using Row = std::map<std::string, double, std::less<>>;
 
 // Every row of the CSV at `path`, named by its header.
-inline auto load_rows(const char* path) -> std::vector<Row> {
-  std::ifstream file{path};
+inline auto load_rows(std::string_view path) -> std::vector<Row> {
+  std::ifstream file{std::string{path}};
   REQUIRE(file);
   std::string line;
   std::getline(file, line);
@@ -59,8 +62,8 @@ inline auto load_rows(const char* path) -> std::vector<Row> {
 }
 
 // The columns `x`, `y` and `z` of `row`.
-inline auto read_vector(const Row& row, const char* x, const char* y,
-                        const char* z) -> model::QuantityVector {
+inline auto read_vector(const Row& row, std::string_view x, std::string_view y,
+                        std::string_view z) -> model::QuantityVector {
   return model::QuantityVector{row.at(x), row.at(y), row.at(z)};
 }
 

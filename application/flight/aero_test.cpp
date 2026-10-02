@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "application/flight/testing.hpp"
@@ -43,8 +44,9 @@ auto read_inputs(const Row& row, const AircraftData& aircraft) -> AeroInputs {
 }
 
 // Checks the aircraft at `path` against JSBSim's recording at `reference`.
-auto check_against_jsbsim(const char* path, const char* reference) -> void {
-  auto aircraft = load_aircraft(path);
+auto check_against_jsbsim(std::string_view path, std::string_view reference)
+    -> void {
+  auto aircraft = load_aircraft(std::string{path});
   if (!aircraft) {
     FAIL(aircraft.error().message());
   }

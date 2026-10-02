@@ -131,7 +131,8 @@ auto run_pid(const FlightBlock& block, double input, double dt,
     integral = 0.0;
   }
   integral += block.ki * dt * increment;
-  double rate = (input - previous) / dt;
+  // A step of no time, as when an aircraft is set up, has no rate.
+  double rate = dt > 0.0 ? (input - previous) / dt : 0.0;
   double output = block.kp * input + integral + block.kd * rate;
   before_previous = trigger < 0.0 ? 0.0 : previous;
   previous = input;
@@ -272,6 +273,10 @@ auto find_signal(const FlightControlData& controls, std::string_view name)
 auto run_flight_controls(const FlightControlData& controls,
                          InOut<FlightSignals> signals, Time dt) -> void {
   double seconds = dt.numerical_value_in(second);
+  for (std::size_t i = 0; i < controls.throttles.size(); ++i) {
+    signals->values[controls.throttles[i]] =
+        signals->values[index_of(FlightSignal::THROTTLE_COMMAND_0) + i];
+  }
   for (const FlightBlock& block : controls.blocks) {
     double input = input_of(block, *signals);
     double value = 0.0;

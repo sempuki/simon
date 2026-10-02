@@ -29,7 +29,7 @@ using model::Airframe;
 using model::AirState;
 using model::AirStateRate;
 using model::Angle;
-using model::EngineControls;
+using model::BodyAcceleration;
 using model::Engines;
 using model::FlightControls;
 using model::FlightSignals;
@@ -122,7 +122,7 @@ struct PreciseAircraft final                                       //
 struct RigidAircraft final                                      //
     : Archetype<"rigid aircraft",                               //
                 Requires<AirState, RigidBody, RigidBodyRate,    //
-                         FlightSignals, EngineControls,         //
+                         BodyAcceleration, FlightSignals,       //
                          Engines, FuelTanks,                    //
                          MassBalance, AircraftType, Autopilot,  //
                          Route, SurfaceAutopilot>> {};          //
@@ -133,7 +133,7 @@ using World = framework::World<
     AirState,
     framework::TypeList<AirStateRate, FlightControls, Commands, Airframe,
                         Handling, Autopilot, Route, RigidBody, RigidBodyRate,
-                        FlightSignals, EngineControls, Engines, FuelTanks,
+                        BodyAcceleration, FlightSignals, Engines, FuelTanks,
                         MassBalance, AircraftType, SurfaceAutopilot>,
     framework::TypeList<archetype::Aircraft, archetype::PreciseAircraft,
                         archetype::RigidAircraft>>;

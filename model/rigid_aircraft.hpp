@@ -100,11 +100,6 @@ struct Engines final {
   std::array<TurbineState, MAX_ENGINES> turbines{};
 };
 
-// Each engine's throttle command, from 0 to 1.
-struct EngineControls final {
-  std::array<double, MAX_ENGINES> throttle{};
-};
-
 // The fuel in each tank, in the aircraft data's order.
 struct FuelTanks final {
   std::array<Mass, MAX_TANKS> contents{};
@@ -113,20 +108,19 @@ struct FuelTanks final {
 // The tanks as the aircraft data fills them.
 auto fill_fuel_tanks(const AircraftData& aircraft) -> FuelTanks;
 
-// The engines settled at `controls` in `air`.
-auto settled_engines(const AircraftData& aircraft,
-                     const EngineControls& controls, const EngineAir& air)
-    -> Engines;
+// The engines settled at the throttles in `signals`, in `air`.
+auto settled_engines(const AircraftData& aircraft, const FlightSignals& signals,
+                     const EngineAir& air) -> Engines;
 
 // The air the engines breathe at `body`. Over the standard atmosphere the
 // density altitude is the altitude.
 auto compute_engine_air(const RigidBody& body, const Earth& earth,
                         const StandardAirTable& air, Time time) -> EngineAir;
 
-// Advances each engine by `dt` at its throttle. An engine whose tanks are
-// empty makes no thrust and burns nothing.
+// Advances each engine by `dt` at its throttle in `signals`. An engine whose
+// tanks are empty makes no thrust and burns nothing.
 auto run_engines(const AircraftData& aircraft, InOut<Engines> engines,
-                 const EngineControls& controls, const FuelTanks& tanks,
+                 const FlightSignals& signals, const FuelTanks& tanks,
                  const EngineAir& air, Time dt) -> void;
 
 // Burns each engine's fuel flow for `dt`, from its feed tanks that have fuel,
@@ -158,6 +152,13 @@ auto compute_mass_balance(const AircraftData& aircraft, const FuelTanks& tanks)
 auto body_offset(const Displacement& structural,
                  const Displacement& center_of_mass) -> Displacement;
 
+// What an aircraft's body feels, in body axes: the force on it but gravity's,
+// per unit mass, and its angular acceleration.
+struct BodyAcceleration final {
+  Acceleration specific_force = meters_per_second_squared(0.0, 0.0, 0.0);
+  AngularAcceleration angular = QuantityVector{} * radian_per_second_squared;
+};
+
 // The rate of a rigid aircraft's body, under its aerodynamics, which read its
 // flight control `signals`, its engines'
 // thrust, along body x from where each is mounted, and gravity. Lift is summed
@@ -165,11 +166,24 @@ auto body_offset(const Displacement& structural,
 // step's lift coefficient, and the forces before the moments, so the rate of
 // angle of attack that the moments read is this step's exact one, as long as
 // no force reads it; if one does, the forces are found again with it.
+// It writes what the body feels to `felt`.
 auto rigid_aircraft_rate(const RigidBody& body, const FlightSignals& signals,
                          const Engines& engines, const MassBalance& mass,
                          const AircraftData& aircraft, const Earth& earth,
-                         const StandardAirTable& air, Time time)
-    -> RigidBodyRate;
+                         const StandardAirTable& air, Time time,
+                         Out<BodyAcceleration> felt) -> RigidBodyRate;
+
+// Sets the state the flight controls read in `signals`, at `body`: air data,
+// ground speed, body velocity, attitude, and the accelerations the pilot feels
+// at the aircraft's eye point from `felt`. It finds only what the aircraft's
+// flight controls read, besides its body velocity and angles of attack.
+// JSBSim's flight controls read these from the frame before; here only `felt`
+// is, because a step's own needs the surfaces the flight controls are about to
+// set. No wheel carries weight.
+auto sense_flight_state(const RigidBody& body, const BodyAcceleration& felt,
+                        const MassBalance& mass, const AircraftData& aircraft,
+                        const Earth& earth, const StandardAirTable& air,
+                        Time time, InOut<FlightSignals> signals) -> void;
 
 // Computes the aerodynamics' inputs at `body`, all but the rate of angle of
 // attack, which needs the body's acceleration. `reference` is the aerodynamic

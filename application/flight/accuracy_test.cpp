@@ -28,7 +28,8 @@ namespace {
 
 using namespace std::chrono_literals;
 
-constexpr char REFERENCE[] = "application/flight/reference/jsbsim_737.csv";
+constexpr std::string_view REFERENCE =
+    "application/flight/reference/jsbsim_737.csv";
 constexpr Duration SAMPLE = 200ms;  // Between the reference's rows.
 
 // The 737, as jsbsim_737.py fitted it.

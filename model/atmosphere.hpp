@@ -139,4 +139,53 @@ class StandardAirTable final {
   std::vector<Air> air_;
 };
 
+// The airspeed that a pitot tube calibrated at standard sea level shows at
+// `mach` in `air`, as JSBSim finds it (FGAuxiliary): the impact pressure,
+// isentropic below Mach 1 and behind a normal shock above it, read back as
+// the Mach number that makes it at sea level. The air's pressure follows from
+// its density and speed of sound, which for an ideal gas fix it.
+inline auto calibrated_airspeed(double mach, const Air& air) -> Speed {
+  using internal::HEAT_RATIO;
+  using internal::SEA_LEVEL_PRESSURE;
+  double sound = air.speed_of_sound.numerical_value_in(meter_per_second);
+  double pressure = air.density.numerical_value_in(kilogram_per_cubic_meter) *
+                    sound * sound / HEAT_RATIO;
+
+  // The pitot tube's total pressure.
+  double b = HEAT_RATIO / (HEAT_RATIO - 1.0);
+  double total = pressure;
+  if (mach >= 1.0) {
+    double c = 2.0 * b;
+    double d = 1.0 / (HEAT_RATIO - 1.0);
+    double coeff = std::pow(0.5 * (HEAT_RATIO + 1.0), b) *
+                   std::pow((HEAT_RATIO + 1.0) / (HEAT_RATIO - 1.0), d);
+    total = pressure * coeff * std::pow(mach, c) /
+            std::pow(c * mach * mach - 1.0, d);
+  } else if (mach > 0.0) {
+    total =
+        pressure * std::pow(1.0 + 0.5 * (HEAT_RATIO - 1.0) * mach * mach, b);
+  }
+
+  // The Mach number that makes the same impact pressure at sea level.
+  double a = 2.0 / (HEAT_RATIO - 1.0);
+  double e = (HEAT_RATIO - 1.0) / HEAT_RATIO;
+  double c = 2.0 / e;
+  double d = 0.5 * a;
+  double ratio =
+      (total - pressure) / SEA_LEVEL_PRESSURE.numerical_value_in(pascal) + 1.0;
+  double sea_level_mach = std::sqrt(a * (std::pow(ratio, e) - 1.0));
+  if (sea_level_mach > 1.0) {
+    double coeff = std::pow(0.5 * (HEAT_RATIO + 1.0), -0.25 * c) *
+                   std::pow(0.5 * (HEAT_RATIO + 1.0) / HEAT_RATIO, -0.5 * d);
+    for (int i = 0; i < 10; ++i) {
+      sea_level_mach =
+          coeff * std::sqrt(ratio * std::pow(1.0 - 1.0 / (c * sea_level_mach *
+                                                          sea_level_mach),
+                                             d));
+    }
+  }
+  return sea_level_mach *
+         internal::air_at_geopotential(0.0 * meter).speed_of_sound;
+}
+
 }  // namespace simon::model

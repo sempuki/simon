@@ -36,7 +36,8 @@ namespace {
 using namespace std::chrono_literals;
 using WallClock = std::chrono::steady_clock;
 
-constexpr char BOEING_737[] = "application/flight/aircraft/737.aircraft";
+constexpr std::string_view BOEING_737 =
+    "application/flight/aircraft/737.aircraft";
 constexpr Duration DT = 8ms;
 constexpr int DEFAULT_STEPS = 250;  // 2 s simulated.
 
@@ -140,7 +141,8 @@ auto main(int argc, char** argv) -> int {
   if (populations.empty()) {
     populations = {100, 1'000, 10'000};
   }
-  auto data = simon::model::load_aircraft(simon::flight::BOEING_737);
+  auto data =
+      simon::model::load_aircraft(std::string{simon::flight::BOEING_737});
   if (!data) {
     std::println(stderr, "{}", data.error().message());
     return 1;

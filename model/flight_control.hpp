@@ -3,6 +3,7 @@
 #pragma once
 
 #include <array>
+#include <bitset>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -225,13 +226,23 @@ struct FlightBlock final {
 struct FlightControlData final {
   std::vector<std::string> signals;  // By index: the fixed ones first.
   std::vector<FlightBlock> blocks;
+  // Each engine's throttle, `throttle_<n>`: its command, unless a block
+  // writes it.
+  std::vector<std::size_t> throttles;
+  // The fixed signals the blocks read, so an aircraft finds only those.
+  std::bitset<FLIGHT_SIGNAL_COUNT> read;
+
+  auto reads(FlightSignal signal) const -> bool {
+    return read[index_of(signal)];
+  }
 };
 
 // The index of the signal `controls` names `name`, if any.
 auto find_signal(const FlightControlData& controls, std::string_view name)
     -> std::optional<std::size_t>;
 
-// Runs every block once, in order, over `dt`.
+// Sets each engine's throttle to its command, as JSBSim does at the start of
+// a frame, then runs every block once, in order, over `dt`.
 auto run_flight_controls(const FlightControlData& controls,
                          InOut<FlightSignals> signals, Time dt) -> void;
 

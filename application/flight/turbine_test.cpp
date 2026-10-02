@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "application/flight/testing.hpp"
@@ -23,7 +24,7 @@ namespace {
 
 using namespace flight::testing;
 
-constexpr char REFERENCE[] =
+constexpr std::string_view REFERENCE =
     "application/flight/reference/jsbsim_737_turbine.csv";
 constexpr double DT = 1.0 / 60.0;  // The reference's frame, seconds.
 
@@ -36,15 +37,15 @@ auto read_air(const Row& row) -> EngineAir {
   };
 }
 
-auto column(const char* name, int engine) -> std::string {
+auto column(std::string_view name, int engine) -> std::string {
   return std::string{name} + "_" + std::to_string(engine);
 }
 
 // Checks each engine of the aircraft at `path` against JSBSim's recording
 // at `reference`, made every `dt` seconds.
-auto check_against_jsbsim(const char* path, const char* reference, double dt)
-    -> void {
-  auto aircraft = load_aircraft(path);
+auto check_against_jsbsim(std::string_view path, std::string_view reference,
+                          double dt) -> void {
+  auto aircraft = load_aircraft(std::string{path});
   REQUIRE(aircraft);
   std::vector<Row> rows = load_rows(reference);
   REQUIRE(rows.size() > 1000);
@@ -94,7 +95,7 @@ TEST_CASE("Turbine737") {
   }
 
   SECTION("ShouldMatchJsbsimGivenSettledEngine") {
-    auto aircraft = load_aircraft(BOEING_737);
+    auto aircraft = load_aircraft(std::string{BOEING_737});
     REQUIRE(aircraft);
     // By the end, the second engine has held 0.9 for 13 s.
     std::vector<Row> rows = load_rows(REFERENCE);

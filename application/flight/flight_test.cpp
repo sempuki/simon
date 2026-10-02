@@ -247,7 +247,8 @@ TEST_CASE("Simulation") {
 
 namespace {
 
-constexpr char BOEING_737[] = "application/flight/aircraft/737.aircraft";
+constexpr std::string_view BOEING_737 =
+    "application/flight/aircraft/737.aircraft";
 
 // A 737 trimmed in cruise at 6 km and 200 m/s, heading north from the
 // world's origin toward a waypoint 500 km ahead.
@@ -282,7 +283,7 @@ auto fly_rigid(Duration duration, InOut<Scheduler> scheduler,
 }  // namespace
 
 TEST_CASE("RigidAircraft") {
-  auto data = model::load_aircraft(BOEING_737);
+  auto data = model::load_aircraft(std::string{BOEING_737});
   REQUIRE(data);
   World world;
   build_small_world(Out(world));

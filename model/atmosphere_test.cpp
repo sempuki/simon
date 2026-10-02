@@ -71,4 +71,29 @@ TEST_CASE("StandardAirTable") {
   }
 }
 
+TEST_CASE("CalibratedAirspeed") {
+  SECTION("ShouldMatchJsbsimGivenSubsonicAndSupersonicFlight") {
+    // JSBSim's velocities/vc-kts in m/s, at its velocities/mach, over the
+    // standard atmosphere at each altitude. They differ by a few parts in
+    // 10^6, because JSBSim rounds its gas constant in English units.
+    struct Point final {
+      double altitude;  // m.
+      double mach;
+      double calibrated;  // m/s.
+    };
+    for (Point point :
+         {Point{0.0, 0.3, 102.08805610600513},
+          Point{3000.0, 0.57935238046670334, 165.99256485009212},
+          Point{6000.0, 0.83694263780500477, 202.75850442467558},
+          Point{10000.0, 1.2323001259090951, 239.8446487478603},
+          Point{15000.0, 1.7342033881976764, 242.57718268966568}}) {
+      Speed speed =
+          calibrated_airspeed(point.mach, standard_air(point.altitude * meter));
+      CAPTURE(point.altitude);
+      CHECK_THAT(speed.numerical_value_in(meter_per_second),
+                 WithinRel(point.calibrated, 1e-5));
+    }
+  }
+}
+
 }  // namespace simon::model

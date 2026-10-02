@@ -24,7 +24,7 @@ namespace {
 
 using namespace flight::testing;
 
-constexpr char REFERENCE[] =
+constexpr std::string_view REFERENCE =
     "application/flight/reference/jsbsim_737_flight_control.csv";
 constexpr double DT = 1.0 / 60.0;  // The reference's frame, seconds.
 
@@ -55,7 +55,7 @@ auto name_of(FlightSignal signal) -> std::string {
 }  // namespace
 
 TEST_CASE("FlightControl737") {
-  auto aircraft = load_aircraft(BOEING_737);
+  auto aircraft = load_aircraft(std::string{BOEING_737});
   REQUIRE(aircraft);
   const FlightControlData& controls = aircraft->flight_controls;
   REQUIRE(controls.blocks.size() > 10);
@@ -109,7 +109,7 @@ TEST_CASE("FlightControl737") {
 }
 
 TEST_CASE("FlightControlF16") {
-  auto aircraft = load_aircraft(F16);
+  auto aircraft = load_aircraft(std::string{F16});
   REQUIRE(aircraft);
   const FlightControlData& controls = aircraft->flight_controls;
   std::vector<Row> rows =

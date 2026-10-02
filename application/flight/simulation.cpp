@@ -79,26 +79,33 @@ auto create_rigid_aircraft(const model::AircraftData& data,
 
   FlightSignals signals;
   signals[model::FlightSignal::PITCH_TRIM_COMMAND] = trim.pitch_trim;
+  for (std::size_t i = 0; i < data.engines.size(); ++i) {
+    signals
+        .values[model::index_of(model::FlightSignal::THROTTLE_COMMAND_0) + i] =
+        trim.throttle;
+  }
   model::settle_flight_controls(data.flight_controls, InOut(signals));
   model::run_flight_controls(data.flight_controls, InOut(signals),
                              0.0 * model::second);
-  EngineControls controls;
-  controls.throttle.fill(trim.throttle);
   model::StandardAirTable air;
   Engines engines = model::settled_engines(
-      data, controls,
+      data, signals,
       model::compute_engine_air(body, earth, air, 0.0 * model::second));
   FuelTanks tanks = model::fill_fuel_tanks(data);
+  MassBalance mass = model::compute_mass_balance(data, tanks);
+  BodyAcceleration felt;
+  model::rigid_aircraft_rate(body, signals, engines, mass, data, earth, air,
+                             0.0 * model::second, Out(felt));
 
   return world->create<archetype::RigidAircraft>()
       .with(earth.air_state(body, 0.0 * model::second))
       .with(body)
       .with(RigidBodyRate{})
+      .with(felt)
       .with(signals)
-      .with(controls)
       .with(engines)
       .with(tanks)
-      .with(model::compute_mass_balance(data, tanks))
+      .with(mass)
       .with(AircraftType{.data = &data})
       .with(Autopilot{
           .altitude = trim.altitude, .heading = heading, .speed = trim.speed})
