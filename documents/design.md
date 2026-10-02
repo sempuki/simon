@@ -984,8 +984,14 @@ Rules:
   operator takes it. Time is not world data, so it is not in `ProjectedWorld`.
 - **Optional stages** (`prepare(world[, step])` before the main loop,
   `resolve(world[, step])` after it) are detected at compile time and cost
-  nothing when absent. The older
-  simulator did the same with stage tags.
+  nothing when absent. The older simulator did the same with stage tags. A
+  prepare that returns false skips the loop and resolve with it: resolve is
+  the loop's post-processing, and work a step needs regardless belongs in
+  prepare. Pre- and post-processing belong in one system's stages when they
+  work on exactly the data the loop does, or must always run just before or
+  after it; when they need other inputs or do different work, they are
+  systems of their own, as `ProposeEngagements` and `ResolveEngagements`
+  are.
 
 **Any callable can be a system.** Systems often keep state between steps, so
 besides structs, a system can be made from a lambda or any other callable. The

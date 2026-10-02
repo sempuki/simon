@@ -281,7 +281,7 @@ TEST_CASE("System") {
     CHECK(check.without == 2);
   }
 
-  SECTION("ShouldSkipLoopButResolveGivenPrepareReturnsFalse") {
+  SECTION("ShouldSkipLoopAndResolveGivenPrepareReturnsFalse") {
     REQUIRE(world.create<Body>().with(Health{1.0}).build());
     world.sync();
     Scheduler<TestWorld, SystemList<Skippable>> scheduler;
@@ -289,11 +289,12 @@ TEST_CASE("System") {
     scheduler.system<Skippable>().run = false;
     scheduler.step(STEP, InOut(world));
     CHECK(scheduler.system<Skippable>().called == 0);
-    CHECK(scheduler.system<Skippable>().resolved);
+    CHECK_FALSE(scheduler.system<Skippable>().resolved);
 
     scheduler.system<Skippable>().run = true;
     scheduler.step(STEP, InOut(world));
     CHECK(scheduler.system<Skippable>().called == 1);
+    CHECK(scheduler.system<Skippable>().resolved);
   }
 
   SECTION("ShouldReadOtherEntitiesGivenDeclaredLookup") {

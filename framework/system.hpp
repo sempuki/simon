@@ -400,8 +400,10 @@ struct SystemRunner final {
                   "owners; the component would never be there.");
 
     ProjectedWorld<SystemType, WorldType> access{Depend(*world)};
-    // A prepare stage that returns false skips the per-entity loop, for steps
-    // with nothing to do.
+    // A prepare stage that returns false skips the per-entity loop and the
+    // resolve stage after it, for steps with nothing to do. Resolve is the
+    // loop's post-processing; work the step needs regardless belongs in
+    // prepare.
     bool proceed = stage(
         step,
         [](auto& target,
@@ -409,10 +411,11 @@ struct SystemRunner final {
           return target.prepare(arguments...);
         },
         system, InOut(access));
-    if (proceed) {
-      loop(step, typename SystemType::OtherComponentList{}, system, world,
-           InOut(access));
+    if (!proceed) {
+      return;
     }
+    loop(step, typename SystemType::OtherComponentList{}, system, world,
+         InOut(access));
     stage(
         step,
         [](auto& target,
