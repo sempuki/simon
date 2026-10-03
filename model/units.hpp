@@ -222,6 +222,13 @@ auto seconds(std::chrono::duration<RepresentationType, PeriodType> duration)
   return std::chrono::duration<double>(duration).count() * second;
 }
 
+// A vector quantity's numbers as an Eigen vector, in its own unit, which for
+// every vector type here is the SI one.
+template <auto UNIT>
+auto eigen(const units::quantity<UNIT, QuantityVector>& quantity) -> Vector3 {
+  return quantity.numerical_value_in(UNIT).eigen();
+}
+
 // Vector algebra on quantities. mp-units 2.5 has none for custom
 // representations, so these unwrap, operate, and rewrap with the product unit.
 template <auto A, auto B>

@@ -2434,7 +2434,11 @@ beside it (see [The F-16](#the-f-16)).
 | `model/turbine` | JSBSim's turbine: spools, thrust from idle to military and through reheat to maximum, fuel flow |
 | `model/earth` | The WGS84 ellipsoid, J2 gravitation, the Earth's rotation, geodetic conversion |
 | `model/rigid_body` | Stevens and Lewis's equations of motion in an inertial frame, as a `ContinuousState` |
-| `model/rigid_aircraft` | The flat or round Earth, air data, mass balance, engines and fuel, and the body's rate |
+| `model/frames` | The flat or round Earth, a body's place on it, and its motion relative to the air and the wind |
+| `model/mass_balance` | Fuel tanks, and the mass, center of mass and inertia they give with the empty aircraft |
+| `model/propulsion` | The engines' air, their spools and thrust at the throttles, and the fuel they burn |
+| `model/sensing` | The air data, attitude, motion and pilot's accelerations the flight controls read |
+| `model/rigid_aircraft` | The aerodynamics' inputs and the body's rate, and a header that includes the four above |
 | `application/flight` | The archetype and its systems |
 
 Each step a rigid aircraft runs `RunFlightControls`, `RunEngines`, then
