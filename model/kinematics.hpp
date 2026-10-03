@@ -72,7 +72,8 @@ struct Control final {
 };
 
 // Advances `kinematics` by `dt` under constant `acceleration`, using the
-// midpoint method (exact for constant acceleration).
+// midpoint method (exact for constant acceleration; Hairer, Norsett and
+// Wanner; see model/REFERENCES.md).
 inline auto integrate_midpoint(const Acceleration& acceleration, Time dt,
                                InOut<Kinematics> kinematics) -> void {
   Velocity mid_velocity = kinematics->velocity + acceleration * (dt * 0.5);

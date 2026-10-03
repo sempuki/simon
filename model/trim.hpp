@@ -24,7 +24,8 @@
 // angle of attack the acceleration along body z, throttle along body x, pitch
 // trim the pitch, bank the acceleration along body y, aileron the roll and
 // rudder the yaw. There is no sideslip. Newton's method solves them together,
-// with a numerical Jacobian, to accelerations near rounding.
+// with a finite-difference Jacobian (Dennis and Schnabel; see
+// model/REFERENCES.md), to accelerations near rounding.
 //
 // Each evaluation settles the flight controls with the airframe: the blocks
 // stand as they do when their inputs hold still, and read the state and the

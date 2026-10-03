@@ -131,7 +131,8 @@ struct FlightControls final {
 // The properties of an aircraft the dynamics read every step: mass, the drag
 // polar CD = CD0 + K1 * CL + K * CL^2 over its wing area, and its sea-level
 // thrust, which falls with air density. K1 lets the polar's least drag fall at
-// a lift other than zero, as a cambered wing's does.
+// a lift other than zero, as a cambered wing's does (Raymer; see
+// model/REFERENCES.md).
 struct Airframe final {
   Mass mass = 1.0 * kilogram;
   Area wing_area = 1.0 * square_meter;
@@ -191,7 +192,8 @@ inline auto compute_point_mass_rate(const AirState& state,
   };
 }
 
-// Advances `state` by `dt` in one pass, semi-implicitly: speed and angles
+// Advances `state` by `dt` in one pass, semi-implicitly, as symplectic Euler
+// does (Hairer, Lubich and Wanner; see model/REFERENCES.md): speed and angles
 // first, from `rate`, then position along the new velocity. One evaluation
 // per step, and stable for the slow modes this model has at the steps a large
 // simulation takes. `rate` must be compute_point_mass_rate's for `state`, whose

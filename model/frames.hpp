@@ -63,8 +63,9 @@ class Earth final {
 
   // The rate relative to the air at which `body` keeps its attitude to the
   // local north-east-down frame as it moves over the Earth, in body axes: the
-  // frame's turning, which flying level round the Earth needs. None over a
-  // flat Earth.
+  // frame's turning, which flying level round the Earth needs: its transport
+  // rate, from the ellipsoid's radii of curvature (Titterton and Weston; see
+  // model/REFERENCES.md). None over a flat Earth.
   auto level_rate(const RigidBody& body, Time time) const -> AngularVelocity;
 
   // Height above sea level: the geodetic altitude, or z over a flat Earth.
@@ -149,7 +150,9 @@ inline auto compute_body_motion(const RigidBody& body, const Earth& earth,
 // `specific_force` in body axes and gravity `gravity` in the inertial frame.
 // With the wind u in the inertial frame, turning with the Earth,
 // d/dt R^T (v - W x r - u) = f / m + R^T (g - W x v - W x u) -
-// w x R^T (v - W x r - u).
+// w x R^T (v - W x r - u). Derived here from Stevens and Lewis's equations of
+// motion (see rigid_body.hpp) by the rule for a vector's rate in a turning
+// frame, with the wind held still in the local frame.
 template <bool WINDY>
 inline auto compute_air_acceleration(const RigidBody& body,
                                      const BodyMotion& motion,

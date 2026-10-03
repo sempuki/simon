@@ -80,7 +80,9 @@ auto sense_flight_state(const RigidBody& body, const BodyAcceleration& felt,
   }
 
   // The pilot's acceleration: the body's, and the eye point's about the
-  // center of mass, in g.
+  // center of mass, a + alpha x r + w x (w x r), in g. It is the acceleration
+  // of a point fixed in a rigid body (Stevens and Lewis), as JSBSim's
+  // FGAuxiliary finds its pilot's.
   if (controls.reads(PILOT_ACCELERATION_Y) ||
       controls.reads(PILOT_ACCELERATION_Z)) {
     Vector3 eye =

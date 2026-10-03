@@ -77,7 +77,8 @@ auto uniform(std::uint64_t seed, std::uint64_t n) -> double {
   return (static_cast<double>(z >> 11) + 1.0) * 0x1.0p-53;
 }
 
-// Six standard normal numbers for a step, by Box and Muller.
+// Six standard normal numbers for a step, by Box and Muller's transform (see
+// model/REFERENCES.md).
 auto normals(std::uint64_t seed, std::uint64_t step) -> std::array<double, 6> {
   std::array<double, 6> result{};
   for (std::size_t i = 0; i < 3; ++i) {
@@ -123,7 +124,10 @@ auto advance_first_order(double state, double x, double noise) -> double {
 // Advances a second-order Dryden filter, two lags in series scaled to unit
 // variance, by `x` of its time constants, with the normal numbers `a` and `b`.
 // Its states' steady correlation is 1 / sqrt(2), and the gust is
-// sqrt(3/2) s0 + (1 - sqrt(3)) / 2 s1 in units of its intensity.
+// sqrt(3/2) s0 + (1 - sqrt(3)) / 2 s1 in units of its intensity. Derived here:
+// the step's covariance is Van Loan's integral of the filter's transition,
+// e^(-a t) (1, a t), in closed form, and the gust's weights are the partial
+// fractions of the Dryden filter (1 + sqrt(3) L s / V) / (1 + L s / V)^2.
 auto advance_second_order(std::array<double, 2> state, double x, double a,
                           double b) -> std::array<double, 2> {
   double decay = std::exp(-x);
@@ -145,7 +149,8 @@ auto second_order_gust(const std::array<double, 2>& state) -> double {
 }
 
 // Advances a lag of time constant `tau` by `dt`, its input moving in a
-// straight line from `from` to `to`.
+// straight line from `from` to `to`: the lag's first-order-hold equivalent
+// (Franklin, Powell and Workman; see model/REFERENCES.md).
 auto advance_lag(double lagged, double from, double to, double dt, double tau)
     -> double {
   double x = dt / tau;

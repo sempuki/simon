@@ -133,7 +133,8 @@ auto compute_rate(const RigidBody& body, const FlightSignals& signals,
   // The rate of angle of attack follows from the body's acceleration, which
   // the forces set. In body axes the air velocity changes at the force per
   // unit mass and the rest, which the stage fixes (see
-  // compute_air_acceleration).
+  // compute_air_acceleration). With alpha = atan2(w, u), its rate is
+  // (u w' - w u') / (u^2 + w^2), as JSBSim's FGAuxiliary has it.
   const Vector3& uvw = motion.air_velocity;
   Vector3 rest = compute_air_acceleration<WINDY>(
       body, motion, earth, place, wind, Vector3::Zero(), eigen(gravity));

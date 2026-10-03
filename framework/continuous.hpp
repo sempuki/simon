@@ -48,6 +48,8 @@ using rate_of_t = typename StateType::RateComponent;
 
 //-- Methods: explicit Runge-Kutta, as Butcher tableaus ------------------------
 
+// The tableaus are the standard ones (Butcher; see model/REFERENCES.md).
+
 // Forward Euler: one stage, first order.
 struct Euler final {
   static constexpr std::size_t stages = 1;

@@ -29,8 +29,9 @@ inline auto limit(const Acceleration& acceleration, AccelerationMagnitude limit)
 //   a = N * Vc * (omega x r) / |r|,   omega = (r x v) / |r|^2,
 //   Vc = -(r . v) / |r|
 //
-// where r and v are the target's position and velocity relative to `self`.
-// Returns zero when the target is at `self`.
+// where r and v are the target's position and velocity relative to `self`
+// (Zarchan; see model/REFERENCES.md). Returns zero when the target is at
+// `self`.
 inline auto compute_proportional_navigation(const Kinematics& self,
                                             const Kinematics& target,
                                             double gain) -> Acceleration {

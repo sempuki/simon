@@ -180,7 +180,9 @@ auto compute_wind_angles(const Vector3& air_velocity) -> WindAngles;
 
 // The sums as body-axis loads, at angle of attack `alpha` and sideslip
 // `beta`, with the aerodynamic reference point `reference` from the center of
-// mass in body axes (x forward, y right, z down).
+// mass in body axes (x forward, y right, z down). Forces turn from wind axes
+// to body axes as Stevens and Lewis turn them (see model/REFERENCES.md), and
+// move to the center of mass with the moment of the force at the reference.
 auto compute_aero_loads(const AeroSums& sums, const WindAngles& wind,
                         const Displacement& reference) -> AeroLoads;
 auto compute_aero_loads(const AeroSums& sums, Angle alpha, Angle beta,

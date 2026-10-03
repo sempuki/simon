@@ -110,7 +110,8 @@ struct PiGains final {
 
 // The output of a PI controller for `error`, integrating over `dt` into
 // `integral`. The integral stops growing while the output is held at a limit
-// in the error's direction, so it does not wind up.
+// in the error's direction, so it does not wind up: conditional integration
+// (Astrom and Hagglund; see model/REFERENCES.md).
 template <typename ErrorType, typename OutputType>
 auto pi_control(ErrorType error, const PiGains<ErrorType, OutputType>& gains,
                 Time dt, InOut<OutputType> integral) -> OutputType {

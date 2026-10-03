@@ -40,7 +40,7 @@ auto run_engines(const AircraftData& aircraft, InOut<Engines> engines,
                  const EngineAir& air, Time dt) -> void;
 
 // Burns each engine's fuel flow for `dt`, from its feed tanks that have fuel,
-// in equal shares, as JSBSim does.
+// in equal shares, as JSBSim's FGPropulsion does.
 auto burn_fuel(const AircraftData& aircraft, const Engines& engines,
                InOut<FuelTanks> tanks, Time dt) -> void;
 
