@@ -3,9 +3,10 @@
 """Flies JSBSim's F-16 through open-loop check cases, for check_case_test.
 
 The F-16 is trimmed in cruise at 6 km and 200 m/s, 30 degrees north, heading
-northeast, and from there flown for 30 s in each of five cases: holding the
-trim, and a stick doublet in pitch and in roll, a rudder doublet, and a
-throttle step into reheat on top of it (see `command`). The pilot's commands
+northeast, and from there flown for 30 s in each of six cases: holding the
+trim, a stick doublet in pitch and in roll, a rudder doublet, and a throttle
+step into reheat on top of it (see `command`), and holding the trim into a
+wind that starts just after 1 s (see `WIND`). The pilot's commands
 are open loop; the fly-by-wire flight controls close their own loops on rate
 and load factor. Each case is flown at 8 ms, and at 0.125 ms, where JSBSim has
 converged to a millimeter or so, and to 5 cm after the roll doublet. The flight
@@ -52,7 +53,12 @@ FINE = 125
 SECONDS = 30
 SAMPLE = 200000  # Microseconds: a multiple of both frames.
 
-CASES = ['hold', 'elevator', 'aileron', 'rudder', 'throttle']
+CASES = ['hold', 'elevator', 'aileron', 'rudder', 'throttle', 'wind']
+# The wind in the wind case: north, east and down, in m/s, from WIND_START
+# microseconds, between two of the F-16's flight control frames, so that
+# each frame reads the air its state moved through.
+WIND = (8.0, -12.0, 2.0)
+WIND_START = 1004000
 PIDS = ['roll-rate-pid', 'g-load-pid', 'yaw-load-pid']
 
 
@@ -171,6 +177,10 @@ def fly(case, frame, flight_signals, commands=None):
         fdm['fcs/aileron-cmd-norm'] = trim[1] + offset['aileron']
         fdm['fcs/rudder-cmd-norm'] = trim[2] + offset['rudder']
         fdm['fcs/throttle-cmd-norm'] = trim[6] + offset['throttle']
+        blowing = case == 'wind' and t >= WIND_START
+        for axis, speed in zip(('north', 'east', 'down'), WIND):
+            fdm['atmosphere/wind-%s-fps' % axis] = (speed / FT if blowing
+                                                    else 0.0)
         fdm.run()
         if t % SAMPLE == 0:
             rows.append([CASES.index(case), frame, t / 1e6] + state(fdm))

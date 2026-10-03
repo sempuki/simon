@@ -16,6 +16,7 @@
 #include "model/control.hpp"
 #include "model/flight_path.hpp"
 #include "model/rigid_aircraft.hpp"
+#include "model/wind.hpp"
 
 namespace simon::flight {
 
@@ -26,6 +27,40 @@ using namespace std::chrono_literals;
 
 template <typename SystemType>
 using ProjectedWorld = framework::ProjectedWorld<SystemType, World>;
+
+//-- Wind ----------------------------------------------------------------------
+
+// Each step, the air moves at each aircraft that has a Wind: by the field's
+// steady wind, and, for a rigid aircraft that has Gusts, by the turbulence it
+// meets along its path. The wind holds over the step.
+struct MoveAir final          //
+    : System<Wind,            //
+             const AirState,  //
+             Gusts,           //
+             const AircraftType> {
+  using SystemWorld = ProjectedWorld<MoveAir>;
+
+  explicit MoveAir(model::WindField field = {}) : field_{field} {}
+
+  auto operator()(SystemWorld&, Entity,      //
+                  Wind& wind,                //
+                  const AirState* state,     //
+                  Gusts* gusts,              //
+                  const AircraftType* type,  //
+                  Step step) const -> void {
+    if (!gusts || !state || !type || !type->data) {
+      wind = model::compute_wind(field_);
+      return;
+    }
+    model::advance_gusts(field_.turbulence, model::altitude_of(*state),
+                         state->speed, type->data->wing_span,
+                         model::seconds(step.dt), InOut(*gusts));
+    wind = model::compute_wind(field_, *gusts, state->heading);
+  }
+
+ private:
+  model::WindField field_;
+};
 
 //-- Guidance and control: discrete, at their own rates ------------------------
 
@@ -228,6 +263,33 @@ using Precise =
     framework::Continuous<framework::RungeKutta4, TypeList<AirState>,
                           SystemList<PointMassRates>>;
 
+// After Fly and Precise, the wind carries each point-mass aircraft that has
+// one. Its AirState is its motion through the air, so the air's own motion
+// adds to its position alone. Rigid aircraft fly through the wind in their
+// dynamics, so DriftWithWind excludes them.
+struct DriftWithWind final  //
+    : System<const Wind,    //
+             AirState> {
+  using SystemWorld = ProjectedWorld<DriftWithWind>;
+  using SequenceAfterSystemList = SystemList<Fly, Precise>;
+  using ExcludeComponentList = TypeList<RigidBody>;
+
+  auto operator()(SystemWorld&, Entity,  //
+                  const Wind& wind,      //
+                  AirState* state,       //
+                  Step step) const -> void {
+    if (!state) {
+      return;
+    }
+    // North, east and down to the local frame's east, north and up.
+    Vector3 ned =
+        wind.north_east_down.numerical_value_in(model::meter_per_second)
+            .eigen();
+    state->position += model::meters_per_second(ned.y(), ned.x(), -ned.z()) *
+                       model::seconds(step.dt);
+  }
+};
+
 // Each step, each rigid aircraft's autopilot flies its surfaces toward the
 // targets FollowRoute sets, as it sets every aircraft's: aileron for the bank
 // its heading needs, elevator for the flight-path angle its altitude needs,
@@ -320,7 +382,8 @@ struct RunFlightControls final        //
              const RigidBody,         //
              const BodyAcceleration,  //
              const MassBalance,       //
-             const AircraftType> {
+             const AircraftType,      //
+             const Wind> {
   using SystemWorld = ProjectedWorld<RunFlightControls>;
 
   explicit RunFlightControls(model::Earth earth = model::Earth::flat(),
@@ -346,13 +409,14 @@ struct RunFlightControls final        //
                   const BodyAcceleration* felt,  //
                   const MassBalance* mass,       //
                   const AircraftType* type,      //
+                  const Wind* wind,              //
                   Step step) const -> void {
     if (!body || !felt || !mass || !type || !type->data) {
       return;
     }
-    model::sense_flight_state(*body, *felt, *mass, *type->data, earth_, air_,
-                              model::seconds(step.time.time_since_epoch()),
-                              InOut(signals));
+    model::sense_flight_state(
+        *body, *felt, *mass, *type->data, earth_, air_, wind ? *wind : still_,
+        model::seconds(step.time.time_since_epoch()), InOut(signals));
     model::run_flight_controls(type->data->flight_controls, InOut(signals),
                                dt_);
   }
@@ -360,6 +424,7 @@ struct RunFlightControls final        //
  private:
   model::Earth earth_;
   model::StandardAirTable air_;
+  Wind still_;
   std::optional<engine::RateGate> gate_;
   Time dt_ = 0.0 * model::second;  // The blocks' step.
 };
@@ -371,7 +436,8 @@ struct RunEngines final            //
              const RigidBody,      //
              const FlightSignals,  //
              const FuelTanks,      //
-             const AircraftType> {
+             const AircraftType,   //
+             const Wind> {
   using SystemWorld = ProjectedWorld<RunEngines>;
   using SequenceAfterSystemList = SystemList<RunFlightControls>;
 
@@ -384,12 +450,14 @@ struct RunEngines final            //
                   const FlightSignals* signals,  //
                   const FuelTanks* tanks,        //
                   const AircraftType* type,      //
+                  const Wind* wind,              //
                   Step step) const -> void {
     if (!body || !signals || !tanks || !type || !type->data) {
       return;
     }
-    model::EngineAir air = model::compute_engine_air(
-        *body, earth_, air_, model::seconds(step.time.time_since_epoch()));
+    model::EngineAir air =
+        model::compute_engine_air(*body, earth_, air_, wind ? *wind : still_,
+                                  model::seconds(step.time.time_since_epoch()));
     model::run_engines(*type->data, InOut(engines), *signals, *tanks, air,
                        model::seconds(step.dt));
   }
@@ -397,6 +465,7 @@ struct RunEngines final            //
  private:
   model::Earth earth_;
   model::StandardAirTable air_;
+  Wind still_;
 };
 
 // The rate of each rigid aircraft's body, over a flat Earth unless
@@ -410,7 +479,8 @@ struct RigidAircraftRates final    //
              const Engines,        //
              const MassBalance,    //
              const AircraftType,   //
-             BodyAcceleration> {
+             BodyAcceleration,     //
+             const Wind> {
   using SystemWorld = ProjectedWorld<RigidAircraftRates>;
 
   explicit RigidAircraftRates(model::Earth earth = model::Earth::flat())
@@ -424,6 +494,7 @@ struct RigidAircraftRates final    //
                   const MassBalance* mass,       //
                   const AircraftType* type,      //
                   BodyAcceleration* felt,        //
+                  const Wind* wind,              //
                   Step step) const -> void {
     if (!body || !signals || !engines || !mass || !type || !type->data ||
         !felt) {
@@ -431,12 +502,14 @@ struct RigidAircraftRates final    //
     }
     rate = model::rigid_aircraft_rate(
         *body, *signals, *engines, *mass, *type->data, earth_, air_,
-        model::seconds(step.time.time_since_epoch()), Out(*felt));
+        wind ? *wind : still_, model::seconds(step.time.time_since_epoch()),
+        Out(*felt));
   }
 
  private:
   model::Earth earth_;
   model::StandardAirTable air_;
+  Wind still_;
 };
 
 using Rigid = framework::Continuous<framework::RungeKutta4, TypeList<RigidBody>,
@@ -471,9 +544,10 @@ struct BurnFuel final             //
 // queries and the rest of the world see it as they see any aircraft. Aircraft
 // with FlightControls fly the point-mass model, so their segments are
 // skipped whole.
-struct FollowRigidBody final  //
-    : System<AirState,        //
-             const RigidBody> {
+struct FollowRigidBody final   //
+    : System<AirState,         //
+             const RigidBody,  //
+             const Wind> {
   using SystemWorld = ProjectedWorld<FollowRigidBody>;
   using SequenceAfterSystemList = SystemList<Rigid>;
   using ExcludeComponentList = TypeList<FlightControls>;
@@ -484,24 +558,28 @@ struct FollowRigidBody final  //
   auto operator()(SystemWorld&, Entity,   //
                   AirState& state,        //
                   const RigidBody* body,  //
+                  const Wind* wind,       //
                   Step step) const -> void {
     if (!body) {
       return;
     }
     // The body has moved on by the step.
     state = earth_.air_state(
-        *body, model::seconds((step.time + step.dt).time_since_epoch()));
+        *body, model::seconds((step.time + step.dt).time_since_epoch()),
+        wind ? *wind : still_);
   }
 
  private:
   model::Earth earth_;
+  Wind still_;
 };
 
 //-- Schedule -----------------------------------------------------------------
 
 using Schedule =
-    SystemList<FollowRoute, FlyAutopilot, Actuate, Fly, Precise, FlySurfaces,
-               RunFlightControls, RunEngines, Rigid, BurnFuel, FollowRigidBody>;
+    SystemList<MoveAir, FollowRoute, FlyAutopilot, Actuate, Fly, Precise,
+               DriftWithWind, FlySurfaces, RunFlightControls, RunEngines, Rigid,
+               BurnFuel, FollowRigidBody>;
 using Scheduler = framework::Scheduler<World, Schedule>;
 
 }  // namespace simon::flight

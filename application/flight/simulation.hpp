@@ -40,6 +40,11 @@ struct Scenario final {
   // about 2 km at 200 m/s.
   SurfaceGains fighter_gains{.max_bank = 1.05 * model::radian};
 
+  // The air every aircraft flies in, still by default. Point-mass aircraft
+  // drift with its steady wind; rigid aircraft fly through it, and through
+  // its turbulence, each meeting its own gusts.
+  model::WindField wind;
+
   Length spacing = 5000.0 * model::meter;  // Per aircraft, on average.
   Length route_reach = 20000.0 * model::meter;
   Length lowest = 3000.0 * model::meter;
@@ -72,12 +77,16 @@ auto trim_in_cruise(const model::AircraftData& data, const model::Earth& earth,
 // Creates a rigid aircraft of type `data` over `earth`, trimmed by `trim`,
 // at `x` and `y` in the world's local frame, at the trim's altitude, and
 // heading `heading`, flying `route` from there by `gains`. Over a flat Earth
-// a trim holds wherever the aircraft is and whichever way it heads.
+// a trim holds wherever the aircraft is and whichever way it heads, and in a
+// steady wind, whose air it moves with. In a `wind` that is not still the
+// aircraft has a Wind, and in turbulence Gusts drawn from `seed`.
 auto create_rigid_aircraft(const model::AircraftData& data,
                            const model::Earth& earth, const model::Trim& trim,
                            const SurfaceGains& gains, Length x, Length y,
                            Angle heading, const Route& route,
-                           InOut<World> world)
+                           InOut<World> world,
+                           const model::WindField& wind = {},
+                           std::uint64_t seed = 0)
     -> std::expected<Entity, framework::Status>;
 
 // The rigid aircraft types a scenario flies, read once: null where it flies
@@ -102,7 +111,7 @@ auto build_scenario(const Scenario& scenario, const RigidTypes& types,
 // the driver stops. Any driver can run it.
 class Simulation final {
  public:
-  explicit Simulation(Scenario scenario = {}) : scenario_{scenario} {}
+  explicit Simulation(Scenario scenario = {});
 
   // Builds the world and the scenario in it. A scenario too big for a world
   // fails this phase with the builder's Status.

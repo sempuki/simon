@@ -3,9 +3,10 @@
 """Flies JSBSim's 737 through open-loop check cases, for check_case_test.
 
 The 737 is trimmed in cruise at 6 km and 200 m/s, 30 degrees north, heading
-northeast, and from there flown open loop for 30 s in each of five cases:
-holding the trim, and an elevator, aileron and rudder doublet and a throttle
-step on top of it (see `command`). Each case is flown twice: at a frame of
+northeast, and from there flown open loop for 30 s in each of six cases:
+holding the trim, an elevator, aileron and rudder doublet and a throttle step
+on top of it (see `command`), and holding the trim into a wind that starts just
+after 1 s (see `WIND`). Each case is flown twice: at a frame of
 8 ms, simon's step, and at 0.5 ms, where JSBSim's integrators and its frame
 lags have converged, as the reference both are judged against.
 
@@ -34,7 +35,12 @@ FINE = 500
 SECONDS = 30
 SAMPLE = 200000  # Microseconds: a multiple of both frames.
 
-CASES = ['hold', 'elevator', 'aileron', 'rudder', 'throttle']
+CASES = ['hold', 'elevator', 'aileron', 'rudder', 'throttle', 'wind']
+# The wind in the wind case: north, east and down, in m/s, from WIND_START
+# microseconds, between two of the F-16's flight control frames, so that
+# each frame reads the air its state moved through.
+WIND = (8.0, -12.0, 2.0)
+WIND_START = 1004000
 
 
 def command(case, microseconds):
@@ -133,6 +139,10 @@ def fly(case, frame):
         fdm['fcs/rudder-cmd-norm'] = trim[2] + offset['rudder']
         fdm['fcs/throttle-cmd-norm[0]'] = trim[6] + offset['throttle']
         fdm['fcs/throttle-cmd-norm[1]'] = trim[7] + offset['throttle']
+        blowing = case == 'wind' and t >= WIND_START
+        for axis, speed in zip(('north', 'east', 'down'), WIND):
+            fdm['atmosphere/wind-%s-fps' % axis] = (speed / FT if blowing
+                                                    else 0.0)
         fdm.run()
         if t % SAMPLE == 0:
             rows.append([CASES.index(case), frame, t / 1e6] + state(fdm))

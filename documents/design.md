@@ -2309,7 +2309,8 @@ Decisions made while building it:
 - **Speed comes first.** The steepest climb the autopilot commands shrinks as
   the aircraft falls below its target speed, and is zero 20 m/s below it, so
   a long climb at altitude never trades away more speed than that.
-- **No ground, no wind, no stall.** Routes stay between 3 and 9 km.
+- **No ground and no stall.** Routes stay between 3 and 9 km. Wind is opt
+  in (see [Wind and turbulence](#wind-and-turbulence)).
 
 The test checks the autopilot (holding altitude, speed and heading, and
 turning the short way to a waypoint behind), that a closed route is flown,
@@ -2694,7 +2695,86 @@ rigid aircraft the panel follows. The panel shows that aircraft's air data,
 attitude, load factor, engine and surfaces, and strip charts of its altitude
 and airspeed sit under the map. Both viewers share their window in
 `application/viewing.hpp`, which takes `--scale`, and `--frames` and
-`--screenshot` for running a viewer with nobody watching.
+`--screenshot` for running a viewer with nobody watching. The flight viewer's
+panel also sets the scenario's wind and turbulence.
+
+#### Wind and turbulence
+
+Wind is opt in, like every level. A scenario's `wind` is a
+`model::WindField`: a steady wind, the same everywhere, and turbulence of a
+severity. By default the air is still, no aircraft has a `Wind`, and every
+level costs what it did: 1.19 µs per rigid aircraft-step at 1,000 over a flat
+Earth, and 7.56 ms per step for the mixed 100,000.
+
+In moving air each aircraft has a `Wind`: the air's velocity relative to the
+Earth, in the local north-east-down frame, and the rotation turbulence gives
+it, held over a step. `MoveAir` sets it each step. A point-mass aircraft's
+`AirState` is its motion through the air, so `DriftWithWind` adds the wind to
+its position after `Fly` and `Precise`. Rigid aircraft in wind are an
+archetype of their own, `RigidAircraftInWind`, which requires a `Wind`. The
+rigid systems read it as a sibling that the still archetype lacks, so a rigid
+aircraft in still air never looks for one. The rate, the flight controls' air
+data and the engines' air are compiled apart for still air for the same
+reason. A rigid aircraft in wind that also has `Gusts` flies through
+turbulence. It starts trimmed for still air and moving with the air, which
+over a flat Earth is the same trim.
+
+A rigid aircraft's air velocity is its velocity less the air's,
+R^T (v - W x r - u) with u the wind in the inertial frame, and its rate
+relative to the air leaves out the turbulence's rotation. The rate of angle
+of attack reads the rate of the air velocity in body axes, which counts the
+wind turning in body axes as the body turns:
+
+    d/dt R^T (v - W x r - u) = f / m + R^T (g - W x v - W x u) - w x R^T (v - W x r - u)
+
+`rigid_aircraft_test` checks it against a central difference along a body's
+motion, over a flat Earth and a round one. JSBSim's `FGAuxiliary` takes the
+rate of angle of attack from the rate of the velocity over the ground, which
+leaves out w x R^T u.
+
+The check cases add a wind: from JSBSim's trim, a wind of 8 m/s north,
+12 m/s west and 2 m/s down starts at 1.004 s, between two of the F-16's
+flight control frames, and holds. The largest distance from JSBSim's
+converged flight over 30 s:
+
+| Aircraft | simon at 0.5 ms | simon at 8 ms | JSBSim at 8 ms |
+|---|---:|---:|---:|
+| 737 | 92 cm | 96 cm | 11.7 cm |
+| F-16 | 4.4 mm | 3.8 cm | 2.4 cm |
+
+The F-16's aerodynamics do not read the rate of angle of attack, and in wind
+it agrees with JSBSim to millimeters, as in still air. The 737's pitching
+moment does, and it parts from JSBSim by 92 cm; flown with JSBSim's rate, it
+agrees to 1.7 cm. The wind starts between 8 ms steps, so at 8 ms simon and
+JSBSim each start it 4 ms off the reference.
+
+Turbulence follows MIL-F-8785C. The gusts along the path (u), across it (v)
+and down (w) have its Dryden spectra, and the roll, pitch and yaw gusts
+follow from them over the wing span. The intensities come from its
+low-altitude model up to 1,000 ft and its table of intensities by
+probability of exceedance above 2,000 ft. Light, moderate and severe are
+exceeded with probabilities of 10^-2, 10^-3 and 10^-5. The turbulence is
+frozen in the air, and each aircraft meets it along its own path at its
+airspeed, from its own seed.
+
+- **Each filter is sampled exactly.** A step draws the filter's next state
+  from the distribution the continuous filter reaches over the step, so the
+  gusts' variance and correlation are the specification's at any step.
+  `wind_test` checks them against Dryden's at 20 ms and at 250 ms. JSBSim's
+  MIL-F-8785C turbulence advances its filters by Euler steps and takes the
+  second-order v and w spectra as first-order, so its turbulence changes
+  with its frame.
+- **Turbulence needs no time to build up.** The first draw starts each filter
+  from its steady distribution.
+- **The pitch and yaw gusts have the air's own signs,** q = -dw/dx and
+  r = dv/dx, through lags of 4b / (pi V) and 3b / (pi V).
+- **The noise needs no generator state.** It is SplitMix64, counted by step
+  from the aircraft's seed, so a run repeats exactly from its seed.
+
+`flight_test` flies 737s, F-16s and point-mass aircraft in a 15 m/s wind and
+moderate turbulence for five minutes, and checks that they keep to the
+routes' envelope and reach waypoints. It also checks that a point-mass
+aircraft in wind flies as it does in still air, carried by the wind.
 
 ## Libraries
 
@@ -2774,6 +2854,8 @@ Each step ends with a working application and passing tests.
      [Trim](#trim)).
    - Done: a flight viewer for the mixed world (see
      [Mixed fidelity](#mixed-fidelity)).
+   - Done: wind and MIL-F-8785C turbulence, opt in (see
+     [Wind and turbulence](#wind-and-turbulence)).
    - Next for rigid aircraft: many rigid aircraft batched in one segment.
    - Later: Adams-Bashforth with rate history, many replicas of a scenario
      in one world, world snapshots, and trim tables computed offline. JSBSim,

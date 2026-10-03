@@ -59,7 +59,7 @@ struct Scatter final {
   std::vector<double> x;
   std::vector<double> y;
 
-  auto add(const Position& position) -> void {
+  auto append(const Position& position) -> void {
     model::QuantityVector meters = position.numerical_value_in(model::meter);
     x.push_back(meters.x());
     y.push_back(meters.y());
@@ -160,6 +160,13 @@ class Viewer final {
 
  private:
   auto restart() -> void {
+    // The wind blows from `wind_from_`, so the air moves the other way.
+    double from = wind_from_ / RAD_TO_DEG;
+    scenario_.wind = model::WindField{
+        .north_east_down = model::meters_per_second(
+            -wind_speed_ * std::cos(from), -wind_speed_ * std::sin(from), 0.0),
+        .turbulence = static_cast<model::Turbulence>(turbulence_),
+    };
     session_.reset();  // Finish the old run before starting the new one.
     session_ = std::make_unique<Session>(scenario_, speed_);
     histories_.clear();
@@ -200,7 +207,7 @@ class Viewer final {
         continue;  // Paused, or no step since the last frame.
       }
       if (time - history.last_trail >= TRAIL_EVERY) {
-        history.trail.add(state->position);
+        history.trail.append(state->position);
         history.last_trail = time;
         if (history.trail.size() > TRAIL_SECONDS / TRAIL_EVERY) {
           history.trail.x.erase(history.trail.x.begin());
@@ -245,6 +252,12 @@ class Viewer final {
     ImGui::InputInt("Runge-Kutta 4", &scenario_.precise);
     ImGui::InputInt("Rigid 737s", &scenario_.rigid);
     ImGui::InputInt("Rigid F-16s", &scenario_.fighters);
+    ImGui::SliderFloat("Wind from", &wind_from_, 0.0f, 360.0f, "%.0f deg");
+    ImGui::SliderFloat("Wind", &wind_speed_, 0.0f, 40.0f, "%.0f m/s");
+    constexpr std::array<const char*, 4> TURBULENCE{"None", "Light", "Moderate",
+                                                    "Severe"};
+    ImGui::Combo("Turbulence", &turbulence_, TURBULENCE.data(),
+                 static_cast<int>(TURBULENCE.size()));
     if (ImGui::Button("Restart", ImVec2(-1.0f, 0.0f))) {
       restart();
       return;
@@ -312,6 +325,7 @@ class Viewer final {
         world.store_of<Engines>().maybe_component_of(entity);
     const BodyAcceleration* felt =
         world.store_of<BodyAcceleration>().maybe_component_of(entity);
+    const Wind* wind = world.store_of<Wind>().maybe_component_of(entity);
     if (!state || !body || !signals || !type || !type->data || !engines ||
         !felt) {
       return;
@@ -320,9 +334,13 @@ class Viewer final {
     model::Earth earth = model::Earth::flat();
     Matrix3 attitude =
         earth.body_to_north_east_down(*body, model::seconds(0.0s));
-    Vector3 uvw = earth.air_velocity(*body)
+    Vector3 uvw = model::compute_air_velocity(
+                      *body, earth, earth.place(*body, model::seconds(0.0s)),
+                      wind ? *wind : Wind{})
                       .numerical_value_in(model::meter_per_second)
                       .eigen();
+    Vector3 ground =
+        body->velocity.numerical_value_in(model::meter_per_second).eigen();
     double g = model::STANDARD_GRAVITY.numerical_value_in(
         model::meter_per_second_squared);
     auto signal = [&](std::string_view name) -> std::optional<double> {
@@ -338,6 +356,14 @@ class Viewer final {
                 model::altitude_of(*state).numerical_value_in(model::meter));
     ImGui::Text("Airspeed      %7.1f m/s",
                 state->speed.numerical_value_in(model::meter_per_second));
+    ImGui::Text("Ground speed  %7.1f m/s", std::hypot(ground.x(), ground.y()));
+    if (wind) {
+      Vector3 air =
+          wind->north_east_down.numerical_value_in(model::meter_per_second)
+              .eigen();
+      ImGui::Text("Wind          %7.1f m/s", std::hypot(air.x(), air.y()));
+      ImGui::Text("Rising air    %7.1f m/s", -air.z());
+    }
     ImGui::Text("Heading       %7.1f deg",
                 model::radians(state->heading) * RAD_TO_DEG);
     ImGui::Text("Climb angle   %7.1f deg",
@@ -428,11 +454,11 @@ class Viewer final {
     world.store_of<AirState>().for_each([&](Entity entity,
                                             const AirState& state) {
       if (world.store_of<RigidBody>().maybe_component_of(entity)) {
-        (is_fighter(entity) ? fighters : airliners).add(state.position);
+        (is_fighter(entity) ? fighters : airliners).append(state.position);
       } else if (world.store_of<AirStateRate>().maybe_component_of(entity)) {
-        precise.add(state.position);
+        precise.append(state.position);
       } else {
-        simple.add(state.position);
+        simple.append(state.position);
       }
     });
     if (fit_ &&
@@ -455,14 +481,14 @@ class Viewer final {
               world.store_of<Route>().maybe_component_of(followed)) {
         Scatter waypoints;
         for (const Position& waypoint : route->waypoints) {
-          waypoints.add(waypoint);
+          waypoints.append(waypoint);
         }
-        waypoints.add(route->waypoints.front());
+        waypoints.append(route->waypoints.front());
         ImPlot::SetNextLineStyle(ImVec4(1.0f, 0.9f, 0.3f, 0.5f), scale_);
         ImPlot::PlotLine("Route", waypoints.x.data(), waypoints.y.data(),
                          waypoints.size());
         Scatter next;
-        next.add(route->waypoints[route->next % route->waypoints.size()]);
+        next.append(route->waypoints[route->next % route->waypoints.size()]);
         ImPlot::SetNextMarkerStyle(ImPlotMarker_Cross, 8.0f * scale_, YELLOW,
                                    2.0f * scale_, YELLOW);
         ImPlot::PlotScatter("Next waypoint", next.x.data(), next.y.data(), 1);
@@ -491,6 +517,9 @@ class Viewer final {
   }
 
   Scenario scenario_;
+  float wind_from_ = 270.0f;  // Degrees from north.
+  float wind_speed_ = 0.0f;   // m/s.
+  int turbulence_ = 0;        // A model::Turbulence.
   float speed_ = 10.0f;
   float scale_ = 1.0f;
   std::unique_ptr<Session> session_;

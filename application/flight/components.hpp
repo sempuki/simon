@@ -14,11 +14,14 @@
 #include "model/rigid_aircraft.hpp"
 #include "model/rigid_body.hpp"
 #include "model/units.hpp"
+#include "model/wind.hpp"
 
 // Aircraft fly routes of waypoints under an autopilot. Most fly a cheap,
 // single-pass point-mass model; aircraft whose archetype opts in are
 // integrated with Runge-Kutta 4 instead. Rigid aircraft, the highest fidelity,
-// fly six degrees of freedom by their control surfaces.
+// fly six degrees of freedom by their control surfaces. Aircraft that have a
+// Wind fly in moving air, and rigid aircraft that have Gusts fly through
+// turbulence.
 namespace simon::flight {
 
 using framework::Duration;
@@ -34,6 +37,7 @@ using model::Engines;
 using model::FlightControls;
 using model::FlightSignals;
 using model::FuelTanks;
+using model::Gusts;
 using model::Length;
 using model::MassBalance;
 using model::Position;
@@ -42,6 +46,7 @@ using model::RigidBody;
 using model::RigidBodyRate;
 using model::Speed;
 using model::Time;
+using model::Wind;
 
 // The autopilot's commands, which the airframe follows with lags and limits
 // (see Handling).
@@ -115,21 +120,24 @@ struct AircraftType final {
 
 namespace archetype {
 
+using framework::Allows;
 using framework::Archetype;
 using framework::Requires;
 
-// Flies the single-pass point-mass model.
+// Flies the single-pass point-mass model. A Wind carries it with the air.
 struct Aircraft final                                                   //
     : Archetype<"aircraft",                                             //
                 Requires<AirState, FlightControls, Commands, Airframe,  //
-                         Handling, Autopilot, Route>> {};               //
+                         Handling, Autopilot, Route>,                   //
+                Allows<Wind>> {};                                       //
 
 // Opts in to Runge-Kutta 4 by having the rate of its AirState.
 struct PreciseAircraft final                                       //
     : Archetype<"precise aircraft",                                //
                 Requires<AirState, AirStateRate, FlightControls,   //
                          Commands, Airframe, Handling, Autopilot,  //
-                         Route>> {};                               //
+                         Route>,                                   //
+                Allows<Wind>> {};                                  //
 
 // Flies six degrees of freedom, integrated with Runge-Kutta 4: its flight
 // controls turn its commands, in its FlightSignals, into the control surface
@@ -145,6 +153,18 @@ struct RigidAircraft final                                      //
                          MassBalance, AircraftType, Autopilot,  //
                          Route, SurfaceAutopilot>> {};          //
 
+// A rigid aircraft in moving air: its Wind moves the air it flies through, and
+// Gusts, if it has them, add turbulence. An archetype of its own, so that
+// rigid aircraft in still air never look for a wind.
+struct RigidAircraftInWind final                                //
+    : Archetype<"rigid aircraft in wind",                       //
+                Requires<AirState, RigidBody, RigidBodyRate,    //
+                         BodyAcceleration, FlightSignals,       //
+                         Engines, FuelTanks,                    //
+                         MassBalance, AircraftType, Autopilot,  //
+                         Route, SurfaceAutopilot, Wind>,        //
+                Allows<Gusts>> {};                              //
+
 }  // namespace archetype
 
 using World = framework::World<
@@ -152,8 +172,10 @@ using World = framework::World<
     framework::TypeList<AirStateRate, FlightControls, Commands, Airframe,
                         Handling, Autopilot, Route, RigidBody, RigidBodyRate,
                         BodyAcceleration, FlightSignals, Engines, FuelTanks,
-                        MassBalance, AircraftType, SurfaceAutopilot>,
+                        MassBalance, AircraftType, SurfaceAutopilot, Wind,
+                        Gusts>,
     framework::TypeList<archetype::Aircraft, archetype::PreciseAircraft,
-                        archetype::RigidAircraft>>;
+                        archetype::RigidAircraft,
+                        archetype::RigidAircraftInWind>>;
 
 }  // namespace simon::flight

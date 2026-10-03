@@ -19,6 +19,10 @@ names its source in brief, and the full reference is here.
 | `trim.hpp` | The pitch that gives a flight-path angle at an angle of attack and bank, with no sideslip | The rate-of-climb constraint of steady flight, Stevens and Lewis, above |
 | `control.hpp` | Exact discretization of a first-order lag | The zero-order-hold equivalent, as in G. F. Franklin, J. D. Powell and M. Workman, *Digital Control of Dynamic Systems*, 3rd edition, 1998 |
 | `flight_path.hpp` | Point-mass flight-path equations | Stevens and Lewis, above |
+| `wind.hpp` | Turbulence intensities and scale lengths, and the Dryden spectra of the linear and angular gusts | *Military Specification: Flying Qualities of Piloted Airplanes*, MIL-F-8785C, 1980, section 3.7 |
+| `wind.hpp` | Sampling a filter driven by white noise exactly over a step | C. F. Van Loan, "Computing integrals involving the matrix exponential", *IEEE Transactions on Automatic Control* 23(3), 1978 |
+| `wind.hpp` | The signs of the air's rotation in gusts | B. Etkin, *Dynamics of Atmospheric Flight*, Wiley, 1972 |
+| `wind.hpp` | SplitMix64 | G. L. Steele, D. Lea and C. H. Flood, "Fast splittable pseudorandom number generators", OOPSLA 2014 |
 
 The flight application's references, which compare simon with JSBSim, are
 described in `application/flight/reference/README.md`.

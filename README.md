@@ -173,6 +173,24 @@ bazel test //application/flight:trim_test
 bazel test //application/flight:check_case_test --test_arg=HoldsTrim
 ```
 
+### It flies through wind and turbulence
+
+Wind is opt in. In still air every aircraft costs what it did. In wind, the
+F-16 agrees with JSBSim to 4.4 mm over 30 s, as it does in still air. The 737
+parts from JSBSim by 92 cm, because JSBSim's rate of angle of attack leaves
+out the wind turning in body axes as the aircraft pitches, and the 737's
+pitching moment reads that rate. simon's rate is checked against a numerical
+derivative, and flown with JSBSim's rate the 737 agrees to 1.7 cm.
+
+Turbulence follows MIL-F-8785C's Dryden spectra. Each filter is sampled
+exactly, so the turbulence's variance and correlation are the
+specification's at any step. JSBSim's change with its frame.
+
+```sh
+bazel test //application/flight:check_case_test //model:rigid_aircraft_test
+bazel test //model:wind_test
+```
+
 ### It runs faster than JSBSim
 
 | Rigid 737s | Flat Earth | Round Earth |
@@ -258,7 +276,7 @@ regenerate a table, run its script after `pip install jsbsim numpy`.
   over a 130 km flight (`accuracy_test`). Its fitted drag polar causes most of
   that drift. The model suits traffic at scale, and the rigid model suits
   handling.
-- **Ground, wind and stall.** Routes stay between 3 and 9 km.
+- **Ground and stall.** Routes stay between 3 and 9 km.
 
 ## Build
 

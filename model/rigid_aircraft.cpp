@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <optional>
 #include <vector>
 
 namespace simon::model {
@@ -30,6 +31,14 @@ auto eigen(const AngularAcceleration& w) -> Vector3 {
 // The Earth's rotation, in the inertial frame, or none.
 auto spin(bool round) -> Vector3 {
   return round ? eigen(wgs84::rotation()) : Vector3::Zero();
+}
+
+// The body's velocity through the air at `place`, in the inertial frame: its
+// velocity less the air's, which turns with the Earth and moves with `wind`.
+auto inertial_air_velocity(const RigidBody& body, bool round,
+                           const Place& place, const Wind& wind) -> Vector3 {
+  return eigen(body.velocity) - spin(round).cross(eigen(body.position)) -
+         place.north_east_down * eigen(wind.north_east_down);
 }
 
 // From the north-east-down frame at a geodetic latitude and longitude to
@@ -201,7 +210,8 @@ auto Earth::body_to_north_east_down(const RigidBody& body, Time time) const
          body.attitude.toRotationMatrix();
 }
 
-auto Earth::air_state(const RigidBody& body, Time time) const -> AirState {
+auto Earth::air_state(const RigidBody& body, Time time, const Wind& wind) const
+    -> AirState {
   Position fixed = find_fixed(body, time);
   Position local = round_
                        ? QuantityVector{fixed_to_local_ *
@@ -211,7 +221,8 @@ auto Earth::air_state(const RigidBody& body, Time time) const -> AirState {
 
   Vector3 relative =
       eigen(body.velocity) - spin(round_).cross(eigen(body.position));
-  Vector3 ned = north_east_down(fixed, time).transpose() * relative;
+  Vector3 ned = north_east_down(fixed, time).transpose() * relative -
+                eigen(wind.north_east_down);
   double speed = ned.norm();
   return AirState{
       .position = local,
@@ -337,12 +348,20 @@ auto settled_engines(const AircraftData& aircraft, const FlightSignals& signals,
 }
 
 auto compute_engine_air(const RigidBody& body, const Earth& earth,
-                        const StandardAirTable& air, Time time) -> EngineAir {
-  Length altitude = earth.altitude(body, time);
+                        const StandardAirTable& air, const Wind& wind,
+                        Time time) -> EngineAir {
+  Length altitude = 0.0 * meter;
+  double speed = 0.0;
+  if (is_still(wind)) {
+    altitude = earth.altitude(body, time);
+    speed = eigen(earth.air_velocity(body)).norm();
+  } else {
+    Place place = earth.place(body, time);
+    altitude = place.altitude;
+    speed = inertial_air_velocity(body, earth.is_round(), place, wind).norm();
+  }
   Air here = air(altitude);
   double sound = here.speed_of_sound.numerical_value_in(meter_per_second);
-  double speed =
-      magnitude(earth.air_velocity(body).numerical_value_in(meter_per_second));
   // The speed of sound is sqrt(gamma R T).
   double temperature =
       sound * sound /
@@ -418,22 +437,52 @@ auto compute_aero_inputs(const RigidBody& body, const FlightSignals& signals,
 namespace {
 
 // A body's motion, found once for everything that reads it: its attitude as
-// a matrix, and its velocity and rate relative to the air, in body axes.
+// a matrix, and its velocity and rate relative to the air at `place`, which
+// `wind` moves and turns, in body axes.
 struct BodyMotion final {
   Matrix3 to_inertial = Matrix3::Identity();
   Vector3 air_velocity = Vector3::Zero();
   Vector3 air_rate = Vector3::Zero();
 };
 
-auto compute_body_motion(const RigidBody& body, const Earth& earth)
-    -> BodyMotion {
+template <bool WINDY>
+auto compute_body_motion(const RigidBody& body, const Earth& earth,
+                         const Place& place, const Wind& wind) -> BodyMotion {
   BodyMotion motion{.to_inertial = body.attitude.toRotationMatrix()};
-  Vector3 turning = spin(earth.is_round());
   Matrix3 to_body = motion.to_inertial.transpose();
+  Vector3 turning = spin(earth.is_round());
+  if constexpr (!WINDY) {
+    motion.air_velocity =
+        to_body * (eigen(body.velocity) - turning.cross(eigen(body.position)));
+    motion.air_rate = eigen(body.rate) - to_body * turning;
+    return motion;
+  }
   motion.air_velocity =
-      to_body * (eigen(body.velocity) - turning.cross(eigen(body.position)));
-  motion.air_rate = eigen(body.rate) - to_body * turning;
+      to_body * inertial_air_velocity(body, earth.is_round(), place, wind);
+  motion.air_rate =
+      eigen(body.rate) -
+      to_body * (turning + place.north_east_down * eigen(wind.rotation));
   return motion;
+}
+
+// The rate of `motion`'s air velocity, in body axes, under the specific force
+// `specific_force` in body axes and gravity `gravity` in the inertial frame.
+// With the wind u in the inertial frame, turning with the Earth,
+// d/dt R^T (v - W x r - u) = f / m + R^T (g - W x v - W x u) -
+// w x R^T (v - W x r - u).
+template <bool WINDY>
+auto compute_air_acceleration(const RigidBody& body, const BodyMotion& motion,
+                              const Earth& earth, const Place& place,
+                              const Wind& wind, const Vector3& specific_force,
+                              const Vector3& gravity) -> Vector3 {
+  Vector3 turning = spin(earth.is_round());
+  Vector3 carried = eigen(body.velocity);
+  if constexpr (WINDY) {
+    carried += place.north_east_down * eigen(wind.north_east_down);
+  }
+  return specific_force +
+         motion.to_inertial.transpose() * (gravity - turning.cross(carried)) -
+         eigen(body.rate).cross(motion.air_velocity);
 }
 
 auto compute_aero_inputs(const RigidBody& body, const BodyMotion& motion,
@@ -483,8 +532,9 @@ auto compute_aero_inputs(const RigidBody& body, const FlightSignals& signals,
                          const Displacement& reference, const Earth& earth,
                          const Place& place, const StandardAirTable& air)
     -> AeroInputs {
-  return compute_aero_inputs(body, compute_body_motion(body, earth), signals,
-                             aircraft, reference, place, air);
+  return compute_aero_inputs(body,
+                             compute_body_motion<false>(body, earth, place, {}),
+                             signals, aircraft, reference, place, air);
 }
 
 namespace {
@@ -504,20 +554,25 @@ auto sum(const AeroModel& model, AeroAxis axis, const AeroInputs& inputs)
 
 }  // namespace
 
-auto rigid_aircraft_rate(const RigidBody& body, const FlightSignals& signals,
-                         const Engines& engines, const MassBalance& mass,
-                         const AircraftData& aircraft, const Earth& earth,
-                         const StandardAirTable& air, Time time,
-                         Out<BodyAcceleration> felt) -> RigidBodyRate {
+namespace {
+
+// The rate, compiled for still air apart, so that it costs what it would
+// without wind.
+template <bool WINDY>
+auto compute_rigid_aircraft_rate(
+    const RigidBody& body, const FlightSignals& signals, const Engines& engines,
+    const MassBalance& mass, const AircraftData& aircraft, const Earth& earth,
+    const StandardAirTable& air, const Wind& wind, Time time,
+    Out<BodyAcceleration> felt) -> RigidBodyRate {
   const AeroModel& model = aircraft.aero;
   Displacement reference =
       body_offset(aircraft.aero_reference, mass.center_of_mass);
   Place place = earth.place(body, time);
-  BodyMotion motion = compute_body_motion(body, earth);
+  BodyMotion motion = compute_body_motion<WINDY>(body, earth, place, wind);
   AeroInputs inputs = compute_aero_inputs(body, motion, signals, aircraft,
                                           reference, place, air);
   Acceleration gravity = earth.gravity(place);
-  WindAngles wind = compute_wind_angles(motion.air_velocity);
+  WindAngles angles = compute_wind_angles(motion.air_velocity);
   double kilograms = mass.properties.mass.numerical_value_in(kilogram);
 
   // Lift first, so the induced drag reads its coefficient.
@@ -547,15 +602,13 @@ auto rigid_aircraft_rate(const RigidBody& body, const FlightSignals& signals,
 
   // The rate of angle of attack follows from the body's acceleration, which
   // the forces set. In body axes the air velocity changes at the force per
-  // unit mass and the rest, which the stage fixes: d/dt R^T (v - W x r) =
-  // f / m + R^T (g - W x v) - w x R^T (v - W x r).
+  // unit mass and the rest, which the stage fixes (see
+  // compute_air_acceleration).
   const Vector3& uvw = motion.air_velocity;
-  Vector3 rest = motion.to_inertial.transpose() *
-                     (eigen(gravity) -
-                      spin(earth.is_round()).cross(eigen(body.velocity))) -
-                 eigen(body.rate).cross(uvw);
+  Vector3 rest = compute_air_acceleration<WINDY>(
+      body, motion, earth, place, wind, Vector3::Zero(), eigen(gravity));
   auto alpha_rate = [&](const AeroSums& sums) {
-    Vector3 force = aero_loads(sums, wind, reference)
+    Vector3 force = aero_loads(sums, angles, reference)
                         .force.numerical_value_in(newton)
                         .eigen() +
                     thrust_force;
@@ -577,7 +630,7 @@ auto rigid_aircraft_rate(const RigidBody& body, const FlightSignals& signals,
   sums[index(AeroAxis::PITCH)] = sum(model, AeroAxis::PITCH, inputs);
   sums[index(AeroAxis::YAW)] = sum(model, AeroAxis::YAW, inputs);
 
-  AeroLoads loads = aero_loads(sums, wind, reference);
+  AeroLoads loads = aero_loads(sums, angles, reference);
   Vector3 force = loads.force.numerical_value_in(newton).eigen() + thrust_force;
   Vector3 moment =
       loads.moment.numerical_value_in(newton_meter).eigen() + thrust_moment;
@@ -594,35 +647,68 @@ auto rigid_aircraft_rate(const RigidBody& body, const FlightSignals& signals,
   return rate;
 }
 
+}  // namespace
+
+auto rigid_aircraft_rate(const RigidBody& body, const FlightSignals& signals,
+                         const Engines& engines, const MassBalance& mass,
+                         const AircraftData& aircraft, const Earth& earth,
+                         const StandardAirTable& air, const Wind& wind,
+                         Time time, Out<BodyAcceleration> felt)
+    -> RigidBodyRate {
+  if (is_still(wind)) {
+    return compute_rigid_aircraft_rate<false>(
+        body, signals, engines, mass, aircraft, earth, air, wind, time, felt);
+  }
+  return compute_rigid_aircraft_rate<true>(
+      body, signals, engines, mass, aircraft, earth, air, wind, time, felt);
+}
+
 auto sense_flight_state(const RigidBody& body, const BodyAcceleration& felt,
                         const MassBalance& mass, const AircraftData& aircraft,
                         const Earth& earth, const StandardAirTable& air,
-                        Time time, InOut<FlightSignals> signals) -> void {
+                        const Wind& wind, Time time,
+                        InOut<FlightSignals> signals) -> void {
   const FlightControlData& controls = aircraft.flight_controls;
   using enum FlightSignal;
   FlightSignals& values = *signals;
 
-  Vector3 uvw = eigen(earth.air_velocity(body));
+  // The body's place on the Earth, found once, if anything needs it.
+  bool still = is_still(wind);
+  bool air_data = controls.reads(MACH) || controls.reads(CALIBRATED_AIRSPEED);
+  bool attitude = controls.reads(PITCH) || controls.reads(ROLL) ||
+                  controls.reads(GROUND_SPEED);
+  std::optional<Place> place;
+  if (!still || air_data || attitude) {
+    place = earth.place(body, time);
+  }
+
+  bool reads_rates = controls.reads(ROLL_RATE) || controls.reads(PITCH_RATE) ||
+                     controls.reads(YAW_RATE);
+  Vector3 uvw = Vector3::Zero();
+  Vector3 rates = Vector3::Zero();
+  if (still) {
+    uvw = eigen(earth.air_velocity(body));
+    if (reads_rates) {
+      rates = eigen(earth.air_rate(body));
+    }
+  } else {
+    BodyMotion motion = compute_body_motion<true>(body, earth, *place, wind);
+    uvw = motion.air_velocity;
+    rates = motion.air_rate;
+  }
   values[BODY_VELOCITY_X] = uvw.x();
   values[BODY_VELOCITY_Y] = uvw.y();
   values[ALPHA] = std::atan2(uvw.z(), uvw.x());
   values[BETA] = std::atan2(uvw.y(), std::hypot(uvw.x(), uvw.z()));
-  if (controls.reads(ROLL_RATE) || controls.reads(PITCH_RATE) ||
-      controls.reads(YAW_RATE)) {
-    Vector3 rates = eigen(earth.air_rate(body));
+  if (reads_rates) {
     values[ROLL_RATE] = rates.x();
     values[PITCH_RATE] = rates.y();
     values[YAW_RATE] = rates.z();
   }
 
-  // The body's place on the Earth, found once, if anything needs it.
-  bool air_data = controls.reads(MACH) || controls.reads(CALIBRATED_AIRSPEED);
-  bool attitude = controls.reads(PITCH) || controls.reads(ROLL) ||
-                  controls.reads(GROUND_SPEED);
   if (air_data || attitude) {
-    Place place = earth.place(body, time);
     if (air_data) {
-      Air here = air(place.altitude);
+      Air here = air(place->altitude);
       double mach =
           uvw.norm() / here.speed_of_sound.numerical_value_in(meter_per_second);
       values[MACH] = mach;
@@ -633,8 +719,10 @@ auto sense_flight_state(const RigidBody& body, const BodyAcceleration& felt,
     }
     if (attitude) {
       Matrix3 to_north_east_down =
-          place.north_east_down.transpose() * body.attitude.toRotationMatrix();
-      Vector3 north_east_down = to_north_east_down * uvw;
+          place->north_east_down.transpose() * body.attitude.toRotationMatrix();
+      // Over the ground: through the air, and with it.
+      Vector3 north_east_down =
+          to_north_east_down * uvw + eigen(wind.north_east_down);
       values[GROUND_SPEED] =
           std::hypot(north_east_down.x(), north_east_down.y());
       values[PITCH] =
@@ -658,6 +746,23 @@ auto sense_flight_state(const RigidBody& body, const BodyAcceleration& felt,
     values[PILOT_ACCELERATION_Z] = pilot.z();
   }
   values[WEIGHT_ON_WHEELS] = 0.0;
+}
+
+auto compute_air_velocity(const RigidBody& body, const Earth& earth,
+                          const Place& place, const Wind& wind) -> Velocity {
+  return QuantityVector{
+             compute_body_motion<true>(body, earth, place, wind).air_velocity} *
+         meter_per_second;
+}
+
+auto compute_air_acceleration(const RigidBody& body, const Earth& earth,
+                              const Place& place, const Wind& wind,
+                              const Acceleration& specific_force,
+                              const Acceleration& gravity) -> Acceleration {
+  return QuantityVector{compute_air_acceleration<true>(
+             body, compute_body_motion<true>(body, earth, place, wind), earth,
+             place, wind, eigen(specific_force), eigen(gravity))} *
+         meter_per_second_squared;
 }
 
 }  // namespace simon::model

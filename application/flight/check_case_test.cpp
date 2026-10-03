@@ -71,7 +71,14 @@ constexpr Checked F16_CASES{
     .throttle = 0.4,
 };
 
-enum class Case : std::uint8_t { HOLD, ELEVATOR, AILERON, RUDDER, THROTTLE };
+enum class Case : std::uint8_t {
+  HOLD,
+  ELEVATOR,
+  AILERON,
+  RUDDER,
+  THROTTLE,
+  WIND
+};
 
 // The offsets a case adds to the trim at `microseconds`, as the scripts have
 // them.
@@ -130,8 +137,29 @@ struct Pilot final  //
   std::size_t engines_ = 0;
 };
 
-using CheckSchedule = SystemList<Pilot, RunFlightControls, RunEngines, Rigid,
-                                 BurnFuel, FollowRigidBody>;
+// Sets each rigid aircraft's wind for the case at the step's start: still,
+// or in the wind case from 1 s on, the scripts' WIND.
+struct Blow final  //
+    : System<Wind> {
+  using SystemWorld = ProjectedWorld<Blow>;
+
+  explicit Blow(Case flown) : flown_{flown} {}
+
+  auto operator()(SystemWorld&, Entity,  //
+                  Wind& wind,            //
+                  Step step) const -> void {
+    bool blowing = flown_ == Case::WIND && step.time >= TimePoint{1004ms};
+    wind = Wind{.north_east_down =
+                    blowing ? model::meters_per_second(8.0, -12.0, 2.0)
+                            : model::meters_per_second(0.0, 0.0, 0.0)};
+  }
+
+ private:
+  Case flown_ = Case::HOLD;
+};
+
+using CheckSchedule = SystemList<Pilot, Blow, RunFlightControls, RunEngines,
+                                 Rigid, BurnFuel, FollowRigidBody>;
 
 // The distance between two bodies: in position, velocity, attitude and rate.
 struct Apart final {
@@ -211,9 +239,10 @@ auto fly(const Checked& checked, Case flown, Duration dt,
          const model::AircraftData& data, const Row& trim, const Row* recorded)
     -> std::vector<RigidBody> {
   World world;
-  REQUIRE(
-      World::set_up().numbered(1).holding<archetype::RigidAircraft>(1).build(
-          Out(world)));
+  REQUIRE(World::set_up()
+              .numbered(1)
+              .holding<archetype::RigidAircraftInWind>(1)
+              .build(Out(world)));
   model::Earth earth = model::Earth::round(model::wgs84::Geodetic{});
   RigidBody body = read_body(trim);
   model::StandardAirTable air;
@@ -221,13 +250,13 @@ auto fly(const Checked& checked, Case flown, Duration dt,
   FlightSignals signals = trimmed_flight_controls(data, trim, recorded);
   Engines engines = model::settled_engines(
       data, signals,
-      model::compute_engine_air(body, earth, air, 0.0 * model::second));
+      model::compute_engine_air(body, earth, air, Wind{}, 0.0 * model::second));
   FuelTanks tanks = trimmed_tanks(data, trim);
   MassBalance mass = model::compute_mass_balance(data, tanks);
   BodyAcceleration felt;
   model::rigid_aircraft_rate(body, signals, engines, mass, data, earth, air,
-                             0.0 * model::second, Out(felt));
-  auto aircraft = world.create<archetype::RigidAircraft>()
+                             Wind{}, 0.0 * model::second, Out(felt));
+  auto aircraft = world.create<archetype::RigidAircraftInWind>()
                       .with(earth.air_state(body, 0.0 * model::second))
                       .with(body)
                       .with(RigidBodyRate{})
@@ -240,12 +269,13 @@ auto fly(const Checked& checked, Case flown, Duration dt,
                       .with(Autopilot{})
                       .with(Route{})
                       .with(SurfaceAutopilot{})
+                      .with(Wind{})
                       .build();
   REQUIRE(aircraft);
   world.sync();
 
   framework::Scheduler<World, CheckSchedule> scheduler{CheckSchedule{
-      Pilot{checked, flown, trim, data.engines.size()},
+      Pilot{checked, flown, trim, data.engines.size()}, Blow{flown},
       RunFlightControls{earth, checked.flight_control_period},
       RunEngines{earth}, Rigid{SystemList{RigidAircraftRates{earth}}},
       BurnFuel{}, FollowRigidBody{earth}}};
@@ -342,6 +372,23 @@ TEST_CASE("CheckCases737") {
   }
 }
 
+TEST_CASE("CheckCases737InWind") {
+  auto [physics, simon, theirs] = measure(BOEING_737_CASES, Case::WIND);
+  CAPTURE(physics.position, physics.velocity, physics.attitude, physics.rate);
+  CAPTURE(simon.position, simon.velocity, simon.attitude, simon.rate);
+  CAPTURE(theirs.position, theirs.velocity, theirs.attitude, theirs.rate);
+
+  // The 737's pitching moment reads the rate of angle of attack, which
+  // JSBSim takes from the velocity over the ground. That leaves out the
+  // wind turning in body axes as the 737 pitches (see
+  // model::compute_air_acceleration and its test), so in wind simon's 737
+  // parts from JSBSim's by 92 cm in 30 s. With JSBSim's rate it agrees to
+  // 1.7 cm.
+  CHECK(physics.position < 1.0);
+  CHECK(physics.attitude < 2e-3);
+  CHECK(simon.position < 1.0);
+}
+
 TEST_CASE("CheckCasesF16") {
   SECTION("ShouldMatchJsbsimGivenTrimmedMassBalance") {
     auto data = model::load_aircraft(std::string{F16});
@@ -381,6 +428,22 @@ TEST_CASE("CheckCasesF16") {
     CHECK(simon.position < std::max(theirs.position, 0.005));
     CHECK(simon.attitude < std::max(theirs.attitude, 1e-6));
   }
+}
+
+TEST_CASE("CheckCasesF16InWind") {
+  auto [physics, simon, theirs] = measure(F16_CASES, Case::WIND);
+  CAPTURE(physics.position, physics.velocity, physics.attitude, physics.rate);
+  CAPTURE(simon.position, simon.velocity, simon.attitude, simon.rate);
+  CAPTURE(theirs.position, theirs.velocity, theirs.attitude, theirs.rate);
+
+  // The F-16's aerodynamics do not read the rate of angle of attack, and
+  // in wind simon's physics and JSBSim's agree to 4.4 mm, as in still air.
+  CHECK(physics.position < 0.01);
+  CHECK(physics.attitude < 1e-4);
+
+  // The wind starts between 8 ms steps, so at 8 ms simon and JSBSim each
+  // start it 4 ms off the reference: simon stays within 4 cm.
+  CHECK(simon.position < 0.05);
 }
 
 // How far a trimmed aircraft wanders in 30 s: in altitude and in airspeed.

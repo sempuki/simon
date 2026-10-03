@@ -41,6 +41,16 @@ auto split(const Scenario& scenario) -> Split {
           .fighters = fighters};
 }
 
+// Builds `builder`'s entity with a Wind if `field` is not still.
+template <typename BuilderType>
+auto build_in(BuilderType builder, const model::WindField& field)
+    -> std::expected<Entity, framework::Status> {
+  if (model::is_still(field)) {
+    return std::move(builder).build();
+  }
+  return std::move(builder).with(Wind{}).build();
+}
+
 template <typename ArchetypeType>
 auto create_aircraft(const Scenario& scenario, const AirState& state,
                      const Route& route, InOut<World> world)
@@ -60,14 +70,27 @@ auto create_aircraft(const Scenario& scenario, const AirState& state,
                           .throttle_integral = TRIM_THROTTLE})
           .with(route);
   if constexpr (std::is_same_v<ArchetypeType, archetype::PreciseAircraft>) {
-    RETURN_IF_UNEXPECTED(std::move(created).with(AirStateRate{}).build());
+    RETURN_IF_UNEXPECTED(
+        build_in(std::move(created).with(AirStateRate{}), scenario.wind));
   } else {
-    RETURN_IF_UNEXPECTED(std::move(created).build());
+    RETURN_IF_UNEXPECTED(build_in(std::move(created), scenario.wind));
   }
   return {};
 }
 
+// The seed of the `i`th aircraft's gusts: a stream of its own.
+auto gust_seed(const Scenario& scenario, std::size_t i) -> std::uint64_t {
+  return scenario.seed * 0xd1b54a32d192ed03ULL + i;
+}
+
 }  // namespace
+
+Simulation::Simulation(Scenario scenario)
+    : scenario_{std::move(scenario)},
+      scheduler_{Schedule{
+          MoveAir{scenario_.wind}, FollowRoute{}, FlyAutopilot{}, Actuate{},
+          Fly{}, Precise{}, DriftWithWind{}, FlySurfaces{}, RunFlightControls{},
+          RunEngines{}, Rigid{}, BurnFuel{}, FollowRigidBody{}}} {}
 
 auto trim_in_cruise(const model::AircraftData& data, const model::Earth& earth,
                     Length altitude, Speed speed)
@@ -85,7 +108,8 @@ auto create_rigid_aircraft(const model::AircraftData& data,
                            const model::Earth& earth, const model::Trim& trim,
                            const SurfaceGains& gains, Length x, Length y,
                            Angle heading, const Route& route,
-                           InOut<World> world)
+                           InOut<World> world, const model::WindField& wind,
+                           std::uint64_t seed)
     -> std::expected<Entity, framework::Status> {
   model::Time start = 0.0 * model::second;
   Length altitude = earth.altitude(trim.body, start);
@@ -103,33 +127,54 @@ auto create_rigid_aircraft(const model::AircraftData& data,
   // Level round the Earth on the new heading.
   RigidBody body = body_at(model::QuantityVector{} * model::radian_per_second);
   body = body_at(earth.level_rate(body, start));
+  // Moving with the air.
+  model::Wind steady = model::compute_wind(wind);
+  body.velocity +=
+      model::QuantityVector{
+          earth.place(body, start).north_east_down *
+          steady.north_east_down.numerical_value_in(model::meter_per_second)
+              .eigen()} *
+      model::meter_per_second;
 
-  return world->create<archetype::RigidAircraft>()
-      .with(earth.air_state(body, start))
-      .with(body)
-      .with(RigidBodyRate{})
-      .with(trim.felt)
-      .with(trim.signals)
-      .with(trim.engines)
-      .with(model::fill_fuel_tanks(data))
-      .with(trim.mass)
-      .with(AircraftType{.data = &data})
-      .with(Autopilot{.altitude = altitude, .heading = heading, .speed = speed})
-      .with(route)
-      .with(SurfaceAutopilot{.gains = gains,
-                             .pitch_trim = trim.pitch_trim,
-                             .throttle_trim = trim.throttle})
-      .build();
+  auto create = [&]<typename ArchetypeType>() {
+    return world->create<ArchetypeType>()
+        .with(earth.air_state(body, start, steady))
+        .with(body)
+        .with(RigidBodyRate{})
+        .with(trim.felt)
+        .with(trim.signals)
+        .with(trim.engines)
+        .with(model::fill_fuel_tanks(data))
+        .with(trim.mass)
+        .with(AircraftType{.data = &data})
+        .with(
+            Autopilot{.altitude = altitude, .heading = heading, .speed = speed})
+        .with(route)
+        .with(SurfaceAutopilot{.gains = gains,
+                               .pitch_trim = trim.pitch_trim,
+                               .throttle_trim = trim.throttle});
+  };
+  if (model::is_still(wind)) {
+    return create.template operator()<archetype::RigidAircraft>().build();
+  }
+  auto windy =
+      create.template operator()<archetype::RigidAircraftInWind>().with(steady);
+  if (wind.turbulence != model::Turbulence::NONE) {
+    return std::move(windy).with(Gusts{.seed = seed}).build();
+  }
+  return std::move(windy).build();
 }
 
 auto build_world(const Scenario& scenario, Out<World> world)
     -> std::expected<void, framework::Status> {
   auto [simple, precise, airliners, fighters] = split(scenario);
+  bool still = model::is_still(scenario.wind);
   return World::set_up()
       .numbered(1)
       .holding<archetype::Aircraft>(simple)
       .holding<archetype::PreciseAircraft>(precise)
-      .holding<archetype::RigidAircraft>(airliners + fighters)
+      .holding<archetype::RigidAircraft>(still ? airliners + fighters : 0)
+      .holding<archetype::RigidAircraftInWind>(still ? 0 : airliners + fighters)
       .build(world);
 }
 
@@ -187,11 +232,13 @@ auto build_scenario(const Scenario& scenario, const RigidTypes& types,
     } else if (i < simple + precise + airliners) {
       RETURN_IF_UNEXPECTED(create_rigid_aircraft(
           *types.airliner, earth, *airliner_trim, scenario.airliner_gains,
-          x * model::meter, y * model::meter, state.heading, route, world));
+          x * model::meter, y * model::meter, state.heading, route, world,
+          scenario.wind, gust_seed(scenario, i)));
     } else {
       RETURN_IF_UNEXPECTED(create_rigid_aircraft(
           *types.fighter, earth, *fighter_trim, scenario.fighter_gains,
-          x * model::meter, y * model::meter, state.heading, route, world));
+          x * model::meter, y * model::meter, state.heading, route, world,
+          scenario.wind, gust_seed(scenario, i)));
     }
   }
   transaction.commit();

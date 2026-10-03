@@ -175,8 +175,20 @@ cc_library(
         ":rigid_body",
         ":turbine",
         ":units",
+        ":wind",
         "@eigen",
         "@lib//base:core",
+    ],
+)
+
+cc_test(
+    name = "rigid_aircraft_test",
+    size = "small",
+    srcs = ["rigid_aircraft_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":rigid_aircraft",
+        "@lib//base:testing",
     ],
 )
 
@@ -224,6 +236,18 @@ cc_library(
 )
 
 cc_library(
+    name = "wind",
+    srcs = ["wind.cpp"],
+    hdrs = ["wind.hpp"],
+    copts = COPTS,
+    deps = [
+        ":units",
+        "//framework:vocabulary",
+        "@eigen",
+    ],
+)
+
+cc_library(
     name = "random",
     hdrs = ["random.hpp"],
     copts = COPTS,
@@ -247,4 +271,5 @@ cc_library(
     "flight_path",
     "guidance",
     "random",
+    "wind",
 ]]

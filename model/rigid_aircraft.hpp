@@ -13,6 +13,7 @@
 #include "model/rigid_body.hpp"
 #include "model/turbine.hpp"
 #include "model/units.hpp"
+#include "model/wind.hpp"
 
 // An aircraft as a rigid body (see rigid_body.hpp), flown by its control
 // surfaces through aerodynamics read from data (see aircraft_data.hpp). It is
@@ -26,7 +27,8 @@ namespace simon::model {
 // Round a turning WGS84 Earth, the inertial frame is ECI, which coincides
 // with ECEF at time zero, and the world's local frame is the plane tangent to
 // the ellipsoid at `origin`, so the rest of a world can treat the aircraft as
-// it treats any other. There is no wind: the air turns with the Earth.
+// it treats any other. The air turns with the Earth, and a Wind moves it
+// relative to the Earth.
 // A body's place on the Earth at a time, found once for the frames, gravity
 // and the air to share.
 struct Place final {
@@ -79,9 +81,10 @@ class Earth final {
       -> Matrix3;
 
   // The body's position in the world's local frame, and its flight path
-  // relative to the air: speed, flight-path angle above the local horizon,
-  // and heading from local north.
-  auto air_state(const RigidBody& body, Time time) const -> AirState;
+  // relative to the air, which moves as `wind` has it: speed, flight-path
+  // angle above the local horizon, and heading from local north.
+  auto air_state(const RigidBody& body, Time time, const Wind& wind = {}) const
+      -> AirState;
 
   // A body at `position` in the world's local frame, with Euler angles
   // `roll`, `pitch` and `yaw` from the local north-east-down frame, moving
@@ -118,10 +121,11 @@ auto fill_fuel_tanks(const AircraftData& aircraft) -> FuelTanks;
 auto settled_engines(const AircraftData& aircraft, const FlightSignals& signals,
                      const EngineAir& air) -> Engines;
 
-// The air the engines breathe at `body`. Over the standard atmosphere the
-// density altitude is the altitude.
+// The air the engines breathe at `body`, moving as `wind` has it. Over the
+// standard atmosphere the density altitude is the altitude.
 auto compute_engine_air(const RigidBody& body, const Earth& earth,
-                        const StandardAirTable& air, Time time) -> EngineAir;
+                        const StandardAirTable& air, const Wind& wind,
+                        Time time) -> EngineAir;
 
 // Advances each engine by `dt` at its throttle in `signals`. An engine whose
 // tanks are empty makes no thrust and burns nothing.
@@ -165,31 +169,51 @@ struct BodyAcceleration final {
   AngularAcceleration angular = QuantityVector{} * radian_per_second_squared;
 };
 
+// The body's velocity through the air at `place`, which turns with the Earth
+// and moves with `wind`, in body axes.
+auto compute_air_velocity(const RigidBody& body, const Earth& earth,
+                          const Place& place, const Wind& wind) -> Velocity;
+
+// The rate of that velocity, in body axes, for a body under `specific_force`
+// (every force but gravity, per unit mass, in body axes) and `gravity` (in
+// the inertial frame). The wind holds still in the local north-east-down
+// frame, which turns with the Earth; the frame's turning as the body moves
+// over the Earth is left out, 5 x 10^-4 m/s^2 at 200 m/s in a 15 m/s wind. In
+// wind it differs from the rate of the velocity over the ground by w x R^T u,
+// the wind turning in body axes as the body turns. JSBSim takes the rate of
+// angle of attack from the rate over the ground.
+auto compute_air_acceleration(const RigidBody& body, const Earth& earth,
+                              const Place& place, const Wind& wind,
+                              const Acceleration& specific_force,
+                              const Acceleration& gravity) -> Acceleration;
+
 // The rate of a rigid aircraft's body, under its aerodynamics, which read its
-// flight control `signals`, its engines'
-// thrust, along body x from where each is mounted, and gravity. Lift is summed
-// first, so induced drag reads this
-// step's lift coefficient, and the forces before the moments, so the rate of
-// angle of attack that the moments read is this step's exact one, as long as
-// no force reads it; if one does, the forces are found again with it.
-// It writes what the body feels to `felt`.
+// flight control `signals` and its motion through the air that `wind` moves,
+// its engines' thrust, along body x from where each is mounted, and gravity.
+// Lift is summed first, so induced drag reads this step's lift coefficient,
+// and the forces before the moments, so the rate of angle of attack that the
+// moments read is this step's exact one, as long as no force reads it; if one
+// does, the forces are found again with it, from the rate of the air velocity
+// (see compute_air_acceleration). It writes what the body feels to `felt`.
 auto rigid_aircraft_rate(const RigidBody& body, const FlightSignals& signals,
                          const Engines& engines, const MassBalance& mass,
                          const AircraftData& aircraft, const Earth& earth,
-                         const StandardAirTable& air, Time time,
-                         Out<BodyAcceleration> felt) -> RigidBodyRate;
+                         const StandardAirTable& air, const Wind& wind,
+                         Time time, Out<BodyAcceleration> felt)
+    -> RigidBodyRate;
 
-// Sets the state the flight controls read in `signals`, at `body`: air data,
-// ground speed, body velocity, attitude, and the accelerations the pilot feels
-// at the aircraft's eye point from `felt`. It finds only what the aircraft's
-// flight controls read, besides its body velocity and angles of attack.
-// JSBSim's flight controls read these from the frame before; here only `felt`
-// is, because a step's own needs the surfaces the flight controls are about to
-// set. No wheel carries weight.
+// Sets the state the flight controls read in `signals`, at `body` in the air
+// that `wind` moves: air data, ground speed, body velocity, attitude, and the
+// accelerations the pilot feels at the aircraft's eye point from `felt`. It
+// finds only what the aircraft's flight controls read, besides its body
+// velocity and angles of attack. JSBSim's flight controls read these from the
+// frame before; here only `felt` is, because a step's own needs the surfaces
+// the flight controls are about to set. No wheel carries weight.
 auto sense_flight_state(const RigidBody& body, const BodyAcceleration& felt,
                         const MassBalance& mass, const AircraftData& aircraft,
                         const Earth& earth, const StandardAirTable& air,
-                        Time time, InOut<FlightSignals> signals) -> void;
+                        const Wind& wind, Time time,
+                        InOut<FlightSignals> signals) -> void;
 
 // Computes the aerodynamics' inputs at `body`, all but the rate of angle of
 // attack, which needs the body's acceleration. `reference` is the aerodynamic

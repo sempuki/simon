@@ -10,6 +10,7 @@
 
 #include "application/flight/simulation.hpp"
 #include "base/testing.hpp"
+#include "catch2/matchers/catch_matchers_floating_point.hpp"
 #include "engine/driver.hpp"
 #include "framework/vocabulary.hpp"
 
@@ -17,6 +18,7 @@ namespace simon::flight {
 
 namespace {
 
+using Catch::Matchers::WithinAbs;
 using namespace std::chrono_literals;
 
 constexpr Duration DT = 20ms;
@@ -276,6 +278,81 @@ TEST_CASE("Simulation") {
     CHECK(fastest < 270.0);
     CHECK(simulation.rigid_waypoints_reached() >= 6);
   }
+
+  SECTION("ShouldFlyRoutesGivenWindAndTurbulence") {
+    // A 15 m/s wind, and turbulence exceeded once in a thousand hours at
+    // altitude, for 737s, F-16s and point-mass aircraft alike.
+    Scenario scenario{
+        .seed = 3,
+        .aircraft = 40,
+        .precise = 10,
+        .rigid = 4,
+        .fighters = 4,
+        .wind = {.north_east_down = model::meters_per_second(9.0, -12.0, 0.0),
+                 .turbulence = model::Turbulence::MODERATE}};
+    Simulation simulation{scenario};
+    REQUIRE(simulation.configure());
+    double lowest = 1e9;
+    double highest = 0.0;
+    double slowest = 1e9;
+    double fastest = 0.0;
+    for (TimePoint time{}; time < TimePoint{5min}; time += DT) {
+      REQUIRE(simulation.step(framework::Step{.time = time, .dt = DT}));
+      const World& world = simulation.world();
+      world.store_of<RigidBody>().for_each([&](Entity entity,
+                                               const RigidBody&) {
+        const AirState& state = state_of(world, entity);
+        double altitude =
+            model::altitude_of(state).numerical_value_in(model::meter);
+        double speed = state.speed.numerical_value_in(model::meter_per_second);
+        lowest = std::min(lowest, altitude);
+        highest = std::max(highest, altitude);
+        slowest = std::min(slowest, speed);
+        fastest = std::max(fastest, speed);
+      });
+    }
+    CAPTURE(lowest, highest, slowest, fastest);
+    CHECK(lowest > 2500.0);
+    CHECK(highest < 9500.0);
+    CHECK(slowest > 150.0);
+    CHECK(fastest < 270.0);
+    CHECK(simulation.rigid_waypoints_reached() >= 6);
+    CHECK(simulation.waypoints_reached() >
+          simulation.rigid_waypoints_reached());
+  }
+
+  SECTION("ShouldDriftWithWindGivenPointMassAircraft") {
+    // The same aircraft, from the same seed, in still air and in a wind:
+    // point-mass aircraft fly the same through the air, and the wind carries
+    // them by its speed times the time. Within a second FollowRoute steers
+    // only once, from where they start.
+    auto positions = [](const model::WindField& wind) {
+      Scenario scenario{.seed = 5, .aircraft = 20, .precise = 5, .wind = wind};
+      Simulation simulation{scenario};
+      REQUIRE(simulation.configure());
+      for (TimePoint time{}; time < TimePoint{1s}; time += DT) {
+        REQUIRE(simulation.step(framework::Step{.time = time, .dt = DT}));
+      }
+      std::vector<Position> result;
+      simulation.world().store_of<AirState>().for_each(
+          [&](Entity, const AirState& state) {
+            result.push_back(state.position);
+          });
+      return result;
+    };
+    std::vector<Position> still = positions({});
+    std::vector<Position> windy = positions(
+        {.north_east_down = model::meters_per_second(9.0, -12.0, 0.0)});
+    REQUIRE(still.size() == windy.size());
+    for (std::size_t i = 0; i < still.size(); ++i) {
+      // North 9 m/s and east -12 m/s for 1 s: x east, y north.
+      model::QuantityVector moved =
+          (windy[i] - still[i]).numerical_value_in(model::meter);
+      CHECK_THAT(moved.eigen().x(), WithinAbs(-12.0, 1e-9));
+      CHECK_THAT(moved.eigen().y(), WithinAbs(9.0, 1e-9));
+      CHECK_THAT(moved.eigen().z(), WithinAbs(0.0, 1e-9));
+    }
+  }
 }
 
 namespace {
@@ -299,11 +376,11 @@ auto rigid_737(const model::Earth& earth, const model::AircraftData& data,
 }
 
 auto scheduler_for(const model::Earth& earth) -> Scheduler {
-  return Scheduler{Schedule{FollowRoute{}, FlyAutopilot{}, Actuate{}, Fly{},
-                            Precise{}, FlySurfaces{earth},
-                            RunFlightControls{earth}, RunEngines{earth},
-                            Rigid{SystemList{RigidAircraftRates{earth}}},
-                            BurnFuel{}, FollowRigidBody{earth}}};
+  return Scheduler{Schedule{
+      MoveAir{}, FollowRoute{}, FlyAutopilot{}, Actuate{}, Fly{}, Precise{},
+      DriftWithWind{}, FlySurfaces{earth}, RunFlightControls{earth},
+      RunEngines{earth}, Rigid{SystemList{RigidAircraftRates{earth}}},
+      BurnFuel{}, FollowRigidBody{earth}}};
 }
 
 auto fly_rigid(Duration duration, InOut<Scheduler> scheduler,
