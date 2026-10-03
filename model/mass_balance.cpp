@@ -8,16 +8,6 @@
 
 namespace simon::model {
 
-namespace {
-
-// The point mass inertia of `mass` at `offset` from the center of mass.
-auto point_inertia(double mass, const Vector3& offset) -> Matrix3 {
-  return mass * (offset.squaredNorm() * Matrix3::Identity() -
-                 offset * offset.transpose());
-}
-
-}  // namespace
-
 auto fill_fuel_tanks(const AircraftData& aircraft) -> FuelTanks {
   FuelTanks tanks;
   for (std::size_t i = 0; i < aircraft.tanks.size(); ++i) {
@@ -49,27 +39,39 @@ auto compute_mass_balance(const AircraftData& aircraft,
     total += fuel;
     moment += fuel * eigen(aircraft.tanks[i].location);
   }
-  Displacement center = QuantityVector{moment / total} * meter;
+  Vector3 center = moment / total;
 
+  // Each mass's inertia about the center of mass, in body axes: structural x
+  // aft and z up, body x forward and z down. The tensor is symmetric, so its
+  // six terms are summed alone: xx, yy, zz, xy, xz, yz.
   const std::array<double, 6>& j = aircraft.empty_inertia;
-  Matrix3 inertia;
-  inertia << j[0], j[3], j[4],  //
-      j[3], j[1], j[5],         //
-      j[4], j[5], j[2];
-  inertia += point_inertia(
-      empty, eigen(body_offset(aircraft.empty_center_of_mass, center)));
+  std::array<double, 6> terms = j;
+  auto add = [&](double mass, const Displacement& location) {
+    Vector3 apart = eigen(location) - center;
+    double x = -apart.x();
+    double y = apart.y();
+    double z = -apart.z();
+    terms[0] += mass * (y * y + z * z);
+    terms[1] += mass * (x * x + z * z);
+    terms[2] += mass * (x * x + y * y);
+    terms[3] -= mass * x * y;
+    terms[4] -= mass * x * z;
+    terms[5] -= mass * y * z;
+  };
+  add(empty, aircraft.empty_center_of_mass);
   for (const PointMass& point : aircraft.point_masses) {
-    inertia += point_inertia(point.mass.numerical_value_in(kilogram),
-                             eigen(body_offset(point.location, center)));
+    add(point.mass.numerical_value_in(kilogram), point.location);
   }
   for (std::size_t i = 0; i < contents.size(); ++i) {
-    inertia +=
-        point_inertia(contents[i].numerical_value_in(kilogram),
-                      eigen(body_offset(aircraft.tanks[i].location, center)));
+    add(contents[i].numerical_value_in(kilogram), aircraft.tanks[i].location);
   }
+  Matrix3 inertia;
+  inertia << terms[0], terms[3], terms[4],  //
+      terms[3], terms[1], terms[5],         //
+      terms[4], terms[5], terms[2];
   return MassBalance{
       .properties = compute_mass_properties(total * kilogram, inertia),
-      .center_of_mass = center,
+      .center_of_mass = QuantityVector{center} * meter,
   };
 }
 
