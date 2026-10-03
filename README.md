@@ -278,6 +278,21 @@ regenerate a table, run its script after `pip install jsbsim numpy`.
   handling.
 - **Ground and stall.** Routes stay between 3 and 9 km.
 
+## In progress: automotive
+
+simon's second application, closed-loop driving at the level of objects,
+checks each claim against an open reference, as the aeronautic one checks
+against JSBSim (see [documents/design.md](documents/design.md#automotive)).
+Its roads come first: read from ASAM OpenDRIVE, their positions, lane
+borders and lanes match [libOpenDRIVE](https://github.com/pageldev/libOpenDRIVE)
+to 8e-14 m on test roads of every geometry and on CARLA's Town01. On
+parametric cubics simon follows the exact arc length to 1e-13 m, where
+libOpenDRIVE's table of chords is 5.4 mm off.
+
+```sh
+bazel test //application/automotive:opendrive_reference_test
+```
+
 ## Build
 
 Requires [Bazelisk](https://github.com/bazelbuild/bazelisk) (installed as

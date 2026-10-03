@@ -310,6 +310,32 @@ cc_library(
 )
 
 cc_library(
+    name = "road",
+    srcs = ["road.cpp"],
+    hdrs = ["road.hpp"],
+    copts = COPTS,
+    deps = [
+        ":units",
+        "@eigen",
+        "@lib//base:core",
+    ],
+)
+
+cc_library(
+    name = "opendrive",
+    srcs = ["opendrive.cpp"],
+    hdrs = ["opendrive.hpp"],
+    copts = COPTS,
+    deps = [
+        ":road",
+        "//framework:vocabulary",
+        "@lib//base:core",
+        "@lib//base:status",
+        "@pugixml",
+    ],
+)
+
+cc_library(
     name = "random",
     hdrs = ["random.hpp"],
     copts = COPTS,
@@ -332,6 +358,8 @@ cc_library(
     "control",
     "flight_path",
     "guidance",
+    "opendrive",
     "random",
+    "road",
     "wind",
 ]]

@@ -20,6 +20,10 @@ says the math is derived here, it shows the derivation.
 | `trim.hpp` | The pitch that gives a flight-path angle at an angle of attack and bank, with no sideslip | The rate-of-climb constraint of steady flight, Stevens and Lewis, above |
 | `control.hpp` | Exact discretization of a first-order lag | The zero-order-hold equivalent, as in G. F. Franklin, J. D. Powell and M. Workman, *Digital Control of Dynamic Systems*, 3rd edition, 1998 |
 | `flight_path.hpp` | Point-mass flight-path equations | Stevens and Lewis, above |
+| `road.hpp` | Roads: the reference line's geometries, elevation, superelevation, lane offset, lane sections and widths, and road coordinates | *ASAM OpenDRIVE*, version 1.8, ASAM e.V., 2023 |
+| `road.cpp` | Gauss-Legendre quadrature's nodes and weights | M. Abramowitz and I. A. Stegun, *Handbook of Mathematical Functions*, NBS, 1964, table 25.4 |
+| `road_test.cpp` | The Fresnel integrals, for the clothoid | Abramowitz and Stegun, above, table 7.7 |
+| `road.cpp` | Turning the road's normal about its tangent by the superelevation | Rodrigues' rotation formula, Goldstein, Poole and Safko, above, section 4.7 |
 | `wind.hpp` | Turbulence intensities and scale lengths, and the Dryden spectra of the linear and angular gusts | *Military Specification: Flying Qualities of Piloted Airplanes*, MIL-F-8785C, 1980, section 3.7 |
 | `wind.hpp` | Sampling a filter driven by white noise exactly over a step | C. F. Van Loan, "Computing integrals involving the matrix exponential", *IEEE Transactions on Automatic Control* 23(3), 1978 |
 | `wind.hpp` | The signs of the air's rotation in gusts | B. Etkin, *Dynamics of Atmospheric Flight*, Wiley, 1972 |

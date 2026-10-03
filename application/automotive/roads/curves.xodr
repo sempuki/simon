@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OpenDRIVE>
+  <header revMajor="1" revMinor="6" name="simon test" version="1"/>
+  <road name="curves" id="1" length="390" junction="-1">
+    <planView>
+        <geometry s="0" x="-20" y="15" hdg="0.29999999999999999" length="60">
+          <line/>
+        </geometry>
+        <geometry s="60" x="37.320189347536278" y="32.731212399680373" hdg="0.29999999999999999" length="50">
+          <spiral curvStart="0" curvEnd="0.0066666666666666671"/>
+        </geometry>
+        <geometry s="110" x="84.135236552924368" y="50.114682828001456" hdg="0.46666666666666667" length="70">
+          <arc curvature="0.0066666666666666671"/>
+        </geometry>
+        <geometry s="180" x="137.18969402368612" y="94.801835887396692" hdg="0.93333333333333335" length="80">
+          <spiral curvStart="0.0066666666666666671" curvEnd="-0.0050000000000000001"/>
+        </geometry>
+        <geometry s="260" x="177.34783209957024" y="163.91926072249942" hdg="1" length="60">
+          <arc curvature="-0.0050000000000000001"/>
+        </geometry>
+        <geometry s="320" x="216.7984916136113" y="208.82723700576918" hdg="0.69999999999999996" length="40">
+          <spiral curvStart="-0.0050000000000000001" curvEnd="0"/>
+        </geometry>
+        <geometry s="360" x="249.02659901833761" y="232.49002239924951" hdg="0.59999999999999998" length="30">
+          <line/>
+        </geometry>
+    </planView>
+    <elevationProfile>
+      <elevation s="0" a="12" b="0.02" c="0" d="0"/>
+      <elevation s="150" a="15" b="0.02" c="-1e-4" d="2e-7"/>
+    </elevationProfile>
+    <lateralProfile>
+      <superelevation s="0" a="0" b="0" c="0" d="0"/>
+      <superelevation s="110" a="0" b="0.0005" c="0" d="0"/>
+      <superelevation s="250" a="0.07" b="-0.0007" c="0" d="0"/>
+    </lateralProfile>
+    <lanes>
+      <laneOffset s="0" a="0.2" b="0" c="0" d="0"/>
+      <laneOffset s="200" a="0.2" b="0" c="1e-4" d="-1e-6"/>
+      <laneSection s="0">
+        <left><lane id="1" type="driving"><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane><lane id="2" type="shoulder"><width sOffset="0" a="1" b="0.0040000000000000001" c="0" d="0"/><width sOffset="100" a="1.3999999999999999" b="0" c="0" d="0"/></lane></left>
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane><lane id="-2" type="sidewalk"><width sOffset="0" a="2" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+      <laneSection s="120">
+        <left><lane id="1" type="driving"><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane><lane id="2" type="shoulder"><width sOffset="0" a="1.3999999999999999" b="0" c="0" d="0"/></lane></left>
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane><lane id="-2" type="driving"><width sOffset="0" a="0" b="0" c="0.0027083333333333334" d="-3.0092592592592593e-05"/><width sOffset="60" a="3.25" b="0" c="0" d="0"/></lane><lane id="-3" type="sidewalk"><width sOffset="0" a="2" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+      <laneSection s="300">
+        <left><lane id="1" type="driving"><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></left>
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><width sOffset="0" a="3.5" b="0.002" c="-1.0000000000000001e-05" d="2e-08"/></lane><lane id="-2" type="driving"><width sOffset="0" a="3.25" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+    </lanes>
+  </road>
+</OpenDRIVE>

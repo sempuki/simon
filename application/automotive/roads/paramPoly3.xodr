@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OpenDRIVE>
+  <header revMajor="1" revMinor="6" name="simon test" version="1"/>
+  <road name="poly 2" id="2" length="59.999999999999993" junction="-1">
+    <planView>
+        <geometry s="0" x="5" y="-3" hdg="0.10000000000000001" length="59.999999999999993">
+          <paramPoly3 aU="0" bU="0.99711880480515114" cU="0" dU="-1.9999999999999999e-06" aV="0" bV="0" cV="0.0040000000000000001" dV="-3.0000000000000001e-05" pRange="arcLength"/>
+        </geometry>
+    </planView>
+    <lanes>
+      <laneSection s="0">
+        <left><lane id="1" type="driving"><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></left>
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+    </lanes>
+  </road>
+  <road name="poly 3" id="3" length="75.693444965682787" junction="-1">
+    <planView>
+        <geometry s="0" x="512000.25" y="5400000.75" hdg="2.6000000000000001" length="75.693444965682787">
+          <paramPoly3 aU="0" bU="80" cU="-6" dU="1.5" aV="0" bV="0" cV="9" dV="-4" pRange="normalized"/>
+        </geometry>
+    </planView>
+    <lanes>
+      <laneSection s="0">
+        <left><lane id="1" type="driving"><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></left>
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+    </lanes>
+  </road>
+</OpenDRIVE>

@@ -2795,6 +2795,66 @@ moderate turbulence for five minutes, and checks that they keep to the
 routes' envelope and reach waypoints. It also checks that a point-mass
 aircraft in wind flies as it does in still air, carried by the wind.
 
+### automotive
+
+Vehicles drive a network of roads, closed loop at the level of objects:
+traffic and a vehicle under test, without sensors. It proves the framework
+can carry a driving simulation comparable to the best open source, as
+aeronautic does against JSBSim, with each claim checked against an open
+reference: roads against libOpenDRIVE, vehicles against CommonRoad's models
+and Chrono::Vehicle, traffic against SUMO, scenarios against esmini. It is
+being built in eight steps (see the [Roadmap](#roadmap)); the first, roads,
+is done.
+
+#### Roads
+
+`model/road` holds roads as ASAM OpenDRIVE describes them, and
+`model/opendrive` reads them from OpenDRIVE files with pugixml. A road is a
+reference line of lines, arcs, spirals and parametric cubics, with an
+elevation, a superelevation and a lane offset along it, and lane sections
+whose lanes have widths that are cubics in s. A point on a road is (s, t, h):
+s along the reference line in the plane, t across it to the left, h up from
+the surface. simon finds a point's position, each lane's borders, the lane
+at a point, and the road coordinates of a position. It reads what geometry
+needs, and refuses the deprecated poly3 and lanes given by borders, as
+libOpenDRIVE does.
+
+- **Each geometry is evaluated exactly.** A line and an arc are in closed
+  form, the arc's chord written so it holds as its curvature goes to zero. A
+  spiral's position is the integral of its tangent, whose heading is
+  quadratic in s: the Fresnel integral, by 8-point Gauss-Legendre quadrature
+  in parts that turn at most half a radian, where the rule's error is far
+  below rounding. It matches the Fresnel integrals' tabulated values to
+  1e-15.
+- **s is arc length on a parametric cubic too.** A paramPoly3's s is its arc
+  length, found by quadrature of its speed and Newton's method. A file's
+  length and the curve's arc length often differ a little, so s runs over
+  the curve in proportion to its arc length, from its start at 0 to its end
+  at the file's length.
+- **Lane borders sum the lanes' widths** from the center out, each evaluated
+  at s, plus the lane offset.
+- **Road coordinates are found by projection.** Each piece is sampled every 2
+  m and every tenth of a radian, and the nearest sample refined by Newton's
+  method on the tangent's component of the offset.
+
+`opendrive_reference_test` checks simon against libOpenDRIVE on three
+networks: test roads with every geometry, elevation, superelevation and
+changing lanes, one of them at map coordinates, and CARLA's Town01, 98 roads
+as RoadRunner writes them (see `application/automotive/reference/README.md`):
+
+| Check | Agreement |
+|---|---:|
+| Positions on lines, arcs and spirals, through elevation and superelevation, on and off the surface | 8e-14 m |
+| Lane borders | 8e-14 m |
+| The lane at each lane's middle | 4,329 of 4,330 |
+| Positions on parametric cubics, against an exact arc length | 1.2e-13 m |
+
+libOpenDRIVE finds a parametric cubic's arc length through a table of chords
+made to 1 cm, and is 5.4 mm from the exact arc length; simon is at rounding.
+The one lane they disagree on is where a lane opens from no width: libOpenDRIVE
+keys lanes by their outer border, so a lane of no width that shares its
+neighbor's border can take a point in the neighbor's middle.
+
 ## Libraries
 
 | Need | Library |
@@ -2805,6 +2865,7 @@ aircraft in wind flies as it does in still air, carried by the wind.
 | Benchmarks | A small `std::chrono` harness per benchmark, printing one table per question. Benchmarks sit beside what they measure, like tests; only ones that measure several things go in a common directory. |
 | UI | Dear ImGui, and ImPlot (0.17) for the viewers' maps and charts |
 | Window and input | SDL2 now; SDL3 when it is in the Bazel Central Registry |
+| XML, for OpenDRIVE | pugixml |
 | Profiling, later | Tracy |
 
 C++26 reflection would eliminate some boilerplate, but GCC 16 supports it and
@@ -2875,11 +2936,22 @@ Each step ends with a working application and passing tests.
      [Mixed fidelity](#mixed-fidelity)).
    - Done: wind and MIL-F-8785C turbulence, opt in (see
      [Wind and turbulence](#wind-and-turbulence)).
-   - Next for rigid aircraft: many rigid aircraft batched in one segment.
+   - Parked: many rigid aircraft batched in one segment, until more than the
+     6,900 one thread flies in real time are needed.
    - Later: Adams-Bashforth with rate history, many replicas of a scenario
      in one world, world snapshots, and trim tables computed offline. JSBSim,
      run offline, stays the reference each level's accuracy is measured
      against.
+
+7. **Automotive (in progress).** Closed-loop driving at the level of objects,
+   each claim checked against an open reference (see
+   [automotive](#automotive)):
+   - Done: roads, read from OpenDRIVE and checked against libOpenDRIVE.
+   - Next: kinematic traffic on lanes under IDM and MOBIL, against SUMO; a
+     scale benchmark against SUMO and Waymax; single-track and multibody
+     vehicles against CommonRoad's models; Chrono::Vehicle through the ISO
+     maneuvers; OpenSCENARIO against esmini; metrics and batch runs; a
+     viewer.
 
 Later: `LockstepDriver` and a second process, scenario files with two-phase
 loading, parent-child transforms (a radar mounted on a vehicle), and DIS or HLA
