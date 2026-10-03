@@ -7,7 +7,7 @@
 #include <cmath>
 #include <optional>
 
-#include "application/flight/components.hpp"
+#include "application/aeronautic/components.hpp"
 #include "engine/rate_gate.hpp"
 #include "framework/continuous.hpp"
 #include "framework/system.hpp"
@@ -18,7 +18,7 @@
 #include "model/rigid_aircraft.hpp"
 #include "model/wind.hpp"
 
-namespace simon::flight {
+namespace simon::aeronautic {
 
 using framework::System;
 using framework::SystemList;
@@ -583,4 +583,4 @@ using Schedule =
                BurnFuel, FollowRigidBody>;
 using Scheduler = framework::Scheduler<World, Schedule>;
 
-}  // namespace simon::flight
+}  // namespace simon::aeronautic

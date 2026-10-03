@@ -40,5 +40,5 @@ says the math is derived here, it shows the derivation.
 | `control.hpp` | A PI controller that stops integrating at a limit, against windup | K. J. Astrom and T. Hagglund, *Advanced PID Control*, ISA, 2006, section 3.5 |
 | `guidance.hpp` | True proportional navigation | P. Zarchan, *Tactical and Strategic Missile Guidance*, 6th edition, AIAA, 2012, chapter 2 |
 
-The flight application's references, which compare simon with JSBSim, are
-described in `application/flight/reference/README.md`.
+The aeronautic application's references, which compare simon with JSBSim, are
+described in `application/aeronautic/reference/README.md`.

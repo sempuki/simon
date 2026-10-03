@@ -2,7 +2,7 @@
 
 // Watches a flight scenario in real time, every fidelity level in one world:
 //
-//   bazel run //application/flight:viewer -- [aircraft] [precise] [rigid]
+//   bazel run //application/aeronautic:viewer -- [aircraft] [precise] [rigid]
 //       [fighters] [seed] [--scale=N] [--frames=N] [--screenshot=PATH]
 //
 // Point-mass aircraft are dots; rigid 737s and F-16s are larger markers with
@@ -25,7 +25,7 @@
 #include <string_view>
 #include <vector>
 
-#include "application/flight/simulation.hpp"
+#include "application/aeronautic/simulation.hpp"
 #include "application/viewing.hpp"
 #include "base/core.hpp"
 #include "engine/driver.hpp"
@@ -33,7 +33,7 @@
 #include "imgui/imgui.h"
 #include "implot/implot.h"
 
-namespace simon::flight {
+namespace simon::aeronautic {
 namespace {
 
 using namespace std::chrono_literals;
@@ -80,7 +80,7 @@ class Viewer final {
     session_->tick();
     record();
     viewing::draw_window(
-        "Flight", 320.0f * scale_, [&] { draw_controls(); },
+        "Aeronautic", 320.0f * scale_, [&] { draw_controls(); },
         [&] {
           float chart_height = 170.0f * scale_;
           float spacing = ImGui::GetStyle().ItemSpacing.y;
@@ -444,23 +444,24 @@ class Viewer final {
 };
 
 }  // namespace
-}  // namespace simon::flight
+}  // namespace simon::aeronautic
 
 auto main(int argc, char** argv) -> int {
   using namespace simon;
-  viewing::WindowOptions options{.title = "Flight"};
+  viewing::WindowOptions options{.title = "Aeronautic"};
   std::vector<std::string_view> arguments =
       viewing::parse_window_options(argc, argv, InOut(options));
   auto integer = [&](std::size_t index, std::int64_t fallback) {
     return viewing::parse_integer(arguments, index, fallback);
   };
-  flight::Scenario scenario{
+  aeronautic::Scenario scenario{
       .seed = static_cast<std::uint64_t>(integer(4, 1)),
       .aircraft = static_cast<int>(integer(0, 2000)),
       .precise = static_cast<int>(integer(1, 20)),
       .rigid = static_cast<int>(integer(2, 4)),
       .fighters = static_cast<int>(integer(3, 4)),
   };
-  return viewing::run(
-      options, [&](float scale) { return flight::Viewer{scenario, scale}; });
+  return viewing::run(options, [&](float scale) {
+    return aeronautic::Viewer{scenario, scale};
+  });
 }

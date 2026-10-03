@@ -11,7 +11,7 @@ frame's air data, so the state they read is the frame before's, which is read
 before each frame; the surfaces are read after it.
 
   pip install jsbsim
-  python application/flight/reference/jsbsim_737_flight_control.py
+  python application/aeronautic/reference/jsbsim_737_flight_control.py
 """
 
 import math

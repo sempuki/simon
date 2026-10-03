@@ -1,6 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-#include "application/flight/simulation.hpp"
+#include "application/aeronautic/simulation.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -12,7 +12,7 @@
 #include "framework/vocabulary.hpp"
 #include "model/random.hpp"
 
-namespace simon::flight {
+namespace simon::aeronautic {
 
 namespace {
 
@@ -289,4 +289,4 @@ auto Simulation::rigid_waypoints_reached() const -> std::uint64_t {
   return reached;
 }
 
-}  // namespace simon::flight
+}  // namespace simon::aeronautic

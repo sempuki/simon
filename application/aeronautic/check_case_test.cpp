@@ -10,9 +10,9 @@
 #include <string_view>
 #include <vector>
 
-#include "application/flight/components.hpp"
-#include "application/flight/systems.hpp"
-#include "application/flight/testing.hpp"
+#include "application/aeronautic/components.hpp"
+#include "application/aeronautic/systems.hpp"
+#include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 #include "framework/vocabulary.hpp"
@@ -24,7 +24,7 @@
 // and at 0.5 ms. The reference is JSBSim where its integrators and frame lags
 // have converged: at 0.5 ms for the 737, and at 0.125 ms for the F-16, whose
 // flight controls run every 8 ms in both.
-namespace simon::flight {
+namespace simon::aeronautic {
 
 namespace {
 
@@ -50,8 +50,8 @@ struct Checked final {
 
 constexpr Checked BOEING_737_CASES{
     .aircraft = BOEING_737,
-    .initial = "application/flight/reference/jsbsim_737_check_initial.csv",
-    .cases = "application/flight/reference/jsbsim_737_check_cases.csv",
+    .initial = "application/aeronautic/reference/jsbsim_737_check_initial.csv",
+    .cases = "application/aeronautic/reference/jsbsim_737_check_cases.csv",
     .elevator = 0.05,
     .aileron = 0.2,
     .rudder = 0.2,
@@ -60,9 +60,9 @@ constexpr Checked BOEING_737_CASES{
 
 constexpr Checked F16_CASES{
     .aircraft = F16,
-    .initial = "application/flight/reference/jsbsim_f16_check_initial.csv",
-    .cases = "application/flight/reference/jsbsim_f16_check_cases.csv",
-    .signals = "application/flight/reference/jsbsim_f16_check_signals.csv",
+    .initial = "application/aeronautic/reference/jsbsim_f16_check_initial.csv",
+    .cases = "application/aeronautic/reference/jsbsim_f16_check_cases.csv",
+    .signals = "application/aeronautic/reference/jsbsim_f16_check_signals.csv",
     .reference = std::chrono::microseconds{125},
     .flight_control_period = 8ms,
     .elevator = 0.05,
@@ -572,4 +572,4 @@ TEST_CASE("HoldsTrim") {
   }
 }
 
-}  // namespace simon::flight
+}  // namespace simon::aeronautic

@@ -22,7 +22,7 @@
 // fly six degrees of freedom by their control surfaces. Aircraft that have a
 // Wind fly in moving air, and rigid aircraft that have Gusts fly through
 // turbulence.
-namespace simon::flight {
+namespace simon::aeronautic {
 
 using framework::Duration;
 using framework::Entity;
@@ -178,4 +178,4 @@ using World = framework::World<
                         archetype::RigidAircraft,
                         archetype::RigidAircraftInWind>>;
 
-}  // namespace simon::flight
+}  // namespace simon::aeronautic

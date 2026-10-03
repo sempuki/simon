@@ -19,7 +19,7 @@ state a frame ends at moves under the command of its own time, as it does in
 simon.
 
   pip install jsbsim numpy
-  python application/flight/reference/jsbsim_737_check_cases.py
+  python application/aeronautic/reference/jsbsim_737_check_cases.py
 """
 
 import math

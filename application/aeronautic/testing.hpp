@@ -21,12 +21,12 @@
 #include "model/units.hpp"
 
 // Shared by the flight tests.
-namespace simon::flight::testing {
+namespace simon::aeronautic::testing {
 
 inline constexpr std::string_view BOEING_737 =
-    "application/flight/aircraft/737.aircraft";
+    "application/aeronautic/aircraft/737.aircraft";
 inline constexpr std::string_view F16 =
-    "application/flight/aircraft/f16.aircraft";
+    "application/aeronautic/aircraft/f16.aircraft";
 
 // One row of a recording, as columns by name.
 using Row = std::map<std::string, double, std::less<>>;
@@ -85,4 +85,4 @@ inline auto worse(double worst, double actual, double expected, double scale)
   return std::max(worst, std::abs(actual - expected) / scale);
 }
 
-}  // namespace simon::flight::testing
+}  // namespace simon::aeronautic::testing

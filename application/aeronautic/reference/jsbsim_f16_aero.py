@@ -14,7 +14,7 @@ pressure and the rest from the state at the frame's start, then runs the
 flight control system and the aerodynamics, then moves the state on.
 
   pip install jsbsim
-  python application/flight/reference/jsbsim_f16_aero.py
+  python application/aeronautic/reference/jsbsim_f16_aero.py
 """
 
 import math

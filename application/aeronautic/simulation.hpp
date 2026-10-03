@@ -7,14 +7,14 @@
 #include <memory>
 #include <string>
 
-#include "application/flight/components.hpp"
-#include "application/flight/systems.hpp"
+#include "application/aeronautic/components.hpp"
+#include "application/aeronautic/systems.hpp"
 #include "base/core.hpp"
 #include "engine/lifecycle.hpp"
 #include "framework/vocabulary.hpp"
 #include "model/trim.hpp"
 
-namespace simon::flight {
+namespace simon::aeronautic {
 
 // Everything a run depends on. The same scenario gives the same run.
 //
@@ -32,8 +32,8 @@ struct Scenario final {
   int fighters = 0;
   // The rigid aircraft's data, as tools/jsbsim/convert.py writes it, and the
   // gains their autopilots fly by.
-  std::string rigid_aircraft = "application/flight/aircraft/737.aircraft";
-  std::string fighter_aircraft = "application/flight/aircraft/f16.aircraft";
+  std::string rigid_aircraft = "application/aeronautic/aircraft/737.aircraft";
+  std::string fighter_aircraft = "application/aeronautic/aircraft/f16.aircraft";
   SurfaceGains airliner_gains;
   // A fighter's fly-by-wire turns a stick into rates and load, which the
   // airliner's gains fly as well; it banks to 60 degrees, so it turns on
@@ -141,4 +141,4 @@ class Simulation final {
   Scheduler scheduler_;
 };
 
-}  // namespace simon::flight
+}  // namespace simon::aeronautic

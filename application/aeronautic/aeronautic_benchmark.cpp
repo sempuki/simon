@@ -4,7 +4,8 @@
 // every aircraft on the single-pass model, with every aircraft opted in to
 // Runge-Kutta 4, and mixed, with 1% on Runge-Kutta 4 and 0.1% rigid 737s.
 //
-//   bazel run -c opt //application/flight:flight_benchmark [-- --steps N]
+//   bazel run -c opt //application/aeronautic:aeronautic_benchmark [-- --steps
+//   N]
 //       [--contend[=N]] [aircraft...]
 //
 // Traffic density is the same at every size. Each system's line ends with the
@@ -25,13 +26,13 @@
 #include <tuple>
 #include <vector>
 
-#include "application/flight/simulation.hpp"
+#include "application/aeronautic/simulation.hpp"
 #include "base/core.hpp"
 #include "framework/benchmarking.hpp"
 #include "framework/type_list.hpp"
 #include "framework/vocabulary.hpp"
 
-namespace simon::flight {
+namespace simon::aeronautic {
 namespace {
 
 using namespace std::chrono_literals;
@@ -141,13 +142,13 @@ auto measure(int aircraft, Fidelity fidelity, int steps,
 }
 
 }  // namespace
-}  // namespace simon::flight
+}  // namespace simon::aeronautic
 
-// flight_benchmark [--steps N] [--contend[=N]] [aircraft...]
+// aeronautic_benchmark [--steps N] [--contend[=N]] [aircraft...]
 auto main(int argc, char** argv) -> int {
   using simon::framework::benchmark::Contention;
   using simon::framework::benchmark::parse_count;
-  int steps = simon::flight::DEFAULT_STEPS;
+  int steps = simon::aeronautic::DEFAULT_STEPS;
   unsigned threads = 0;
   std::vector<int> populations;
   for (int i = 1; i < argc; ++i) {
@@ -169,19 +170,19 @@ auto main(int argc, char** argv) -> int {
   if (populations.empty()) {
     populations = {1'000, 10'000, 100'000};
   }
-  auto rigid =
-      simon::model::load_aircraft("application/flight/aircraft/737.aircraft");
+  auto rigid = simon::model::load_aircraft(
+      "application/aeronautic/aircraft/737.aircraft");
   if (!rigid) {
     std::println(stderr, "{}", rigid.error().message());
     return 1;
   }
   Contention contention{threads};
   std::println("{}", Contention::describe(threads));
-  using simon::flight::Fidelity;
+  using simon::aeronautic::Fidelity;
   for (int aircraft : populations) {
     for (Fidelity fidelity :
          {Fidelity::SINGLE_PASS, Fidelity::RUNGE_KUTTA, Fidelity::MIXED}) {
-      simon::flight::measure(aircraft, fidelity, steps, *rigid);
+      simon::aeronautic::measure(aircraft, fidelity, steps, *rigid);
     }
   }
 }

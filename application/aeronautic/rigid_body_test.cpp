@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "application/flight/testing.hpp"
+#include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/earth.hpp"
@@ -24,10 +24,10 @@ namespace simon::model {
 
 namespace {
 
-using namespace flight::testing;
+using namespace aeronautic::testing;
 
 constexpr std::string_view REFERENCE =
-    "application/flight/reference/jsbsim_737_rigid_body.csv";
+    "application/aeronautic/reference/jsbsim_737_rigid_body.csv";
 
 }  // namespace
 

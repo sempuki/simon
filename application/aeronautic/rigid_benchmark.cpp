@@ -4,7 +4,7 @@
 // Earth and round a turning one: 737s converted from JSBSim, trimmed roughly
 // in cruise, each flying on its own.
 //
-//   bazel run -c opt //application/flight:rigid_benchmark [-- --steps N]
+//   bazel run -c opt //application/aeronautic:rigid_benchmark [-- --steps N]
 //       [aircraft...]
 //
 // Each system runs in its own single-system scheduler, in schedule order,
@@ -23,21 +23,21 @@
 #include <tuple>
 #include <vector>
 
-#include "application/flight/components.hpp"
-#include "application/flight/simulation.hpp"
-#include "application/flight/systems.hpp"
+#include "application/aeronautic/components.hpp"
+#include "application/aeronautic/simulation.hpp"
+#include "application/aeronautic/systems.hpp"
 #include "base/core.hpp"
 #include "framework/benchmarking.hpp"
 #include "framework/vocabulary.hpp"
 
-namespace simon::flight {
+namespace simon::aeronautic {
 namespace {
 
 using namespace std::chrono_literals;
 using WallClock = std::chrono::steady_clock;
 
 constexpr std::string_view BOEING_737 =
-    "application/flight/aircraft/737.aircraft";
+    "application/aeronautic/aircraft/737.aircraft";
 constexpr Duration DT = 8ms;
 constexpr int DEFAULT_STEPS = 250;  // 2 s simulated.
 
@@ -119,12 +119,12 @@ auto measure(int aircraft, bool round, int steps,
 }
 
 }  // namespace
-}  // namespace simon::flight
+}  // namespace simon::aeronautic
 
 // rigid_benchmark [--steps N] [aircraft...]
 auto main(int argc, char** argv) -> int {
   using simon::framework::benchmark::parse_count;
-  int steps = simon::flight::DEFAULT_STEPS;
+  int steps = simon::aeronautic::DEFAULT_STEPS;
   std::vector<int> populations;
   for (int i = 1; i < argc; ++i) {
     std::string_view argument{argv[i]};
@@ -144,13 +144,13 @@ auto main(int argc, char** argv) -> int {
     populations = {100, 1'000, 10'000};
   }
   auto data =
-      simon::model::load_aircraft(std::string{simon::flight::BOEING_737});
+      simon::model::load_aircraft(std::string{simon::aeronautic::BOEING_737});
   if (!data) {
     std::println(stderr, "{}", data.error().message());
     return 1;
   }
   for (int aircraft : populations) {
-    simon::flight::measure(aircraft, false, steps, *data);
-    simon::flight::measure(aircraft, true, steps, *data);
+    simon::aeronautic::measure(aircraft, false, steps, *data);
+    simon::aeronautic::measure(aircraft, true, steps, *data);
   }
 }

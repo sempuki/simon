@@ -10,9 +10,9 @@
 #include <utility>
 #include <vector>
 
-#include "application/flight/components.hpp"
-#include "application/flight/systems.hpp"
-#include "application/flight/testing.hpp"
+#include "application/aeronautic/components.hpp"
+#include "application/aeronautic/systems.hpp"
+#include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
 #include "framework/vocabulary.hpp"
 
@@ -22,14 +22,14 @@
 // controls, and the paths are compared. Both see the same controls, so the
 // rest is the model's own error, mostly its drag polar, and the
 // integrator's.
-namespace simon::flight {
+namespace simon::aeronautic {
 
 namespace {
 
 using namespace std::chrono_literals;
 
 constexpr std::string_view REFERENCE =
-    "application/flight/reference/jsbsim_737.csv";
+    "application/aeronautic/reference/jsbsim_737.csv";
 constexpr Duration SAMPLE = 200ms;  // Between the reference's rows.
 
 // The 737, as jsbsim_737.py fitted it.
@@ -229,4 +229,4 @@ TEST_CASE("Accuracy") {
   }
 }
 
-}  // namespace simon::flight
+}  // namespace simon::aeronautic

@@ -10,7 +10,7 @@ read. All of it is read after a frame: JSBSim starts each frame by moving the
 state on, then finds the forces and rates of the state it moved to.
 
   pip install jsbsim numpy
-  python application/flight/reference/jsbsim_737_rigid_body.py
+  python application/aeronautic/reference/jsbsim_737_rigid_body.py
 """
 
 import math

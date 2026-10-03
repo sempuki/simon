@@ -7,7 +7,7 @@
 #include <string_view>
 #include <vector>
 
-#include "application/flight/testing.hpp"
+#include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/turbine.hpp"
@@ -22,10 +22,10 @@ namespace simon::model {
 
 namespace {
 
-using namespace flight::testing;
+using namespace aeronautic::testing;
 
 constexpr std::string_view REFERENCE =
-    "application/flight/reference/jsbsim_737_turbine.csv";
+    "application/aeronautic/reference/jsbsim_737_turbine.csv";
 constexpr double DT = 1.0 / 60.0;  // The reference's frame, seconds.
 
 auto read_air(const Row& row) -> EngineAir {
@@ -112,9 +112,9 @@ TEST_CASE("Turbine737") {
 
 TEST_CASE("TurbineF16") {
   SECTION("ShouldMatchJsbsimGivenRecordedAirAndThrottleThroughReheat") {
-    check_against_jsbsim(F16,
-                         "application/flight/reference/jsbsim_f16_turbine.csv",
-                         1.0 / 120.0);
+    check_against_jsbsim(
+        F16, "application/aeronautic/reference/jsbsim_f16_turbine.csv",
+        1.0 / 120.0);
   }
 }
 

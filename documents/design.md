@@ -967,7 +967,7 @@ Rules:
   component up for an archetype that only allows it, and checks nothing for
   one that cannot have it. A system that excludes nothing pays nothing, and
   one cannot both name and exclude a component. Fidelity levels use it: the
-  flight application's single-pass `Fly` excludes the `AirStateRate` that
+  aeronautic application's single-pass `Fly` excludes the `AirStateRate` that
   only Runge-Kutta aircraft have.
 - **The call order is `(ProjectedWorld& world, Entity self, driving component,
   other components..., Step step)`.** `ProjectedWorld<S, W>` is the system's
@@ -2242,14 +2242,14 @@ Blasts last a single step, so the viewer never sees one; it draws an
 explosion wherever a drone or interceptor disappears. That is presentation
 only and changes nothing in the simulation.
 
-### flight
+### aeronautic
 
 Aircraft fly closed routes of waypoints under an autopilot, spread over an
 area that grows with their number so traffic density stays the same. It is
 the application for flight control algorithms of the class JSBSim runs, and
 it shows fidelity as an opt-in: most aircraft fly a single-pass model, and
 those whose archetype opts in are integrated with Runge-Kutta 4.
-`bazel run //application/flight -- <aircraft> <precise> <seed>` flies one
+`bazel run //application/aeronautic -- <aircraft> <precise> <seed>` flies one
 scenario headless and prints how many waypoints were reached.
 
 The code is in three layers:
@@ -2258,7 +2258,7 @@ The code is in three layers:
 |---|---|
 | `framework/continuous.hpp` | `Continuous`, generic over any `ContinuousState` |
 | `model/` | `flight_path.hpp` (the point-mass state, its rate equations, a single-pass integrator and autopilot laws), `atmosphere.hpp`, `control.hpp` (lags, rate limits, PI control, tables) |
-| `application/flight/` | The aircraft components and archetypes, the systems, the scenario and the simulation |
+| `application/aeronautic/` | The aircraft components and archetypes, the systems, the scenario and the simulation |
 
 The model is point-mass flight path: an `AirState` of position, speed,
 flight-path angle and heading, flown by commanding load factor, bank and
@@ -2268,7 +2268,7 @@ layers are in geopotential altitude, as the 1976 standard and JSBSim have
 them, so its density is within 10^-5 of JSBSim's up to 20 km. `AirState` is the
 world's spatial component, so no copy of the position is kept anywhere else.
 
-Components (`application/flight/components.hpp`):
+Components (`application/aeronautic/components.hpp`):
 
 | Component | Holds |
 |---|---|
@@ -2281,7 +2281,7 @@ Components (`application/flight/components.hpp`):
 | `Autopilot` | The altitude, heading and speed it holds, and its throttle integral |
 | `Route` | Four waypoints, the speed to fly them, the next one and how many were reached |
 
-Schedule (`application/flight/systems.hpp`):
+Schedule (`application/aeronautic/systems.hpp`):
 
 | System | Does |
 |---|---|
@@ -2318,7 +2318,7 @@ that a single-pass and a Runge-Kutta aircraft flying the same route end within
 from its seed. `accuracy_test` compares the model with JSBSim (see
 [Accuracy against JSBSim](#accuracy-against-jsbsim)).
 
-`bazel run -c opt //application/flight:flight_benchmark` flies 500 steps of
+`bazel run -c opt //application/aeronautic:aeronautic_benchmark` flies 500 steps of
 20 ms at each population, once with every aircraft on the single-pass model
 and once with every aircraft on Runge-Kutta 4. GCC, ms per step:
 
@@ -2406,7 +2406,7 @@ The largest drift over the flight, which covers 130 km:
 
 The test holds the drift at 20 ms and 1 s with about 25% headroom. To
 regenerate the reference, install JSBSim's Python package and NumPy, and run
-`python application/flight/reference/jsbsim_737.py`. It prints the fitted
+`python application/aeronautic/reference/jsbsim_737.py`. It prints the fitted
 airframe, which the test keeps as constants.
 
 #### Rigid aircraft
@@ -2423,7 +2423,7 @@ aircraft's XML into simon's aircraft format, in SI units, and
 `model/aircraft_data` reads it back, refusing bad files with the line at
 fault. A converted aircraft holds its metrics, mass balance, fuel tanks,
 turbines, flight control system and aerodynamics. The 737 is
-`application/flight/aircraft/737.aircraft`, and the F-16 is `f16.aircraft`
+`application/aeronautic/aircraft/737.aircraft`, and the F-16 is `f16.aircraft`
 beside it (see [The F-16](#the-f-16)).
 
 | Layer | Holds |
@@ -2438,7 +2438,7 @@ beside it (see [The F-16](#the-f-16)).
 | `model/propulsion` | The engines' air, their spools and thrust at the throttles, and the fuel they burn |
 | `model/sensing` | The air data, attitude, motion and pilot's accelerations the flight controls read |
 | `model/rigid_aircraft` | The aerodynamics' inputs and the body's rate, and a header that includes the four above |
-| `application/flight` | The archetype and its systems |
+| `application/aeronautic` | The archetype and its systems |
 
 Each step a rigid aircraft runs `RunFlightControls`, `RunEngines`, then
 `Rigid` (Runge-Kutta 4 over `RigidAircraftRates`), then `BurnFuel` and
@@ -2451,7 +2451,7 @@ one; round, the inertial frame is ECI and the world's local frame is the
 plane tangent to the ellipsoid at an origin.
 
 Each layer is checked against JSBSim's 737 (see
-`application/flight/reference/README.md`):
+`application/aeronautic/reference/README.md`):
 
 | Test | Checks | Agreement |
 |---|---|---|
@@ -2494,7 +2494,7 @@ measured:
   1.4e-8 off, and keeps its atmosphere's constants in English units, 8.5e-6
   off in density. simon uses the definitions and the 1976 standard.
 
-`bazel run -c opt //application/flight:rigid_benchmark` flies rigid 737s
+`bazel run -c opt //application/aeronautic:rigid_benchmark` flies rigid 737s
 at 8 ms steps, each on its own. GCC, per aircraft per step:
 
 | Aircraft | Flat Earth | Round Earth |
@@ -2658,7 +2658,7 @@ held, the trim alone is measured.
 Every level flies in one world. A scenario's `rigid` and `fighters` counts
 make some of its aircraft rigid 737s and rigid F-16s, and they fly the same
 kind of routes as the rest: `FollowRoute` sets their autopilot's targets as it
-sets every aircraft's. `bazel run //application/flight -- <aircraft>
+sets every aircraft's. `bazel run //application/aeronautic -- <aircraft>
 <precise> <rigid> <fighters> <seed>` flies one, over a flat Earth so that
 every level shares the world's frame.
 
@@ -2685,7 +2685,7 @@ waypoints each to the point-mass aircraft's 6.5: a 737 turns wider than the
 point-mass jet. F-16s keep between 4.0 and 7.7 km and between 200 and 238
 m/s, and reach about 6 waypoints each.
 
-`flight_benchmark` adds a mixed population, 1% on Runge-Kutta 4 and 0.1%
+`aeronautic_benchmark` adds a mixed population, 1% on Runge-Kutta 4 and 0.1%
 rigid. At 100,000 aircraft, GCC, 20 ms steps:
 
 | Aircraft | Systems | ms per step | Share |
@@ -2700,13 +2700,13 @@ its own aircraft cost, and nothing more: the single-pass aircraft run as
 fast as they do alone (6.27 ms at 100,000), because each level's systems are
 driven by components only its aircraft have.
 
-`bazel run -c opt //application/flight:viewer` watches a mixed world under
+`bazel run -c opt //application/aeronautic:viewer` watches a mixed world under
 `RealTimeDriver`, by default 2,000 aircraft with 20 on Runge-Kutta 4, four
 rigid 737s and four rigid F-16s, at ten times real time. An ImPlot map draws
 each level its own way, rigid aircraft with trails, and the route of the
 rigid aircraft the panel follows. The panel shows that aircraft's air data,
 attitude, load factor, engine and surfaces, and strip charts of its altitude
-and airspeed sit under the map. The flight viewer's panel also sets the
+and airspeed sit under the map. The aeronautic viewer's panel also sets the
 scenario's wind and turbulence.
 
 Both viewers share `application/viewing.hpp`: the window and its frame loop,
@@ -2790,7 +2790,7 @@ airspeed, from its own seed.
 - **The noise needs no generator state.** It is SplitMix64, counted by step
   from the aircraft's seed, so a run repeats exactly from its seed.
 
-`flight_test` flies 737s, F-16s and point-mass aircraft in a 15 m/s wind and
+`aeronautic_test` flies 737s, F-16s and point-mass aircraft in a 15 m/s wind and
 moderate turbulence for five minutes, and checks that they keep to the
 routes' envelope and reach waypoints. It also checks that a point-mass
 aircraft in wind flies as it does in still air, carried by the wind.
@@ -2855,9 +2855,9 @@ Each step ends with a working application and passing tests.
      [Continuous state](#continuous-state)). missile, which does not use it,
      pays nothing for it.
    - Done: the standard atmosphere, a point-mass flight-path model, and the
-     [flight](#flight) application flying it at two fidelity levels.
-   - Done: `flight_benchmark`, idle and contended, for both levels (see
-     [flight](#flight)).
+     [aeronautic](#aeronautic) application flying it at two fidelity levels.
+   - Done: `aeronautic_benchmark`, idle and contended, for both levels (see
+     [aeronautic](#aeronautic)).
    - Done: accuracy against JSBSim's 737 (see
      [Accuracy against JSBSim](#accuracy-against-jsbsim)).
    - Done: rigid aircraft, six degrees of freedom from JSBSim aircraft
@@ -2871,7 +2871,7 @@ Each step ends with a working application and passing tests.
      checked the same way (see [The F-16](#the-f-16)).
    - Done: a trim of simon's own, level over the round Earth (see
      [Trim](#trim)).
-   - Done: a flight viewer for the mixed world (see
+   - Done: an aeronautic viewer for the mixed world (see
      [Mixed fidelity](#mixed-fidelity)).
    - Done: wind and MIL-F-8785C turbulence, opt in (see
      [Wind and turbulence](#wind-and-turbulence)).

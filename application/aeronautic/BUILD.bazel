@@ -8,7 +8,7 @@ load("@rules_cc//cc:cc_test.bzl", "cc_test")
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "flight_library",
+    name = "aeronautic_library",
     srcs = ["simulation.cpp"],
     hdrs = [
         "components.hpp",
@@ -49,9 +49,9 @@ cc_library(
 )
 
 cc_test(
-    name = "flight_test",
+    name = "aeronautic_test",
     size = "medium",
-    srcs = ["flight_test.cpp"],
+    srcs = ["aeronautic_test.cpp"],
     copts = COPTS,
     data = [
         "aircraft/737.aircraft",
@@ -59,7 +59,7 @@ cc_test(
     ],
     deps = [
         "//framework:vocabulary",
-        ":flight_library",
+        ":aeronautic_library",
         "//engine:driver",
         "@lib//base:testing",
     ],
@@ -74,7 +74,7 @@ cc_test(
     deps = [
         ":testing",
         "//framework:vocabulary",
-        ":flight_library",
+        ":aeronautic_library",
         "@lib//base:testing",
     ],
 )
@@ -176,7 +176,7 @@ cc_test(
     deps = [
         ":testing",
         "//framework:vocabulary",
-        ":flight_library",
+        ":aeronautic_library",
         "//model:trim",
         "@lib//base:testing",
     ],
@@ -192,7 +192,7 @@ cc_binary(
     ],
     deps = [
         "//framework:vocabulary",
-        ":flight_library",
+        ":aeronautic_library",
         "//application:viewing",
         "//engine:driver",
         "@imgui",
@@ -220,7 +220,7 @@ cc_test(
     env = {"SDL_VIDEODRIVER": "dummy"},
     deps = [
         "//framework:vocabulary",
-        ":flight_library",
+        ":aeronautic_library",
         "//application:viewing",
         "//engine:driver",
         "@imgui",
@@ -230,7 +230,7 @@ cc_test(
 )
 
 cc_binary(
-    name = "flight",
+    name = "aeronautic",
     srcs = ["main.cpp"],
     copts = COPTS,
     data = [
@@ -239,19 +239,19 @@ cc_binary(
     ],
     deps = [
         "//framework:vocabulary",
-        ":flight_library",
+        ":aeronautic_library",
         "//engine:driver",
     ],
 )
 
 cc_binary(
-    name = "flight_benchmark",
-    srcs = ["flight_benchmark.cpp"],
+    name = "aeronautic_benchmark",
+    srcs = ["aeronautic_benchmark.cpp"],
     copts = COPTS,
     data = ["aircraft/737.aircraft"],
     deps = [
         "//framework:vocabulary",
-        ":flight_library",
+        ":aeronautic_library",
         "//framework",
         "//framework:benchmarking",
         "@lib//base:core",
@@ -265,7 +265,7 @@ cc_binary(
     data = ["aircraft/737.aircraft"],
     deps = [
         "//framework:vocabulary",
-        ":flight_library",
+        ":aeronautic_library",
         "//framework:benchmarking",
         "@lib//base:core",
     ],

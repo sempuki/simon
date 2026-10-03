@@ -8,13 +8,13 @@
 #include <utility>
 #include <vector>
 
-#include "application/flight/simulation.hpp"
+#include "application/aeronautic/simulation.hpp"
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 #include "engine/driver.hpp"
 #include "framework/vocabulary.hpp"
 
-namespace simon::flight {
+namespace simon::aeronautic {
 
 namespace {
 
@@ -358,7 +358,7 @@ TEST_CASE("Simulation") {
 namespace {
 
 constexpr std::string_view BOEING_737 =
-    "application/flight/aircraft/737.aircraft";
+    "application/aeronautic/aircraft/737.aircraft";
 
 // A 737 trimmed in cruise at 6 km and 200 m/s, heading north from the
 // world's origin toward a waypoint 500 km ahead.
@@ -481,4 +481,4 @@ TEST_CASE("RigidAircraft") {
   }
 }
 
-}  // namespace simon::flight
+}  // namespace simon::aeronautic

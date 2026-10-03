@@ -2,7 +2,8 @@
 
 // Flies one flight scenario as fast as possible and prints what it did:
 //
-//   bazel run //application/flight -- [aircraft] [precise] [rigid] [fighters]
+//   bazel run //application/aeronautic -- [aircraft] [precise] [rigid]
+//   [fighters]
 //       [seed]
 //
 // `rigid` aircraft are 737s and `fighters` F-16s, both flying as rigid
@@ -13,7 +14,7 @@
 #include <cstdlib>
 #include <print>
 
-#include "application/flight/simulation.hpp"
+#include "application/aeronautic/simulation.hpp"
 #include "engine/driver.hpp"
 #include "framework/vocabulary.hpp"
 
@@ -21,7 +22,7 @@ auto main(int argc, char** argv) -> int {
   using namespace simon;
   using namespace std::chrono_literals;
 
-  flight::Scenario scenario;
+  aeronautic::Scenario scenario;
   if (argc > 1) {
     scenario.aircraft = std::atoi(argv[1]);
   }
@@ -37,7 +38,7 @@ auto main(int argc, char** argv) -> int {
   if (argc > 5) {
     scenario.seed = std::strtoull(argv[5], nullptr, 10);
   }
-  flight::Simulation simulation{scenario};
+  aeronautic::Simulation simulation{scenario};
   engine::BatchDriver driver{engine::Timing{.max_step = 20ms},
                              Depend(simulation)};
 

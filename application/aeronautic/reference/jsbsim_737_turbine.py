@@ -10,7 +10,7 @@ changes too. Every column is read after its frame, which finds the engines'
 air, runs them, and burns their fuel.
 
   pip install jsbsim
-  python application/flight/reference/jsbsim_737_turbine.py
+  python application/aeronautic/reference/jsbsim_737_turbine.py
 """
 
 import math

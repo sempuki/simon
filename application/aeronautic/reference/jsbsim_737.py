@@ -20,7 +20,7 @@ Drag is left to simon's drag polar, fitted to JSBSim's level and turning trims
 over the scenario's envelope. Run with JSBSim's Python package and NumPy:
 
   pip install jsbsim numpy
-  python application/flight/reference/jsbsim_737.py
+  python application/aeronautic/reference/jsbsim_737.py
 """
 
 import math

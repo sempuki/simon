@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "application/flight/testing.hpp"
+#include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
 #include "model/aerodynamics.hpp"
 #include "model/aircraft_data.hpp"
@@ -24,7 +24,7 @@ namespace simon::model {
 
 namespace {
 
-using namespace flight::testing;
+using namespace aeronautic::testing;
 
 // The inputs `row` records, by simon's names: the variables, and the
 // aircraft's flight control signals.
@@ -112,11 +112,12 @@ auto check_against_jsbsim(std::string_view path, std::string_view reference)
 
 TEST_CASE("Aerodynamics737") {
   check_against_jsbsim(BOEING_737,
-                       "application/flight/reference/jsbsim_737_aero.csv");
+                       "application/aeronautic/reference/jsbsim_737_aero.csv");
 }
 
 TEST_CASE("AerodynamicsF16") {
-  check_against_jsbsim(F16, "application/flight/reference/jsbsim_f16_aero.csv");
+  check_against_jsbsim(F16,
+                       "application/aeronautic/reference/jsbsim_f16_aero.csv");
 }
 
 }  // namespace simon::model

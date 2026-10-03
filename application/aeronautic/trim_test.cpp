@@ -6,7 +6,7 @@
 #include <string_view>
 #include <vector>
 
-#include "application/flight/testing.hpp"
+#include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/atmosphere.hpp"
@@ -22,7 +22,7 @@ namespace simon::model {
 
 namespace {
 
-using namespace flight::testing;
+using namespace aeronautic::testing;
 
 struct Compared final {
   Trim simon;
@@ -80,9 +80,10 @@ auto compare(std::string_view path, std::string_view initial) -> Compared {
 
 TEST_CASE("Trim") {
   for (auto [path, initial] :
-       {std::pair{BOEING_737, std::string_view{"application/flight/reference/"
-                                               "jsbsim_737_check_initial.csv"}},
-        std::pair{F16, std::string_view{"application/flight/reference/"
+       {std::pair{BOEING_737,
+                  std::string_view{"application/aeronautic/reference/"
+                                   "jsbsim_737_check_initial.csv"}},
+        std::pair{F16, std::string_view{"application/aeronautic/reference/"
                                         "jsbsim_f16_check_initial.csv"}}}) {
     Compared c = compare(path, initial);
     CAPTURE(path);

@@ -17,7 +17,7 @@ before's air data and accelerations, which are read before it.
 Columns use simon's names and SI units, from tools/jsbsim/convert.py.
 
   pip install jsbsim
-  python application/flight/reference/jsbsim_f16_flight_control.py
+  python application/aeronautic/reference/jsbsim_f16_flight_control.py
 """
 
 import math

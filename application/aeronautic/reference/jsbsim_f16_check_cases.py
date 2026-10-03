@@ -25,7 +25,7 @@ frames. After the trim each PID's integral is zeroed, as simon's start, because
 JSBSim does not show it.
 
   pip install jsbsim numpy
-  python application/flight/reference/jsbsim_f16_check_cases.py
+  python application/aeronautic/reference/jsbsim_f16_check_cases.py
 """
 
 import os

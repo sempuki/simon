@@ -13,7 +13,7 @@ flight control system and the aerodynamics, then moves the state on. JSBSim's
 lift coefficient lags a frame: its induced drag uses the frame before's.
 
   pip install jsbsim
-  python application/flight/reference/jsbsim_737_aero.py
+  python application/aeronautic/reference/jsbsim_737_aero.py
 """
 
 import math

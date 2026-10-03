@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "application/flight/testing.hpp"
+#include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/flight_control.hpp"
@@ -22,10 +22,10 @@ namespace simon::model {
 
 namespace {
 
-using namespace flight::testing;
+using namespace aeronautic::testing;
 
 constexpr std::string_view REFERENCE =
-    "application/flight/reference/jsbsim_737_flight_control.csv";
+    "application/aeronautic/reference/jsbsim_737_flight_control.csv";
 constexpr double DT = 1.0 / 60.0;  // The reference's frame, seconds.
 
 constexpr std::array COMMANDS{
@@ -112,8 +112,8 @@ TEST_CASE("FlightControlF16") {
   auto aircraft = load_aircraft(std::string{F16});
   REQUIRE(aircraft);
   const FlightControlData& controls = aircraft->flight_controls;
-  std::vector<Row> rows =
-      load_rows("application/flight/reference/jsbsim_f16_flight_control.csv");
+  std::vector<Row> rows = load_rows(
+      "application/aeronautic/reference/jsbsim_f16_flight_control.csv");
   REQUIRE(rows.size() > 3000);
   constexpr double F16_DT = 1.0 / 120.0;
 

@@ -6,7 +6,7 @@ simulations that don't use it.
 
 ## What this proves
 
-simon is a framework for entity-component simulations. Its flight
+simon is a framework for entity-component simulations. Its aeronautic
 application shows that the framework can carry a flight simulator comparable
 to [JSBSim](https://github.com/JSBSim-Team/jsbsim), a widely used open-source
 flight dynamics model. The application's physics matches JSBSim's layer by
@@ -14,7 +14,7 @@ layer for two very different aircraft, a 737 airliner and an F-16 fighter,
 and one thread flies a hundred thousand aircraft at mixed fidelity.
 Each claim below names the command that checks it. Timings are GCC builds on
 one core of an AMD Ryzen 9 5900XT. The details are in
-[documents/design.md](documents/design.md#flight).
+[documents/design.md](documents/design.md#aeronautic).
 
 ### The physics matches JSBSim
 
@@ -38,8 +38,8 @@ equations of motion, and the F-16's mass, center of mass and inertia, its
 pilot included, match JSBSim's to within JSBSim's rounded slug, 1.4e-8.
 
 ```sh
-bazel test //application/flight:aero_test //application/flight:rigid_body_test \
-    //application/flight:turbine_test //application/flight:flight_control_test
+bazel test //application/aeronautic:aero_test //application/aeronautic:rigid_body_test \
+    //application/aeronautic:turbine_test //application/aeronautic:flight_control_test
 ```
 
 ### Both whole aircraft match JSBSim
@@ -88,7 +88,7 @@ closer than JSBSim after the roll doublet, and 4 times closer after the
 throttle step.
 
 ```sh
-bazel test //application/flight:check_case_test   # about 3 minutes
+bazel test //application/aeronautic:check_case_test   # about 3 minutes
 ```
 
 ### It flies the 737 through its flight controls
@@ -112,7 +112,7 @@ pedals, step the trims, and move the flaps, gear, speedbrake and spoilers,
 every surface agrees with JSBSim's to 4e-15 on every frame.
 
 ```sh
-bazel test //application/flight:flight_control_test
+bazel test //application/aeronautic:flight_control_test
 ```
 
 ### It flies the F-16 through its fly-by-wire
@@ -144,7 +144,7 @@ and throttle sweep, pull to high angle of attack below 250 kt, and fly
 supersonic.
 
 ```sh
-bazel test //application/flight:flight_control_test
+bazel test //application/aeronautic:flight_control_test
 ```
 
 ### It trims its own aircraft
@@ -169,8 +169,8 @@ Burning fuel lightens the aircraft, which climbs and speeds up. With the mass
 held, the trim alone is measured.
 
 ```sh
-bazel test //application/flight:trim_test
-bazel test //application/flight:check_case_test --test_arg=HoldsTrim
+bazel test //application/aeronautic:trim_test
+bazel test //application/aeronautic:check_case_test --test_arg=HoldsTrim
 ```
 
 ### It flies through wind and turbulence
@@ -187,7 +187,7 @@ exactly, so the turbulence's variance and correlation are the
 specification's at any step. JSBSim's change with its frame.
 
 ```sh
-bazel test //application/flight:check_case_test //model:rigid_aircraft_test
+bazel test //application/aeronautic:check_case_test //model:rigid_aircraft_test
 bazel test //model:wind_test
 ```
 
@@ -207,7 +207,7 @@ is 4.6 times faster round the Earth, and 7.9 times over a flat one. One
 thread flies about 6,900 rigid 737s in real time over a flat Earth.
 
 ```sh
-bazel run -c opt //application/flight:rigid_benchmark
+bazel run -c opt //application/aeronautic:rigid_benchmark
 ```
 
 ### It scales
@@ -224,7 +224,7 @@ A single-pass aircraft costs about 63 ns a step at any population, so 100,000
 of them run 3.2 times faster than real time.
 
 ```sh
-bazel run -c opt //application/flight:flight_benchmark
+bazel run -c opt //application/aeronautic:aeronautic_benchmark
 ```
 
 ### Fidelity costs only the aircraft that use it
@@ -246,13 +246,13 @@ autopilot, and at the world's 20 ms step they stay within 15 cm of the
 converged JSBSim reference.
 
 ```sh
-bazel run -c opt //application/flight:flight_benchmark   # the mixed population
-bazel run -c opt //application/flight -- 10000 100 10 10 # and 10 F-16s: 10 min in 25 s
+bazel run -c opt //application/aeronautic:aeronautic_benchmark   # the mixed population
+bazel run -c opt //application/aeronautic -- 10000 100 10 10 # and 10 F-16s: 10 min in 25 s
 ```
 
 ### You can watch it
 
-![The flight viewer](documents/images/flight_viewer.png)
+![The aeronautic viewer](documents/images/aeronautic_viewer.png)
 
 The viewer flies a mixed world in real time: 2,000 point-mass aircraft, 20 of
 them on Runge-Kutta 4, with four rigid 737s and four rigid F-16s among them.
@@ -260,13 +260,13 @@ Its panel follows one rigid aircraft, with its route, air data, attitude,
 engine and surfaces, and charts of its altitude and airspeed.
 
 ```sh
-bazel run -c opt //application/flight:viewer
+bazel run -c opt //application/aeronautic:viewer
 ```
 
 ### Anyone can regenerate the references
 
 Each JSBSim table comes from a script in
-[application/flight/reference](application/flight/reference/README.md). The
+[application/aeronautic/reference](application/aeronautic/reference/README.md). The
 tests compare against the committed tables, so they run without JSBSim. To
 regenerate a table, run its script after `pip install jsbsim numpy`.
 
@@ -293,10 +293,10 @@ git submodule update --init
 bazel test //...
 bazel run //application/hello
 bazel run //application/missile:viewer   # watch a missile scenario
-bazel run -c opt //application/flight:viewer   # watch the flight world
+bazel run -c opt //application/aeronautic:viewer   # watch the aeronautic world
 bazel run //application/missile -- 7    # run seed 7 headless
-bazel run //application/flight -- 1000 100   # 1,000 aircraft, 100 on RK4
-bazel run -c opt //application/flight:flight_benchmark
+bazel run //application/aeronautic -- 1000 100   # 1,000 aircraft, 100 on RK4
+bazel run -c opt //application/aeronautic:aeronautic_benchmark
 ```
 
 Code targets C++26; flags come from `@lib//bazel:copts.bzl`.
