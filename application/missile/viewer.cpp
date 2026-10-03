@@ -14,8 +14,6 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
-#include <cstdlib>
-#include <iostream>
 #include <memory>
 #include <numbers>
 #include <string>
@@ -36,7 +34,8 @@ namespace {
 
 using namespace std::chrono_literals;
 using WallClock = std::chrono::steady_clock;
-using Driver = engine::RealTimeDriver<Simulation>;
+using Session = viewing::Session<Simulation, Scenario>;
+using viewing::Scatter;
 
 constexpr ImVec4 RED{0.95f, 0.30f, 0.25f, 1.0f};
 constexpr ImVec4 BLUE{0.35f, 0.65f, 1.00f, 1.0f};
@@ -56,18 +55,6 @@ auto point_of(const Kinematics& kinematics) -> Point {
       kinematics.position.numerical_value_in(model::meter);
   return Point{.x = position.x(), .y = position.y()};
 }
-
-// Positions of one group of markers, in the layout ImPlot wants.
-struct Scatter final {
-  std::vector<double> x;
-  std::vector<double> y;
-
-  auto add(Point point) -> void {
-    x.push_back(point.x);
-    y.push_back(point.y);
-  }
-  auto size() const -> int { return static_cast<int>(x.size()); }
-};
 
 // A ring drawn where a drone or interceptor disappeared. Blasts last one step,
 // so the viewer never sees them; it infers them from disappearances instead.
@@ -92,47 +79,6 @@ auto plot_circle(const char* label, Point center, double radius, ImVec4 color,
   ImPlot::PlotLine(label, x.data(), y.data(), SEGMENTS + 1);
 }
 
-// One run of a scenario, paced to the wall clock.
-class Session final {
- public:
-  Session(Scenario scenario, double speed)
-      : scenario_{scenario},
-        simulation_{std::make_unique<Simulation>(scenario)},
-        driver_{std::make_unique<Driver>(engine::Timing{.max_step = 10ms},
-                                         speed, Depend(*simulation_))} {}
-
-  ~Session() {
-    engine::Phase phase = driver_->driver().phase();
-    if (phase == engine::Phase::RUNNING || phase == engine::Phase::STOPPED) {
-      engine::FinishResult _ = driver_->finish();
-    }
-  }
-
-  auto tick() -> void {
-    if (finished_) {
-      return;
-    }
-    engine::PhaseResult result = driver_->tick();
-    if (!result) {
-      std::cerr << "Error: " << result.error().message() << "\n";
-      finished_ = true;
-    } else if (*result == engine::Flow::STOP) {
-      finished_ = true;
-    }
-  }
-
-  auto scenario() const -> const Scenario& { return scenario_; }
-  auto simulation() const -> const Simulation& { return *simulation_; }
-  auto driver() -> Driver& { return *driver_; }
-  auto finished() const -> bool { return finished_; }
-
- private:
-  Scenario scenario_;
-  std::unique_ptr<Simulation> simulation_;
-  std::unique_ptr<Driver> driver_;
-  bool finished_ = false;
-};
-
 class Viewer final {
  public:
   // Draws everything `scale` times its base size.
@@ -141,26 +87,11 @@ class Viewer final {
   }
 
   auto frame() -> void {
-    if (ImGui::IsKeyPressed(ImGuiKey_Space) && !ImGui::GetIO().WantTextInput) {
-      toggle_pause();
-    }
     session_->tick();
     notice_disappearances();
-
-    const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(viewport->WorkPos);
-    ImGui::SetNextWindowSize(viewport->WorkSize);
-    ImGui::Begin("Missile", nullptr,
-                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
-                     ImGuiWindowFlags_NoSavedSettings |
-                     ImGuiWindowFlags_NoBringToFrontOnFocus);
-    ImGui::BeginChild("Controls", ImVec2(280.0f * scale_, 0.0f),
-                      ImGuiChildFlags_Borders);
-    draw_controls();
-    ImGui::EndChild();
-    ImGui::SameLine();
-    draw_map();
-    ImGui::End();
+    viewing::draw_window(
+        "Missile", 280.0f * scale_, [&] { draw_controls(); },
+        [&] { draw_map(); });
   }
 
   // Whether the Quit button was pressed.
@@ -169,14 +100,10 @@ class Viewer final {
  private:
   auto restart() -> void {
     session_.reset();  // Finish the old run before starting the new one.
-    session_ = std::make_unique<Session>(Scenario{.seed = seed_}, speed_);
+    session_ = std::make_unique<Session>(
+        Scenario{.seed = seed_}, engine::Timing{.max_step = 10ms}, speed_);
     last_seen_.clear();
     explosions_.clear();
-  }
-
-  auto toggle_pause() -> void {
-    Driver& driver = session_->driver();
-    driver.paused() ? driver.resume() : driver.pause();
   }
 
   // Compares this frame's drones and interceptors with the last frame's, and
@@ -223,31 +150,14 @@ class Viewer final {
   auto draw_controls() -> void {
     const Simulation& simulation = session_->simulation();
     const World& world = simulation.world();
-    Driver& driver = session_->driver();
 
     ImGui::SeparatorText("Scenario");
     ImGui::InputScalar("Seed", ImGuiDataType_U64, &seed_);
-    if (ImGui::Button("Restart", ImVec2(-1.0f, 0.0f))) {
+    if (viewing::draw_run_buttons(InOut(quitting_))) {
       restart();
       return;
     }
-    if (ImGui::Button("Quit (esc)", ImVec2(-1.0f, 0.0f))) {
-      quitting_ = true;
-    }
-
-    ImGui::SeparatorText("Time");
-    double seconds =
-        std::chrono::duration<double>(driver.driver().now().time_since_epoch())
-            .count();
-    ImGui::Text("Simulated  %8.2f s", seconds);
-    if (ImGui::Button(driver.paused() ? "Resume (space)" : "Pause (space)",
-                      ImVec2(-1.0f, 0.0f))) {
-      toggle_pause();
-    }
-    if (ImGui::SliderFloat("Speed", &speed_, 0.25f, 20.0f, "%.2fx",
-                           ImGuiSliderFlags_Logarithmic)) {
-      driver.set_speed(speed_);
-    }
+    viewing::draw_time_controls(InOut(*session_), InOut(speed_), 20.0f);
 
     ImGui::SeparatorText("Red");
     ImGui::TextColored(RED, "Drones remaining  %zu",
@@ -295,7 +205,8 @@ class Viewer final {
           [&](Entity entity, const ComponentType&) {
             if (const Kinematics* kinematics =
                     world.store_of<Kinematics>().maybe_component_of(entity)) {
-              scatter.add(point_of(*kinematics));
+              Point point = point_of(*kinematics);
+              scatter.append(point.x, point.y);
             }
           });
       return scatter;
@@ -324,15 +235,14 @@ class Viewer final {
     world.store_of<Estimate>().for_each([&](Entity, const Estimate& estimate) {
       model::QuantityVector position =
           estimate.position.numerical_value_in(model::meter);
-      tracks.add(Point{.x = position.x(), .y = position.y()});
+      tracks.append(position.x(), position.y());
     });
 
-    auto plot = [this](const char* label, const Scatter& scatter,
+    auto plot = [this](std::string_view label, const Scatter& scatter,
                        ImPlotMarker marker, float size, ImVec4 fill,
                        ImVec4 outline) {
-      ImPlot::SetNextMarkerStyle(marker, size * scale_, fill, scale_, outline);
-      ImPlot::PlotScatter(label, scatter.x.data(), scatter.y.data(),
-                          scatter.size());
+      viewing::plot_scatter(label, scatter, marker, size, fill, outline,
+                            scale_);
     };
     plot("Asset", positions.template operator()<Asset>(), ImPlotMarker_Square,
          8.0f, GREEN, GREEN);
@@ -393,10 +303,8 @@ auto main(int argc, char** argv) -> int {
   viewing::WindowOptions options{.title = "Missile"};
   std::vector<std::string_view> arguments =
       viewing::parse_window_options(argc, argv, InOut(options));
-  std::uint64_t seed = 1;
-  if (!arguments.empty()) {
-    seed = std::strtoull(std::string{arguments[0]}.c_str(), nullptr, 10);
-  }
+  auto seed =
+      static_cast<std::uint64_t>(viewing::parse_integer(arguments, 0, 1));
   return viewing::run(
       options, [&](float scale) { return missile::Viewer{seed, scale}; });
 }

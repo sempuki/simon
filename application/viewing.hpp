@@ -5,13 +5,19 @@
 #include <SDL2/SDL.h>
 
 #include <algorithm>
+#include <charconv>
+#include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "engine/driver.hpp"
 #include "framework/vocabulary.hpp"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_sdl2.h"
@@ -19,7 +25,9 @@
 #include "implot/implot.h"
 
 // A window for an application's viewer: SDL2, Dear ImGui and ImPlot, scaled
-// to the display, running the viewer's frame until the user quits.
+// to the display, running the viewer's frame until the user quits. Also the
+// pieces every viewer draws: a run of its simulation paced to the wall clock,
+// a side panel with run and time controls, and scatter plots of markers.
 //
 // Every viewer takes these options, besides its own arguments:
 //
@@ -55,6 +63,23 @@ inline auto parse_window_options(int argc, char** argv,
     }
   }
   return rest;
+}
+
+// The integer argument at `index` of `arguments`, or `fallback` if there is
+// none or it is not an integer.
+inline auto parse_integer(std::span<const std::string_view> arguments,
+                          std::size_t index, std::int64_t fallback)
+    -> std::int64_t {
+  if (index >= arguments.size()) {
+    return fallback;
+  }
+  std::string_view argument = arguments[index];
+  std::int64_t value = 0;
+  auto [end, error] = std::from_chars(argument.data(),
+                                      argument.data() + argument.size(), value);
+  return error == std::errc{} && end == argument.data() + argument.size()
+             ? value
+             : fallback;
 }
 
 // Computes the interface's scale on `display`: its height in screen
@@ -206,6 +231,142 @@ auto run(const WindowOptions& options, MakeType make) -> int {
   SDL_DestroyWindow(window);
   SDL_Quit();
   return code;
+}
+
+// One run of a scenario under `RealTimeDriver`, paced to the wall clock. It
+// finishes the run when it goes, so a viewer restarts by replacing it.
+template <typename SimulationType, typename ScenarioType>
+class Session final {
+ public:
+  using DriverType = engine::RealTimeDriver<SimulationType>;
+
+  Session(ScenarioType scenario, engine::Timing timing, double speed)
+      : scenario_{std::move(scenario)},
+        simulation_{std::make_unique<SimulationType>(scenario_)},
+        driver_{std::make_unique<DriverType>(timing, speed,
+                                             Depend(*simulation_))} {}
+
+  ~Session() {
+    engine::Phase phase = driver_->driver().phase();
+    if (phase == engine::Phase::RUNNING || phase == engine::Phase::STOPPED) {
+      engine::FinishResult _ = driver_->finish();
+    }
+  }
+
+  Session(const Session&) = delete;
+  auto operator=(const Session&) -> Session& = delete;
+
+  // Advances the run to the wall clock, until it stops or fails.
+  auto tick() -> void {
+    if (finished_) {
+      return;
+    }
+    engine::PhaseResult result = driver_->tick();
+    if (!result) {
+      std::cerr << "Error: " << result.error().message() << "\n";
+      finished_ = true;
+    } else if (*result == engine::Flow::STOP) {
+      finished_ = true;
+    }
+  }
+
+  auto toggle_pause() -> void {
+    driver_->paused() ? driver_->resume() : driver_->pause();
+  }
+
+  // Simulated time, in seconds.
+  auto seconds() const -> double {
+    return std::chrono::duration<double>(
+               driver_->driver().now().time_since_epoch())
+        .count();
+  }
+
+  auto scenario() const -> const ScenarioType& { return scenario_; }
+  auto simulation() const -> const SimulationType& { return *simulation_; }
+  auto driver() -> DriverType& { return *driver_; }
+  auto finished() const -> bool { return finished_; }
+
+ private:
+  ScenarioType scenario_;
+  std::unique_ptr<SimulationType> simulation_;
+  std::unique_ptr<DriverType> driver_;
+  bool finished_ = false;
+};
+
+// Fills the window: a side panel `width` wide, drawn by `panel`, and beside
+// it the rest, drawn by `main`.
+template <typename PanelType, typename MainType>
+auto draw_window(std::string_view title, float width, PanelType panel,
+                 MainType main) -> void {
+  const ImGuiViewport* viewport = ImGui::GetMainViewport();
+  ImGui::SetNextWindowPos(viewport->WorkPos);
+  ImGui::SetNextWindowSize(viewport->WorkSize);
+  ImGui::Begin(std::string{title}.c_str(), nullptr,
+               ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+                   ImGuiWindowFlags_NoSavedSettings |
+                   ImGuiWindowFlags_NoBringToFrontOnFocus);
+  ImGui::BeginChild("Controls", ImVec2(width, 0.0f), ImGuiChildFlags_Borders);
+  panel();
+  ImGui::EndChild();
+  ImGui::SameLine();
+  ImGui::BeginGroup();
+  main();
+  ImGui::EndGroup();
+  ImGui::End();
+}
+
+// Draws the Restart and Quit buttons, sets `quitting` if Quit was pressed,
+// and returns whether Restart was.
+inline auto draw_run_buttons(InOut<bool> quitting) -> bool {
+  bool restart = ImGui::Button("Restart", ImVec2(-1.0f, 0.0f));
+  if (ImGui::Button("Quit (esc)", ImVec2(-1.0f, 0.0f))) {
+    *quitting = true;
+  }
+  return restart;
+}
+
+// Draws the Time section for `session`: its simulated time, a button that
+// pauses and resumes it, as Space does, and a slider that sets `speed` up to
+// `fastest` times real time.
+template <typename SessionType>
+auto draw_time_controls(InOut<SessionType> session, InOut<float> speed,
+                        float fastest) -> void {
+  if (ImGui::IsKeyPressed(ImGuiKey_Space) && !ImGui::GetIO().WantTextInput) {
+    session->toggle_pause();
+  }
+  ImGui::SeparatorText("Time");
+  ImGui::Text("Simulated  %8.1f s", session->seconds());
+  if (ImGui::Button(
+          session->driver().paused() ? "Resume (space)" : "Pause (space)",
+          ImVec2(-1.0f, 0.0f))) {
+    session->toggle_pause();
+  }
+  if (ImGui::SliderFloat("Speed", &*speed, 0.25f, fastest, "%.2fx",
+                         ImGuiSliderFlags_Logarithmic)) {
+    session->driver().set_speed(*speed);
+  }
+}
+
+// Positions of one group of markers, in the layout ImPlot wants.
+struct Scatter final {
+  std::vector<double> x;
+  std::vector<double> y;
+
+  auto append(double at_x, double at_y) -> void {
+    x.push_back(at_x);
+    y.push_back(at_y);
+  }
+  auto size() const -> int { return static_cast<int>(x.size()); }
+};
+
+// Plots `scatter` as markers of `size`, filled with `fill` and outlined with
+// `outline`, both `scale` times their base size.
+inline auto plot_scatter(std::string_view label, const Scatter& scatter,
+                         ImPlotMarker marker, float size, ImVec4 fill,
+                         ImVec4 outline, float scale) -> void {
+  ImPlot::SetNextMarkerStyle(marker, size * scale, fill, scale, outline);
+  ImPlot::PlotScatter(std::string{label}.c_str(), scatter.x.data(),
+                      scatter.y.data(), scatter.size());
 }
 
 }  // namespace simon::viewing

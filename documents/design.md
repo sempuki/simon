@@ -2699,10 +2699,15 @@ rigid 737s and four rigid F-16s, at ten times real time. An ImPlot map draws
 each level its own way, rigid aircraft with trails, and the route of the
 rigid aircraft the panel follows. The panel shows that aircraft's air data,
 attitude, load factor, engine and surfaces, and strip charts of its altitude
-and airspeed sit under the map. Both viewers share their window in
-`application/viewing.hpp`, which takes `--scale`, and `--frames` and
-`--screenshot` for running a viewer with nobody watching. The flight viewer's
-panel also sets the scenario's wind and turbulence.
+and airspeed sit under the map. The flight viewer's panel also sets the
+scenario's wind and turbulence.
+
+Both viewers share `application/viewing.hpp`: the window and its frame loop,
+which take `--scale`, and `--frames` and `--screenshot` for running a viewer
+with nobody watching; a `Session` that runs a scenario under `RealTimeDriver`
+and finishes it when replaced; the side panel with its Restart, Quit, pause
+and speed controls; and scatter plots of markers. A viewer draws only what is
+its own.
 
 #### Wind and turbulence
 

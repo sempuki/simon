@@ -10,6 +10,7 @@ cc_library(
     hdrs = ["viewing.hpp"],
     copts = COPTS,
     deps = [
+        "//engine:driver",
         "//framework:vocabulary",
         "@imgui",
         "@imgui//backends:platform-sdl2",

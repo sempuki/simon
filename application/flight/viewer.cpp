@@ -17,9 +17,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
-#include <cstdlib>
 #include <deque>
-#include <iostream>
 #include <memory>
 #include <numbers>
 #include <optional>
@@ -39,7 +37,8 @@ namespace simon::flight {
 namespace {
 
 using namespace std::chrono_literals;
-using Driver = engine::RealTimeDriver<Simulation>;
+using Session = viewing::Session<Simulation, Scenario>;
+using viewing::Scatter;
 
 constexpr ImVec4 GREY{0.60f, 0.62f, 0.65f, 0.70f};
 constexpr ImVec4 TEAL{0.40f, 0.80f, 0.80f, 0.90f};
@@ -54,18 +53,11 @@ constexpr double TRAIL_EVERY = 1.0;
 // How long the strip chart looks back.
 constexpr double CHART_SECONDS = 120.0;
 
-// Positions of one group of markers, in the layout ImPlot wants.
-struct Scatter final {
-  std::vector<double> x;
-  std::vector<double> y;
-
-  auto append(const Position& position) -> void {
-    model::QuantityVector meters = position.numerical_value_in(model::meter);
-    x.push_back(meters.x());
-    y.push_back(meters.y());
-  }
-  auto size() const -> int { return static_cast<int>(x.size()); }
-};
+// Appends `position` to `scatter`: its east and north.
+auto append(const Position& position, InOut<Scatter> scatter) -> void {
+  model::QuantityVector meters = position.numerical_value_in(model::meter);
+  scatter->append(meters.x(), meters.y());
+}
 
 // One rigid aircraft's recent past: where it was, for its trail, and its
 // altitude and speed, for the strip chart.
@@ -77,46 +69,6 @@ struct History final {
   double last_trail = -1e9;
 };
 
-// One run of a scenario, paced to the wall clock.
-class Session final {
- public:
-  Session(Scenario scenario, double speed)
-      : scenario_{scenario},
-        simulation_{std::make_unique<Simulation>(scenario)},
-        driver_{std::make_unique<Driver>(engine::Timing{.max_step = 20ms},
-                                         speed, Depend(*simulation_))} {}
-
-  ~Session() {
-    engine::Phase phase = driver_->driver().phase();
-    if (phase == engine::Phase::RUNNING || phase == engine::Phase::STOPPED) {
-      engine::FinishResult _ = driver_->finish();
-    }
-  }
-
-  auto tick() -> void {
-    if (finished_) {
-      return;
-    }
-    engine::PhaseResult result = driver_->tick();
-    if (!result) {
-      std::cerr << "Error: " << result.error().message() << "\n";
-      finished_ = true;
-    } else if (*result == engine::Flow::STOP) {
-      finished_ = true;
-    }
-  }
-
-  auto scenario() const -> const Scenario& { return scenario_; }
-  auto simulation() const -> const Simulation& { return *simulation_; }
-  auto driver() -> Driver& { return *driver_; }
-
- private:
-  Scenario scenario_;
-  std::unique_ptr<Simulation> simulation_;
-  std::unique_ptr<Driver> driver_;
-  bool finished_ = false;
-};
-
 class Viewer final {
  public:
   // Draws everything `scale` times its base size.
@@ -125,34 +77,19 @@ class Viewer final {
   }
 
   auto frame() -> void {
-    if (ImGui::IsKeyPressed(ImGuiKey_Space) && !ImGui::GetIO().WantTextInput) {
-      toggle_pause();
-    }
     session_->tick();
     record();
-
-    const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(viewport->WorkPos);
-    ImGui::SetNextWindowSize(viewport->WorkSize);
-    ImGui::Begin("Flight", nullptr,
-                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
-                     ImGuiWindowFlags_NoSavedSettings |
-                     ImGuiWindowFlags_NoBringToFrontOnFocus);
-    ImGui::BeginChild("Controls", ImVec2(320.0f * scale_, 0.0f),
-                      ImGuiChildFlags_Borders);
-    draw_controls();
-    ImGui::EndChild();
-    ImGui::SameLine();
-    ImGui::BeginGroup();
-    float chart_height = 170.0f * scale_;
-    float spacing = ImGui::GetStyle().ItemSpacing.y;
-    draw_map(ImGui::GetContentRegionAvail().y - chart_height - spacing);
-    if (!rigid_.empty()) {
-      draw_charts(histories_[std::min(selected_, rigid_.size() - 1)],
-                  chart_height);
-    }
-    ImGui::EndGroup();
-    ImGui::End();
+    viewing::draw_window(
+        "Flight", 320.0f * scale_, [&] { draw_controls(); },
+        [&] {
+          float chart_height = 170.0f * scale_;
+          float spacing = ImGui::GetStyle().ItemSpacing.y;
+          draw_map(ImGui::GetContentRegionAvail().y - chart_height - spacing);
+          if (!rigid_.empty()) {
+            draw_charts(histories_[std::min(selected_, rigid_.size() - 1)],
+                        chart_height);
+          }
+        });
   }
 
   // Whether the Quit button was pressed.
@@ -168,22 +105,12 @@ class Viewer final {
         .turbulence = static_cast<model::Turbulence>(turbulence_),
     };
     session_.reset();  // Finish the old run before starting the new one.
-    session_ = std::make_unique<Session>(scenario_, speed_);
+    session_ = std::make_unique<Session>(
+        scenario_, engine::Timing{.max_step = 20ms}, speed_);
     histories_.clear();
     rigid_.clear();
     selected_ = 0;
     fit_ = true;
-  }
-
-  auto toggle_pause() -> void {
-    Driver& driver = session_->driver();
-    driver.paused() ? driver.resume() : driver.pause();
-  }
-
-  auto now() -> double {
-    return std::chrono::duration<double>(
-               session_->driver().driver().now().time_since_epoch())
-        .count();
   }
 
   // Lists the rigid aircraft, once the world has them, and adds to each one's
@@ -195,7 +122,7 @@ class Viewer final {
           [&](Entity entity, const RigidBody&) { rigid_.push_back(entity); });
       histories_.resize(rigid_.size());
     }
-    double time = now();
+    double time = session_->seconds();
     for (std::size_t i = 0; i < rigid_.size(); ++i) {
       const AirState* state =
           world.store_of<AirState>().maybe_component_of(rigid_[i]);
@@ -207,7 +134,7 @@ class Viewer final {
         continue;  // Paused, or no step since the last frame.
       }
       if (time - history.last_trail >= TRAIL_EVERY) {
-        history.trail.append(state->position);
+        append(state->position, InOut(history.trail));
         history.last_trail = time;
         if (history.trail.size() > TRAIL_SECONDS / TRAIL_EVERY) {
           history.trail.x.erase(history.trail.x.begin());
@@ -244,7 +171,6 @@ class Viewer final {
   auto draw_controls() -> void {
     const Simulation& simulation = session_->simulation();
     const World& world = simulation.world();
-    Driver& driver = session_->driver();
 
     ImGui::SeparatorText("Scenario");
     ImGui::InputScalar("Seed", ImGuiDataType_U64, &scenario_.seed);
@@ -258,24 +184,11 @@ class Viewer final {
                                                     "Severe"};
     ImGui::Combo("Turbulence", &turbulence_, TURBULENCE.data(),
                  static_cast<int>(TURBULENCE.size()));
-    if (ImGui::Button("Restart", ImVec2(-1.0f, 0.0f))) {
+    if (viewing::draw_run_buttons(InOut(quitting_))) {
       restart();
       return;
     }
-    if (ImGui::Button("Quit (esc)", ImVec2(-1.0f, 0.0f))) {
-      quitting_ = true;
-    }
-
-    ImGui::SeparatorText("Time");
-    ImGui::Text("Simulated  %8.1f s", now());
-    if (ImGui::Button(driver.paused() ? "Resume (space)" : "Pause (space)",
-                      ImVec2(-1.0f, 0.0f))) {
-      toggle_pause();
-    }
-    if (ImGui::SliderFloat("Speed", &speed_, 0.25f, 60.0f, "%.2fx",
-                           ImGuiSliderFlags_Logarithmic)) {
-      driver.set_speed(speed_);
-    }
+    viewing::draw_time_controls(InOut(*session_), InOut(speed_), 60.0f);
 
     ImGui::SeparatorText("Aircraft");
     ImGui::TextColored(GREY, "Single pass     %zu",
@@ -454,11 +367,12 @@ class Viewer final {
     world.store_of<AirState>().for_each([&](Entity entity,
                                             const AirState& state) {
       if (world.store_of<RigidBody>().maybe_component_of(entity)) {
-        (is_fighter(entity) ? fighters : airliners).append(state.position);
+        append(state.position,
+               InOut(is_fighter(entity) ? fighters : airliners));
       } else if (world.store_of<AirStateRate>().maybe_component_of(entity)) {
-        precise.append(state.position);
+        append(state.position, InOut(precise));
       } else {
-        simple.append(state.position);
+        append(state.position, InOut(simple));
       }
     });
     if (fit_ &&
@@ -481,14 +395,15 @@ class Viewer final {
               world.store_of<Route>().maybe_component_of(followed)) {
         Scatter waypoints;
         for (const Position& waypoint : route->waypoints) {
-          waypoints.append(waypoint);
+          append(waypoint, InOut(waypoints));
         }
-        waypoints.append(route->waypoints.front());
+        append(route->waypoints.front(), InOut(waypoints));
         ImPlot::SetNextLineStyle(ImVec4(1.0f, 0.9f, 0.3f, 0.5f), scale_);
         ImPlot::PlotLine("Route", waypoints.x.data(), waypoints.y.data(),
                          waypoints.size());
         Scatter next;
-        next.append(route->waypoints[route->next % route->waypoints.size()]);
+        append(route->waypoints[route->next % route->waypoints.size()],
+               InOut(next));
         ImPlot::SetNextMarkerStyle(ImPlotMarker_Cross, 8.0f * scale_, YELLOW,
                                    2.0f * scale_, YELLOW);
         ImPlot::PlotScatter("Next waypoint", next.x.data(), next.y.data(), 1);
@@ -503,11 +418,9 @@ class Viewer final {
                        history.trail.size());
     }
 
-    auto plot = [this](const char* label, const Scatter& scatter,
+    auto plot = [this](std::string_view label, const Scatter& scatter,
                        ImPlotMarker marker, float size, ImVec4 color) {
-      ImPlot::SetNextMarkerStyle(marker, size * scale_, color, scale_, color);
-      ImPlot::PlotScatter(label, scatter.x.data(), scatter.y.data(),
-                          scatter.size());
+      viewing::plot_scatter(label, scatter, marker, size, color, color, scale_);
     };
     plot("Single pass", simple, ImPlotMarker_Circle, 1.5f, GREY);
     plot("Runge-Kutta 4", precise, ImPlotMarker_Circle, 2.5f, TEAL);
@@ -538,26 +451,16 @@ auto main(int argc, char** argv) -> int {
   viewing::WindowOptions options{.title = "Flight"};
   std::vector<std::string_view> arguments =
       viewing::parse_window_options(argc, argv, InOut(options));
-  flight::Scenario scenario{
-      .aircraft = 2000, .precise = 20, .rigid = 4, .fighters = 4};
-  auto number = [&](std::size_t i) {
-    return std::atoll(std::string{arguments[i]}.c_str());
+  auto integer = [&](std::size_t index, std::int64_t fallback) {
+    return viewing::parse_integer(arguments, index, fallback);
   };
-  if (arguments.size() > 0) {
-    scenario.aircraft = static_cast<int>(number(0));
-  }
-  if (arguments.size() > 1) {
-    scenario.precise = static_cast<int>(number(1));
-  }
-  if (arguments.size() > 2) {
-    scenario.rigid = static_cast<int>(number(2));
-  }
-  if (arguments.size() > 3) {
-    scenario.fighters = static_cast<int>(number(3));
-  }
-  if (arguments.size() > 4) {
-    scenario.seed = static_cast<std::uint64_t>(number(4));
-  }
+  flight::Scenario scenario{
+      .seed = static_cast<std::uint64_t>(integer(4, 1)),
+      .aircraft = static_cast<int>(integer(0, 2000)),
+      .precise = static_cast<int>(integer(1, 20)),
+      .rigid = static_cast<int>(integer(2, 4)),
+      .fighters = static_cast<int>(integer(3, 4)),
+  };
   return viewing::run(
       options, [&](float scale) { return flight::Viewer{scenario, scale}; });
 }
