@@ -102,6 +102,18 @@ cc_test(
 )
 
 cc_test(
+    name = "openscenario_test",
+    size = "small",
+    srcs = ["openscenario_test.cpp"],
+    copts = COPTS,
+    data = glob(["scenarios/**"]),
+    deps = [
+        "//model:openscenario",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
     name = "opendrive_reference_test",
     size = "small",
     srcs = ["opendrive_reference_test.cpp"],

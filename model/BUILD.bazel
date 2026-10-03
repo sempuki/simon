@@ -410,6 +410,18 @@ cc_library(
 )
 
 cc_library(
+    name = "openscenario",
+    srcs = ["openscenario.cpp"],
+    hdrs = ["openscenario.hpp"],
+    copts = COPTS,
+    deps = [
+        "@lib//base:core",
+        "@lib//base:status",
+        "@pugixml",
+    ],
+)
+
+cc_library(
     name = "random",
     hdrs = ["random.hpp"],
     copts = COPTS,
