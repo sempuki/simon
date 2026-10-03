@@ -44,6 +44,19 @@ cc_binary(
     ],
 )
 
+cc_binary(
+    name = "automotive_benchmark",
+    srcs = ["automotive_benchmark.cpp"],
+    copts = COPTS,
+    data = ["roads/rings.xodr"],
+    deps = [
+        ":automotive_library",
+        "//framework:benchmarking",
+        "//framework:vocabulary",
+        "@lib//base:core",
+    ],
+)
+
 cc_test(
     name = "automotive_test",
     size = "small",

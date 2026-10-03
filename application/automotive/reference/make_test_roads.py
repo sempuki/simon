@@ -14,6 +14,8 @@ the second opening a right lane. paramPoly3.xodr has two parametric cubic roads,
 one over arcLength, whose arc length over its range is its length, and one
 normalized, at map coordinates, 500 km east and 5,400 km north. ring.xodr is
 two half circles leading into each other, two lanes each way, for traffic.
+rings.xodr is 100 such rings of 1 km radius, three lanes each way, for the
+scale benchmark.
 
   pip install numpy
   python application/automotive/reference/make_test_roads.py
@@ -204,21 +206,21 @@ def poly_road(road_id, start, u, v, normalized):
             % (road_id, road_id, piece['length'], geometry_xml(piece), lanes))
 
 
-def ring():
-    """Two half circles of 100 m radius, each road leading into the other at
-    both ends, with two lanes each way linked across."""
+def ring(first_id=10, center=(0.0, 0.0), radius=100.0, lanes_each_way=2):
+    """Two half circles of `radius` about `center`, each road leading into
+    the other at both ends, with lanes each way linked across."""
     def half(road_id, other, start):
         x, y, hdg = start
         piece = {'kind': 'arc', 's': 0.0, 'x': x, 'y': y, 'hdg': hdg,
-                 'length': math.pi * 100.0, 'curvature': 0.01}
+                 'length': math.pi * radius, 'curvature': 1.0 / radius}
+        side = lambda sign: ''.join(
+            lane_xml(sign * i, 'driving', [(0, 3.5, 0, 0, 0)], sign * i, sign * i)
+            for i in range(1, lanes_each_way + 1))
         lanes = ('      <laneSection s="0">\n'
-                 '        <left>%s%s</left>\n'
+                 '        <left>%s</left>\n'
                  '        <center><lane id="0" type="none"/></center>\n'
-                 '        <right>%s%s</right>\n      </laneSection>\n'
-                 % (lane_xml(1, 'driving', [(0, 3.5, 0, 0, 0)], 1, 1),
-                    lane_xml(2, 'driving', [(0, 3.5, 0, 0, 0)], 2, 2),
-                    lane_xml(-1, 'driving', [(0, 3.5, 0, 0, 0)], -1, -1),
-                    lane_xml(-2, 'driving', [(0, 3.5, 0, 0, 0)], -2, -2)))
+                 '        <right>%s</right>\n      </laneSection>\n'
+                 % (side(1), side(-1)))
         return ('  <road name="ring %s" id="%s" length="%.17g" junction="-1">\n'
                 '    <link>\n'
                 '      <predecessor elementType="road" elementId="%s" contactPoint="end"/>\n'
@@ -228,8 +230,20 @@ def ring():
                 '    <lanes>\n%s    </lanes>\n  </road>\n'
                 % (road_id, road_id, piece['length'], other, other,
                    geometry_xml(piece), lanes))
-    return [half('10', '11', (0.0, -100.0, 0.0)),
-            half('11', '10', (0.0, 100.0, math.pi))]
+    a, b = str(first_id), str(first_id + 1)
+    cx, cy = center
+    return [half(a, b, (cx, cy - radius, 0.0)),
+            half(b, a, (cx, cy + radius, math.pi))]
+
+
+def rings():
+    """100 rings of 1 km radius, three lanes each way, 2.5 km apart on a
+    grid: 3,770 km of lanes, room for 100,000 vehicles at highway spacing."""
+    roads = []
+    for k in range(100):
+        roads += ring(1000 + 2 * k, (2500.0 * (k % 10), 2500.0 * (k // 10)),
+                      1000.0, 3)
+    return roads
 
 
 def document(roads):
@@ -245,6 +259,8 @@ def main():
         f.write(document([curves()]))
     with open(os.path.join(roads, 'ring.xodr'), 'w') as f:
         f.write(document(ring()))
+    with open(os.path.join(roads, 'rings.xodr'), 'w') as f:
+        f.write(document(rings()))
     with open(os.path.join(roads, 'paramPoly3.xodr'), 'w') as f:
         f.write(document([
             poly_road('2', (5.0, -3.0, 0.1), arc_length_u((0.0, 0.0, 0.004, -3e-5)),
