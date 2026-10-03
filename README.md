@@ -195,16 +195,16 @@ bazel test //model:wind_test
 
 | Rigid 737s | Flat Earth | Round Earth |
 |---:|---:|---:|
-| 100 | 1.19 µs | 2.26 µs |
-| 1,000 | 1.18 µs | 2.27 µs |
-| 10,000 | 1.23 µs | 2.37 µs |
+| 100 | 1.22 µs | 2.03 µs |
+| 1,000 | 1.16 µs | 2.02 µs |
+| 10,000 | 1.19 µs | 2.06 µs |
 
 The cost per aircraft-step stays flat with population. JSBSim takes 9.2 µs a
 frame for one 737, timed through its Python module. The comparison is rough,
 since JSBSim's frame also runs ground reactions and its property tree. Even so,
 the application evaluates the aircraft four times a step to JSBSim's once and
-is 4 times faster round the Earth, and 7.8 times over a flat one. One thread
-flies about 6,700 rigid 737s in real time over a flat Earth.
+is 4.6 times faster round the Earth, and 7.9 times over a flat one. One
+thread flies about 6,900 rigid 737s in real time over a flat Earth.
 
 ```sh
 bazel run -c opt //application/flight:rigid_benchmark
@@ -216,12 +216,12 @@ Point-mass aircraft fly routes under an autopilot, at 20 ms steps:
 
 | Aircraft | Single pass | Runge-Kutta 4 |
 |---:|---:|---:|
-| 1,000 | 0.07 ms | 0.17 ms |
-| 10,000 | 0.72 ms | 1.87 ms |
-| 100,000 | 7.25 ms | 19.1 ms |
+| 1,000 | 0.06 ms | 0.17 ms |
+| 10,000 | 0.63 ms | 1.89 ms |
+| 100,000 | 6.27 ms | 19.2 ms |
 
-A single-pass aircraft costs about 73 ns a step at any population, so 100,000
-of them run 2.8 times faster than real time.
+A single-pass aircraft costs about 63 ns a step at any population, so 100,000
+of them run 3.2 times faster than real time.
 
 ```sh
 bazel run -c opt //application/flight:flight_benchmark
@@ -235,10 +235,10 @@ level it doesn't use. One world at 100,000 aircraft:
 
 | Aircraft | ms per step | Share |
 |---|---:|---:|
-| 98,900 single pass | 7.25 | 95.8% |
-| 1,000 Runge-Kutta 4 | 0.18 | 2.3% |
-| 100 rigid 737s | 0.14 | 1.8% |
-| All | 7.57 | |
+| 98,900 single pass | 6.20 | 95.3% |
+| 1,000 Runge-Kutta 4 | 0.18 | 2.7% |
+| 100 rigid 737s | 0.13 | 2.0% |
+| All | 6.50 | |
 
 The single-pass aircraft cost the same per aircraft as they do alone. The
 rigid 737s fly the same routes as everyone else, under a deliberately small

@@ -2325,22 +2325,22 @@ and once with every aircraft on Runge-Kutta 4. GCC, ms per step:
 
 | Aircraft | Single pass | ns per entity-step | Runge-Kutta 4 | ns per entity-step |
 |---:|---:|---:|---:|---:|
-| 1,000 | 0.07 | 68 | 0.17 | 167 |
-| 10,000 | 0.72 | 72 | 1.87 | 187 |
-| 100,000 | 7.25 | 73 | 19.1 | 191 |
-| 100,000, 4 contending threads | 8.00 | 80 | 29.9 | 299 |
+| 1,000 | 0.06 | 59 | 0.17 | 170 |
+| 10,000 | 0.63 | 63 | 1.89 | 189 |
+| 100,000 | 6.27 | 63 | 19.2 | 192 |
+| 100,000, 4 contending threads | 7.25 | 73 | 32.1 | 321 |
 
 - **The single-pass model is bound by computation.** Cost per aircraft is
   nearly flat from 1,000 to 100,000, and four contending threads slow it only
-  1.1 times. `Fly` is three quarters of the step, and three `sincos` calls are
+  1.2 times. `Fly` is three quarters of the step, and three `sincos` calls are
   most of `Fly`.
-- **Runge-Kutta 4 costs 2.6 times as much,** and is bound by memory under
-  contention (1.6 times slower), because its copies of the start state and
+- **Runge-Kutta 4 costs 3.1 times as much,** and is bound by memory under
+  contention (1.7 times slower), because its copies of the start state and
   four stages' rates stream through memory every step.
-- **Two changes took the single-pass step from 8.34 to 7.25 ms,** and the
-  Runge-Kutta 4 step from 29.8 to 19.1 ms. The rates take each sine and
-  cosine once, and `fly` gets the new velocity from the rate's derivative,
-  not more trigonometry. `wrap` calls `std::remainder` only when a heading
+- **The single pass takes 6.27 ms and Runge-Kutta 4 19.2 ms.** The rates
+  take each sine and cosine once, and `fly` gets the new velocity from the
+  rate's derivative, not more trigonometry, and its direction's cosine by a
+  square root rather than `hypot`. `wrap` calls `std::remainder` only when a heading
   leaves [-π, π]. `StandardAirTable`, the atmosphere tabulated every 100 m of
   geopotential altitude (within a few parts in 10^5), replaced the power and
   exponential of `standard_air`; it saved 6% of `Fly`, and 20% of Runge-Kutta
@@ -2500,12 +2500,12 @@ at 8 ms steps, each on its own. GCC, per aircraft per step:
 
 | Aircraft | Flat Earth | Round Earth |
 |---:|---:|---:|
-| 100 | 1.19 µs | 2.26 µs |
-| 1,000 | 1.18 µs | 2.27 µs |
-| 10,000 | 1.23 µs | 2.37 µs |
+| 100 | 1.22 µs | 2.03 µs |
+| 1,000 | 1.16 µs | 2.02 µs |
+| 10,000 | 1.19 µs | 2.06 µs |
 
-- **The cost is flat with population,** so one thread flies about 6,700
-  rigid 737s in real time over a flat Earth, and 3,500 round one. `Rigid`
+- **The cost is flat with population,** so one thread flies about 6,900
+  rigid 737s in real time over a flat Earth, and 3,900 round one. `Rigid`
   is two thirds to seven tenths of it: four stages, each building up the
   aerodynamics.
 - **A stage finds the body's motion once.** It turns the attitude into a
@@ -2518,11 +2518,15 @@ at 8 ms steps, each on its own. GCC, per aircraft per step:
   module from its own trim, with one instance per aircraft. Its frame does
   work simon's does not, such as ground reactions and its property tree, so
   the comparison is rough; simon evaluates the aircraft four times a step to
-  JSBSim's once and is still 4 times faster round the Earth, and 7.8 times
-  over a flat one.
-- **The round Earth costs 90% more.** Each stage finds the body's place on
-  it once, its geodetic position, local frame and the Earth's turn, in
-  `Earth::place`, which took the round Earth from 3.57 to 2.81 µs.
+  JSBSim's once and is still 4.6 times faster round the Earth, and 7.9
+  times over a flat one.
+- **The round Earth costs 75% more.** Each stage finds the body's place on
+  it once, its altitude, local frame and the Earth's turn, in `Earth::place`.
+  `wgs84::locate` gives the local frame's sines and cosines straight from
+  Heikkinen's closed form, with no angles to take them of.
+- **The mass balance sums six terms.** `BurnFuel` recomputes it every step
+  as the fuel burns, summing the inertia tensor's six distinct terms rather
+  than a matrix per mass: 50 ns a step for the 737.
 
 Building it turned up JSBSim behaviors that a comparison has to allow for,
 all noted where they matter: a frame starts by moving the state on, so
@@ -2610,7 +2614,7 @@ The largest distance from JSBSim at 0.125 ms over 30 s:
   times, and the throttle step, by 4 times. In the hold and the rudder
   doublet JSBSim at 8 ms is closer, both being under simon's floor of 4 mm.
 
-A rigid 737 costs 1.18 µs per aircraft-step flat and 2.27 µs round at 1,000;
+A rigid 737 costs 1.16 µs per aircraft-step flat and 2.02 µs round at 1,000;
 the F-16's sensing costs it nothing.
 
 #### Trim
@@ -2687,14 +2691,14 @@ rigid. At 100,000 aircraft, GCC, 20 ms steps:
 
 | Aircraft | Systems | ms per step | Share |
 |---|---|---:|---:|
-| 98,900 single pass | `FollowRoute`, `FlyAutopilot`, `Actuate`, `Fly` | 7.25 | 95.8% |
-| 1,000 Runge-Kutta 4 | `Continuous(AirState)` | 0.18 | 2.3% |
-| 100 rigid 737s | `FlySurfaces` to `FollowRigidBody` | 0.14 | 1.8% |
-| All | | 7.57 | |
+| 98,900 single pass | `FollowRoute`, `FlyAutopilot`, `Actuate`, `Fly` | 6.20 | 95.3% |
+| 1,000 Runge-Kutta 4 | `Continuous(AirState)` | 0.18 | 2.7% |
+| 100 rigid 737s | `FlySurfaces` to `FollowRigidBody` | 0.13 | 2.0% |
+| All | | 6.50 | |
 
-One thread runs it 2.6 times faster than real time. Each level costs what
+One thread runs it 3.1 times faster than real time. Each level costs what
 its own aircraft cost, and nothing more: the single-pass aircraft run as
-fast as they do alone (7.25 ms at 100,000), because each level's systems are
+fast as they do alone (6.27 ms at 100,000), because each level's systems are
 driven by components only its aircraft have.
 
 `bazel run -c opt //application/flight:viewer` watches a mixed world under
@@ -2718,8 +2722,8 @@ its own.
 Wind is opt in, like every level. A scenario's `wind` is a
 `model::WindField`: a steady wind, the same everywhere, and turbulence of a
 severity. By default the air is still, no aircraft has a `Wind`, and every
-level costs what it did: 1.19 µs per rigid aircraft-step at 1,000 over a flat
-Earth, and 7.56 ms per step for the mixed 100,000.
+level costs what it would without wind: 1.16 µs per rigid aircraft-step at
+1,000 over a flat Earth, and 6.50 ms per step for the mixed 100,000.
 
 In moving air each aircraft has a `Wind`: the air's velocity relative to the
 Earth, in the local north-east-down frame, and the rotation turbulence gives
