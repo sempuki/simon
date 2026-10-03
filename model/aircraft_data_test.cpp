@@ -185,6 +185,15 @@ end
                ContainsSubstring("increasing"));
   }
 
+  SECTION("ShouldRefuseGivenNonFiniteNumber") {
+    std::string text = GLIDER;
+    text.replace(text.find("    0.2 1.2"), 11, "    nan 1.2");
+    auto data = parse_aircraft(text);
+    REQUIRE_FALSE(data);
+    CHECK_THAT(std::string{data.error().message()},
+               ContainsSubstring("finite"));
+  }
+
   SECTION("ShouldRefuseGivenEngineWithoutThrustTable") {
     std::string text = GLIDER;
     std::size_t from = text.find("  military_thrust_factor");

@@ -155,11 +155,14 @@ class Table1 final {
   }
 
   // Locates `x` among `breakpoints`: the breakpoint at or below it, and the
-  // fraction of the way to the next one, in [0, 1). Clamped to the ends.
+  // fraction of the way to the next one, in [0, 1). Clamped to the ends. NaN
+  // compares false with every breakpoint, so the first test is written to
+  // take it to the first breakpoint, where the rest of the search would take
+  // it past the last.
   static auto locate(const std::vector<BreakpointType>& breakpoints,
                      const BreakpointType& x)
       -> std::pair<std::size_t, double> {
-    if (x <= breakpoints.front()) {
+    if (!(x > breakpoints.front())) {
       return {0, 0.0};
     }
     if (x >= breakpoints.back()) {

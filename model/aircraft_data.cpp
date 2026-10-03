@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cmath>
 #include <fstream>
 #include <functional>
 #include <sstream>
@@ -175,6 +176,9 @@ class Parser final {
         std::from_chars(word.data(), word.data() + word.size(), value);
     if (error != std::errc{} || end != word.data() + word.size()) {
       return fail("`" + std::string{word} + "` is not a number");
+    }
+    if (!std::isfinite(value)) {
+      return fail("`" + std::string{word} + "` is not a finite number");
     }
     return value;
   }

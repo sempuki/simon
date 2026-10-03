@@ -4,6 +4,7 @@
 #include "framework/vocabulary.hpp"
 
 #include <cmath>
+#include <limits>
 
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
@@ -133,6 +134,10 @@ TEST_CASE("Table1") {
     CHECK(constant(-5.0) == 7.0);
     CHECK(constant(5.0) == 7.0);
   }
+
+  SECTION("ShouldStayInBoundsGivenNaN") {
+    CHECK(table(std::numeric_limits<double>::quiet_NaN()) == 0.0);
+  }
 }
 
 TEST_CASE("Table2") {
@@ -147,6 +152,12 @@ TEST_CASE("Table2") {
   SECTION("ShouldClampGivenPointOutsideTable") {
     CHECK_THAT(table(2.0, 5.0), WithinAbs(21.0, 1e-12));
     CHECK_THAT(table(-1.0, 0.5), WithinAbs(5.0, 1e-12));
+  }
+
+  SECTION("ShouldStayInBoundsGivenNaN") {
+    double nan = std::numeric_limits<double>::quiet_NaN();
+    CHECK_THAT(table(nan, 0.5), WithinAbs(5.0, 1e-12));
+    CHECK_THAT(table(0.5, nan), WithinAbs(0.5, 1e-12));
   }
 }
 
