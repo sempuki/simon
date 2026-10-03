@@ -9,9 +9,9 @@
 #include <string_view>
 #include <vector>
 
-#include "model/openscenario.hpp"
 #include "model/road.hpp"
 #include "model/road_placement.hpp"
+#include "scenario/openscenario.hpp"
 
 // Runs an OpenSCENARIO storyboard (see model/REFERENCES.md): its elements'
 // states, standby, running and complete, and the start, end, stop and skip
@@ -27,12 +27,12 @@
 // running action of the same domain, longitudinal or lateral. A condition's
 // edge needs a value before it, so none fires on its first evaluation, and a
 // trigger that fires starts its conditions over.
-namespace simon::model::openscenario {
+namespace simon::scenario {
 
 // What the storyboard reads of each entity, as the last step left it.
 struct EntityState final {
-  RoadPlacement placement;
-  PlacementPose pose;
+  model::RoadPlacement placement;
+  model::PlacementPose pose;
   double speed = 0.0;         // m/s, along the heading.
   double acceleration = 0.0;  // m/s^2.
   double end_of_road = -1.0;  // s at the end of its road, -1 if not there.
@@ -65,7 +65,7 @@ class StoryboardPlayer final {
   };
 
   // The storyboard of `scenario` on `network`, both of which it keeps.
-  StoryboardPlayer(const Scenario& scenario, const RoadNetwork& network);
+  StoryboardPlayer(const Scenario& scenario, const model::RoadNetwork& network);
 
   // The entity named `name`'s index, or the entity count if none is.
   auto find_entity(std::string_view name) const -> std::size_t;
@@ -90,7 +90,8 @@ class StoryboardPlayer final {
 
   // Where `position` is, entities' positions as `entities` has them.
   auto locate(const Position& position,
-              std::span<const EntityState> entities) const -> RoadPlacement;
+              std::span<const EntityState> entities) const
+      -> model::RoadPlacement;
 
  private:
   enum class State : std::uint8_t { INIT, STANDBY, RUNNING, COMPLETE };
@@ -146,7 +147,7 @@ class StoryboardPlayer final {
       -> double;
 
   const Scenario* scenario_ = nullptr;
-  const RoadNetwork* network_ = nullptr;
+  const model::RoadNetwork* network_ = nullptr;
   std::vector<Element> elements_;  // The storyboard first.
   std::vector<std::pair<const Condition*, ConditionMemory>> memories_;
   std::vector<Parameter> parameters_;
@@ -162,4 +163,4 @@ class StoryboardPlayer final {
   std::vector<std::size_t> instant_;
 };
 
-}  // namespace simon::model::openscenario
+}  // namespace simon::scenario

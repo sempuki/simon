@@ -1,13 +1,15 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-#include "model/opendrive.hpp"
+#include "format/opendrive.hpp"
 
 #include <string>
 
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_string.hpp"
 
-namespace simon::model {
+namespace simon::format {
+
+using namespace model;
 
 namespace {
 
@@ -155,4 +157,4 @@ TEST_CASE("OpenDrive") {
   }
 }
 
-}  // namespace simon::model
+}  // namespace simon::format

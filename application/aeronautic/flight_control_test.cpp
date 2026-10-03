@@ -10,6 +10,7 @@
 
 #include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
+#include "format/aircraft_file.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/flight_control.hpp"
 #include "model/units.hpp"
@@ -55,7 +56,7 @@ auto name_of(FlightSignal signal) -> std::string {
 }  // namespace
 
 TEST_CASE("FlightControl737") {
-  auto aircraft = load_aircraft(std::string{BOEING_737});
+  auto aircraft = format::load_aircraft(std::string{BOEING_737});
   REQUIRE(aircraft);
   const FlightControlData& controls = aircraft->flight_controls;
   REQUIRE(controls.blocks.size() > 10);
@@ -109,7 +110,7 @@ TEST_CASE("FlightControl737") {
 }
 
 TEST_CASE("FlightControlF16") {
-  auto aircraft = load_aircraft(std::string{F16});
+  auto aircraft = format::load_aircraft(std::string{F16});
   REQUIRE(aircraft);
   const FlightControlData& controls = aircraft->flight_controls;
   std::vector<Row> rows = load_rows(

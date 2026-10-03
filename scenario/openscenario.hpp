@@ -5,41 +5,23 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <expected>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <variant>
 #include <vector>
 
-#include "base/status.hpp"
-
-// Reads scenarios from ASAM OpenSCENARIO 1.x files (see model/REFERENCES.md):
-// the entities, their vehicles from catalogs, and the storyboard that drives
-// them, its stories, acts, maneuver groups, maneuvers and events, and the
-// triggers that start and stop them. Parameters are substituted where they
-// are referred to as $name, and expressions ${...} are evaluated, as 1.1
-// defines them: numbers, parameters, + - * / %, parentheses and unary minus.
+// A scenario as ASAM OpenSCENARIO 1.x describes it (see model/REFERENCES.md):
+// the entities, their vehicles, and the storyboard that drives them, its
+// stories, acts, maneuver groups, maneuvers and events, and the triggers that
+// start and stop them. format/openscenario reads it from files.
 //
-// The subset read is what object-level driving needs: positions on lanes,
+// The subset is what object-level driving needs: positions on lanes,
 // roads and in the world; speed, lane change, lane offset, teleport and
 // parameter actions; and the conditions on time, speed, distance, headway,
 // position, the end of the road, leaving the road, parameters and the
-// storyboard's own states. Anything else that would change what happens is
-// refused, so that a scenario never runs other than as written; what only
-// shows a scenario, its scene graph and 3D models, is left out.
-namespace simon::model::openscenario {
-
-// The reasons a scenario could not be read.
-enum class ScenarioError {
-  UNREADABLE,   // A file could not be opened.
-  MALFORMED,    // The message says where and how.
-  UNSUPPORTED,  // An element simon does not run; the message names it.
-  COUNT,
-};
-
-inline constexpr std::size_t SCENARIO_ERROR_COUNT =
-    static_cast<std::size_t>(ScenarioError::COUNT);
+// storyboard's own states.
+namespace simon::scenario {
 
 //-- Positions ----------------------------------------------------------------
 
@@ -395,27 +377,4 @@ struct Scenario final {
   Storyboard storyboard;
 };
 
-// Reads the scenario that `text` describes, its relative paths, to the road
-// network and catalogs, from `directory`.
-auto parse_openscenario(std::string_view text, const std::string& directory)
-    -> std::expected<Scenario, lib::Status>;
-
-// Reads the scenario in the file at `path`.
-auto load_openscenario(const std::string& path)
-    -> std::expected<Scenario, lib::Status>;
-
-// The value of the expression `text` (the body of ${...}) with
-// `parameters`' values.
-auto evaluate_expression(std::string_view text,
-                         const std::vector<Parameter>& parameters)
-    -> std::expected<double, std::string>;
-
-}  // namespace simon::model::openscenario
-
-// Messages for each ScenarioError, defined in openscenario.cpp.
-template <>
-const std::array<lib::StatusConditionEntry,
-                 simon::model::openscenario::SCENARIO_ERROR_COUNT>
-    lib::EnumStatusKindConditionMixin<
-        simon::model::openscenario::ScenarioError,
-        simon::model::openscenario::SCENARIO_ERROR_COUNT>::conditions_;
+}  // namespace simon::scenario

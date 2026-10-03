@@ -15,7 +15,7 @@
 //   F = D sin(C atan(B x - E (B x - atan(B x)))) + S_V,   x = slip + S_H
 //
 // MagicFormulaTire has the whole of 5.2's steady state as TNO's tire
-// property files (.tir) give it, read by model/tire_file. CommonRoadTire has
+// property files (.tir) give it, read by format/tire_file. CommonRoadTire has
 // the subset CommonRoad's vehicle models use (Althoff and Wuersching,
 // "CommonRoad: Vehicle Models"): every scaling factor 1, the load dependence
 // beyond the linear and the aligning moment left out, and the lateral shifts

@@ -11,7 +11,7 @@ namespace simon::automotive {
 
 namespace {
 
-namespace osc = model::openscenario;
+namespace osc = scenario;
 
 constexpr double SMALL = 1e-10;
 
@@ -239,8 +239,7 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
         lateral.transition.target = sign(lane) * change->target_offset;
         lateral.transition.end =
             change->dynamics.dimension == osc::DynamicsDimension::RATE
-                ? lateral.transition.compute_end_at_peak(
-                      change->dynamics.value)
+                ? lateral.transition.compute_end_at_peak(change->dynamics.value)
                 : change->dynamics.value;
         motion.change = lateral;
       } else if (const auto* offset =

@@ -10,6 +10,7 @@
 
 #include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
+#include "format/aircraft_file.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/earth.hpp"
 #include "model/rigid_aircraft.hpp"
@@ -85,7 +86,7 @@ TEST_CASE("RigidBody737") {
     CHECK(worst_angular < 1e-12);
   }
 
-  auto aircraft = load_aircraft(std::string{BOEING_737});
+  auto aircraft = format::load_aircraft(std::string{BOEING_737});
   REQUIRE(aircraft);
   Earth earth = Earth::round(wgs84::Geodetic{});
   StandardAirTable air;

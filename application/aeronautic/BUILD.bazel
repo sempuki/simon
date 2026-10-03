@@ -17,6 +17,7 @@ cc_library(
     ],
     copts = COPTS,
     deps = [
+        "//format:aircraft_file",
         "//model:trim",
         "//framework:vocabulary",
         "//engine:lifecycle",
@@ -58,6 +59,7 @@ cc_test(
         "aircraft/f16.aircraft",
     ],
     deps = [
+        "//format:aircraft_file",
         "//framework:vocabulary",
         ":aeronautic_library",
         "//engine:driver",
@@ -91,6 +93,7 @@ cc_test(
         "reference/jsbsim_f16_aero.csv",
     ],
     deps = [
+        "//format:aircraft_file",
         ":testing",
         "//model:aerodynamics",
         "//model:aircraft_data",
@@ -109,6 +112,7 @@ cc_test(
         "reference/jsbsim_737_rigid_body.csv",
     ],
     deps = [
+        "//format:aircraft_file",
         ":testing",
         "//model:aircraft_data",
         "//model:earth",
@@ -131,6 +135,7 @@ cc_test(
         "reference/jsbsim_f16_turbine.csv",
     ],
     deps = [
+        "//format:aircraft_file",
         ":testing",
         "//model:aircraft_data",
         "//model:turbine",
@@ -151,6 +156,7 @@ cc_test(
         "reference/jsbsim_f16_flight_control.csv",
     ],
     deps = [
+        "//format:aircraft_file",
         ":testing",
         "//model:aircraft_data",
         "//model:flight_control",
@@ -174,6 +180,7 @@ cc_test(
         "reference/jsbsim_f16_check_signals.csv",
     ],
     deps = [
+        "//format:aircraft_file",
         ":testing",
         "//framework:vocabulary",
         ":aeronautic_library",
@@ -250,6 +257,7 @@ cc_binary(
     copts = COPTS,
     data = ["aircraft/737.aircraft"],
     deps = [
+        "//format:aircraft_file",
         "//framework:vocabulary",
         ":aeronautic_library",
         "//framework",
@@ -264,6 +272,7 @@ cc_binary(
     copts = COPTS,
     data = ["aircraft/737.aircraft"],
     deps = [
+        "//format:aircraft_file",
         "//framework:vocabulary",
         ":aeronautic_library",
         "//framework:benchmarking",
@@ -283,6 +292,7 @@ cc_test(
         "reference/jsbsim_f16_check_initial.csv",
     ],
     deps = [
+        "//format:aircraft_file",
         ":testing",
         "//model:aircraft_data",
         "//model:atmosphere",

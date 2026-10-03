@@ -1,6 +1,7 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "application/aeronautic/simulation.hpp"
+#include "format/aircraft_file.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -249,12 +250,12 @@ auto build_scenario(const Scenario& scenario, const RigidTypes& types,
 auto Simulation::configure() -> engine::PhaseResult {
   if (scenario_.rigid > 0) {
     RETURN_OR_ASSIGN(model::AircraftData loaded,
-                     model::load_aircraft(scenario_.rigid_aircraft));
+                     format::load_aircraft(scenario_.rigid_aircraft));
     airliner_ = std::make_unique<model::AircraftData>(std::move(loaded));
   }
   if (scenario_.fighters > 0) {
     RETURN_OR_ASSIGN(model::AircraftData loaded,
-                     model::load_aircraft(scenario_.fighter_aircraft));
+                     format::load_aircraft(scenario_.fighter_aircraft));
     fighter_ = std::make_unique<model::AircraftData>(std::move(loaded));
   }
   RETURN_IF_UNEXPECTED(build_world(scenario_, Out(world_)));

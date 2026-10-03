@@ -19,7 +19,7 @@
 // lateral shape, lane heights, road marks, objects and signals are left out.
 // The deprecated poly3 geometry and lanes given by their borders rather than
 // their widths are refused, as libOpenDRIVE refuses them.
-namespace simon::model {
+namespace simon::format {
 
 // The reasons a road network could not be read.
 enum class OpenDriveError {
@@ -33,18 +33,18 @@ inline constexpr std::size_t OPEN_DRIVE_ERROR_COUNT =
 
 // Reads the road network that `text` describes.
 auto parse_opendrive(std::string_view text)
-    -> std::expected<RoadNetwork, lib::Status>;
+    -> std::expected<model::RoadNetwork, lib::Status>;
 
 // Reads the road network in the file at `path`.
 auto load_opendrive(const std::string& path)
-    -> std::expected<RoadNetwork, lib::Status>;
+    -> std::expected<model::RoadNetwork, lib::Status>;
 
-}  // namespace simon::model
+}  // namespace simon::format
 
 // Messages for each OpenDriveError, defined in opendrive.cpp.
 template <>
 const std::array<lib::StatusConditionEntry,
-                 simon::model::OPEN_DRIVE_ERROR_COUNT>
+                 simon::format::OPEN_DRIVE_ERROR_COUNT>
     lib::EnumStatusKindConditionMixin<
-        simon::model::OpenDriveError,
-        simon::model::OPEN_DRIVE_ERROR_COUNT>::conditions_;
+        simon::format::OpenDriveError,
+        simon::format::OPEN_DRIVE_ERROR_COUNT>::conditions_;

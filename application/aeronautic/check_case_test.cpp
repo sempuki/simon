@@ -15,6 +15,7 @@
 #include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
+#include "format/aircraft_file.hpp"
 #include "framework/vocabulary.hpp"
 #include "model/trim.hpp"
 
@@ -323,7 +324,7 @@ struct Distances final {
 };
 
 auto measure(const Checked& checked, Case flown) -> Distances {
-  auto data = model::load_aircraft(std::string{checked.aircraft});
+  auto data = format::load_aircraft(std::string{checked.aircraft});
   REQUIRE(data);
   std::vector<Row> initial = load_rows(checked.initial);
   REQUIRE(initial.size() == 1);
@@ -392,7 +393,7 @@ TEST_CASE("CheckCases737InWind") {
 
 TEST_CASE("CheckCasesF16") {
   SECTION("ShouldMatchJsbsimGivenTrimmedMassBalance") {
-    auto data = model::load_aircraft(std::string{F16});
+    auto data = format::load_aircraft(std::string{F16});
     REQUIRE(data);
     std::vector<Row> initial = load_rows(F16_CASES.initial);
     REQUIRE(initial.size() == 1);
@@ -479,7 +480,7 @@ using HeldMassSchedule =
 // far JSBSim's own trim wanders at its reference frame, burning fuel.
 template <typename ScheduleType>
 auto hold(const Checked& checked) -> std::pair<Wander, Wander> {
-  auto data = model::load_aircraft(std::string{checked.aircraft});
+  auto data = format::load_aircraft(std::string{checked.aircraft});
   REQUIRE(data);
   std::vector<Row> initial = load_rows(checked.initial);
   REQUIRE(initial.size() == 1);

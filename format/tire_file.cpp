@@ -1,6 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-#include "model/tire_file.hpp"
+#include "format/tire_file.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -10,15 +10,18 @@
 #include <utility>
 
 template <>
-const std::array<lib::StatusConditionEntry, simon::model::TIRE_FILE_ERROR_COUNT>
+const std::array<lib::StatusConditionEntry,
+                 simon::format::TIRE_FILE_ERROR_COUNT>
     lib::EnumStatusKindConditionMixin<
-        simon::model::TireFileError,
-        simon::model::TIRE_FILE_ERROR_COUNT>::conditions_ = {
+        simon::format::TireFileError,
+        simon::format::TIRE_FILE_ERROR_COUNT>::conditions_ = {
         lib::StatusConditionEntry{"tire file unreadable"},
         lib::StatusConditionEntry{"tire file malformed"},
 };
 
-namespace simon::model {
+namespace simon::format {
+
+using namespace model;
 
 namespace {
 
@@ -245,4 +248,4 @@ auto load_tire_file(const std::string& path)
   return parse_tire_file(text.str());
 }
 
-}  // namespace simon::model
+}  // namespace simon::format

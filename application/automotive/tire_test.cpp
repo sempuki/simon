@@ -7,8 +7,8 @@
 
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
+#include "format/tire_file.hpp"
 #include "model/tire.hpp"
-#include "model/tire_file.hpp"
 
 // simon's Magic Formula 5.2 tire against Project Chrono's Pac02, on the
 // Sedan's tire, from the table reference/chrono_reference.cpp recorded.
@@ -31,7 +31,8 @@ using namespace testing;
 using model::MagicFormulaTire;
 
 auto load_sedan_tire() -> MagicFormulaTire {
-  auto tire = model::load_tire_file(std::string{TIRES} + "Sedan_Pac02Tire.tir");
+  auto tire =
+      format::load_tire_file(std::string{TIRES} + "Sedan_Pac02Tire.tir");
   REQUIRE(tire.has_value());
   return *tire;
 }
@@ -142,9 +143,9 @@ TEST_CASE("MagicFormulaTireAgainstChrono") {
       } else if (number(row, "gamma") != 0.0) {
         cambered = std::max(cambered, apart);
       } else {
-        ellipsis = std::max(
-            {ellipsis, relative(fx, number(row, "ellipsis_fx"), load),
-             relative(fy, number(row, "ellipsis_fy"), load)});
+        ellipsis =
+            std::max({ellipsis, relative(fx, number(row, "ellipsis_fx"), load),
+                      relative(fy, number(row, "ellipsis_fy"), load)});
       }
     }
     CAPTURE(clamped, cambered, ellipsis);

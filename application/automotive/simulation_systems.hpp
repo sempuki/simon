@@ -536,13 +536,13 @@ struct RunStoryboard final    //
           if (speed == nullptr || motion == nullptr || actor.entity >= count) {
             return;
           }
-          context.states[actor.entity] = model::openscenario::EntityState{
-              .placement = motion->placement,
-              .pose = model::compute_placement_pose(*context.roads,
-                                                    motion->placement),
-              .speed = speed->speed,
-              .acceleration = speed->acceleration,
-              .end_of_road = motion->end_of_road};
+          context.states[actor.entity] =
+              scenario::EntityState{.placement = motion->placement,
+                                    .pose = model::compute_placement_pose(
+                                        *context.roads, motion->placement),
+                                    .speed = speed->speed,
+                                    .acceleration = speed->acceleration,
+                                    .end_of_road = motion->end_of_road};
           finished.insert(finished.end(), speed->finished.begin(),
                           speed->finished.end());
           finished.insert(finished.end(), motion->finished.begin(),
@@ -572,20 +572,19 @@ struct RunStoryboard final    //
   // names its action alone.
   // A teleport is found where it is given, so that a position relative to
   // an entity teleported before it finds that entity where it went.
-  auto deal(model::openscenario::StoryboardOrders given, bool holding)
-      -> void {
+  auto deal(scenario::StoryboardOrders given, bool holding) -> void {
     ScenarioContext& context = *context_;
     for (ScenarioOrders& orders : orders_) {
       orders.stops.insert(orders.stops.end(), given.stops.begin(),
                           given.stops.end());
     }
-    for (const model::openscenario::ActionOrder& order : given.starts) {
+    for (const scenario::ActionOrder& order : given.starts) {
       if (order.entity >= orders_.size()) {
         continue;
       }
       orders_[order.entity].starts.push_back(order);
       if (const auto* teleport =
-              std::get_if<model::openscenario::TeleportAction>(order.action)) {
+              std::get_if<scenario::TeleportAction>(order.action)) {
         model::RoadPlacement placement =
             context.player->locate(teleport->position, context.states);
         orders_[order.entity].teleports.push_back(placement);

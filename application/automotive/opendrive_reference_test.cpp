@@ -13,9 +13,9 @@
 
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
+#include "format/opendrive.hpp"
 #include "framework/vocabulary.hpp"
 #include "model/lane_graph.hpp"
-#include "model/opendrive.hpp"
 #include "model/road.hpp"
 
 // simon's roads against libOpenDRIVE's, on the roads in
@@ -36,7 +36,7 @@ auto network_of(std::string_view file) -> const model::RoadNetwork& {
   auto found = networks.find(file);
   if (found == networks.end()) {
     auto network =
-        model::load_opendrive(std::string{ROADS} + std::string{file});
+        format::load_opendrive(std::string{ROADS} + std::string{file});
     REQUIRE(network);
     found = networks.emplace(std::string{file}, std::move(*network)).first;
   }

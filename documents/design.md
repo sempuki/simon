@@ -2065,17 +2065,29 @@ Portico for HLA.
 simon/
   framework/     Entity, ComponentStore, World, Spatial, names, builders, commands, Step, System, schedules
   engine/        Lifecycle, drivers, RateGate, EventQueue
-  model/         Reusable physics: kinematics, guidance, flight paths, atmosphere, control blocks (free functions)
+  model/         Reusable physics and maths, as free functions, and the data they work on: frames, the
+                 atmosphere and Earth, rigid bodies, aircraft and their engines, roads and lanes, tires,
+                 vehicles and drivers
+  format/        Readers from files into model/ and scenario/ data: OpenDRIVE, OpenSCENARIO, tire
+                 property files, converted aircraft
+  scenario/      Scenarios as OpenSCENARIO describes them, and the player that runs their storyboards
   application/
     hello/       Two bouncing balls, the first application
     missile/     Red drones against blue radars, launchers and interceptors
-    flight/      Aircraft flying routes under an autopilot, at two fidelity levels
+    aeronautic/  Aircraft flying routes, at several fidelity levels, checked against JSBSim
+    automotive/  Traffic, vehicle dynamics and scenarios on OpenDRIVE roads, checked against open references
+  tools/         Offline converters, such as JSBSim aircraft to simon's data
   documents/     This document
   2nd_party/lib  Shared core libraries (submodule)
 ```
 
 The prototype (`framework/`, `component/` and the top-level `simulation.hpp`)
 was retired in step 1. Its event queue moved to `engine/`.
+
+`model/` holds no file reading and no state that runs over time: a reader
+needs a parser, errors and a policy for what it refuses, and the scenario
+player keeps a storyboard's states from step to step. `scenario/` depends on
+`model/`, `format/` on both, and the applications on all three.
 
 ## Applications
 
@@ -2811,7 +2823,7 @@ done.
 #### Roads
 
 `model/road` holds roads as ASAM OpenDRIVE describes them, and
-`model/opendrive` reads them from OpenDRIVE files with pugixml. A road is a
+`format/opendrive` reads them from OpenDRIVE files with pugixml. A road is a
 reference line of lines, arcs, spirals and parametric cubics, with an
 elevation, a superelevation and a lane offset along it, and lane sections
 whose lanes have widths that are cubics in s. A point on a road is (s, t, h):
@@ -2950,7 +2962,7 @@ measures both as the standards measure them
 (`application/automotive/reference/chrono_reference.cpp` records Chrono).
 
 **The tire.** `model/tire` holds the whole of the Magic Formula 5.2's steady
-state, pure and combined slip and the aligning moment, and `model/tire_file`
+state, pure and combined slip and the aligning moment, and `format/tire_file`
 reads it from TNO tire property files (.tir). A tire on the right is the
 left one mirrored about its wheel plane, so that a pair's asymmetries cancel.
 CommonRoad's subset stays a tire of its own, since its cornering stiffness
@@ -3020,7 +3032,7 @@ not; that difference, up to 0.04 deg/g, is not yet explained.
 
 #### Scenarios against esmini
 
-`model/openscenario` reads ASAM OpenSCENARIO 1.x scenarios with pugixml:
+`format/openscenario` reads ASAM OpenSCENARIO 1.x scenarios with pugixml:
 parameters, substituted as $name and evaluated as ${...} expressions;
 vehicles from catalogs; positions on lanes and roads, relative to entities
 and in the world; speed, lane change, lane offset, teleport and parameter
@@ -3030,7 +3042,7 @@ Anything else that changes what happens, a controller, a route or a
 trajectory among them, is refused. A vehicle towing a
 trailer is refused too, since esmini makes the trailer an entity of its own.
 
-`model/storyboard` runs the storyboard: its elements' states and
+`scenario/storyboard` runs the storyboard: its elements' states and
 transitions, events by priority and execution count, and triggers, each
 condition on its edge and after its delay. `model/road_placement` places a
 vehicle by road, lane, s and offset, either way along any lane, and moves it

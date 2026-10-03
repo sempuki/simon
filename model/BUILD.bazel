@@ -116,14 +116,12 @@ cc_library(
 
 cc_library(
     name = "aircraft_data",
-    srcs = ["aircraft_data.cpp"],
     hdrs = ["aircraft_data.hpp"],
     copts = COPTS,
     deps = [
         ":aerodynamics",
         ":flight_control",
         ":units",
-        "@lib//base:status",
     ],
 )
 
@@ -377,48 +375,10 @@ cc_library(
 )
 
 cc_library(
-    name = "tire_file",
-    srcs = ["tire_file.cpp"],
-    hdrs = ["tire_file.hpp"],
-    copts = COPTS,
-    deps = [
-        ":tire",
-        "@lib//base:core",
-        "@lib//base:status",
-    ],
-)
-
-cc_library(
     name = "traffic",
     hdrs = ["traffic.hpp"],
     copts = COPTS,
     deps = [":units"],
-)
-
-cc_library(
-    name = "opendrive",
-    srcs = ["opendrive.cpp"],
-    hdrs = ["opendrive.hpp"],
-    copts = COPTS,
-    deps = [
-        ":road",
-        "//framework:vocabulary",
-        "@lib//base:core",
-        "@lib//base:status",
-        "@pugixml",
-    ],
-)
-
-cc_library(
-    name = "openscenario",
-    srcs = ["openscenario.cpp"],
-    hdrs = ["openscenario.hpp"],
-    copts = COPTS,
-    deps = [
-        "@lib//base:core",
-        "@lib//base:status",
-        "@pugixml",
-    ],
 )
 
 cc_library(
@@ -431,26 +391,6 @@ cc_library(
         ":units",
         "@lib//base:core",
     ],
-)
-
-cc_library(
-    name = "storyboard",
-    srcs = ["storyboard.cpp"],
-    hdrs = ["storyboard.hpp"],
-    copts = COPTS,
-    deps = [
-        ":openscenario",
-        ":road",
-        ":road_placement",
-        ":units",
-    ],
-)
-
-cc_library(
-    name = "transition",
-    hdrs = ["transition.hpp"],
-    copts = COPTS,
-    deps = [":openscenario"],
 )
 
 cc_library(
@@ -470,14 +410,12 @@ cc_library(
     ],
 ) for test in [
     "aerodynamics",
-    "aircraft_data",
     "atmosphere",
     "earth",
     "control",
     "flight_path",
     "guidance",
     "lane_graph",
-    "opendrive",
     "random",
     "road",
     "wind",

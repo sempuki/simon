@@ -6,7 +6,7 @@
 #include <cmath>
 #include <numbers>
 
-#include "model/openscenario.hpp"
+#include "scenario/openscenario.hpp"
 
 // A value moving from `start` to `target` as a parameter x runs from 0 to its
 // end c, by OpenSCENARIO's transition shapes (see model/REFERENCES.md), with
@@ -19,7 +19,7 @@
 //
 // The parameter is time, distance, or time at a rate, as an action's dynamics
 // say. With no length to run over, every shape is a step.
-namespace simon::model::openscenario {
+namespace simon::scenario {
 
 struct Transition final {
   // Whether the parameter has reached its end.
@@ -113,4 +113,4 @@ struct Transition final {
   double parameter = 0.0;
 };
 
-}  // namespace simon::model::openscenario
+}  // namespace simon::scenario

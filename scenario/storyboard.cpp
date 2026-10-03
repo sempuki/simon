@@ -1,6 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-#include "model/storyboard.hpp"
+#include "scenario/storyboard.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -10,7 +10,9 @@
 #include <type_traits>
 #include <variant>
 
-namespace simon::model::openscenario {
+namespace simon::scenario {
+
+using namespace model;
 
 namespace {
 
@@ -815,4 +817,4 @@ auto StoryboardPlayer::locate(const Position& position,
       position);
 }
 
-}  // namespace simon::model::openscenario
+}  // namespace simon::scenario

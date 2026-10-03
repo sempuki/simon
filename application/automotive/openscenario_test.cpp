@@ -5,7 +5,7 @@
 #include <variant>
 
 #include "base/testing.hpp"
-#include "model/openscenario.hpp"
+#include "format/openscenario.hpp"
 
 // Reading esmini's scenarios (see scenarios/LICENSE-ESMINI): their entities
 // from the vehicle catalog, parameters and expressions, and storyboards.
@@ -13,13 +13,13 @@ namespace simon::automotive {
 
 namespace {
 
-namespace osc = model::openscenario;
+namespace osc = scenario;
 
 constexpr std::string_view SCENARIOS = "application/automotive/scenarios/xosc/";
 
 auto load(std::string_view name) -> osc::Scenario {
   auto scenario =
-      osc::load_openscenario(std::string{SCENARIOS} + std::string{name});
+      format::load_openscenario(std::string{SCENARIOS} + std::string{name});
   if (!scenario) {
     FAIL(scenario.error().message());
   }
@@ -31,15 +31,14 @@ auto load(std::string_view name) -> osc::Scenario {
 TEST_CASE("OpenScenario") {
   SECTION("ShouldEvaluateExpressionsGivenParameters") {
     std::vector<osc::Parameter> parameters{{.name = "Speed", .value = "20"}};
-    CHECK(osc::evaluate_expression("250/3.6", parameters).value() ==
+    CHECK(format::evaluate_expression("250/3.6", parameters).value() ==
           250.0 / 3.6);
-    CHECK(
-        osc::evaluate_expression("-($Speed + 4) * 2 % 7", parameters).value() ==
-        std::fmod(-48.0, 7.0));
-    CHECK(osc::evaluate_expression("1.5e2 - $Speed", parameters).value() ==
+    CHECK(format::evaluate_expression("-($Speed + 4) * 2 % 7", parameters)
+              .value() == std::fmod(-48.0, 7.0));
+    CHECK(format::evaluate_expression("1.5e2 - $Speed", parameters).value() ==
           130.0);
-    CHECK(!osc::evaluate_expression("$Missing", parameters).has_value());
-    CHECK(!osc::evaluate_expression("(1 + 2", parameters).has_value());
+    CHECK(!format::evaluate_expression("$Missing", parameters).has_value());
+    CHECK(!format::evaluate_expression("(1 + 2", parameters).has_value());
   }
 
   SECTION("ShouldReadEntitiesFromTheCatalog") {
@@ -112,7 +111,7 @@ TEST_CASE("OpenScenario") {
         <RoutingAction/>
       </PrivateAction></Private></Actions></Init></Storyboard>
     </OpenSCENARIO>)";
-    auto scenario = osc::parse_openscenario(ROUTED, ".");
+    auto scenario = format::parse_openscenario(ROUTED, ".");
     REQUIRE(!scenario.has_value());
     CHECK(scenario.error().message().find("RoutingAction") !=
           std::string::npos);

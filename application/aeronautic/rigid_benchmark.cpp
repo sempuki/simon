@@ -27,6 +27,7 @@
 #include "application/aeronautic/simulation_components.hpp"
 #include "application/aeronautic/simulation_systems.hpp"
 #include "base/core.hpp"
+#include "format/aircraft_file.hpp"
 #include "framework/benchmarking.hpp"
 #include "framework/vocabulary.hpp"
 
@@ -144,7 +145,7 @@ auto main(int argc, char** argv) -> int {
     populations = {100, 1'000, 10'000};
   }
   auto data =
-      simon::model::load_aircraft(std::string{simon::aeronautic::BOEING_737});
+      simon::format::load_aircraft(std::string{simon::aeronautic::BOEING_737});
   if (!data) {
     std::println(stderr, "{}", data.error().message());
     return 1;

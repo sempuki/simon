@@ -11,9 +11,9 @@
 
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
+#include "format/tire_file.hpp"
 #include "model/multibody.hpp"
 #include "model/single_track.hpp"
-#include "model/tire_file.hpp"
 
 // simon's drift single-track model against Project Chrono's Sedan through
 // the handling maneuvers, from the table reference/chrono_reference.cpp
@@ -75,7 +75,8 @@ auto load_sedan() -> VehicleParameters {
   for (const Row& row : load_rows("chrono_sedan.csv")) {
     value[row.find("name")->second] = number(row, "value");
   }
-  auto tire = model::load_tire_file(std::string{TIRES} + "Sedan_Pac02Tire.tir");
+  auto tire =
+      format::load_tire_file(std::string{TIRES} + "Sedan_Pac02Tire.tir");
   REQUIRE(tire.has_value());
   // Chrono's Pac02 holds camber at zero whatever the wheel's lean, so the
   // tire here has no camber terms.

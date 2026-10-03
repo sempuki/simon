@@ -15,10 +15,10 @@
 #include "model/lane_graph.hpp"
 #include "model/road.hpp"
 #include "model/road_placement.hpp"
-#include "model/storyboard.hpp"
 #include "model/traffic.hpp"
-#include "model/transition.hpp"
 #include "model/units.hpp"
+#include "scenario/storyboard.hpp"
+#include "scenario/transition.hpp"
 
 // Vehicles drive a network of roads, each following its lane by the
 // Intelligent Driver Model and changing lanes by MOBIL. A vehicle's state is
@@ -104,9 +104,9 @@ inline auto pose(const VehiclePose& vehicle) -> model::Pose {
 // world.
 struct ScenarioContext final {
   const model::RoadNetwork* roads = nullptr;
-  const model::openscenario::Scenario* scenario = nullptr;
-  model::openscenario::StoryboardPlayer* player = nullptr;
-  std::vector<model::openscenario::EntityState> states;  // By entity.
+  const scenario::Scenario* scenario = nullptr;
+  scenario::StoryboardPlayer* player = nullptr;
+  std::vector<scenario::EntityState> states;  // By entity.
   bool started = false;
 };
 
@@ -121,7 +121,7 @@ struct ScenarioActor final {
 // handle, and actions to start.
 struct ScenarioOrders final {
   std::vector<std::uint32_t> stops;
-  std::vector<model::openscenario::ActionOrder> starts;
+  std::vector<scenario::ActionOrder> starts;
   // Where each teleport puts the vehicle, in the order given, each found
   // after the teleports before it, as a relative position needs.
   std::vector<model::RoadPlacement> teleports;
@@ -135,10 +135,10 @@ struct ScenarioOrders final {
 // target follows, for a relative target.
 struct SpeedChange final {
   std::uint32_t handle = 0;
-  model::openscenario::Transition transition;
+  scenario::Transition transition;
   std::optional<std::size_t> relative_to;
-  model::openscenario::RelativeTargetSpeed::Kind kind =
-      model::openscenario::RelativeTargetSpeed::Kind::DELTA;
+  scenario::RelativeTargetSpeed::Kind kind =
+      scenario::RelativeTargetSpeed::Kind::DELTA;
   double relative_value = 0.0;
   bool continuous = false;
   bool reached = false;
@@ -165,9 +165,8 @@ struct LateralChange final {
   std::uint32_t handle = 0;
   bool lane_change = true;
   int lane = 0;
-  model::openscenario::DynamicsDimension dimension =
-      model::openscenario::DynamicsDimension::TIME;
-  model::openscenario::Transition transition;
+  scenario::DynamicsDimension dimension = scenario::DynamicsDimension::TIME;
+  scenario::Transition transition;
 };
 
 // A vehicle on the road: where it is, the lateral action moving it, how long

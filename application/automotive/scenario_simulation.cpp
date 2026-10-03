@@ -1,10 +1,11 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "application/automotive/scenario_simulation.hpp"
+#include "format/openscenario.hpp"
 
 #include <utility>
 
-#include "model/opendrive.hpp"
+#include "format/opendrive.hpp"
 
 namespace simon::automotive {
 
@@ -12,15 +13,13 @@ ScenarioSimulation::ScenarioSimulation(std::string path)
     : path_{std::move(path)} {}
 
 auto ScenarioSimulation::configure() -> engine::PhaseResult {
-  RETURN_OR_ASSIGN(model::openscenario::Scenario scenario,
-                   model::openscenario::load_openscenario(path_));
-  scenario_ =
-      std::make_unique<model::openscenario::Scenario>(std::move(scenario));
+  RETURN_OR_ASSIGN(scenario::Scenario scenario,
+                   format::load_openscenario(path_));
+  scenario_ = std::make_unique<scenario::Scenario>(std::move(scenario));
   RETURN_OR_ASSIGN(model::RoadNetwork roads,
-                   model::load_opendrive(scenario_->road_network));
+                   format::load_opendrive(scenario_->road_network));
   roads_ = std::make_unique<model::RoadNetwork>(std::move(roads));
-  player_ = std::make_unique<model::openscenario::StoryboardPlayer>(*scenario_,
-                                                                    *roads_);
+  player_ = std::make_unique<scenario::StoryboardPlayer>(*scenario_, *roads_);
   context_ = std::make_unique<ScenarioContext>(
       ScenarioContext{.roads = roads_.get(),
                       .scenario = scenario_.get(),

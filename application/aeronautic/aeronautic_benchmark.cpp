@@ -28,6 +28,7 @@
 
 #include "application/aeronautic/simulation.hpp"
 #include "base/core.hpp"
+#include "format/aircraft_file.hpp"
 #include "framework/benchmarking.hpp"
 #include "framework/type_list.hpp"
 #include "framework/vocabulary.hpp"
@@ -170,7 +171,7 @@ auto main(int argc, char** argv) -> int {
   if (populations.empty()) {
     populations = {1'000, 10'000, 100'000};
   }
-  auto rigid = simon::model::load_aircraft(
+  auto rigid = simon::format::load_aircraft(
       "application/aeronautic/aircraft/737.aircraft");
   if (!rigid) {
     std::println(stderr, "{}", rigid.error().message());

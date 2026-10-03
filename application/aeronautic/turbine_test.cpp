@@ -9,6 +9,7 @@
 
 #include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
+#include "format/aircraft_file.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/turbine.hpp"
 #include "model/units.hpp"
@@ -45,7 +46,7 @@ auto column(std::string_view name, int engine) -> std::string {
 // at `reference`, made every `dt` seconds.
 auto check_against_jsbsim(std::string_view path, std::string_view reference,
                           double dt) -> void {
-  auto aircraft = load_aircraft(std::string{path});
+  auto aircraft = format::load_aircraft(std::string{path});
   REQUIRE(aircraft);
   std::vector<Row> rows = load_rows(reference);
   REQUIRE(rows.size() > 1000);
@@ -95,7 +96,7 @@ TEST_CASE("Turbine737") {
   }
 
   SECTION("ShouldMatchJsbsimGivenSettledEngine") {
-    auto aircraft = load_aircraft(std::string{BOEING_737});
+    auto aircraft = format::load_aircraft(std::string{BOEING_737});
     REQUIRE(aircraft);
     // By the end, the second engine has held 0.9 for 13 s.
     std::vector<Row> rows = load_rows(REFERENCE);

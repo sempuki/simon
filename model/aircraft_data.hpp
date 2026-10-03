@@ -4,20 +4,17 @@
 
 #include <array>
 #include <cstddef>
-#include <expected>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <vector>
 
-#include "base/status.hpp"
 #include "model/aerodynamics.hpp"
 #include "model/flight_control.hpp"
 #include "model/units.hpp"
 
 // An aircraft as data: what tools/jsbsim/convert.py writes from a JSBSim
-// aircraft, read back. Locations are in JSBSim's structural frame (x aft,
-// y right, z up), in meters.
+// aircraft, read back by format/aircraft_file. Locations are in JSBSim's
+// structural frame (x aft, y right, z up), in meters.
 namespace simon::model {
 
 // The most engines and tanks an aircraft may have.
@@ -89,30 +86,4 @@ struct AircraftData final {
   AeroModel aero;
 };
 
-// The reasons an aircraft could not be read.
-enum class AircraftDataError {
-  UNREADABLE,  // The file could not be opened.
-  MALFORMED,   // The message says where and how.
-  COUNT,
-};
-
-inline constexpr std::size_t AIRCRAFT_DATA_ERROR_COUNT =
-    static_cast<std::size_t>(AircraftDataError::COUNT);
-
-// Reads the aircraft that `text` describes.
-auto parse_aircraft(std::string_view text)
-    -> std::expected<AircraftData, lib::Status>;
-
-// Reads the aircraft in the file at `path`.
-auto load_aircraft(const std::string& path)
-    -> std::expected<AircraftData, lib::Status>;
-
 }  // namespace simon::model
-
-// Messages for each AircraftDataError, defined in aircraft_data.cpp.
-template <>
-const std::array<lib::StatusConditionEntry,
-                 simon::model::AIRCRAFT_DATA_ERROR_COUNT>
-    lib::EnumStatusKindConditionMixin<
-        simon::model::AircraftDataError,
-        simon::model::AIRCRAFT_DATA_ERROR_COUNT>::conditions_;

@@ -8,6 +8,7 @@
 
 #include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
+#include "format/aircraft_file.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/atmosphere.hpp"
 #include "model/rigid_aircraft.hpp"
@@ -36,7 +37,7 @@ struct Compared final {
 };
 
 auto compare(std::string_view path, std::string_view initial) -> Compared {
-  auto aircraft = load_aircraft(std::string{path});
+  auto aircraft = format::load_aircraft(std::string{path});
   REQUIRE(aircraft);
   std::vector<Row> rows = load_rows(initial);
   REQUIRE(rows.size() == 1);

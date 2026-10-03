@@ -12,6 +12,7 @@
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 #include "engine/driver.hpp"
+#include "format/aircraft_file.hpp"
 #include "framework/vocabulary.hpp"
 
 namespace simon::aeronautic {
@@ -395,7 +396,7 @@ auto fly_rigid(Duration duration, InOut<Scheduler> scheduler,
 }  // namespace
 
 TEST_CASE("RigidAircraft") {
-  auto data = model::load_aircraft(std::string{BOEING_737});
+  auto data = format::load_aircraft(std::string{BOEING_737});
   REQUIRE(data);
   World world;
   build_small_world(Out(world));

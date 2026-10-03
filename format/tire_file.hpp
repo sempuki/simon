@@ -17,7 +17,7 @@
 // and ! starting comments. The steady-state coefficients are read; the
 // vertical, transient, rolling and overturning ones, tables and shapes are
 // left out. A file of another format is refused.
-namespace simon::model {
+namespace simon::format {
 
 // The reasons a tire could not be read.
 enum class TireFileError {
@@ -31,17 +31,18 @@ inline constexpr std::size_t TIRE_FILE_ERROR_COUNT =
 
 // Reads the tire that `text` describes.
 auto parse_tire_file(std::string_view text)
-    -> std::expected<MagicFormulaTire, lib::Status>;
+    -> std::expected<model::MagicFormulaTire, lib::Status>;
 
 // Reads the tire in the file at `path`.
 auto load_tire_file(const std::string& path)
-    -> std::expected<MagicFormulaTire, lib::Status>;
+    -> std::expected<model::MagicFormulaTire, lib::Status>;
 
-}  // namespace simon::model
+}  // namespace simon::format
 
 // Messages for each TireFileError, defined in tire_file.cpp.
 template <>
-const std::array<lib::StatusConditionEntry, simon::model::TIRE_FILE_ERROR_COUNT>
+const std::array<lib::StatusConditionEntry,
+                 simon::format::TIRE_FILE_ERROR_COUNT>
     lib::EnumStatusKindConditionMixin<
-        simon::model::TireFileError,
-        simon::model::TIRE_FILE_ERROR_COUNT>::conditions_;
+        simon::format::TireFileError,
+        simon::format::TIRE_FILE_ERROR_COUNT>::conditions_;

@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-#include "model/opendrive.hpp"
+#include "format/opendrive.hpp"
 #include "model/random.hpp"
 
 namespace simon::automotive {
@@ -45,7 +45,7 @@ auto driving_lanes(const Network& network)
 
 auto load_network(const std::string& path)
     -> std::expected<Network, framework::Status> {
-  RETURN_OR_ASSIGN(model::RoadNetwork roads, model::load_opendrive(path));
+  RETURN_OR_ASSIGN(model::RoadNetwork roads, format::load_opendrive(path));
   model::LaneGraph graph = model::build_lane_graph(roads);
   return Network{.roads = std::move(roads), .graph = std::move(graph)};
 }

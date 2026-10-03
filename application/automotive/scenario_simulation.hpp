@@ -9,8 +9,8 @@
 #include "application/automotive/simulation_systems.hpp"
 #include "engine/lifecycle.hpp"
 #include "framework/vocabulary.hpp"
-#include "model/openscenario.hpp"
-#include "model/storyboard.hpp"
+#include "scenario/openscenario.hpp"
+#include "scenario/storyboard.hpp"
 
 namespace simon::automotive {
 
@@ -33,20 +33,16 @@ class ScenarioSimulation final {
 
   // The scenario, its roads and its storyboard's player: until configured,
   // none.
-  auto scenario() const -> const model::openscenario::Scenario& {
-    return *scenario_;
-  }
+  auto scenario() const -> const scenario::Scenario& { return *scenario_; }
   auto roads() const -> const model::RoadNetwork& { return *roads_; }
-  auto player() const -> const model::openscenario::StoryboardPlayer& {
-    return *player_;
-  }
+  auto player() const -> const scenario::StoryboardPlayer& { return *player_; }
 
  private:
   std::string path_;
   // Shared by the systems; none moves once configured.
-  std::unique_ptr<model::openscenario::Scenario> scenario_;
+  std::unique_ptr<scenario::Scenario> scenario_;
   std::unique_ptr<model::RoadNetwork> roads_;
-  std::unique_ptr<model::openscenario::StoryboardPlayer> player_;
+  std::unique_ptr<scenario::StoryboardPlayer> player_;
   std::unique_ptr<ScenarioContext> context_;
   ScenarioWorld world_;
   std::unique_ptr<ScenarioScheduler> scheduler_;

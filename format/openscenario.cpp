@@ -1,6 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-#include "model/openscenario.hpp"
+#include "format/openscenario.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -15,22 +15,18 @@
 #include "pugixml.hpp"
 
 template <>
-const std::array<lib::StatusConditionEntry,
-                 simon::model::openscenario::SCENARIO_ERROR_COUNT>
+const std::array<lib::StatusConditionEntry, simon::format::SCENARIO_ERROR_COUNT>
     lib::EnumStatusKindConditionMixin<
-        simon::model::openscenario::ScenarioError,
-        simon::model::openscenario::SCENARIO_ERROR_COUNT>::conditions_ = {
+        simon::format::ScenarioError,
+        simon::format::SCENARIO_ERROR_COUNT>::conditions_ = {
         lib::StatusConditionEntry{"scenario unreadable"},
         lib::StatusConditionEntry{"scenario malformed"},
         lib::StatusConditionEntry{"scenario unsupported"},
 };
 
-namespace simon::model::openscenario {
+namespace simon::format {
 
-auto Scenario::find_entity(std::string_view name) const -> const Entity* {
-  auto found = std::ranges::find(entities, name, &Entity::name);
-  return found == entities.end() ? nullptr : &*found;
-}
+using namespace scenario;
 
 namespace {
 
@@ -1049,4 +1045,4 @@ auto load_openscenario(const std::string& path)
                             std::filesystem::path{path}.parent_path().string());
 }
 
-}  // namespace simon::model::openscenario
+}  // namespace simon::format

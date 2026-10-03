@@ -1,6 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-#include "model/aircraft_data.hpp"
+#include "format/aircraft_file.hpp"
 
 #include <optional>
 #include <string>
@@ -9,7 +9,9 @@
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 #include "catch2/matchers/catch_matchers_string.hpp"
 
-namespace simon::model {
+namespace simon::format {
+
+using namespace model;
 
 using Catch::Matchers::ContainsSubstring;
 using Catch::Matchers::WithinAbs;
@@ -210,4 +212,4 @@ end
   }
 }
 
-}  // namespace simon::model
+}  // namespace simon::format

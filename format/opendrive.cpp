@@ -1,6 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-#include "model/opendrive.hpp"
+#include "format/opendrive.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -13,15 +13,17 @@
 
 template <>
 const std::array<lib::StatusConditionEntry,
-                 simon::model::OPEN_DRIVE_ERROR_COUNT>
+                 simon::format::OPEN_DRIVE_ERROR_COUNT>
     lib::EnumStatusKindConditionMixin<
-        simon::model::OpenDriveError,
-        simon::model::OPEN_DRIVE_ERROR_COUNT>::conditions_ = {
+        simon::format::OpenDriveError,
+        simon::format::OPEN_DRIVE_ERROR_COUNT>::conditions_ = {
         lib::StatusConditionEntry{"road network unreadable"},
         lib::StatusConditionEntry{"road network malformed"},
 };
 
-namespace simon::model {
+namespace simon::format {
+
+using namespace model;
 
 namespace {
 
@@ -392,4 +394,4 @@ auto load_opendrive(const std::string& path)
   return parse_opendrive(text.str());
 }
 
-}  // namespace simon::model
+}  // namespace simon::format

@@ -1,6 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-#include "model/aircraft_data.hpp"
+#include "format/aircraft_file.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -12,15 +12,17 @@
 
 template <>
 const std::array<lib::StatusConditionEntry,
-                 simon::model::AIRCRAFT_DATA_ERROR_COUNT>
+                 simon::format::AIRCRAFT_FILE_ERROR_COUNT>
     lib::EnumStatusKindConditionMixin<
-        simon::model::AircraftDataError,
-        simon::model::AIRCRAFT_DATA_ERROR_COUNT>::conditions_ = {
+        simon::format::AircraftFileError,
+        simon::format::AIRCRAFT_FILE_ERROR_COUNT>::conditions_ = {
         lib::StatusConditionEntry{"aircraft unreadable"},
         lib::StatusConditionEntry{"aircraft malformed"},
 };
 
-namespace simon::model {
+namespace simon::format {
+
+using namespace model;
 
 namespace {
 
@@ -145,7 +147,7 @@ class Parser final {
   auto fail(const std::string& why) const -> Failure {
     std::size_t number =
         done() ? (lines_.empty() ? 0 : lines_.back().number) : line().number;
-    return Failure{lib::raise(AircraftDataError::MALFORMED,
+    return Failure{lib::raise(AircraftFileError::MALFORMED,
                               "line " + std::to_string(number) + ": " + why)};
   }
 
@@ -714,7 +716,7 @@ class Parser final {
       }
     }
     if (!missing.empty()) {
-      return Failure{lib::raise(AircraftDataError::MALFORMED,
+      return Failure{lib::raise(AircraftFileError::MALFORMED,
                                 "line " + std::to_string(each->line) +
                                     ": no signal `" + missing + "`")};
     }
@@ -1067,11 +1069,11 @@ auto load_aircraft(const std::string& path)
   std::ifstream file{path};
   if (!file) {
     return std::unexpected(
-        lib::raise(AircraftDataError::UNREADABLE, "cannot open " + path));
+        lib::raise(AircraftFileError::UNREADABLE, "cannot open " + path));
   }
   std::stringstream text;
   text << file.rdbuf();
   return parse_aircraft(text.str());
 }
 
-}  // namespace simon::model
+}  // namespace simon::format
