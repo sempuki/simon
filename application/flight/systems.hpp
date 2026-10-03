@@ -319,7 +319,7 @@ struct FlySurfaces final       //
       return;
     }
     const SurfaceGains& gains = trim->gains;
-    Matrix3 attitude = earth_.body_to_north_east_down(
+    Matrix3 attitude = earth_.convert_body_to_north_east_down(
         *body, model::seconds(step.time.time_since_epoch()));
     double bank = std::atan2(attitude(2, 1), attitude(2, 2));
     Vector3 rates = earth_.air_rate(*body)

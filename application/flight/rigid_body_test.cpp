@@ -51,7 +51,7 @@ TEST_CASE("RigidBody737") {
 
       // Gravitation, found where the body is on the turning Earth.
       Matrix3 to_fixed =
-          wgs84::inertial_to_fixed(row.at("earth_angle") * radian);
+          wgs84::convert_inertial_to_fixed(row.at("earth_angle") * radian);
       Position fixed =
           QuantityVector{to_fixed *
                          body.position.numerical_value_in(meter).eigen()} *

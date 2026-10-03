@@ -274,7 +274,7 @@ class Parser final {
   // The aerodynamics read each signal from their own slot.
   auto input(std::string_view name, InOut<AircraftData> data) const
       -> std::expected<AeroInput, lib::Status> {
-    if (std::optional<AeroVariable> found = aero_variable_named(name)) {
+    if (std::optional<AeroVariable> found = find_aero_variable(name)) {
       return aero_input(*found);
     }
     bool magnitude =
@@ -386,7 +386,7 @@ class Parser final {
     if (header.words.size() != 3) {
       return fail("`term` takes an axis and a name");
     }
-    std::optional<AeroAxis> axis = aero_axis_named(header.words[1]);
+    std::optional<AeroAxis> axis = find_aero_axis(header.words[1]);
     if (!axis) {
       return fail("unknown axis `" + std::string{header.words[1]} + "`");
     }

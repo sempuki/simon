@@ -51,11 +51,11 @@ auto find(const std::array<std::pair<std::string_view, EnumType>, Count>& names,
 
 }  // namespace
 
-auto aero_variable_named(std::string_view name) -> std::optional<AeroVariable> {
+auto find_aero_variable(std::string_view name) -> std::optional<AeroVariable> {
   return find(VARIABLE_NAMES, name);
 }
 
-auto aero_axis_named(std::string_view name) -> std::optional<AeroAxis> {
+auto find_aero_axis(std::string_view name) -> std::optional<AeroAxis> {
   return find(AXIS_NAMES, name);
 }
 

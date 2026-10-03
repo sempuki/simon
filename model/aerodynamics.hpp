@@ -50,7 +50,7 @@ inline constexpr std::size_t AERO_VARIABLE_COUNT =
     static_cast<std::size_t>(AeroVariable::COUNT);
 
 // The variable a converted aircraft names `name`, if any.
-auto aero_variable_named(std::string_view name) -> std::optional<AeroVariable>;
+auto find_aero_variable(std::string_view name) -> std::optional<AeroVariable>;
 
 // The most flight control signals an aircraft's aerodynamics may read.
 inline constexpr std::size_t MAX_AERO_SIGNALS = 16;
@@ -138,7 +138,7 @@ enum class AeroAxis : std::uint8_t {
 inline constexpr std::size_t AERO_AXIS_COUNT =
     static_cast<std::size_t>(AeroAxis::COUNT);
 
-auto aero_axis_named(std::string_view name) -> std::optional<AeroAxis>;
+auto find_aero_axis(std::string_view name) -> std::optional<AeroAxis>;
 
 // The sum on each axis: drag, side force and lift in N, and the moments in
 // N m.

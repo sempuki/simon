@@ -32,7 +32,7 @@ auto read_inputs(const Row& row, const AircraftData& aircraft) -> AeroInputs {
   AeroInputs inputs;
   FlightSignals signals;
   for (const auto& [name, value] : row) {
-    if (std::optional<AeroVariable> variable = aero_variable_named(name)) {
+    if (std::optional<AeroVariable> variable = find_aero_variable(name)) {
       inputs[*variable] = value;
     } else if (std::optional<std::size_t> signal =
                    find_signal(aircraft.flight_controls, name)) {

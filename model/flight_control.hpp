@@ -74,7 +74,7 @@ inline constexpr std::size_t MAX_FLIGHT_SIGNALS = 128;
 inline constexpr std::size_t FUNCTION_STACK_SIZE = 16;
 
 // The fixed signal `name` names, if any, and the name of each.
-auto flight_signal_named(std::string_view name) -> std::optional<FlightSignal>;
+auto find_flight_signal(std::string_view name) -> std::optional<FlightSignal>;
 auto flight_signal_name(FlightSignal signal) -> std::string_view;
 
 inline constexpr auto index_of(FlightSignal signal) -> std::size_t {

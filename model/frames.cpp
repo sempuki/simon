@@ -10,8 +10,9 @@ namespace {
 
 // From the north-east-down frame at a place on the ellipsoid to ECEF: its
 // columns are north, east and down.
-auto north_east_down_to_fixed(double sin_lat, double cos_lat, double sin_lon,
-                              double cos_lon) -> Matrix3 {
+auto convert_north_east_down_to_fixed(double sin_lat, double cos_lat,
+                                      double sin_lon, double cos_lon)
+    -> Matrix3 {
   Matrix3 basis;
   basis << -sin_lat * cos_lon, -sin_lon, -cos_lat * cos_lon,  //
       -sin_lat * sin_lon, cos_lon, -cos_lat * sin_lon,        //
@@ -19,9 +20,10 @@ auto north_east_down_to_fixed(double sin_lat, double cos_lat, double sin_lon,
   return basis;
 }
 
-auto north_east_down_to_fixed(const wgs84::Location& where) -> Matrix3 {
-  return north_east_down_to_fixed(where.sin_latitude, where.cos_latitude,
-                                  where.sin_longitude, where.cos_longitude);
+auto convert_north_east_down_to_fixed(const wgs84::Location& where) -> Matrix3 {
+  return convert_north_east_down_to_fixed(
+      where.sin_latitude, where.cos_latitude, where.sin_longitude,
+      where.cos_longitude);
 }
 
 }  // namespace
@@ -29,11 +31,11 @@ auto north_east_down_to_fixed(const wgs84::Location& where) -> Matrix3 {
 auto Earth::round(const wgs84::Geodetic& origin) -> Earth {
   Earth earth;
   earth.round_ = true;
-  earth.origin_fixed_ = wgs84::geodetic_to_fixed(origin);
+  earth.origin_fixed_ = wgs84::convert_geodetic_to_fixed(origin);
   // East, north and up, as rows.
-  Matrix3 ned =
-      north_east_down_to_fixed(sin(origin.latitude), cos(origin.latitude),
-                               sin(origin.longitude), cos(origin.longitude));
+  Matrix3 ned = convert_north_east_down_to_fixed(
+      sin(origin.latitude), cos(origin.latitude), sin(origin.longitude),
+      cos(origin.longitude));
   earth.fixed_to_local_.row(0) = ned.col(1).transpose();
   earth.fixed_to_local_.row(1) = ned.col(0).transpose();
   earth.fixed_to_local_.row(2) = -ned.col(2).transpose();
@@ -50,7 +52,7 @@ auto Earth::find_fixed(const RigidBody& body, Time time) const -> Position {
   if (!round_) {
     return body.position;
   }
-  return QuantityVector{wgs84::inertial_to_fixed(angle(time)) *
+  return QuantityVector{wgs84::convert_inertial_to_fixed(angle(time)) *
                         eigen(body.position)} *
          meter;
 }
@@ -67,14 +69,15 @@ auto Earth::place(const RigidBody& body, Time time) const -> Place {
         0.0, 0.0, -1.0;
     return flat;
   }
-  Matrix3 to_fixed = wgs84::inertial_to_fixed(angle(time));
+  Matrix3 to_fixed = wgs84::convert_inertial_to_fixed(angle(time));
   Position fixed = QuantityVector{to_fixed * eigen(body.position)} * meter;
   wgs84::Location where = wgs84::locate(fixed);
   return Place{
-      .inertial_to_fixed = to_fixed,
+      .convert_inertial_to_fixed = to_fixed,
       .fixed = fixed,
       .altitude = where.altitude,
-      .north_east_down = to_fixed.transpose() * north_east_down_to_fixed(where),
+      .north_east_down =
+          to_fixed.transpose() * convert_north_east_down_to_fixed(where),
       .sin_latitude = where.sin_latitude,
       .cos_latitude = where.cos_latitude,
   };
@@ -90,7 +93,7 @@ auto Earth::gravity(const Place& place) const -> Acceleration {
         0.0, 0.0,
         -STANDARD_GRAVITY.numerical_value_in(meter_per_second_squared));
   }
-  return QuantityVector{place.inertial_to_fixed.transpose() *
+  return QuantityVector{place.convert_inertial_to_fixed.transpose() *
                         eigen(wgs84::compute_gravitation(place.fixed))} *
          meter_per_second_squared;
 }
@@ -135,8 +138,8 @@ auto Earth::north_east_down(const Position& fixed, Time time) const -> Matrix3 {
         0.0, 0.0, -1.0;
     return basis;
   }
-  return wgs84::inertial_to_fixed(angle(time)).transpose() *
-         north_east_down_to_fixed(wgs84::locate(fixed));
+  return wgs84::convert_inertial_to_fixed(angle(time)).transpose() *
+         convert_north_east_down_to_fixed(wgs84::locate(fixed));
 }
 
 auto Earth::level_rate(const RigidBody& body, Time time) const
@@ -165,8 +168,8 @@ auto Earth::level_rate(const RigidBody& body, Time time) const
          radian_per_second;
 }
 
-auto Earth::body_to_north_east_down(const RigidBody& body, Time time) const
-    -> Matrix3 {
+auto Earth::convert_body_to_north_east_down(const RigidBody& body,
+                                            Time time) const -> Matrix3 {
   return north_east_down(find_fixed(body, time), time).transpose() *
          body.attitude.toRotationMatrix();
 }
@@ -202,7 +205,8 @@ auto Earth::body_at(const Position& position, Angle roll, Angle pitch,
   if (round_) {
     Vector3 fixed =
         eigen(origin_fixed_) + fixed_to_local_.transpose() * eigen(position);
-    inertial = wgs84::inertial_to_fixed(angle(time)).transpose() * fixed;
+    inertial =
+        wgs84::convert_inertial_to_fixed(angle(time)).transpose() * fixed;
   }
   Position where = QuantityVector{inertial} * meter;
   Position fixed =

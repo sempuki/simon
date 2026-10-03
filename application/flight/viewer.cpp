@@ -246,7 +246,7 @@ class Viewer final {
     const model::AircraftData& data = *type->data;
     model::Earth earth = model::Earth::flat();
     Matrix3 attitude =
-        earth.body_to_north_east_down(*body, model::seconds(0.0s));
+        earth.convert_body_to_north_east_down(*body, model::seconds(0.0s));
     Vector3 uvw = model::compute_air_velocity(
                       *body, earth, earth.place(*body, model::seconds(0.0s)),
                       wind ? *wind : Wind{})

@@ -249,7 +249,7 @@ auto write(const FlightBlock& block, InOut<FlightSignals> signals, double value)
 
 }  // namespace
 
-auto flight_signal_named(std::string_view name) -> std::optional<FlightSignal> {
+auto find_flight_signal(std::string_view name) -> std::optional<FlightSignal> {
   auto found = std::ranges::find(SIGNAL_NAMES, name);
   if (found == SIGNAL_NAMES.end()) {
     return std::nullopt;

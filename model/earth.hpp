@@ -36,7 +36,7 @@ inline auto rotation() -> AngularVelocity {
 
 // The rotation from ECI to ECEF at `earth_angle`, how far the Earth has
 // turned.
-inline auto inertial_to_fixed(Angle earth_angle) -> Matrix3 {
+inline auto convert_inertial_to_fixed(Angle earth_angle) -> Matrix3 {
   return AngleAxis{-radians(earth_angle), Vector3::UnitZ()}.toRotationMatrix();
 }
 
@@ -47,7 +47,7 @@ struct Geodetic final {
 };
 
 // The ECEF position of a geodetic one.
-inline auto geodetic_to_fixed(const Geodetic& where) -> Position {
+inline auto convert_geodetic_to_fixed(const Geodetic& where) -> Position {
   double sin_latitude = sin(where.latitude);
   double cos_latitude = cos(where.latitude);
   double normal = SEMIMAJOR_AXIS /
@@ -112,7 +112,7 @@ inline auto locate(const Position& fixed) -> Location {
 }
 
 // The geodetic position of an ECEF one (see locate).
-inline auto fixed_to_geodetic(const Position& fixed) -> Geodetic {
+inline auto convert_fixed_to_geodetic(const Position& fixed) -> Geodetic {
   Location where = locate(fixed);
   return Geodetic{
       .latitude = std::atan2(where.sin_latitude, where.cos_latitude) * radian,

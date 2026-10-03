@@ -64,7 +64,7 @@ auto compare(std::string_view path, std::string_view initial) -> Compared {
 
   Vector3 uvw =
       earth.air_velocity(body).numerical_value_in(meter_per_second).eigen();
-  Matrix3 attitude = earth.body_to_north_east_down(body, 0.0 * second);
+  Matrix3 attitude = earth.convert_body_to_north_east_down(body, 0.0 * second);
   return Compared{
       .simon = *result,
       .alpha = std::atan2(uvw.z(), uvw.x()),

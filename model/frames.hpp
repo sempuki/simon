@@ -17,7 +17,7 @@ namespace simon::model {
 // A body's place on the Earth at a time, found once for the frames, gravity
 // and the air to share.
 struct Place final {
-  Matrix3 inertial_to_fixed = Matrix3::Identity();
+  Matrix3 convert_inertial_to_fixed = Matrix3::Identity();
   Position fixed = meters(0.0, 0.0, 0.0);
   Length altitude = 0.0 * meter;
   // From the local north-east-down frame to the inertial frame.
@@ -72,7 +72,7 @@ class Earth final {
   auto altitude(const RigidBody& body, Time time) const -> Length;
 
   // The rotation from body axes to the local north-east-down frame.
-  auto body_to_north_east_down(const RigidBody& body, Time time) const
+  auto convert_body_to_north_east_down(const RigidBody& body, Time time) const
       -> Matrix3;
 
   // The body's position in the world's local frame, and its flight path
