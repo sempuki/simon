@@ -105,6 +105,35 @@ cc_library(
 )
 
 cc_test(
+    name = "collision_test",
+    size = "small",
+    srcs = ["collision_test.cpp"],
+    copts = COPTS,
+    data = ["reference/shapely_boxes.csv"],
+    deps = [
+        ":testing",
+        "//model:collision",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "metrics_test",
+    size = "small",
+    srcs = ["metrics_test.cpp"],
+    copts = COPTS,
+    data = [
+        "reference/esmini_scenarios.csv",
+        "reference/nuplan_metrics.csv",
+    ],
+    deps = [
+        ":testing",
+        "//model:driving_metrics",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
     name = "maneuver_test",
     size = "small",
     srcs = ["maneuver_test.cpp"],
