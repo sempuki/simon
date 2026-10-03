@@ -85,8 +85,8 @@ auto check_against_jsbsim(std::string_view path, std::string_view reference)
           QuantityVector{-apart.eigen().x(), apart.eigen().y(),
                          -apart.eigen().z()} *
           meter;
-      AeroLoads loads = aero_loads(sums, row.at("alpha") * radian,
-                                   row.at("beta") * radian, reference);
+      AeroLoads loads = compute_aero_loads(sums, row.at("alpha") * radian,
+                                           row.at("beta") * radian, reference);
 
       QuantityVector force = loads.force.numerical_value_in(newton);
       QuantityVector moment = loads.moment.numerical_value_in(newton_meter);

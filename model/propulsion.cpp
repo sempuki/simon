@@ -8,11 +8,12 @@
 
 namespace simon::model {
 
-auto settled_engines(const AircraftData& aircraft, const FlightSignals& signals,
-                     const EngineAir& air) -> Engines {
+auto compute_settled_engines(const AircraftData& aircraft,
+                             const FlightSignals& signals, const EngineAir& air)
+    -> Engines {
   Engines engines;
   for (std::size_t i = 0; i < aircraft.engines.size(); ++i) {
-    engines.turbines[i] = steady_turbine(
+    engines.turbines[i] = compute_steady_turbine(
         aircraft.engines[i],
         signals.values[aircraft.flight_controls.throttles[i]], air);
   }

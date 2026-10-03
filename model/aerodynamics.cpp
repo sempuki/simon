@@ -124,13 +124,13 @@ auto compute_wind_angles(const Vector3& air_velocity) -> WindAngles {
                     .cos_beta = along_and_down / speed};
 }
 
-auto aero_loads(const AeroSums& sums, Angle alpha, Angle beta,
-                const Displacement& reference) -> AeroLoads {
-  return aero_loads(sums, compute_wind_angles(alpha, beta), reference);
+auto compute_aero_loads(const AeroSums& sums, Angle alpha, Angle beta,
+                        const Displacement& reference) -> AeroLoads {
+  return compute_aero_loads(sums, compute_wind_angles(alpha, beta), reference);
 }
 
-auto aero_loads(const AeroSums& sums, const WindAngles& wind,
-                const Displacement& reference) -> AeroLoads {
+auto compute_aero_loads(const AeroSums& sums, const WindAngles& wind,
+                        const Displacement& reference) -> AeroLoads {
   double drag = sums[static_cast<std::size_t>(AeroAxis::DRAG)];
   double side = sums[static_cast<std::size_t>(AeroAxis::SIDE)];
   double lift = sums[static_cast<std::size_t>(AeroAxis::LIFT)];

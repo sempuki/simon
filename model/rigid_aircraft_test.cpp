@@ -43,7 +43,7 @@ auto moving(const Earth& earth, const Wind& wind) -> Moving {
   return Moving{
       .earth = earth,
       .body = body,
-      .rate = rigid_body_rate(
+      .rate = compute_rigid_body_rate(
           body, force, QuantityVector{1.0e4, -2.0e4, 5.0e3} * newton_meter,
           mass, gravity),
       .specific_force = force / mass.mass,

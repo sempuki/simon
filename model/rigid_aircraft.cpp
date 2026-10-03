@@ -89,14 +89,14 @@ namespace {
 // The rate, compiled for still air apart, so that it costs what it would
 // without wind.
 template <bool WINDY>
-auto compute_rigid_aircraft_rate(
-    const RigidBody& body, const FlightSignals& signals, const Engines& engines,
-    const MassBalance& mass, const AircraftData& aircraft, const Earth& earth,
-    const StandardAirTable& air, const Wind& wind, Time time,
-    Out<BodyAcceleration> felt) -> RigidBodyRate {
+auto compute_rate(const RigidBody& body, const FlightSignals& signals,
+                  const Engines& engines, const MassBalance& mass,
+                  const AircraftData& aircraft, const Earth& earth,
+                  const StandardAirTable& air, const Wind& wind, Time time,
+                  Out<BodyAcceleration> felt) -> RigidBodyRate {
   const AeroModel& model = aircraft.aero;
   Displacement reference =
-      body_offset(aircraft.aero_reference, mass.center_of_mass);
+      compute_body_offset(aircraft.aero_reference, mass.center_of_mass);
   Place place = earth.place(body, time);
   BodyMotion motion = compute_body_motion<WINDY>(body, earth, place, wind);
   AeroInputs inputs =
@@ -124,8 +124,8 @@ auto compute_rigid_aircraft_rate(
   for (std::size_t i = 0; i < aircraft.engines.size(); ++i) {
     Vector3 thrust{engines.turbines[i].thrust.numerical_value_in(newton), 0.0,
                    0.0};
-    Vector3 arm =
-        eigen(body_offset(aircraft.engines[i].location, mass.center_of_mass));
+    Vector3 arm = eigen(
+        compute_body_offset(aircraft.engines[i].location, mass.center_of_mass));
     thrust_force += thrust;
     thrust_moment += arm.cross(thrust);
   }
@@ -138,7 +138,7 @@ auto compute_rigid_aircraft_rate(
   Vector3 rest = compute_air_acceleration<WINDY>(
       body, motion, earth, place, wind, Vector3::Zero(), eigen(gravity));
   auto alpha_rate = [&](const AeroSums& sums) {
-    Vector3 force = aero_loads(sums, angles, reference)
+    Vector3 force = compute_aero_loads(sums, angles, reference)
                         .force.numerical_value_in(newton)
                         .eigen() +
                     thrust_force;
@@ -160,11 +160,11 @@ auto compute_rigid_aircraft_rate(
   sums[index(AeroAxis::PITCH)] = sum(model, AeroAxis::PITCH, inputs);
   sums[index(AeroAxis::YAW)] = sum(model, AeroAxis::YAW, inputs);
 
-  AeroLoads loads = aero_loads(sums, angles, reference);
+  AeroLoads loads = compute_aero_loads(sums, angles, reference);
   Vector3 force = loads.force.numerical_value_in(newton).eigen() + thrust_force;
   Vector3 moment =
       loads.moment.numerical_value_in(newton_meter).eigen() + thrust_moment;
-  RigidBodyRate rate = rigid_body_rate(
+  RigidBodyRate rate = compute_rigid_body_rate(
       body, motion.to_inertial, QuantityVector{force} * newton,
       QuantityVector{moment} * newton_meter, mass.properties, gravity);
   if (felt) {
@@ -179,18 +179,17 @@ auto compute_rigid_aircraft_rate(
 
 }  // namespace
 
-auto rigid_aircraft_rate(const RigidBody& body, const FlightSignals& signals,
-                         const Engines& engines, const MassBalance& mass,
-                         const AircraftData& aircraft, const Earth& earth,
-                         const StandardAirTable& air, const Wind& wind,
-                         Time time, Out<BodyAcceleration> felt)
-    -> RigidBodyRate {
+auto compute_rigid_aircraft_rate(
+    const RigidBody& body, const FlightSignals& signals, const Engines& engines,
+    const MassBalance& mass, const AircraftData& aircraft, const Earth& earth,
+    const StandardAirTable& air, const Wind& wind, Time time,
+    Out<BodyAcceleration> felt) -> RigidBodyRate {
   if (is_still(wind)) {
-    return compute_rigid_aircraft_rate<false>(
-        body, signals, engines, mass, aircraft, earth, air, wind, time, felt);
+    return compute_rate<false>(body, signals, engines, mass, aircraft, earth,
+                               air, wind, time, felt);
   }
-  return compute_rigid_aircraft_rate<true>(
-      body, signals, engines, mass, aircraft, earth, air, wind, time, felt);
+  return compute_rate<true>(body, signals, engines, mass, aircraft, earth, air,
+                            wind, time, felt);
 }
 
 }  // namespace simon::model

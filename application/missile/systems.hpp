@@ -436,8 +436,8 @@ struct GuideInterceptors final   //
     }
     constexpr Rate SPEED_RESPONSE = 2.0 * model::per_second;
     control->acceleration = model::limit(
-        model::proportional_navigation(*kinematics, *target,
-                                       interceptor.navigation_gain) +
+        model::compute_proportional_navigation(*kinematics, *target,
+                                               interceptor.navigation_gain) +
             model::hold_speed(*kinematics, interceptor.speed, SPEED_RESPONSE),
         interceptor.agility);
   }

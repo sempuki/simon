@@ -150,9 +150,9 @@ struct Airframe final {
 //
 // with lift n m g, drag from the drag polar, and thrust scaled by the density
 // ratio. Speed and cos(gamma) are kept away from zero in the divisions.
-inline auto point_mass_rate(const AirState& state,
-                            const FlightControls& controls,
-                            const Airframe& airframe, const Air& air)
+inline auto compute_point_mass_rate(const AirState& state,
+                                    const FlightControls& controls,
+                                    const Airframe& airframe, const Air& air)
     -> AirStateRate {
   constexpr Density SEA_LEVEL_DENSITY = 1.225 * kilogram_per_cubic_meter;
   constexpr AccelerationMagnitude g = STANDARD_GRAVITY;
@@ -194,7 +194,7 @@ inline auto point_mass_rate(const AirState& state,
 // Advances `state` by `dt` in one pass, semi-implicitly: speed and angles
 // first, from `rate`, then position along the new velocity. One evaluation
 // per step, and stable for the slow modes this model has at the steps a large
-// simulation takes. `rate` must be point_mass_rate's for `state`, whose
+// simulation takes. `rate` must be compute_point_mass_rate's for `state`, whose
 // velocity is the state's.
 //
 // The new velocity is the old one plus its derivative over the step, which
@@ -242,8 +242,8 @@ inline auto fly(const AirState& state, const AirStateRate& rate,
 
 // The flight-path angle that climbs or descends toward `altitude` at
 // `response` (per second) of the error, at most `steepest` either way.
-inline auto climb_command(const AirState& state, Length altitude, Rate response,
-                          Angle steepest) -> Angle {
+inline auto compute_climb_command(const AirState& state, Length altitude,
+                                  Rate response, Angle steepest) -> Angle {
   Speed v = max(state.speed, 1.0 * meter_per_second);
   Speed climb_rate = response * (altitude - altitude_of(state));
   Angle climb = arcsin(std::clamp(number_of(climb_rate / v), -1.0, 1.0));
@@ -252,8 +252,8 @@ inline auto climb_command(const AirState& state, Length altitude, Rate response,
 
 // The load factor that turns the flight-path angle toward `commanded` at
 // `response` (per second) of the error, in a bank of `bank`.
-inline auto load_factor_command(const AirState& state, Angle commanded,
-                                Angle bank, Rate response) -> double {
+inline auto compute_load_factor_command(const AirState& state, Angle commanded,
+                                        Angle bank, Rate response) -> double {
   Speed v = max(state.speed, 1.0 * meter_per_second);
   AngularRate climb = response * (commanded - state.flight_path_angle);
   double pull_up = number_of(v / STANDARD_GRAVITY * (climb / radian));
@@ -263,8 +263,8 @@ inline auto load_factor_command(const AirState& state, Angle commanded,
 
 // The bank that turns toward `heading` at `response` (per second) of the
 // error, the short way round, in a coordinated turn of at most `steepest`.
-inline auto bank_command(const AirState& state, Angle heading, Rate response,
-                         Angle steepest) -> Angle {
+inline auto compute_bank_command(const AirState& state, Angle heading,
+                                 Rate response, Angle steepest) -> Angle {
   AngularRate turn = response * wrap(heading - state.heading);
   Angle bank =
       arctan(number_of(state.speed * (turn / radian) / STANDARD_GRAVITY));
@@ -273,7 +273,7 @@ inline auto bank_command(const AirState& state, Angle heading, Rate response,
 
 // The heading from `from` to `to`, over the ground. The components are in
 // meters only to reach atan2.
-inline auto bearing(const Position& from, const Position& to) -> Angle {
+inline auto compute_bearing(const Position& from, const Position& to) -> Angle {
   QuantityVector apart = (to - from).numerical_value_in(meter);
   return std::atan2(apart.x(), apart.y()) * radian;
 }

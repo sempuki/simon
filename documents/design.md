@@ -909,7 +909,7 @@ struct GuideInterceptors final   //
     if (!kinematics || !control) return;
     const Kinematics* target = world.maybe_component_of<Kinematics>(interceptor.target);
     if (!target) { ... }
-    control->acceleration = model::proportional_navigation(*kinematics, *target, interceptor);
+    control->acceleration = model::compute_proportional_navigation(*kinematics, *target, interceptor);
   }
 };
 ```
@@ -1037,7 +1037,7 @@ and its `AllowComponentList`. The compiler enforces them: a system declared with
 `const Radar` cannot write radar state.
 
 The physics inside a system should be a free function in `model/`
-(`model::proportional_navigation` above), testable without a world.
+(`model::compute_proportional_navigation` above), testable without a world.
 
 ### Relations between entities
 

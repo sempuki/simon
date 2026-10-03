@@ -114,11 +114,12 @@ class Trimmer final {
       sense_flight_state(trim.body, trim.felt, trim.mass, aircraft_, earth_,
                          air_, Wind{}, 0.0 * second, InOut(trim.signals));
       settle_flight_controls(aircraft_.flight_controls, InOut(trim.signals));
-      trim.engines = settled_engines(aircraft_, trim.signals, engine_air);
+      trim.engines =
+          compute_settled_engines(aircraft_, trim.signals, engine_air);
       BodyAcceleration felt;
-      rate = rigid_aircraft_rate(trim.body, trim.signals, trim.engines,
-                                 trim.mass, aircraft_, earth_, air_, Wind{},
-                                 0.0 * second, Out(felt));
+      rate = compute_rigid_aircraft_rate(trim.body, trim.signals, trim.engines,
+                                         trim.mass, aircraft_, earth_, air_,
+                                         Wind{}, 0.0 * second, Out(felt));
       double change =
           magnitude((felt.specific_force - trim.felt.specific_force)
                         .numerical_value_in(meter_per_second_squared));

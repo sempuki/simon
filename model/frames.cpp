@@ -91,7 +91,7 @@ auto Earth::gravity(const Place& place) const -> Acceleration {
         -STANDARD_GRAVITY.numerical_value_in(meter_per_second_squared));
   }
   return QuantityVector{place.inertial_to_fixed.transpose() *
-                        eigen(wgs84::gravitation(place.fixed))} *
+                        eigen(wgs84::compute_gravitation(place.fixed))} *
          meter_per_second_squared;
 }
 auto Earth::air_velocity(const RigidBody& body) const -> Velocity {

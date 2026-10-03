@@ -16,8 +16,8 @@ auto fill_fuel_tanks(const AircraftData& aircraft) -> FuelTanks {
   return tanks;
 }
 
-auto body_offset(const Displacement& structural,
-                 const Displacement& center_of_mass) -> Displacement {
+auto compute_body_offset(const Displacement& structural,
+                         const Displacement& center_of_mass) -> Displacement {
   Vector3 apart = eigen(structural) - eigen(center_of_mass);
   // Structural x aft and z up; body x forward and z down.
   return meters(-apart.x(), apart.y(), -apart.z());

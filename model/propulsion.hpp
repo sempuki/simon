@@ -23,8 +23,9 @@ struct Engines final {
 };
 
 // The engines settled at the throttles in `signals`, in `air`.
-auto settled_engines(const AircraftData& aircraft, const FlightSignals& signals,
-                     const EngineAir& air) -> Engines;
+auto compute_settled_engines(const AircraftData& aircraft,
+                             const FlightSignals& signals, const EngineAir& air)
+    -> Engines;
 
 // The air the engines breathe at `body`, moving as `wind` has it. Over the
 // standard atmosphere the density altitude is the altitude.

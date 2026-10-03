@@ -94,10 +94,10 @@ inline auto compute_mass_properties(Mass mass, const Matrix3& inertia)
 // of mass, gravity left out), and the gravitational acceleration `gravity` in
 // the inertial frame. `to_inertial` is the body's attitude as a matrix, for a
 // caller that has it already.
-inline auto rigid_body_rate(const RigidBody& body, const Matrix3& to_inertial,
-                            const ForceVector& force, const Moment& moment,
-                            const MassProperties& mass,
-                            const Acceleration& gravity) -> RigidBodyRate {
+inline auto compute_rigid_body_rate(
+    const RigidBody& body, const Matrix3& to_inertial, const ForceVector& force,
+    const Moment& moment, const MassProperties& mass,
+    const Acceleration& gravity) -> RigidBodyRate {
   Vector3 w = body.rate.numerical_value_in(radian_per_second).eigen();
   Vector3 f = force.numerical_value_in(newton).eigen();
   Vector3 m = moment.numerical_value_in(newton_meter).eigen();
@@ -117,11 +117,11 @@ inline auto rigid_body_rate(const RigidBody& body, const Matrix3& to_inertial,
   };
 }
 
-inline auto rigid_body_rate(const RigidBody& body, const ForceVector& force,
-                            const Moment& moment, const MassProperties& mass,
-                            const Acceleration& gravity) -> RigidBodyRate {
-  return rigid_body_rate(body, body.attitude.toRotationMatrix(), force, moment,
-                         mass, gravity);
+inline auto compute_rigid_body_rate(
+    const RigidBody& body, const ForceVector& force, const Moment& moment,
+    const MassProperties& mass, const Acceleration& gravity) -> RigidBodyRate {
+  return compute_rigid_body_rate(body, body.attitude.toRotationMatrix(), force,
+                                 moment, mass, gravity);
 }
 
 }  // namespace simon::model

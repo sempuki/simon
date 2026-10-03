@@ -101,7 +101,7 @@ TEST_CASE("Turbine737") {
     std::vector<Row> rows = load_rows(REFERENCE);
     const Row& last = rows.back();
     TurbineState steady =
-        steady_turbine(aircraft->engines[1], 0.9, read_air(last));
+        compute_steady_turbine(aircraft->engines[1], 0.9, read_air(last));
     CHECK(std::abs(steady.n2 - last.at("n2_1")) < 1e-9);
     CHECK(std::abs(steady.thrust.numerical_value_in(newton) -
                    last.at("thrust_1")) /

@@ -91,7 +91,7 @@ struct FollowRoute final      //
       ++route.reached;
     }
     const Position& waypoint = route.waypoints[route.next];
-    autopilot->heading = model::bearing(state->position, waypoint);
+    autopilot->heading = model::compute_bearing(state->position, waypoint);
     autopilot->altitude = model::altitude_of(waypoint);
     autopilot->speed = route.speed;
   }
@@ -146,19 +146,20 @@ struct FlyAutopilot final           //
       return;
     }
     Speed speed_error = autopilot->speed - state->speed;
-    commands.bank = model::bank_command(*state, autopilot->heading,
-                                        gains_.heading, handling->max_bank);
+    commands.bank = model::compute_bank_command(
+        *state, autopilot->heading, gains_.heading, handling->max_bank);
 
     // Speed comes first: a slow aircraft climbs less steeply, or not at all.
-    Angle climb = model::climb_command(*state, autopilot->altitude,
-                                       gains_.altitude, gains_.steepest_climb);
+    Angle climb = model::compute_climb_command(
+        *state, autopilot->altitude, gains_.altitude, gains_.steepest_climb);
     double slow = std::clamp(
         1.0 - model::number_of(speed_error / gains_.speed_margin), 0.0, 1.0);
     climb = model::min(climb, gains_.steepest_climb * slow);
 
-    commands.load_factor = std::clamp(
-        model::load_factor_command(*state, climb, controls->bank, gains_.climb),
-        handling->min_load_factor, handling->max_load_factor);
+    commands.load_factor =
+        std::clamp(model::compute_load_factor_command(
+                       *state, climb, controls->bank, gains_.climb),
+                   handling->min_load_factor, handling->max_load_factor);
     commands.throttle = model::pi_control(speed_error, gains_.speed, elapsed_,
                                           InOut(autopilot->throttle_integral));
   }
@@ -204,8 +205,8 @@ struct Actuate final          //
 inline auto compute_rate(const AirState& state, const FlightControls& controls,
                          const Airframe& airframe,
                          const model::StandardAirTable& air) -> AirStateRate {
-  return model::point_mass_rate(state, controls, airframe,
-                                air(model::altitude_of(state)));
+  return model::compute_point_mass_rate(state, controls, airframe,
+                                        air(model::altitude_of(state)));
 }
 
 // The default: each aircraft advances in one semi-implicit pass per step.
@@ -325,7 +326,7 @@ struct FlySurfaces final       //
                         .numerical_value_in(model::radian_per_second)
                         .eigen();
 
-    double bank_error = model::radians(model::bank_command(
+    double bank_error = model::radians(model::compute_bank_command(
                             *state, autopilot->heading, 0.5 * model::per_second,
                             gains.max_bank)) -
                         bank;
@@ -335,7 +336,7 @@ struct FlySurfaces final       //
                              .numerical_value_in(model::meter_per_second);
     double steepest = 0.08 * std::clamp(1.0 - speed_error / 20.0, 0.0, 1.0);
     double climb_error =
-        std::min(model::radians(model::climb_command(
+        std::min(model::radians(model::compute_climb_command(
                      *state, autopilot->altitude, 0.05 * model::per_second,
                      0.08 * model::radian)),
                  steepest) -
@@ -500,7 +501,7 @@ struct RigidAircraftRates final    //
         !felt) {
       return;
     }
-    rate = model::rigid_aircraft_rate(
+    rate = model::compute_rigid_aircraft_rate(
         *body, *signals, *engines, *mass, *type->data, earth_, air_,
         wind ? *wind : still_, model::seconds(step.time.time_since_epoch()),
         Out(*felt));

@@ -248,14 +248,15 @@ auto fly(const Checked& checked, Case flown, Duration dt,
   model::StandardAirTable air;
 
   FlightSignals signals = trimmed_flight_controls(data, trim, recorded);
-  Engines engines = model::settled_engines(
+  Engines engines = model::compute_settled_engines(
       data, signals,
       model::compute_engine_air(body, earth, air, Wind{}, 0.0 * model::second));
   FuelTanks tanks = trimmed_tanks(data, trim);
   MassBalance mass = model::compute_mass_balance(data, tanks);
   BodyAcceleration felt;
-  model::rigid_aircraft_rate(body, signals, engines, mass, data, earth, air,
-                             Wind{}, 0.0 * model::second, Out(felt));
+  model::compute_rigid_aircraft_rate(body, signals, engines, mass, data, earth,
+                                     air, Wind{}, 0.0 * model::second,
+                                     Out(felt));
   auto aircraft = world.create<archetype::RigidAircraftInWind>()
                       .with(earth.air_state(body, 0.0 * model::second))
                       .with(body)

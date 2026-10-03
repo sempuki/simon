@@ -72,24 +72,24 @@ TEST_CASE("AeroLoads") {
   sums[static_cast<std::size_t>(AeroAxis::LIFT)] = 10.0;
 
   SECTION("ShouldPointDragBackAndLiftUpGivenNoAngles") {
-    AeroLoads loads =
-        aero_loads(sums, 0.0 * radian, 0.0 * radian, meters(0.0, 0.0, 0.0));
+    AeroLoads loads = compute_aero_loads(sums, 0.0 * radian, 0.0 * radian,
+                                         meters(0.0, 0.0, 0.0));
     CHECK(loads.force.numerical_value_in(newton).is_approximately(
         QuantityVector{-1.0, 0.0, -10.0}));
   }
 
   SECTION("ShouldTiltLiftForwardGivenAngleOfAttack") {
     double alpha = std::numbers::pi / 2.0;
-    AeroLoads loads =
-        aero_loads(sums, alpha * radian, 0.0 * radian, meters(0.0, 0.0, 0.0));
+    AeroLoads loads = compute_aero_loads(sums, alpha * radian, 0.0 * radian,
+                                         meters(0.0, 0.0, 0.0));
     // The air comes from below: drag pushes up, lift pushes forward.
     CHECK(loads.force.numerical_value_in(newton).is_approximately(
         QuantityVector{10.0, 0.0, -1.0}));
   }
 
   SECTION("ShouldPitchUpGivenLiftAheadOfCenterOfMass") {
-    AeroLoads loads =
-        aero_loads(sums, 0.0 * radian, 0.0 * radian, meters(2.0, 0.0, 0.0));
+    AeroLoads loads = compute_aero_loads(sums, 0.0 * radian, 0.0 * radian,
+                                         meters(2.0, 0.0, 0.0));
     CHECK_THAT(loads.moment.numerical_value_in(newton_meter).eigen().y(),
                WithinAbs(20.0, 1e-12));
   }

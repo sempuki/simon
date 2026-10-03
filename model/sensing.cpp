@@ -59,7 +59,7 @@ auto sense_flight_state(const RigidBody& body, const BodyAcceleration& felt,
           uvw.norm() / here.speed_of_sound.numerical_value_in(meter_per_second);
       values[MACH] = mach;
       if (controls.reads(CALIBRATED_AIRSPEED)) {
-        values[CALIBRATED_AIRSPEED] = calibrated_airspeed(mach, here)
+        values[CALIBRATED_AIRSPEED] = compute_calibrated_airspeed(mach, here)
                                           .numerical_value_in(meter_per_second);
       }
     }
@@ -83,7 +83,8 @@ auto sense_flight_state(const RigidBody& body, const BodyAcceleration& felt,
   // center of mass, in g.
   if (controls.reads(PILOT_ACCELERATION_Y) ||
       controls.reads(PILOT_ACCELERATION_Z)) {
-    Vector3 eye = eigen(body_offset(aircraft.eye_point, mass.center_of_mass));
+    Vector3 eye =
+        eigen(compute_body_offset(aircraft.eye_point, mass.center_of_mass));
     Vector3 turning = eigen(body.rate);
     Vector3 pilot = eigen(felt.specific_force) +
                     eigen(felt.angular).cross(eye) +

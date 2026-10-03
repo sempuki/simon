@@ -87,8 +87,8 @@ auto spool_rate(double rate, double n2_fraction, double density_ratio)
 
 }  // namespace
 
-auto steady_turbine(const TurbineData& turbine, double throttle,
-                    const EngineAir& air) -> TurbineState {
+auto compute_steady_turbine(const TurbineData& turbine, double throttle,
+                            const EngineAir& air) -> TurbineState {
   double fraction = std::clamp(throttle, 0.0, 1.0);
   double reheat = reheat_of(turbine, throttle);
   double gross = gross_thrust(turbine, air, fraction);

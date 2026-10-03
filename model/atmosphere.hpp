@@ -56,7 +56,7 @@ inline auto pressure_exponent() -> double {
 }  // namespace internal
 
 // The geopotential altitude of a geometric `altitude`.
-inline auto geopotential(Length altitude) -> Length {
+inline auto compute_geopotential(Length altitude) -> Length {
   using internal::EARTH_RADIUS;
   return EARTH_RADIUS * altitude / (EARTH_RADIUS + altitude);
 }
@@ -64,7 +64,7 @@ inline auto geopotential(Length altitude) -> Length {
 namespace internal {
 
 // The air at geopotential altitude `h`, at most the ceiling's.
-inline auto air_at_geopotential(Length h) -> Air {
+inline auto compute_air_at_geopotential(Length h) -> Air {
   Temperature temperature = TROPOPAUSE_TEMPERATURE;
   Pressure pressure = 0.0 * pascal;
   if (h <= TROPOPAUSE) {
@@ -94,8 +94,8 @@ inline auto air_at_geopotential(Length h) -> Air {
 // The air at `altitude` above sea level, geometric. Altitudes above 20 km get
 // the air at 20 km.
 inline auto standard_air(Length altitude) -> Air {
-  return internal::air_at_geopotential(
-      geopotential(std::min(altitude, internal::CEILING)));
+  return internal::compute_air_at_geopotential(
+      compute_geopotential(std::min(altitude, internal::CEILING)));
 }
 
 // The standard atmosphere, tabulated every `spacing` from sea level to 20 km
@@ -107,20 +107,20 @@ class StandardAirTable final {
  public:
   explicit StandardAirTable(Length spacing = 100.0 * meter)
       : spacing_{spacing},
-        top_{number_of(geopotential(internal::CEILING) / spacing)} {
+        top_{number_of(compute_geopotential(internal::CEILING) / spacing)} {
     // The last breakpoint may lie past the ceiling, still in the isothermal
     // layer.
     auto points = static_cast<std::size_t>(std::ceil(top_)) + 1;
     air_.reserve(points);
     for (std::size_t i = 0; i < points; ++i) {
-      air_.push_back(
-          internal::air_at_geopotential(static_cast<double>(i) * spacing_));
+      air_.push_back(internal::compute_air_at_geopotential(
+          static_cast<double>(i) * spacing_));
     }
   }
 
   auto operator()(Length altitude) const -> Air {
-    double position =
-        std::clamp(number_of(geopotential(altitude) / spacing_), 0.0, top_);
+    double position = std::clamp(
+        number_of(compute_geopotential(altitude) / spacing_), 0.0, top_);
     auto i = std::min(static_cast<std::size_t>(position), air_.size() - 2);
     double weight = position - static_cast<double>(i);
 
@@ -144,7 +144,7 @@ class StandardAirTable final {
 // isentropic below Mach 1 and behind a normal shock above it, read back as
 // the Mach number that makes it at sea level. The air's pressure follows from
 // its density and speed of sound, which for an ideal gas fix it.
-inline auto calibrated_airspeed(double mach, const Air& air) -> Speed {
+inline auto compute_calibrated_airspeed(double mach, const Air& air) -> Speed {
   using internal::HEAT_RATIO;
   using internal::SEA_LEVEL_PRESSURE;
   double sound = air.speed_of_sound.numerical_value_in(meter_per_second);
@@ -185,7 +185,7 @@ inline auto calibrated_airspeed(double mach, const Air& air) -> Speed {
     }
   }
   return sea_level_mach *
-         internal::air_at_geopotential(0.0 * meter).speed_of_sound;
+         internal::compute_air_at_geopotential(0.0 * meter).speed_of_sound;
 }
 
 }  // namespace simon::model

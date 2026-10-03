@@ -43,11 +43,10 @@ auto compute_aero_inputs(const RigidBody& body, const FlightSignals& signals,
 // moments read is this step's exact one, as long as no force reads it; if one
 // does, the forces are found again with it, from the rate of the air velocity
 // (see compute_air_acceleration). It writes what the body feels to `felt`.
-auto rigid_aircraft_rate(const RigidBody& body, const FlightSignals& signals,
-                         const Engines& engines, const MassBalance& mass,
-                         const AircraftData& aircraft, const Earth& earth,
-                         const StandardAirTable& air, const Wind& wind,
-                         Time time, Out<BodyAcceleration> felt)
-    -> RigidBodyRate;
+auto compute_rigid_aircraft_rate(
+    const RigidBody& body, const FlightSignals& signals, const Engines& engines,
+    const MassBalance& mass, const AircraftData& aircraft, const Earth& earth,
+    const StandardAirTable& air, const Wind& wind, Time time,
+    Out<BodyAcceleration> felt) -> RigidBodyRate;
 
 }  // namespace simon::model

@@ -25,7 +25,7 @@
 //
 // Everything here is a plain number in SI units, because the terms are data:
 // a term in a force axis yields newtons, a term in a moment axis newton
-// meters. aero_loads turns the sums into typed forces and moments.
+// meters. compute_aero_loads turns the sums into typed forces and moments.
 namespace simon::model {
 
 // The aerodynamic state's variables. Each is in SI units, or a plain number.
@@ -181,9 +181,9 @@ auto compute_wind_angles(const Vector3& air_velocity) -> WindAngles;
 // The sums as body-axis loads, at angle of attack `alpha` and sideslip
 // `beta`, with the aerodynamic reference point `reference` from the center of
 // mass in body axes (x forward, y right, z down).
-auto aero_loads(const AeroSums& sums, const WindAngles& wind,
-                const Displacement& reference) -> AeroLoads;
-auto aero_loads(const AeroSums& sums, Angle alpha, Angle beta,
-                const Displacement& reference) -> AeroLoads;
+auto compute_aero_loads(const AeroSums& sums, const WindAngles& wind,
+                        const Displacement& reference) -> AeroLoads;
+auto compute_aero_loads(const AeroSums& sums, Angle alpha, Angle beta,
+                        const Displacement& reference) -> AeroLoads;
 
 }  // namespace simon::model

@@ -31,9 +31,9 @@ inline auto limit(const Acceleration& acceleration, AccelerationMagnitude limit)
 //
 // where r and v are the target's position and velocity relative to `self`.
 // Returns zero when the target is at `self`.
-inline auto proportional_navigation(const Kinematics& self,
-                                    const Kinematics& target, double gain)
-    -> Acceleration {
+inline auto compute_proportional_navigation(const Kinematics& self,
+                                            const Kinematics& target,
+                                            double gain) -> Acceleration {
   Displacement relative_position = target.position - self.position;
   Velocity relative_velocity = target.velocity - self.velocity;
   auto range = norm(relative_position);

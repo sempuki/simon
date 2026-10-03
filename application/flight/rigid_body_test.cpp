@@ -57,11 +57,11 @@ TEST_CASE("RigidBody737") {
                          body.position.numerical_value_in(meter).eigen()} *
           meter;
       QuantityVector gravity{to_fixed.transpose() *
-                             wgs84::gravitation(fixed)
+                             wgs84::compute_gravitation(fixed)
                                  .numerical_value_in(meter_per_second_squared)
                                  .eigen()};
 
-      RigidBodyRate rate = rigid_body_rate(
+      RigidBodyRate rate = compute_rigid_body_rate(
           body, read_vector(row, "force_x", "force_y", "force_z") * newton,
           read_vector(row, "moment_x", "moment_y", "moment_z") * newton_meter,
           mass, gravity * meter_per_second_squared);
@@ -138,7 +138,7 @@ TEST_CASE("RigidBody737") {
                                row.at("fuel_2") * kilogram};
       MassBalance balance = compute_mass_balance(*aircraft, fuel);
       Displacement reference =
-          body_offset(aircraft->aero_reference, balance.center_of_mass);
+          compute_body_offset(aircraft->aero_reference, balance.center_of_mass);
       AeroInputs inputs = compute_aero_inputs(body, FlightSignals{}, *aircraft,
                                               reference, earth, air, time);
 

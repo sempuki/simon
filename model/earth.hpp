@@ -125,7 +125,7 @@ inline auto fixed_to_geodetic(const Position& fixed) -> Geodetic {
 // The gravitational acceleration at an ECEF position, to the J2 term. It
 // leaves out the centrifugal acceleration of the Earth's rotation, which
 // comes from the equations of motion.
-inline auto gravitation(const Position& fixed) -> Acceleration {
+inline auto compute_gravitation(const Position& fixed) -> Acceleration {
   QuantityVector xyz = fixed.numerical_value_in(meter);
   double r = magnitude(xyz);
   double sin_latitude = xyz.eigen().z() / r;  // Geocentric.

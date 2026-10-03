@@ -87,8 +87,8 @@ TEST_CASE("CalibratedAirspeed") {
           Point{6000.0, 0.83694263780500477, 202.75850442467558},
           Point{10000.0, 1.2323001259090951, 239.8446487478603},
           Point{15000.0, 1.7342033881976764, 242.57718268966568}}) {
-      Speed speed =
-          calibrated_airspeed(point.mach, standard_air(point.altitude * meter));
+      Speed speed = compute_calibrated_airspeed(
+          point.mach, standard_air(point.altitude * meter));
       CAPTURE(point.altitude);
       CHECK_THAT(speed.numerical_value_in(meter_per_second),
                  WithinRel(point.calibrated, 1e-5));

@@ -83,13 +83,13 @@ TEST_CASE("Gravitation") {
     // the poles (WGS84); gravitation is that plus the centrifugal part.
     double centrifugal = ROTATION_RATE * ROTATION_RATE * SEMIMAJOR_AXIS;
     double equator =
-        magnitude(gravitation(geodetic_to_fixed(Geodetic{}))
+        magnitude(compute_gravitation(geodetic_to_fixed(Geodetic{}))
                       .numerical_value_in(meter_per_second_squared));
     CHECK_THAT(equator - centrifugal, WithinRel(9.7803253, 1e-4));
-    double pole =
-        magnitude(gravitation(geodetic_to_fixed(
-                                  Geodetic{.latitude = 90.0 * DEGREE * radian}))
-                      .numerical_value_in(meter_per_second_squared));
+    double pole = magnitude(
+        compute_gravitation(
+            geodetic_to_fixed(Geodetic{.latitude = 90.0 * DEGREE * radian}))
+            .numerical_value_in(meter_per_second_squared));
     CHECK_THAT(pole, WithinRel(9.8321849, 1e-4));
   }
 }

@@ -41,8 +41,8 @@ struct TurbineState final {
 
 // A turbine settled at `throttle` (from 0 to 1, or to 2 with reheat) in
 // `air`.
-auto steady_turbine(const TurbineData& turbine, double throttle,
-                    const EngineAir& air) -> TurbineState;
+auto compute_steady_turbine(const TurbineData& turbine, double throttle,
+                            const EngineAir& air) -> TurbineState;
 
 // `state` advanced by `dt` at `throttle` in `air`.
 auto run_turbine(const TurbineData& turbine, const TurbineState& state,

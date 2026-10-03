@@ -61,8 +61,8 @@ TEST_CASE("RigidBody") {
 
     for (int i = 0; i < 120 * 60; ++i) {
       body = runge_kutta(body, [&](const RigidBody& b) {
-        return rigid_body_rate(b, zero_force(), zero_moment(), mass,
-                               no_gravity());
+        return compute_rigid_body_rate(b, zero_force(), zero_moment(), mass,
+                                       no_gravity());
       });
     }
     CHECK((momentum(body) - start).norm() < 1e-8);
@@ -77,7 +77,8 @@ TEST_CASE("RigidBody") {
     Acceleration gravity = meters_per_second_squared(0.0, 0.0, -9.8);
     for (int i = 0; i < 120; ++i) {
       body = runge_kutta(body, [&](const RigidBody& b) {
-        return rigid_body_rate(b, zero_force(), zero_moment(), mass, gravity);
+        return compute_rigid_body_rate(b, zero_force(), zero_moment(), mass,
+                                       gravity);
       });
     }
     // After 120 steps of 8.333 ms.
@@ -93,8 +94,8 @@ TEST_CASE("RigidBody") {
     RigidBody body{.attitude = Quaternion{
                        AngleAxis{std::numbers::pi / 2.0, Vector3::UnitZ()}}};
     RigidBodyRate rate =
-        rigid_body_rate(body, QuantityVector{4.0, 0.0, 0.0} * newton,
-                        zero_moment(), mass, no_gravity());
+        compute_rigid_body_rate(body, QuantityVector{4.0, 0.0, 0.0} * newton,
+                                zero_moment(), mass, no_gravity());
     CHECK(rate.acceleration.numerical_value_in(meter_per_second_squared)
               .is_approximately(QuantityVector{0.0, 2.0, 0.0}));
   }

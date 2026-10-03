@@ -37,7 +37,7 @@ TEST_CASE("PointMassRate") {
 
   SECTION("ShouldHoldPathGivenLevelUnbankedFlight") {
     AirStateRate rate =
-        point_mass_rate(level(200.0, 0.0), FlightControls{}, JET, air);
+        compute_point_mass_rate(level(200.0, 0.0), FlightControls{}, JET, air);
 
     CHECK_THAT(rate.climb.numerical_value_in(radian_per_second),
                WithinAbs(0.0, 1e-12));
@@ -53,7 +53,8 @@ TEST_CASE("PointMassRate") {
     double bank = PI / 3.0;
     FlightControls controls{.load_factor = 1.0 / std::cos(bank),
                             .bank = bank * radian};
-    AirStateRate rate = point_mass_rate(level(200.0, 0.0), controls, JET, air);
+    AirStateRate rate =
+        compute_point_mass_rate(level(200.0, 0.0), controls, JET, air);
 
     CHECK_THAT(rate.climb.numerical_value_in(radian_per_second),
                WithinAbs(0.0, 1e-12));
@@ -70,7 +71,8 @@ TEST_CASE("PointMassRate") {
     double throttle = drag / (100000.0 * rho / 1.225);
     FlightControls controls{.throttle = throttle};
 
-    AirStateRate rate = point_mass_rate(level(200.0, 0.0), controls, JET, air);
+    AirStateRate rate =
+        compute_point_mass_rate(level(200.0, 0.0), controls, JET, air);
 
     CHECK_THAT(rate.acceleration.numerical_value_in(meter_per_second_squared),
                WithinAbs(0.0, 1e-9));
@@ -95,8 +97,8 @@ TEST_CASE("Fly") {
     state.flight_path_angle = 0.1 * radian;
     FlightControls controls{
         .load_factor = 1.5, .bank = 0.6 * radian, .throttle = 0.5};
-    AirStateRate rate =
-        point_mass_rate(state, controls, JET, standard_air(5000.0 * meter));
+    AirStateRate rate = compute_point_mass_rate(state, controls, JET,
+                                                standard_air(5000.0 * meter));
 
     AirState next = fly(state, rate, 20ms);
     QuantityVector expected =
@@ -130,35 +132,35 @@ TEST_CASE("Fly") {
 
 TEST_CASE("AutopilotLaws") {
   SECTION("ShouldClimbAtMostSteepestGivenFarBelowAltitude") {
-    Angle gamma = climb_command(level(200.0, 0.0), 9000.0 * meter,
-                                0.2 * per_second, 0.25 * radian);
+    Angle gamma = compute_climb_command(level(200.0, 0.0), 9000.0 * meter,
+                                        0.2 * per_second, 0.25 * radian);
     CHECK(radians(gamma) == 0.25);
   }
 
   SECTION("ShouldClimbGentlyGivenNearAltitude") {
-    Angle gamma = climb_command(level(200.0, 0.0), 5100.0 * meter,
-                                0.2 * per_second, 0.25 * radian);
+    Angle gamma = compute_climb_command(level(200.0, 0.0), 5100.0 * meter,
+                                        0.2 * per_second, 0.25 * radian);
     CHECK_THAT(radians(gamma), WithinRel(std::asin(20.0 / 200.0), 1e-12));
   }
 
   SECTION("ShouldHoldOneGGivenLevelPathAndNoBank") {
-    double n = load_factor_command(level(200.0, 0.0), 0.0 * radian,
-                                   0.0 * radian, 1.0 * per_second);
+    double n = compute_load_factor_command(level(200.0, 0.0), 0.0 * radian,
+                                           0.0 * radian, 1.0 * per_second);
     CHECK_THAT(n, WithinAbs(1.0, 1e-12));
   }
 
   SECTION("ShouldTurnTheShortWayGivenTargetAcrossSouth") {
     // From 170 degrees to -170 degrees is 20 degrees to the right.
-    Angle bank = bank_command(level(200.0, 170.0 * PI / 180.0),
-                              -170.0 * PI / 180.0 * radian, 0.5 * per_second,
-                              1.0 * radian);
+    Angle bank = compute_bank_command(level(200.0, 170.0 * PI / 180.0),
+                                      -170.0 * PI / 180.0 * radian,
+                                      0.5 * per_second, 1.0 * radian);
     CHECK(radians(bank) > 0.0);
   }
 
   SECTION("ShouldMeasureBearingFromNorthTowardEast") {
-    CHECK_THAT(radians(bearing(meters(0, 0, 0), meters(10, 0, 0))),
+    CHECK_THAT(radians(compute_bearing(meters(0, 0, 0), meters(10, 0, 0))),
                WithinAbs(PI / 2.0, 1e-12));
-    CHECK_THAT(radians(bearing(meters(0, 0, 0), meters(0, 10, 0))),
+    CHECK_THAT(radians(compute_bearing(meters(0, 0, 0), meters(0, 10, 0))),
                WithinAbs(0.0, 1e-12));
     CHECK(ground_distance(meters(0, 0, 0), meters(3, 4, 100)) == 5.0 * meter);
   }

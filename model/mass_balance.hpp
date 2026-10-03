@@ -42,7 +42,7 @@ auto compute_mass_balance(const AircraftData& aircraft, const FuelTanks& tanks)
     -> MassBalance;
 
 // A point in the structural frame, from the center of mass, in body axes.
-auto body_offset(const Displacement& structural,
-                 const Displacement& center_of_mass) -> Displacement;
+auto compute_body_offset(const Displacement& structural,
+                         const Displacement& center_of_mass) -> Displacement;
 
 }  // namespace simon::model

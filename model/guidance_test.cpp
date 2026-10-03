@@ -22,7 +22,7 @@ TEST_CASE("ProportionalNavigation") {
     target.position = meters(1000.0, 0.0, 0.0);
     target.velocity = meters_per_second(-50.0, 0.0, 0.0);
 
-    CHECK(value_of(proportional_navigation(self, target, 4.0))
+    CHECK(value_of(compute_proportional_navigation(self, target, 4.0))
               .is_approximately(QuantityVector{0.0, 0.0, 0.0}));
   }
 
@@ -33,7 +33,7 @@ TEST_CASE("ProportionalNavigation") {
     target.velocity = meters_per_second(0.0, 50.0, 0.0);
 
     QuantityVector command =
-        value_of(proportional_navigation(self, target, 3.0));
+        value_of(compute_proportional_navigation(self, target, 3.0));
 
     // omega = (r x v)/|r|^2 = 0.05 rad/s about z; Vc = 100 m/s;
     // a = 3 * 100 * 0.05 = 15 m/s^2 along +y.
@@ -41,7 +41,7 @@ TEST_CASE("ProportionalNavigation") {
   }
 
   SECTION("ShouldCommandNothingGivenTargetAtSelf") {
-    CHECK(value_of(proportional_navigation(self, target, 4.0)) ==
+    CHECK(value_of(compute_proportional_navigation(self, target, 4.0)) ==
           QuantityVector{0.0, 0.0, 0.0});
   }
 }

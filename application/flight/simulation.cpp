@@ -220,9 +220,10 @@ auto build_scenario(const Scenario& scenario, const RigidTypes& types,
                                random.uniform(lowest, highest));
     }
     Position start = model::meters(x, y, random.uniform(lowest, highest));
-    AirState state{.position = start,
-                   .speed = route.speed,
-                   .heading = model::bearing(start, route.waypoints[0])};
+    AirState state{
+        .position = start,
+        .speed = route.speed,
+        .heading = model::compute_bearing(start, route.waypoints[0])};
     if (i < simple) {
       RETURN_IF_UNEXPECTED(
           create_aircraft<archetype::Aircraft>(scenario, state, route, world));
