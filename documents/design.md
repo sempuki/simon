@@ -2882,6 +2882,33 @@ three vehicles, a Ford Escort, a BMW 320i and a VW Vanagon:
 | Paths over 20 s of steering and acceleration steps, by the same Runge-Kutta 4 at 0.05 s | 1.9e-13 m |
 | The same paths at 0.05 s against 0.0005 s | 0.23 mm |
 
+#### Drivers
+
+`model/traffic` holds the drivers' models: the Intelligent Driver Model for
+following, in the form of Treiber and Kesting's *Traffic Flow Dynamics*, its
+desired gap never less than the minimum gap, and MOBIL for changing lanes, by
+its symmetric criterion with a bias toward the right lane. MOBIL weighs a
+change by the accelerations it brings this driver and, by its politeness,
+both followers, and refuses one that brakes the new follower harder than its
+safe deceleration.
+
+Its authors' own implementation, movsim's traffic-simulation.de, is a
+variant: a linear free-road term above the desired speed, the gap held at
+the minimum gap, braking capped at 18 m/s^2, and a MOBIL whose safe
+deceleration changes with speed and which leaves out the old follower.
+`traffic_test` checks simon against it where the two agree with the published
+models, and checks a platoon against SUMO:
+
+| Check | Agreement |
+|---|---:|
+| IDM accelerations at 1,000 gaps and speeds, for four drivers, against movsim | 1e-14 |
+| MOBIL decisions at 1,000 sets of accelerations, to either side, against movsim | All 1,000 |
+| Five IDM followers behind a leader that brakes and speeds up, 80 s, simon by Runge-Kutta 4 at 0.1 s against SUMO at 0.001 s | 1.07 cm |
+
+SUMO's Euler update is first order: at its usual 0.1 s step it is 1.06 m from
+its own converged platoon, so the 1.07 cm is its error at 0.001 s; simon at
+0.1 s is within 0.1 mm of its own converged platoon.
+
 ## Libraries
 
 | Need | Library |

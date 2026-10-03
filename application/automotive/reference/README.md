@@ -17,9 +17,13 @@ OpenDRIVE library that renders and queries road networks, on the roads in
 | `make_test_roads.py` | `../roads/curves.xodr`, `../roads/paramPoly3.xodr` | `opendrive_reference_test` |
 | `libopendrive_reference.cpp` | `libopendrive_positions.csv`, `libopendrive_borders.csv`, `libopendrive_lanes.csv`, `libopendrive_successors.csv` (its routing graph) | `opendrive_reference_test` |
 | `commonroad_kinematic.py` | `commonroad_parameters.csv`, `commonroad_rates.csv`, `commonroad_paths.csv`: CommonRoad's kinematic single-track model ([commonroad-vehicle-models](https://commonroad.in.tum.de), BSD) | `single_track_test` |
+| `movsim_reference.js` | `movsim_idm.csv`, `movsim_mobil.csv`: IDM and MOBIL as their authors implement them ([traffic-simulation.de](https://github.com/movsim/traffic-simulation-de), GPL-3.0) | `traffic_test` |
+| `sumo_platoon.py` | `sumo_platoon.csv`: a platoon of IDM followers in [SUMO](https://eclipse.dev/sumo) (EPL-2.0), at 0.1 s and 0.001 s | `traffic_test` |
 | `exact_param_poly3.py` | `exact_positions.csv`: the parametric cubics by exact arc length | `opendrive_reference_test` |
 
 `make_test_roads.py` and `exact_param_poly3.py` need NumPy, and
-`commonroad_kinematic.py` also needs `pip install commonroad-vehicle-models`. Each script says
+`commonroad_kinematic.py` also needs `pip install commonroad-vehicle-models`,
+and `sumo_platoon.py` `pip install eclipse-sumo traci`. `movsim_reference.js`
+runs under Node.js beside a clone of movsim. Each script says
 how to run it in its docstring; `libopendrive_reference.cpp` is built beside
 libOpenDRIVE with CMake, outside simon's build.

@@ -46,3 +46,20 @@ cc_test(
         "@lib//base:testing",
     ],
 )
+
+cc_test(
+    name = "traffic_test",
+    size = "small",
+    srcs = ["traffic_test.cpp"],
+    copts = COPTS,
+    data = [
+        "reference/movsim_idm.csv",
+        "reference/movsim_mobil.csv",
+        "reference/sumo_platoon.csv",
+    ],
+    deps = [
+        ":testing",
+        "//model:traffic",
+        "@lib//base:testing",
+    ],
+)

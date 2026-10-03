@@ -340,6 +340,13 @@ cc_library(
 )
 
 cc_library(
+    name = "traffic",
+    hdrs = ["traffic.hpp"],
+    copts = COPTS,
+    deps = [":units"],
+)
+
+cc_library(
     name = "opendrive",
     srcs = ["opendrive.cpp"],
     hdrs = ["opendrive.hpp"],
