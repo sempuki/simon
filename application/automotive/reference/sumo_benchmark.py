@@ -3,9 +3,9 @@
 """Times SUMO driving the traffic automotive_benchmark drives, for the
 comparison in design.md.
 
-SUMO (https://eclipse.dev/sumo, EPL-2.0) converts rings.xodr with netconvert
-and drives 1,000, 10,000 and 100,000 vehicles on it, each following by SUMO's
-IDM (v0 = 30 m/s, spread by 10%, T = 1 s, s0 = 2 m, a = 1 m/s^2,
+SUMO (https://eclipse.dev/sumo, EPL-2.0) converts rings.xodr with netconvert,
+with a speed limit of 30 m/s, and drives 1,000, 10,000 and 100,000 vehicles on it, each following by SUMO's
+IDM (v0 = 30 m/s spread uniformly by 10%, T = 1 s, s0 = 2 m, a = 1 m/s^2,
 b = 1.5 m/s^2, delta = 4) and changing lanes by SUMO's default LC2013. The
 vehicles start at 25 m/s, spread at random over the lanes, and each loops its
 ring. SUMO runs on one thread with 0.1 s steps, as simon does, and without
@@ -66,7 +66,7 @@ def routes(net, vehicles, path):
         f.write('<routes>\n'
                 '  <vType id="idm" carFollowModel="IDM" length="4.5" minGap="2" '
                 'accel="1" decel="1.5" emergencyDecel="9" tau="1" delta="4" '
-                'maxSpeed="60" desiredMaxSpeed="30" speedFactor="normc(1,0.0577,0.9,1.1)" '
+                'maxSpeed="60" '
                 'laneChangeModel="LC2013"/>\n')
         for e in edges:
             f.write('  <route id="r%s" edges="%s"/>\n'
@@ -81,7 +81,8 @@ def routes(net, vehicles, path):
                     break
             f.write('  <vehicle id="v%d" type="idm" route="r%s" depart="0" '
                     'departLane="%d" departPos="%.2f" departSpeed="25" '
-                    'insertionChecks="none"/>\n' % (n, edge.getID(), lane, pos))
+                    'speedFactor="%.4f" insertionChecks="none"/>\n'
+                    % (n, edge.getID(), lane, pos, rng.uniform(0.9, 1.1)))
         f.write('</routes>\n')
 
 
@@ -103,7 +104,8 @@ def main():
     with tempfile.TemporaryDirectory() as directory:
         net = os.path.join(directory, 'rings.net.xml')
         subprocess.run([binary('netconvert'), '--opendrive-files', ROADS,
-                        '-o', net], check=True, capture_output=True)
+                        '--speed.minimum', '30', '-o', net],
+                       check=True, capture_output=True)
         network = sumolib.net.readNet(net)
         for vehicles in populations:
             path = os.path.join(directory, 'routes.rou.xml')

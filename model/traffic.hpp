@@ -46,7 +46,12 @@ inline auto compute_idm_acceleration(const IntelligentDriver& driver,
   double v0 = driver.desired_speed.numerical_value_in(meter_per_second);
   double a = driver.acceleration.numerical_value_in(meter_per_second_squared);
   double b = driver.deceleration.numerical_value_in(meter_per_second_squared);
-  double free = 1.0 - std::pow(v / v0, driver.exponent);
+  // The usual exponent of 4 by squaring twice, a tenth of pow's cost.
+  double ratio = v / v0;
+  double squared = ratio * ratio;
+  double free =
+      1.0 - (driver.exponent == 4.0 ? squared * squared
+                                    : std::pow(ratio, driver.exponent));
   double interaction = 0.0;
   if (leader) {
     double approach = v - leader->speed.numerical_value_in(meter_per_second);
@@ -54,8 +59,8 @@ inline auto compute_idm_acceleration(const IntelligentDriver& driver,
         driver.minimum_gap.numerical_value_in(meter) +
         std::max(0.0, v * driver.time_headway.numerical_value_in(second) +
                           v * approach / (2.0 * std::sqrt(a * b)));
-    double ratio = wanted / leader->gap.numerical_value_in(meter);
-    interaction = ratio * ratio;
+    double crowding = wanted / leader->gap.numerical_value_in(meter);
+    interaction = crowding * crowding;
   }
   return a * (free - interaction) * meter_per_second_squared;
 }

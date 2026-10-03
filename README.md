@@ -296,9 +296,14 @@ Model and change lanes by MOBIL, matching their authors' implementation, and
 a platoon follows SUMO's to its converged solution: 1 cm, where SUMO at its
 usual step is 1 m off.
 
+At scale, 100,000 vehicles on 3,770 km of lanes step in 25 ms on one
+thread, 248 ns a vehicle, where SUMO takes 6.5 µs a vehicle on the same
+network and drivers.
+
 ```sh
 bazel test //application/automotive/...
 bazel run -c opt //application/automotive -- application/automotive/roads/Town01.xodr 60 120
+bazel run -c opt //application/automotive:automotive_benchmark
 ```
 
 ## Build

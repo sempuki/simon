@@ -2803,8 +2803,8 @@ can carry a driving simulation comparable to the best open source, as
 aeronautic does against JSBSim, with each claim checked against an open
 reference: roads against libOpenDRIVE, vehicles against CommonRoad's models
 and Chrono::Vehicle, traffic against SUMO, scenarios against esmini. It is
-being built in eight steps (see the [Roadmap](#roadmap)); the first, roads,
-is done.
+being built in eight steps (see the [Roadmap](#roadmap)); the first three,
+roads, traffic and a scale benchmark, are done.
 
 #### Roads
 
@@ -2937,8 +2937,9 @@ Schedule (`application/automotive/simulation_systems.hpp`):
 
 - **A driver reads its neighbors from an index.** `Decide` writes only the
   command, so it may read every vehicle's lane state; its `prepare` sorts
-  them by lane and distance along, and leaders and followers are binary
-  searches. A leader is the next vehicle in the lane, else the first in the
+  them by lane and distance along. A vehicle's leader and follower in its own
+  lane sit beside it in the index, found through a table from entity to
+  place; in other lanes they are binary searches. A leader is the next vehicle in the lane, else the first in the
   lanes the vehicle's way leads into, within 250 m; a dead end is a leader
   standing still.
 - **A vehicle's way is fixed by its seed.** At a fork the lane is picked by
@@ -2956,6 +2957,41 @@ closer than 1.09 m, and change lanes 129 times, more of them ending in the
 right lane than the left; the same seed repeats exactly. In Town01, 60
 vehicles enter 1,573 lanes through its junctions in 120 s, at 10.2 of their
 11 m/s.
+
+#### Scale
+
+`automotive_benchmark` drives 1,000, 10,000 and 100,000 vehicles on 100
+rings of 1 km radius, three lanes each way, 3,770 km of lanes in all
+(`roads/rings.xodr`). Drivers want 30 m/s, spread uniformly by 10%, and
+start at 25 m/s; steps are 0.1 s. After 60 s of settling it times 300 steps,
+each system on its own, on one thread. `reference/sumo_benchmark.py` drives
+the same network, converted by netconvert, in SUMO 1.27.1: the same IDM
+drivers, SUMO's LC2013 for changing lanes, one thread, no output, no
+teleporting and no TraCI, timed by SUMO's own duration over the same 300
+steps. Both run on an AMD Ryzen 9 5900XT.
+
+| Vehicles | simon, ns per vehicle-step | SUMO, ns per vehicle-step | SUMO / simon | Mean speed at the end, simon / SUMO |
+|---:|---:|---:|---:|---:|
+| 1,000 | 174 | 1,433 | 8.2 | 29.9 / 29.8 m/s |
+| 10,000 | 234 | 7,140 | 31 | 29.3 / 29.5 m/s |
+| 100,000 | 248 | 6,510 | 26 | 20.4 / 22.2 m/s |
+
+At 100,000 vehicles simon steps in 25 ms, four times faster than real time
+at 0.1 s steps; SUMO takes 651 ms, 6.5 times slower than real time. simon's
+step splits into `Decide` 57%, `FollowLane` 39% and `Drive` 3%. `Decide`'s
+cost is mostly its index, sorted each step, and the IDM's arithmetic;
+`FollowLane`'s is the road geometry, each vehicle's place found from its
+lane's middle on an arc.
+
+The two drive differently in detail, so the comparison is of cost at the
+same load. SUMO's lane changing is LC2013, simon's
+MOBIL, and SUMO updates by Euler where simon holds the acceleration over the
+step. At 100,000 vehicles, 26.5 vehicles a lane-kilometer, traffic is near
+the IDM's capacity at 30 m/s, and both slow down.
+
+Waymax is not measured. Its scenarios come from the Waymo Open Motion
+Dataset, whose license allows only non-commercial use, and its throughput
+depends on the accelerator it runs on, so no figure for it is quoted here.
 
 ## Libraries
 
@@ -3052,7 +3088,9 @@ Each step ends with a working application and passing tests.
    - Done: the lane graph, against libOpenDRIVE's routing graph; the
      kinematic single-track model, against CommonRoad's; IDM and MOBIL,
      against movsim and SUMO; traffic on lanes in the ECS.
-   - Next: a scale benchmark against SUMO and Waymax; single-track with tires
+   - Done: a scale benchmark against SUMO, 26 times SUMO's speed at 100,000
+     vehicles.
+   - Next: single-track with tires
      and multibody vehicles against CommonRoad's models; Chrono::Vehicle through the ISO
      maneuvers; OpenSCENARIO against esmini; metrics and batch runs; a
      viewer.

@@ -71,9 +71,15 @@ auto measure(const Network& network, int vehicles, int steps) -> void {
     timed(follow);
   }
 
+  double speeds = 0.0;
+  world.store_of<LaneState>().for_each([&](Entity, const LaneState& state) {
+    speeds += state.speed.numerical_value_in(model::meter_per_second);
+  });
+
   double total = seconds[0] + seconds[1] + seconds[2];
   double entity_steps = static_cast<double>(vehicles) * steps;
-  std::println("\n{} vehicles: {} steps of 0.1 s", vehicles, steps);
+  std::println("\n{} vehicles: {} steps of 0.1 s, ending at {:.1f} m/s",
+               vehicles, steps, speeds / vehicles);
   std::println("  total {:10.3f} ms/step {:10.1f} ns/entity-step",
                1e3 * total / steps, 1e9 * total / entity_steps);
   std::array<std::string_view, 3> names{"Decide", "Drive", "FollowLane"};

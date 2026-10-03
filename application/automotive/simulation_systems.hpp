@@ -107,11 +107,14 @@ inline auto find_neighbor(const Network& network, const LaneKey& lane,
 // followers. Collected before the step's decisions; the pointers stay valid
 // until the next sync point.
 class LaneOccupancy final {
+  static constexpr std::uint32_t NOWHERE = ~std::uint32_t{0};
+
  public:
   struct Occupant final {
     LaneKey lane;
-    double along = 0.0;  // m along the lane, its front bumper.
-    double speed = 0.0;  // m/s.
+    double along = 0.0;   // m along the lane, its front bumper.
+    double speed = 0.0;   // m/s.
+    double length = 0.0;  // m.
     std::uint32_t turns = 0;
     const Driver* driver = nullptr;
     Entity entity;
@@ -131,6 +134,7 @@ class LaneOccupancy final {
               .lane = state.lane,
               .along = along_lane(network, state.lane, state.s),
               .speed = state.speed.numerical_value_in(model::meter_per_second),
+              .length = driver->length.numerical_value_in(model::meter),
               .turns = state.turns,
               .driver = driver,
               .entity = owner});
@@ -139,11 +143,33 @@ class LaneOccupancy final {
       return std::tie(a.lane, a.along, a.entity) <
              std::tie(b.lane, b.along, b.entity);
     });
+    lanes_.clear();
+    places_.assign(places_.size(), NOWHERE);
+    for (std::uint32_t i = 0; i < occupants_.size(); ++i) {
+      if (lanes_.empty() || lanes_.back().lane != occupants_[i].lane) {
+        lanes_.push_back(Span{.lane = occupants_[i].lane, .first = i});
+      }
+      lanes_.back().last = i + 1;
+      std::uint32_t index = occupants_[i].entity.index;
+      if (index >= places_.size()) {
+        places_.resize(index + 1, NOWHERE);
+      }
+      places_[index] = i;
+    }
   }
 
   // The first vehicle in `lane` ahead of `along`, but `self`.
   auto find_ahead(const LaneKey& lane, double along, Entity self) const
       -> const Occupant* {
+    // In its own lane, the vehicles ahead of `self` follow it.
+    if (std::uint32_t at = place_of(self, lane); at != NOWHERE) {
+      for (++at; at < occupants_.size() && occupants_[at].lane == lane; ++at) {
+        if (occupants_[at].along > along) {
+          return &occupants_[at];
+        }
+      }
+      return nullptr;
+    }
     auto [first, last] = in_lane(lane);
     for (auto it = std::upper_bound(first, last, along, by_along); it != last;
          ++it) {
@@ -157,6 +183,15 @@ class LaneOccupancy final {
   // The last vehicle in `lane` behind `along`, but `self`.
   auto find_behind(const LaneKey& lane, double along, Entity self) const
       -> const Occupant* {
+    // In its own lane, the vehicles behind `self` precede it.
+    if (std::uint32_t at = place_of(self, lane); at != NOWHERE) {
+      while (at > 0 && occupants_[--at].lane == lane) {
+        if (occupants_[at].along < along) {
+          return &occupants_[at];
+        }
+      }
+      return nullptr;
+    }
     auto [first, last] = in_lane(lane);
     for (auto it = std::lower_bound(first, last, along, after_along);
          it != first;) {
@@ -184,14 +219,36 @@ class LaneOccupancy final {
     return occupant.along < along;
   }
 
-  auto in_lane(const LaneKey& lane) const -> std::pair<Iterator, Iterator> {
-    auto first =
-        std::ranges::lower_bound(occupants_, lane, {}, &Occupant::lane);
-    auto last = std::ranges::upper_bound(occupants_, lane, {}, &Occupant::lane);
-    return {first, last};
+  // The occupants of one lane, as indices into the occupants.
+  struct Span final {
+    LaneKey lane;
+    std::uint32_t first = 0;
+    std::uint32_t last = 0;
+  };
+
+  // Where `self` is among the occupants, if it is in `lane`.
+  auto place_of(Entity self, const LaneKey& lane) const -> std::uint32_t {
+    if (self.index >= places_.size()) {
+      return NOWHERE;
+    }
+    std::uint32_t at = places_[self.index];
+    return at != NOWHERE && occupants_[at].entity == self &&
+                   occupants_[at].lane == lane
+               ? at
+               : NOWHERE;
   }
 
-  std::vector<Occupant> occupants_;
+  auto in_lane(const LaneKey& lane) const -> std::pair<Iterator, Iterator> {
+    auto span = std::ranges::lower_bound(lanes_, lane, {}, &Span::lane);
+    if (span == lanes_.end() || span->lane != lane) {
+      return {occupants_.end(), occupants_.end()};
+    }
+    return {occupants_.begin() + span->first, occupants_.begin() + span->last};
+  }
+
+  std::vector<Occupant> occupants_;    // By lane, then along it.
+  std::vector<Span> lanes_;            // Each occupied lane, in order.
+  std::vector<std::uint32_t> places_;  // Each entity's place, by its index.
 };
 
 //-- Systems -------------------------------------------------------------------
@@ -280,11 +337,8 @@ struct Decide final            //
   // A leader `apart` meters ahead, front bumper to front bumper.
   static auto gap_to(const LaneOccupancy::Occupant& leader, double apart)
       -> model::Leader {
-    return model::Leader{
-        .gap =
-            (apart - leader.driver->length.numerical_value_in(model::meter)) *
-            model::meter,
-        .speed = leader.speed * model::meter_per_second};
+    return model::Leader{.gap = (apart - leader.length) * model::meter,
+                         .speed = leader.speed * model::meter_per_second};
   }
 
   // MOBIL's accelerations for changing from `state`'s lane to `target`: this
@@ -430,12 +484,13 @@ struct FollowLane final    //
     const model::Road& road = network.roads.roads[state.lane.road];
     Length middle =
         model::compute_lane_middle(network.roads, state.lane, state.s);
-    double heading = model::compute_plan_point(road, state.s).heading;
+    model::PlanPoint point = model::compute_plan_point(road, state.s);
+    double heading = point.heading;
     if (!model::runs_with_s(state.lane)) {
       heading += std::numbers::pi;
     }
     return VehiclePose{
-        .position = model::compute_road_position(road, state.s, middle),
+        .position = model::compute_road_position(road, point, state.s, middle),
         .heading = heading * model::radian};
   }
 

@@ -189,6 +189,10 @@ auto compute_plan_point(const Road& road, Length s) -> PlanPoint;
 auto compute_road_position(const Road& road, Length s, Length t,
                            Length h = 0.0 * meter) -> Position;
 
+// The same, given the reference line's point at `s`.
+auto compute_road_position(const Road& road, const PlanPoint& point, Length s,
+                           Length t, Length h = 0.0 * meter) -> Position;
+
 // The lane section in force at `s`: the last that starts at or before it.
 auto find_lane_section(const Road& road, Length s) -> const LaneSection&;
 

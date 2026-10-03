@@ -226,15 +226,22 @@ auto compute_plan_point(const Road& road, Length s) -> PlanPoint {
 // perpendicular, gives cos(angle) n + sin(angle) e_s x n (Rodrigues).
 auto compute_road_position(const Road& road, Length s, Length t, Length h)
     -> Position {
+  return compute_road_position(road, compute_plan_point(road, s), s, t, h);
+}
+
+auto compute_road_position(const Road& road, const PlanPoint& point, Length s,
+                           Length t, Length h) -> Position {
   double at = s.numerical_value_in(meter);
-  PlanPoint point = compute_plan_point(road, s);
   Vector3 along{std::cos(point.heading), std::sin(point.heading),
                 road.elevation.slope(at)};
   Vector3 e_s = along.normalized();
   Vector3 normal{-e_s.y(), e_s.x(), 0.0};
   double roll = road.superelevation.evaluate(at);
-  Vector3 e_t = (std::cos(roll) * normal + std::sin(roll) * e_s.cross(normal))
-                    .normalized();
+  Vector3 e_t =
+      roll == 0.0
+          ? normal.normalized()
+          : (std::cos(roll) * normal + std::sin(roll) * e_s.cross(normal))
+                .normalized();
   Vector3 e_h = along.cross(e_t).normalized();
   Vector3 position = Vector3{point.x, point.y, road.elevation.evaluate(at)} +
                      t.numerical_value_in(meter) * e_t +
