@@ -70,6 +70,24 @@ cc_binary(
     ],
 )
 
+cc_test(
+    name = "viewer_test",
+    size = "small",
+    srcs = ["viewer.cpp"],
+    args = ["--frames=60"],
+    copts = COPTS,
+    env = {"SDL_VIDEODRIVER": "dummy"},
+    deps = [
+        "//framework:vocabulary",
+        ":missile_library",
+        "//application:viewing",
+        "//engine:driver",
+        "@imgui",
+        "@implot",
+        "@lib//base:core",
+    ],
+)
+
 cc_binary(
     name = "missile_benchmark",
     srcs = ["missile_benchmark.cpp"],

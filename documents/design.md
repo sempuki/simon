@@ -469,13 +469,13 @@ the archetype's segment):
 | 100,000 | 1.92 | 3.17 | 1.51 | 1.47 | 1.3–2.2 |
 | 1,000,000 | 6.03 | 13.46 | 5.18 | 5.54 | 5.17 |
 
-A required sibling now costs what a handle or a structural walk costs. Over
-3,000 steps at 10,000 drones, the missile step went from 0.738 to 0.691 ms:
-`Integrate` from 0.060 to 0.041, `TriggerWarheads` from 0.105 to 0.070 and
-`SteerRedDrones` from 0.078 to 0.067. `ApplyBlasts` first went from 0.040 to
-0.056, because it walked the few blasts once per victim and a segmented walk
-has more fixed cost than an array. It now collects the step's blasts once in
-`prepare`, and takes 0.026, bringing the step to 0.66 ms.
+A required sibling costs what a handle or a structural walk costs. Over 3,000
+steps at 10,000 drones, the missile step takes 0.66 ms with segments, against
+0.738 ms with a lookup per sibling: `Integrate` 0.041 against 0.060,
+`TriggerWarheads` 0.070 against 0.105 and `SteerRedDrones` 0.067 against
+0.078. A segmented walk has more fixed cost than an array, so `ApplyBlasts`
+collects the step's few blasts once in `prepare` (0.026 ms) rather than
+walking them once per victim (0.056 ms).
 
 ### Handles and references
 
@@ -1386,26 +1386,26 @@ steps, after archetype segments:
 From 10,000 to 100,000 drones the cost per entity is nearly flat; the step
 from 1,000 is the working set leaving the core's caches.
 
-`UpdateTracks` did not scale at first: every radar scans on the same steps,
-and each track checked every scanning radar in the world, so it went from
-0.011 to 0.824 ms per step for ten times the population. Its `prepare` now
-indexes the step's scanning radars in a `SpatialIndex` with 4 km cells (about
-a radar's range), and each track asks for the nearest one whose range covers
-its target. That takes 0.018 and 0.218 ms per step, growing with the
-population. At 10,000 drones the old loop over 100 radars was cheaper; a query
-has fixed cost. With 1 km cells the query visited dozens of empty cells and
-took 0.499 ms at 100,000 drones, so cell size matters as much as the index.
+Every radar scans on the same steps, so `UpdateTracks` indexes the step's
+scanning radars in its `prepare`, in a `SpatialIndex` with 4 km cells (about a
+radar's range), and each track asks for the nearest one whose range covers its
+target. That takes 0.018 and 0.218 ms per step at 10,000 and 100,000 drones.
+Each track checking every scanning radar takes 0.011 and 0.824 ms: cheaper at
+10,000, where a query's fixed cost is more than a loop over 100 radars, and
+four times dearer at 100,000. With 1 km cells the query visits dozens of empty
+cells and takes 0.499 ms at 100,000 drones, so cell size matters as much as
+the index.
 
 So the index picks it. A `SpatialIndex` built without a cell size sizes its
 cells at every rebuild for about one point per cell over the box the points
 span, counting only the axes they spread along, so points on a plane get
 square cells and height is ignored. Choosing costs one pass over the points.
-`ProposeEngagements` had hard-coded 250 m cells for its track index. A
-launcher wants the nearest track nobody has engaged, which is often near its
-3 km range, so each search crossed about 540 cells and found about 57 tracks
-in them. With cells sized to the tracks it went from 0.635 to 0.268 ms per
-step at 100,000 drones, and from 0.054 to 0.021 ms at 10,000. The radar index
-already had a good size by hand and did not change. The world's own index sizes
+A launcher wants the nearest track nobody has engaged, which is often near
+its 3 km range, so with 250 m cells `ProposeEngagements`'s track index would
+cross about 540 cells and find about 57 tracks in them each search. With cells
+sized to the tracks it takes 0.268 ms per step at 100,000 drones against 0.635
+with 250 m cells, and 0.021 against 0.054 at 10,000. The radar index's 4 km
+cells are as good as the chosen size. The world's own index sizes
 itself the same way unless `cells_of` fixes it.
 
 Under contention (`missile_benchmark --contend=N`, N threads each streaming
@@ -1485,8 +1485,9 @@ reads, such as a copy of a value another component already holds.
 Archetype segments make splitting free. Components an archetype requires sit
 at the same slot of their stores, so a system reaches a required sibling
 without a lookup (see [Archetype segments](#archetype-segments)). A fat
-component used to save lookups; with segments it only costs bandwidth, because
-every system that reads one field streams the whole component.
+component saves no lookups when siblings are found by slot; it only costs
+bandwidth, because every system that reads one field streams the whole
+component.
 
 ```cpp
 // Thin components an archetype requires: Steer, Integrate and the spatial index
@@ -1567,16 +1568,16 @@ auto operator()(SystemWorld& world, Entity self,  //
 A check most entities fail should be cheap: `within_distance` compares squared
 distances, so it takes no square root. `model::limit` does the same for the
 common case, a command already within the limit, and takes a square root only
-to scale one down. That took `SteerRedDrones` from 0.72 to 0.59 ms per step at
-100,000 drones, and `GuideInterceptors`, which also limits its command, from
-0.166 to 0.152 ms.
+to scale one down. `SteerRedDrones` takes 0.59 ms per step at 100,000 drones
+with it, against 0.72 with a square root every time, and `GuideInterceptors`,
+which also limits its command, 0.152 against 0.166 ms.
 
-`TriggerWarheads` had both problems. perf showed its call operator as a
-separate function, because the same function built the Blast. Moving the
-builders out took it from 0.548 to 0.32 ms per step at 100,000 drones, and
-comparing squares instead of calling `distance` took it to 0.23 ms, 2.4 times
-faster overall. Systems whose rare work is small, such as `DropStaleTracks`,
-were already inlined; check perf before splitting one.
+`TriggerWarheads` shows both. Building the Blast in its call operator keeps
+the operator out of line, where perf shows it as a separate function: 0.548
+ms per step at 100,000 drones. With the builders moved out it takes 0.32 ms,
+and comparing squares instead of calling `distance`, 0.23 ms. Systems whose
+rare work is small, such as `DropStaleTracks`, are inlined anyway; check perf
+before splitting one.
 
 ### Measure each system, idle and contended
 
@@ -1586,26 +1587,26 @@ loop reads per entity (`framework::bytes_per_entity_v`).
 
 Measure with both compilers too. Their inliners disagree, and a function that
 is not inlined into a hot loop shows up as its own line in `perf report`. Two
-cases so far:
+cases:
 
-- **Contract checks.** `lib`'s `CHECK_*` macros used to expand, at every check,
-  into a `std::source_location`, a `std::format` and a `throw`. GCC discounts
-  that cold branch when it decides what to inline; Clang does not, so it left
+- **Contract checks.** A check that expands in place into a
+  `std::source_location`, a `std::format` and a `throw` is a cold branch GCC
+  discounts when it decides what to inline and Clang does not, so Clang leaves
   small checked functions such as `InOut`'s `operator->` out of line, called
-  several times per entity by `Integrate`. The failure now happens in one cold,
-  never-inlined function, `lib::internal::do_contract_failure`, so a check is a
-  compare and a call. At 100,000 drones, Clang's `Integrate` went from 0.96 to
-  0.24 ms per step and its whole step from 3.92 to 3.14 ms; GCC's went from
-  3.23 to 3.17 ms.
+  several times per entity by `Integrate`. `lib`'s `CHECK_*` macros fail in
+  one cold, never-inlined function, `lib::internal::do_contract_failure`, so a
+  check is a compare and a call. At 100,000 drones that gives Clang's
+  `Integrate` 0.24 ms per step against 0.96 with the check in place, and its
+  whole step 3.14 against 3.92 ms; GCC's step is 3.17 against 3.23 ms.
 - **Hot framework helpers.** Clang declined to inline
   `SpatialIndex::visit_cell`, which a nearest search calls from several places;
-  `[[gnu::always_inline]]` takes `ProposeEngagements` from 0.77 to 0.62 ms
-  under Clang and changes nothing under GCC.
+  with `[[gnu::always_inline]]`, `ProposeEngagements` takes 0.62 ms under
+  Clang against 0.77 without, and the same under GCC.
 
-GCC, for its part, stopped inlining mp-units' `Position - Position` into
-`SteerRedDrones` and `TriggerWarheads` when the site builder added call sites,
-which costs it about 8%; that was accepted. With both fixes Clang runs the
-100,000-drone step in about 3.0 ms and GCC in about 3.2 ms. Contention shows which
+GCC does not inline mp-units' `Position - Position` into `SteerRedDrones` and
+`TriggerWarheads`, which have several call sites, and that costs it about 8%,
+which is accepted. Clang runs the 100,000-drone step in about 3.0 ms and GCC in
+about 3.2 ms. Contention shows which
 systems are bandwidth-bound: at 100,000 drones, four streaming neighbors slowed
 `ScanRadars` 2.6 times but `TriggerWarheads` 12 times.
 
@@ -1648,15 +1649,14 @@ practices above already give:
 - Packing several components into one struct to keep them together.
 - Giving up units or `double` for speed.
 
-### Bringing missile in line
+### Missile follows these practices
 
-The missile simulation followed these practices only partly, and changing it
-to follow them is the measurement of what they are worth:
+The missile simulation follows these practices, and measures what they are
+worth against a layout that does not:
 
-- **`Kinematics` is position and velocity (48 bytes, was 112).** Its
-  orientation moved to a separate `Orientation` component, which nothing in
-  missile needs, and the acceleration it stored, which nothing read, is gone;
-  the commanded acceleration is in `Control`.
+- **`Kinematics` is position and velocity, 48 bytes.** Orientation is a
+  separate `Orientation` component, which nothing in missile needs, and the
+  commanded acceleration is in `Control`. With both inside, it is 112 bytes.
 - **`Track` is three components its archetype requires:** `Track` (target and
   when it was last seen, 16 bytes), `Estimate` (position and velocity, 48) and
   `Engagement` (launcher and until when, 16). `DropStaleTracks` reads only
@@ -1669,24 +1669,25 @@ to follow them is the measurement of what they are worth:
   `ResolveEngagements` and `ApplyBlasts` skip their loops when no radar scanned,
   no launcher proposed or nothing exploded.
 
-At 100,000 drones (ms per step):
+At 100,000 drones (ms per step), against fat components and radars that create
+tracks:
 
-| | Before | After |
+| | Without them | With them |
 |---|---:|---:|
 | Idle, 500 steps | 6.33 | 2.87 |
 | Idle, 200 steps | 9.49 | 3.01 |
 | 4 contending threads, 200 steps | 42.4 | 5.53 |
 
 The step is 2.2 times faster idle and 7.7 times faster under contention, where
-it now slows 1.8 times instead of 4.5. The cost per entity is flat from 1,000
-to 100,000 drones (12.9 to 13.4 ns per entity-step). Outcomes are unchanged.
+it slows 1.8 times rather than 4.5. The cost per entity is flat from 1,000 to
+100,000 drones (12.9 to 13.4 ns per entity-step), and the outcomes are the
+same.
 
-The change also fixed a bug the old layout hid. When ten radars covered a drone
-on the first scan, each created a track for it before trying to mark it
-`Tracked`; the nine that lost destroyed theirs, but a destroyed entity's slot
-is freed only at the next sync. At ten sites the first scan ran out of entity
-capacity and silently tracked 5,000 of 10,000 drones. Each drone now creates at
-most one track.
+Drones creating their own tracks also means each drone has at most one. When
+radars create tracks, ten radars that cover a drone on one scan each create a
+track before marking it `Tracked`; the nine that lose destroy theirs, but a
+destroyed entity's slot is freed only at the next sync. At ten sites the first
+scan then runs out of entity capacity and tracks 5,000 of 10,000 drones.
 
 `framework::bytes_per_entity_v<System>` gives the bytes a system's loop can
 read per entity: the owner, the driving component and every other component it
@@ -1700,15 +1701,13 @@ prints it beside each system's time:
 | `Integrate` | 80 | `DropStaleTracks` | 24 |
 | `DetectDrones` | 88 | `ResolveEngagements` | 72 |
 
-`TriggerWarheads` first named both `Interceptor` (48 bytes) and `RedDrone`
-(24), because either held a warhead's target, so its report said 152. A
-`Target` component that both archetypes require now holds it, and the system
-names `Warhead`, `Kinematics` and `Target`: 88 bytes. Its time did not change
-(0.57 to 0.60 ms per step at 100,000 drones, within noise). The runner already
-passed a null `Interceptor` to drones without reading it, so the drone loop
-read about 104 bytes before; most of the remaining time is each drone looking
-up its target's `Kinematics`. The gain is a simpler system and one less copy of
-the target.
+A `Target` component that both archetypes require holds a warhead's target,
+so `TriggerWarheads` names `Warhead`, `Kinematics` and `Target`: 88 bytes,
+against 152 when it names `Interceptor` (48 bytes) and `RedDrone` (24) for
+their targets. The time is the same within noise (0.57 to 0.60 ms per step at
+100,000 drones): the runner passes a null `Interceptor` to drones without
+reading it, and most of the time is each drone looking up its target's
+`Kinematics`. The gain is a simpler system and one copy of the target.
 
 ## Extensible edges
 
@@ -2297,11 +2296,11 @@ Decisions made while building it:
 - **Fidelity is per archetype.** `Aircraft` and `PreciseAircraft` require
   the same components, and the precise one also requires `AirStateRate`.
   `Continuous` integrates only archetypes that can have the rate, and `Fly`
-  excludes the rate, so the runner skips the precise segment whole. `Fly` first
-  named the rate as an optional sibling and returned when it was present.
-  Clang did not inline the call operator, so it paid a call per precise
-  aircraft to return: 0.23 ms per step at 100,000, against 0.06 ms with GCC.
-  Excluding takes both to nothing.
+  excludes the rate, so the runner skips the precise segment whole. Naming
+  the rate as an optional sibling and returning when it is present would cost
+  a call per precise aircraft under Clang, which does not inline the call
+  operator: 0.23 ms per step at 100,000, against 0.06 ms with GCC. Excluding
+  costs nothing under both.
 - **Guidance and control run at their own rates, gated once per system** in
   `prepare`, so the steps in between skip their loops. Per-entity staggered
   gates would spread the work, at the cost of a gate in each component and a
@@ -2342,9 +2341,9 @@ and once with every aircraft on Runge-Kutta 4. GCC, ms per step:
   rate's derivative, not more trigonometry, and its direction's cosine by a
   square root rather than `hypot`. `wrap` calls `std::remainder` only when a heading
   leaves [-π, π]. `StandardAirTable`, the atmosphere tabulated every 100 m of
-  geopotential altitude (within a few parts in 10^5), replaced the power and
-  exponential of `standard_air`; it saved 6% of `Fly`, and 20% of Runge-Kutta
-  4, which evaluates the air four times.
+  geopotential altitude (within a few parts in 10^5), stands in for the
+  power and exponential of `standard_air`, which would cost 6% more in `Fly`
+  and 20% more in Runge-Kutta 4, which evaluates the air four times.
 - **Clang is about 13% slower** (8.3 and 22.7 ms at 100,000).
 
 #### Accuracy against JSBSim
@@ -2415,7 +2414,7 @@ airframe, which the test keeps as constants.
 The rigid aircraft archetype is the highest fidelity level: six degrees of
 freedom, flown by control surfaces, engines and fuel, from an aircraft
 described as data. It is opt in. Point-mass aircraft in the same world cost
-the same as before (7.32 against 7.27 ms per step at 100,000), because each
+what they cost alone (see [Mixed fidelity](#mixed-fidelity)), because each
 rigid system is driven by a component only rigid aircraft have, and `Fly`
 excludes rigid bodies.
 
@@ -2715,7 +2714,8 @@ which take `--scale`, and `--frames` and `--screenshot` for running a viewer
 with nobody watching; a `Session` that runs a scenario under `RealTimeDriver`
 and finishes it when replaced; the side panel with its Restart, Quit, pause
 and speed controls; and scatter plots of markers. A viewer draws only what is
-its own.
+its own. Each viewer's `viewer_test` runs it for 60 frames under SDL's dummy video
+driver, so a viewer that no longer builds, starts or draws fails the tests.
 
 #### Wind and turbulence
 
@@ -2853,7 +2853,7 @@ Each step ends with a working application and passing tests.
      PI control, and lookup tables with linear interpolation.
    - Done: `Continuous` with Euler, midpoint and Runge-Kutta 4 (see
      [Continuous state](#continuous-state)). missile, which does not use it,
-     runs as before: 2.31 against 2.32 ms per step at 100,000 drones.
+     pays nothing for it.
    - Done: the standard atmosphere, a point-mass flight-path model, and the
      [flight](#flight) application flying it at two fidelity levels.
    - Done: `flight_benchmark`, idle and contended, for both levels (see

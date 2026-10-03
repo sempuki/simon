@@ -201,6 +201,34 @@ cc_binary(
     ],
 )
 
+cc_test(
+    name = "viewer_test",
+    size = "small",
+    srcs = ["viewer.cpp"],
+    args = [
+        "200",
+        "5",
+        "1",
+        "1",
+        "--frames=60",
+    ],
+    copts = COPTS,
+    data = [
+        "aircraft/737.aircraft",
+        "aircraft/f16.aircraft",
+    ],
+    env = {"SDL_VIDEODRIVER": "dummy"},
+    deps = [
+        "//framework:vocabulary",
+        ":flight_library",
+        "//application:viewing",
+        "//engine:driver",
+        "@imgui",
+        "@implot",
+        "@lib//base:core",
+    ],
+)
+
 cc_binary(
     name = "flight",
     srcs = ["main.cpp"],
