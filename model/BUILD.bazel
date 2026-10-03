@@ -333,12 +333,46 @@ cc_library(
 )
 
 cc_library(
+    name = "multibody",
+    srcs = ["multibody.cpp"],
+    hdrs = ["multibody.hpp"],
+    copts = COPTS,
+    deps = [
+        ":tire",
+        ":units",
+        ":vehicle",
+        "//framework",
+    ],
+)
+
+cc_library(
     name = "single_track",
+    srcs = ["single_track.cpp"],
     hdrs = ["single_track.hpp"],
     copts = COPTS,
     deps = [
+        ":tire",
         ":units",
+        ":vehicle",
         "//framework",
+    ],
+)
+
+cc_library(
+    name = "tire",
+    srcs = ["tire.cpp"],
+    hdrs = ["tire.hpp"],
+    copts = COPTS,
+    deps = [":units"],
+)
+
+cc_library(
+    name = "vehicle",
+    hdrs = ["vehicle.hpp"],
+    copts = COPTS,
+    deps = [
+        ":tire",
+        ":units",
     ],
 )
 

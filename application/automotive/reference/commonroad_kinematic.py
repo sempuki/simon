@@ -8,7 +8,6 @@ steering and acceleration limits it applies to its inputs, for three vehicles
 (Althoff and Wuersching, "CommonRoad: Vehicle Models", 2020): 1, a Ford
 Escort; 2, a BMW 320i; 3, a VW Vanagon. This script writes:
 
-  commonroad_parameters.csv  each vehicle's parameters the model reads
   commonroad_rates.csv       the rates at 400 states and inputs per vehicle,
                              a quarter of them past a limit
   commonroad_paths.csv       each vehicle driven 20 s through a steering sine
@@ -67,15 +66,6 @@ def drive(p, dt):
 
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
-    with open(os.path.join(here, 'commonroad_parameters.csv'), 'w') as out:
-        out.write('vehicle,length,width,a,b,steering_min,steering_max,'
-                  'steering_rate_min,steering_rate_max,a_max,v_switch,v_min,v_max\n')
-        for vehicle, p in VEHICLES.items():
-            out.write('%d,%s\n' % (vehicle, ','.join('%.17g' % v for v in (
-                p.l, p.w, p.a, p.b, p.steering.min, p.steering.max,
-                p.steering.v_min, p.steering.v_max, p.longitudinal.a_max,
-                p.longitudinal.v_switch, p.longitudinal.v_min, p.longitudinal.v_max))))
-
     random = np.random.default_rng(7)
     with open(os.path.join(here, 'commonroad_rates.csv'), 'w') as out:
         out.write('vehicle,x,y,steering,v,heading,steering_rate,acceleration,'

@@ -17,14 +17,15 @@ OpenDRIVE library that renders and queries road networks, on the roads in
 |---|---|---|
 | `make_test_roads.py` | `../roads/curves.xodr`, `../roads/paramPoly3.xodr`, `../roads/ring.xodr`, `../roads/rings.xodr` | `opendrive_reference_test`, `automotive_test`, `automotive_benchmark` |
 | `libopendrive_reference.cpp` | `libopendrive_positions.csv`, `libopendrive_borders.csv`, `libopendrive_lanes.csv`, `libopendrive_successors.csv` (its routing graph) | `opendrive_reference_test` |
-| `commonroad_kinematic.py` | `commonroad_parameters.csv`, `commonroad_rates.csv`, `commonroad_paths.csv`: CommonRoad's kinematic single-track model ([commonroad-vehicle-models](https://commonroad.in.tum.de), BSD) | `single_track_test` |
+| `commonroad_kinematic.py` | `commonroad_rates.csv`, `commonroad_paths.csv`: CommonRoad's kinematic single-track model ([commonroad-vehicle-models](https://commonroad.in.tum.de), BSD) | `single_track_test` |
+| `commonroad_dynamic.py` | `commonroad_vehicles.csv`: every parameter of CommonRoad's vehicles; `commonroad_tires.csv`, `commonroad_dynamic_rates.csv`, `commonroad_dynamic_paths.csv`: its tire and its dynamic, drift and multibody models, with four corrections patched in | `single_track_test`, `vehicle_dynamics_test` |
 | `movsim_reference.js` | `movsim_idm.csv`, `movsim_mobil.csv`: IDM and MOBIL as their authors implement them ([traffic-simulation.de](https://github.com/movsim/traffic-simulation-de), GPL-3.0) | `traffic_test` |
 | `sumo_platoon.py` | `sumo_platoon.csv`: a platoon of IDM followers in [SUMO](https://eclipse.dev/sumo) (EPL-2.0), at 0.1 s and 0.001 s | `traffic_test` |
 | `sumo_benchmark.py` | None: SUMO's time per vehicle-step on `rings.xodr`, printed | `automotive_benchmark`, by comparison |
 | `exact_param_poly3.py` | `exact_positions.csv`: the parametric cubics by exact arc length | `opendrive_reference_test` |
 
 `make_test_roads.py` and `exact_param_poly3.py` need NumPy, and
-`commonroad_kinematic.py` also needs `pip install commonroad-vehicle-models`,
+`commonroad_kinematic.py` and `commonroad_dynamic.py` also need `pip install commonroad-vehicle-models`,
 `sumo_platoon.py` `pip install eclipse-sumo traci`, and `sumo_benchmark.py`
 `pip install eclipse-sumo`. `movsim_reference.js`
 runs under Node.js beside a clone of movsim. Each script says

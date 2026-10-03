@@ -2882,6 +2882,61 @@ three vehicles, a Ford Escort, a BMW 320i and a VW Vanagon:
 | Paths over 20 s of steering and acceleration steps, by the same Runge-Kutta 4 at 0.05 s | 1.9e-13 m |
 | The same paths at 0.05 s against 0.0005 s | 0.23 mm |
 
+Three dynamic models follow CommonRoad's, for fidelity where the kinematic
+model is not enough, each opt in:
+
+- **The dynamic single-track model** (`model/single_track`) follows the
+  center of gravity, which slips sideways and yaws under each axle's lateral
+  force, linear in its slip angle, with the axle's load shifted by braking
+  and speeding up.
+- **The drift model** adds each axle's wheel spin, and its tires follow the
+  Magic Formula in combined slip, so it brakes, spins its wheels and drifts.
+- **The multibody model** (`model/multibody`), after the US Department of
+  Transportation's vehicle dynamics, has a sprung body that yaws, rolls,
+  pitches and heaves on its suspension over two unsprung axles, four wheels,
+  and compliant pins at each axle's roll axis: 29 states.
+
+`model/tire` holds the Magic Formula 5.2 in CommonRoad's subset: pure and
+combined slip, every scaling factor 1, turn slip left out. `model/vehicle`
+holds every parameter of CommonRoad's vehicles, and the limits on how they
+are driven. At a crawl, where slips are undefined, each model drives as the
+kinematic model about the center of gravity.
+
+simon implements four corrections to CommonRoad, each from its source:
+
+- **The tire's vertical shift is added after the sine**, as Pacejka has it.
+  CommonRoad adds F_z p_vx1 inside the sine, as an angle, which brakes a tire
+  rolling free with about 600 N under 8 kN.
+- **The side force longitudinal slip induces turns with kappa**, the Magic
+  Formula's slip. CommonRoad passes its own slip, -kappa, there, though it
+  negates it for the pure longitudinal force.
+- **At a crawl the slip angle changes at its derivative.** beta =
+  atan(tan(delta) b / l), and CommonRoad's rate squares tan(delta) a second
+  time.
+- **The multibody model's crawling yaw rate changes with the slip angle**,
+  where CommonRoad reads the roll angle.
+
+simon also bounds two cases where CommonRoad's multibody model has no
+answer: a tire off the ground pushes nothing, where CommonRoad's pulls with
+a negative load, and a wheel's slip is divided by at least 0.1 m/s of ground
+speed, as CommonRoad's drift model divides it, where the multibody model
+divides by zero when reversing.
+
+`vehicle_dynamics_test` checks all of it against CommonRoad, its models
+patched with the four corrections (see
+`application/automotive/reference/commonroad_dynamic.py`), for its three
+vehicles:
+
+| Check | Agreement |
+|---|---:|
+| Tire forces at 2,000 slips, slip angles, cambers and loads | 2.9e-15, relative |
+| CommonRoad's own tire forces, uncorrected | 618 N longitudinal, 885 N lateral |
+| Dynamic single-track rates at 900 states, from a crawl to 45 m/s and reversing | 6.4e-15, relative |
+| Drift rates at 900 states, wheels slipping and locked | 3.3e-14, relative |
+| Multibody rates at 592 states, the suspension displaced about rest | 1.9e-14, relative |
+| Paths through a double lane change, braking and speeding up, 8 s, by the same Runge-Kutta 4 at 0.001 s | 2.9e-14 m |
+| The same paths at 0.001 s against 0.0001 s: dynamic, drift, multibody | 4e-11 m, 4.2 µm, 0.52 mm |
+
 #### Drivers
 
 `model/traffic` holds the drivers' models: the Intelligent Driver Model for
@@ -3090,9 +3145,10 @@ Each step ends with a working application and passing tests.
      against movsim and SUMO; traffic on lanes in the ECS.
    - Done: a scale benchmark against SUMO, 26 times SUMO's speed at 100,000
      vehicles.
-   - Next: single-track with tires
-     and multibody vehicles against CommonRoad's models; Chrono::Vehicle through the ISO
-     maneuvers; OpenSCENARIO against esmini; metrics and batch runs; a
+   - Done: the dynamic and drift single-track models, the Magic Formula
+     tire and the multibody model, against CommonRoad's, with four
+     corrections.
+   - Next: Chrono::Vehicle through the ISO maneuvers; OpenSCENARIO against esmini; metrics and batch runs; a
      viewer.
 
 Later: `LockstepDriver` and a second process, scenario files with two-phase

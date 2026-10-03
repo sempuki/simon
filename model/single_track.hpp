@@ -6,6 +6,7 @@
 
 #include "framework/step.hpp"
 #include "model/units.hpp"
+#include "model/vehicle.hpp"
 
 // Single-track vehicle models, as CommonRoad defines them (Althoff and
 // Wuersching, "CommonRoad: Vehicle Models"; see model/REFERENCES.md): each
@@ -13,48 +14,21 @@
 //
 // The kinematic model rolls without slip: the vehicle moves along its
 // heading and turns at v tan(delta) / l, with l the wheelbase, about its rear
-// axle, the point its state follows. It is driven by a steering rate and an
-// acceleration, which the vehicle's limits bound as CommonRoad bounds them.
+// axle, the point its state follows.
+//
+// The dynamic model follows the center of gravity, which slips sideways at
+// the slip angle beta and yaws under the tires' lateral forces, linear in
+// their slip angles with the load each axle carries as the vehicle speeds up
+// or brakes. The drift model adds each axle's wheel spin, and its tires
+// follow the Magic Formula (see model/tire.hpp) in combined slip, so that it
+// can brake, spin its wheels and drift.
+//
+// Each is driven by a steering rate and an acceleration, which the vehicle's
+// limits bound as CommonRoad bounds them. At a crawl the dynamic models'
+// slips are undefined, and they drive as the kinematic model about the
+// center of gravity: the dynamic model below 0.1 m/s, and the drift model
+// blending into it about 0.2 m/s.
 namespace simon::model {
-
-// The steering a vehicle can do: its angle's range, and how fast the angle
-// can change.
-struct SteeringLimits final {
-  Angle min = -0.91 * radian;
-  Angle max = 0.91 * radian;
-  AngularRate min_rate = -0.4 * radian_per_second;
-  AngularRate max_rate = 0.4 * radian_per_second;
-};
-
-// The longitudinal acceleration and speed a vehicle can reach. Above
-// `switch_speed` the engine's power limits acceleration to
-// max_acceleration switch_speed / v.
-struct LongitudinalLimits final {
-  AccelerationMagnitude max_acceleration = 11.5 * meter_per_second_squared;
-  Speed switch_speed = 4.755 * meter_per_second;
-  Speed min_speed = -13.9 * meter_per_second;
-  Speed max_speed = 45.8 * meter_per_second;
-};
-
-// What the single-track models read of a vehicle. The defaults are
-// CommonRoad's vehicle 1, a Ford Escort.
-struct VehicleParameters final {
-  // The wheelbase.
-  auto wheelbase() const -> Length { return front + rear; }
-
-  Length length = 4.298 * meter;
-  Length width = 1.674 * meter;
-  Length front = 0.88392 * meter;  // From the center of gravity to each axle.
-  Length rear = 1.50876 * meter;
-  SteeringLimits steering;
-  LongitudinalLimits longitudinal;
-};
-
-// What drives a single-track vehicle.
-struct SingleTrackInput final {
-  AngularRate steering_rate = 0.0 * radian_per_second;
-  AccelerationMagnitude acceleration = 0.0 * meter_per_second_squared;
-};
 
 struct KinematicSingleTrackRate;
 
@@ -108,38 +82,9 @@ inline auto advance(const KinematicSingleTrack& state,
           .heading = state.heading + rate.heading * seconds};
 }
 
-// The steering rate the vehicle reaches for `wanted` at `steering`: none
-// pressing past either end of the steering's range, and within the rate's
-// bounds otherwise.
-inline auto limit_steering_rate(Angle steering, AngularRate wanted,
-                                const SteeringLimits& limits) -> AngularRate {
-  if ((steering <= limits.min && wanted <= 0.0 * radian_per_second) ||
-      (steering >= limits.max && wanted >= 0.0 * radian_per_second)) {
-    return 0.0 * radian_per_second;
-  }
-  return clamp(wanted, limits.min_rate, limits.max_rate);
-}
-
-// The acceleration the vehicle reaches for `wanted` at `speed`: none pressing
-// past either end of the speed's range, at most max_acceleration braking, and
-// at most the engine's power allows speeding up.
-inline auto limit_acceleration(Speed speed, AccelerationMagnitude wanted,
-                               const LongitudinalLimits& limits)
-    -> AccelerationMagnitude {
-  AccelerationMagnitude most =
-      speed > limits.switch_speed
-          ? limits.max_acceleration * number_of(limits.switch_speed / speed)
-          : limits.max_acceleration;
-  if ((speed <= limits.min_speed && wanted <= 0.0 * meter_per_second_squared) ||
-      (speed >= limits.max_speed && wanted >= 0.0 * meter_per_second_squared)) {
-    return 0.0 * meter_per_second_squared;
-  }
-  return clamp(wanted, -limits.max_acceleration, most);
-}
-
 // The kinematic model's rate under `input` (CommonRoad's vehicle_dynamics_ks).
 inline auto compute_kinematic_single_track_rate(
-    const KinematicSingleTrack& state, const SingleTrackInput& input,
+    const KinematicSingleTrack& state, const VehicleInput& input,
     const VehicleParameters& vehicle) -> KinematicSingleTrackRate {
   double steering = radians(state.steering);
   return KinematicSingleTrackRate{
@@ -153,5 +98,98 @@ inline auto compute_kinematic_single_track_rate(
           state.speed / vehicle.wheelbase() * std::tan(steering) * radian,
   };
 }
+
+//-- Dynamic single-track model ------------------------------------------------
+
+struct DynamicSingleTrackRate;
+
+// The dynamic model's state: the center of gravity's position in the plane,
+// the front wheel's steering angle, its speed, the heading, the yaw rate, and
+// the slip angle between its velocity and the heading.
+struct DynamicSingleTrack final {
+  using RateComponent = DynamicSingleTrackRate;
+  Length x = 0.0 * meter;
+  Length y = 0.0 * meter;
+  Angle steering = 0.0 * radian;
+  Speed speed = 0.0 * meter_per_second;
+  Angle heading = 0.0 * radian;
+  AngularRate yaw_rate = 0.0 * radian_per_second;
+  Angle slip_angle = 0.0 * radian;
+};
+
+struct DynamicSingleTrackRate final {
+  Speed x = 0.0 * meter_per_second;
+  Speed y = 0.0 * meter_per_second;
+  AngularRate steering = 0.0 * radian_per_second;
+  AccelerationMagnitude speed = 0.0 * meter_per_second_squared;
+  AngularRate heading = 0.0 * radian_per_second;
+  AngularAccelerationMagnitude yaw_rate = 0.0 * radian_per_second_squared;
+  AngularRate slip_angle = 0.0 * radian_per_second;
+};
+
+auto operator+(const DynamicSingleTrackRate& a, const DynamicSingleTrackRate& b)
+    -> DynamicSingleTrackRate;
+auto operator*(double weight, const DynamicSingleTrackRate& rate)
+    -> DynamicSingleTrackRate;
+auto advance(const DynamicSingleTrack& state,
+             const DynamicSingleTrackRate& rate, framework::Duration dt)
+    -> DynamicSingleTrack;
+
+// The dynamic model's rate under `input` (CommonRoad's vehicle_dynamics_st),
+// its tires' cornering stiffness and friction those of the Magic Formula
+// tire at small slip.
+auto compute_dynamic_single_track_rate(const DynamicSingleTrack& state,
+                                       const VehicleInput& input,
+                                       const VehicleParameters& vehicle)
+    -> DynamicSingleTrackRate;
+
+//-- Drift single-track model --------------------------------------------------
+
+struct DriftSingleTrackRate;
+
+// The drift model's state: the dynamic model's, and each axle's wheel speed.
+struct DriftSingleTrack final {
+  using RateComponent = DriftSingleTrackRate;
+  Length x = 0.0 * meter;
+  Length y = 0.0 * meter;
+  Angle steering = 0.0 * radian;
+  Speed speed = 0.0 * meter_per_second;
+  Angle heading = 0.0 * radian;
+  AngularRate yaw_rate = 0.0 * radian_per_second;
+  Angle slip_angle = 0.0 * radian;
+  AngularRate front_wheel = 0.0 * radian_per_second;
+  AngularRate rear_wheel = 0.0 * radian_per_second;
+};
+
+struct DriftSingleTrackRate final {
+  Speed x = 0.0 * meter_per_second;
+  Speed y = 0.0 * meter_per_second;
+  AngularRate steering = 0.0 * radian_per_second;
+  AccelerationMagnitude speed = 0.0 * meter_per_second_squared;
+  AngularRate heading = 0.0 * radian_per_second;
+  AngularAccelerationMagnitude yaw_rate = 0.0 * radian_per_second_squared;
+  AngularRate slip_angle = 0.0 * radian_per_second;
+  AngularAccelerationMagnitude front_wheel = 0.0 * radian_per_second_squared;
+  AngularAccelerationMagnitude rear_wheel = 0.0 * radian_per_second_squared;
+};
+
+auto operator+(const DriftSingleTrackRate& a, const DriftSingleTrackRate& b)
+    -> DriftSingleTrackRate;
+auto operator*(double weight, const DriftSingleTrackRate& rate)
+    -> DriftSingleTrackRate;
+auto advance(const DriftSingleTrack& state, const DriftSingleTrackRate& rate,
+             framework::Duration dt) -> DriftSingleTrack;
+
+// The drift model's state straight ahead at `speed`, its wheels rolling.
+auto start_drift_single_track(Speed speed, const VehicleParameters& vehicle)
+    -> DriftSingleTrack;
+
+// The drift model's rate under `input` (CommonRoad's vehicle_dynamics_std).
+// The acceleration asked becomes engine or brake torque, split between the
+// axles, and a wheel spinning backward stops.
+auto compute_drift_single_track_rate(const DriftSingleTrack& state,
+                                     const VehicleInput& input,
+                                     const VehicleParameters& vehicle)
+    -> DriftSingleTrackRate;
 
 }  // namespace simon::model

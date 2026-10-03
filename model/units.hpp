@@ -128,6 +128,13 @@ inline constexpr auto kelvin = units::si::kelvin;
 inline constexpr auto pascal = units::si::pascal;
 inline constexpr auto joule_per_kilogram_kelvin =
     units::si::joule / (kilogram * kelvin);
+inline constexpr auto kilogram_square_meter = kilogram * square_meter;
+inline constexpr auto newton_per_meter = newton / meter;
+inline constexpr auto newton_second_per_meter = newton * second / meter;
+inline constexpr auto newton_meter_per_radian = newton_meter / radian;
+inline constexpr auto meter_per_newton = meter / newton;
+inline constexpr auto radian_per_meter = radian / meter;
+inline constexpr auto radian_per_square_meter = radian / square_meter;
 
 // Scalars.
 using Length = units::quantity<meter, double>;
@@ -137,12 +144,19 @@ using AccelerationMagnitude = units::quantity<meter_per_second_squared, double>;
 using Rate = units::quantity<per_second, double>;
 using Angle = units::quantity<radian, double>;
 using AngularRate = units::quantity<radian_per_second, double>;
+using AngularAccelerationMagnitude =
+    units::quantity<radian_per_second_squared, double>;
 using Mass = units::quantity<kilogram, double>;
 using Force = units::quantity<newton, double>;
 using Area = units::quantity<square_meter, double>;
 using Density = units::quantity<kilogram_per_cubic_meter, double>;
 using Temperature = units::quantity<kelvin, double>;
 using Pressure = units::quantity<pascal, double>;
+using MomentOfInertia = units::quantity<kilogram_square_meter, double>;
+using Stiffness = units::quantity<newton_per_meter, double>;
+using Damping = units::quantity<newton_second_per_meter, double>;
+using TorsionalStiffness = units::quantity<newton_meter_per_radian, double>;
+using Compliance = units::quantity<meter_per_newton, double>;
 
 // Vectors.
 using Displacement = units::quantity<meter, QuantityVector>;

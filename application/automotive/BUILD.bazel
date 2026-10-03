@@ -75,7 +75,11 @@ cc_library(
     testonly = True,
     hdrs = ["testing.hpp"],
     copts = COPTS,
-    deps = ["@lib//base:testing"],
+    deps = [
+        "//model:units",
+        "//model:vehicle",
+        "@lib//base:testing",
+    ],
 )
 
 cc_test(
@@ -107,6 +111,21 @@ cc_test(
     deps = [
         ":testing",
         "//model:single_track",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "vehicle_dynamics_test",
+    size = "small",
+    srcs = ["vehicle_dynamics_test.cpp"],
+    copts = COPTS,
+    data = glob(["reference/commonroad_*.csv"]),
+    deps = [
+        ":testing",
+        "//model:multibody",
+        "//model:single_track",
+        "//model:tire",
         "@lib//base:testing",
     ],
 )

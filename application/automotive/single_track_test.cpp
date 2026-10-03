@@ -28,33 +28,8 @@ using model::meter_per_second;
 using model::meter_per_second_squared;
 using model::radian;
 using model::radian_per_second;
-using model::SingleTrackInput;
+using model::VehicleInput;
 using model::VehicleParameters;
-
-auto vehicles() -> std::map<int, VehicleParameters> {
-  std::map<int, VehicleParameters> by_id;
-  for (const Row& row : load_rows("commonroad_parameters.csv")) {
-    by_id[static_cast<int>(number(row, "vehicle"))] = VehicleParameters{
-        .length = number(row, "length") * meter,
-        .width = number(row, "width") * meter,
-        .front = number(row, "a") * meter,
-        .rear = number(row, "b") * meter,
-        .steering = {.min = number(row, "steering_min") * radian,
-                     .max = number(row, "steering_max") * radian,
-                     .min_rate =
-                         number(row, "steering_rate_min") * radian_per_second,
-                     .max_rate =
-                         number(row, "steering_rate_max") * radian_per_second},
-        .longitudinal = {.max_acceleration =
-                             number(row, "a_max") * meter_per_second_squared,
-                         .switch_speed =
-                             number(row, "v_switch") * meter_per_second,
-                         .min_speed = number(row, "v_min") * meter_per_second,
-                         .max_speed = number(row, "v_max") * meter_per_second},
-    };
-  }
-  return by_id;
-}
 
 auto state_of(const Row& row) -> KinematicSingleTrack {
   return {.x = number(row, "x") * meter,
@@ -66,7 +41,7 @@ auto state_of(const Row& row) -> KinematicSingleTrack {
 
 // The inputs the reference script drives by, at `t` seconds, each held over
 // 0.05 s.
-auto inputs(double t) -> SingleTrackInput {
+auto inputs(double t) -> VehicleInput {
   t = std::floor(t / 0.05 + 1e-9) * 0.05;
   double acceleration = t < 5.0    ? 3.0
                         : t < 9.0  ? -1.5
@@ -111,8 +86,7 @@ auto drive(const VehicleParameters& vehicle, std::chrono::microseconds dt)
   auto steps = 20s / dt;
   auto every = std::chrono::microseconds{100'000} / dt;
   for (std::int64_t k = 0; k < steps; ++k) {
-    SingleTrackInput input =
-        inputs(std::chrono::duration<double>(k * dt).count());
+    VehicleInput input = inputs(std::chrono::duration<double>(k * dt).count());
     auto rate = [&](const KinematicSingleTrack& at) {
       return model::compute_kinematic_single_track_rate(at, input, vehicle);
     };
@@ -132,7 +106,7 @@ auto drive(const VehicleParameters& vehicle, std::chrono::microseconds dt)
 }  // namespace
 
 TEST_CASE("KinematicSingleTrackAgainstCommonRoad") {
-  std::map<int, VehicleParameters> by_id = vehicles();
+  std::map<int, VehicleParameters> by_id = load_commonroad_vehicles();
   REQUIRE(by_id.size() == 3);
 
   SECTION("ShouldMatchRatesGivenStatesOnAndPastLimits") {
