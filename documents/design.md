@@ -2092,7 +2092,7 @@ fire interceptors, and the run ends when red is defeated or the asset is
 destroyed. `bazel run //application/missile -- <seed>` runs one scenario as
 fast as possible and prints the outcome.
 
-Components (`application/missile/components.hpp`):
+Components (`application/missile/simulation_components.hpp`):
 
 | Component | Holds |
 |---|---|
@@ -2124,7 +2124,7 @@ Interceptors and red drones both carry a `Warhead`. An interceptor reaching its
 target and a drone reaching the asset are the same event: a blast, applied to
 every `Health` within its radius.
 
-Schedule (`application/missile/systems.hpp`):
+Schedule (`application/missile/simulation_systems.hpp`):
 
 | System | Does |
 |---|---|
@@ -2268,7 +2268,7 @@ layers are in geopotential altitude, as the 1976 standard and JSBSim have
 them, so its density is within 10^-5 of JSBSim's up to 20 km. `AirState` is the
 world's spatial component, so no copy of the position is kept anywhere else.
 
-Components (`application/aeronautic/components.hpp`):
+Components (`application/aeronautic/simulation_components.hpp`):
 
 | Component | Holds |
 |---|---|
@@ -2281,7 +2281,7 @@ Components (`application/aeronautic/components.hpp`):
 | `Autopilot` | The altitude, heading and speed it holds, and its throttle integral |
 | `Route` | Four waypoints, the speed to fly them, the next one and how many were reached |
 
-Schedule (`application/aeronautic/systems.hpp`):
+Schedule (`application/aeronautic/simulation_systems.hpp`):
 
 | System | Does |
 |---|---|

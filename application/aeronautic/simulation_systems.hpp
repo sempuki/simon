@@ -7,7 +7,7 @@
 #include <cmath>
 #include <optional>
 
-#include "application/aeronautic/components.hpp"
+#include "application/aeronautic/simulation_components.hpp"
 #include "engine/rate_gate.hpp"
 #include "framework/continuous.hpp"
 #include "framework/system.hpp"

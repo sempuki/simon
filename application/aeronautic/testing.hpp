@@ -20,7 +20,7 @@
 #include "model/rigid_body.hpp"
 #include "model/units.hpp"
 
-// Shared by the flight tests.
+// Shared by the aeronautic tests.
 namespace simon::aeronautic::testing {
 
 inline constexpr std::string_view BOEING_737 =

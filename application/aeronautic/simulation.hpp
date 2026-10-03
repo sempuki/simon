@@ -7,8 +7,8 @@
 #include <memory>
 #include <string>
 
-#include "application/aeronautic/components.hpp"
-#include "application/aeronautic/systems.hpp"
+#include "application/aeronautic/simulation_components.hpp"
+#include "application/aeronautic/simulation_systems.hpp"
 #include "base/core.hpp"
 #include "engine/lifecycle.hpp"
 #include "framework/vocabulary.hpp"

@@ -9,8 +9,8 @@
 #include <span>
 #include <vector>
 
-#include "application/missile/components.hpp"
-#include "application/missile/systems.hpp"
+#include "application/missile/simulation_components.hpp"
+#include "application/missile/simulation_systems.hpp"
 #include "base/core.hpp"
 #include "engine/event_queue.hpp"
 #include "engine/lifecycle.hpp"

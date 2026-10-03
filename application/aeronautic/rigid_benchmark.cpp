@@ -23,9 +23,9 @@
 #include <tuple>
 #include <vector>
 
-#include "application/aeronautic/components.hpp"
 #include "application/aeronautic/simulation.hpp"
-#include "application/aeronautic/systems.hpp"
+#include "application/aeronautic/simulation_components.hpp"
+#include "application/aeronautic/simulation_systems.hpp"
 #include "base/core.hpp"
 #include "framework/benchmarking.hpp"
 #include "framework/vocabulary.hpp"

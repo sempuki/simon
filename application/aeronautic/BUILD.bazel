@@ -11,9 +11,9 @@ cc_library(
     name = "aeronautic_library",
     srcs = ["simulation.cpp"],
     hdrs = [
-        "components.hpp",
+        "simulation_components.hpp",
         "simulation.hpp",
-        "systems.hpp",
+        "simulation_systems.hpp",
     ],
     copts = COPTS,
     deps = [

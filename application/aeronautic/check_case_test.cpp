@@ -10,8 +10,8 @@
 #include <string_view>
 #include <vector>
 
-#include "application/aeronautic/components.hpp"
-#include "application/aeronautic/systems.hpp"
+#include "application/aeronautic/simulation_components.hpp"
+#include "application/aeronautic/simulation_systems.hpp"
 #include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"

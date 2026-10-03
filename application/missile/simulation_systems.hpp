@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-#include "application/missile/components.hpp"
+#include "application/missile/simulation_components.hpp"
 #include "base/core.hpp"
 #include "framework/system.hpp"
 #include "model/guidance.hpp"
