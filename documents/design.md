@@ -2374,30 +2374,36 @@ The replay keeps three effects out of the comparison:
 - **The engine.** The throttle is JSBSim's thrust along the velocity, scaled
   to simon's thrust law, so drag is the only force left to simon.
 
-The airframe is the 737's mass and wing area, with a drag polar fitted to 100
-JSBSim trims over the scenario's envelope (3 to 9 km, 160 to 240 m/s, level
-and in turns up to 45° of bank). CD0 is 0.0224 and K is 0.0807, and the worst
-trim is 9.7% off. The largest drift over the flight, which covers 130 km:
+The airframe is the 737's mass and wing area, with a drag polar
+CD = CD0 + K1 CL + K CL^2 fitted to 100 JSBSim trims over the scenario's
+envelope (3 to 9 km, 160 to 240 m/s, level and in turns up to 45° of bank).
+CD0 is 0.0156, K1 is 0.0302 and K is 0.0519, and the worst trim is 3.4% off.
+The largest drift over the flight, which covers 130 km:
 
 | Step | Model | Position | Altitude | Speed | Heading |
 |---:|---|---:|---:|---:|---:|
-| 20 ms | Single pass | 1.78 km | 51 m | 3.3 m/s | 1.2° |
-| 20 ms | Runge-Kutta 4 | 1.77 km | 50 m | 3.3 m/s | 1.2° |
-| 200 ms | Single pass | 1.85 km | 62 m | 3.6 m/s | 1.3° |
-| 200 ms | Runge-Kutta 4 | 1.76 km | 50 m | 3.2 m/s | 1.3° |
-| 1 s | Single pass | 2.05 km | 94 m | 4.5 m/s | 1.9° |
-| 1 s | Runge-Kutta 4 | 1.66 km | 53 m | 3.2 m/s | 1.9° |
+| 20 ms | Single pass | 472 m | 53 m | 2.0 m/s | 0.7° |
+| 20 ms | Runge-Kutta 4 | 476 m | 52 m | 2.0 m/s | 0.7° |
+| 200 ms | Single pass | 434 m | 65 m | 1.8 m/s | 0.5° |
+| 200 ms | Runge-Kutta 4 | 470 m | 52 m | 2.0 m/s | 0.7° |
+| 1 s | Single pass | 436 m | 100 m | 2.5 m/s | 0.9° |
+| 1 s | Runge-Kutta 4 | 475 m | 55 m | 2.2 m/s | 0.9° |
 
 - **The drag polar is most of the drift.** Its speed error changes the turn
-  rate, which bends the path away. In a turn the 737 holds more elevator
-  against its pitch rate, and its elevator drag rises from 0.0027 to 0.0038 at
-  30° of bank. A polar in CL alone cannot follow that. A polar fitted to level
-  trims alone drifts 4.8 km. A Python copy of the replay that takes JSBSim's
-  own drag drifts 55 m, so the equations and integrators are not the limit.
+  rate, which bends the path away. A Python copy of the replay that takes
+  JSBSim's own drag drifts 55 m, so the equations and integrators are not
+  the limit.
+- **The polar has a linear term.** The 737's least drag falls at a lift
+  other than zero, as a cambered wing's does, so CD0 + K CL^2 fits the trims
+  only to 9.7% and drifts 1.8 km. K1 costs one multiply-add a step, and
+  aircraft without it set it to zero.
+- **The polar leaves out pitch rate.** A turn holds elevator against its
+  pitch rate, and a drag term in pitch rate brings the speed error down to
+  1.2 m/s, but the path drifts further, 640 m, and every aircraft would pay
+  for it.
 - **Runge-Kutta 4 buys little at the steps simon runs.** At 20 ms the two
-  models differ by 10 m against a drift of 1.8 km. At 1 s Runge-Kutta 4 holds
-  altitude to 53 m against 94 m. A better drag model would be worth more than
-  either integrator.
+  models differ by 4 m against a drift of 470 m. At 1 s Runge-Kutta 4 holds
+  altitude to 55 m against 100 m.
 
 The test holds the drift at 20 ms and 1 s with about 25% headroom. To
 regenerate the reference, install JSBSim's Python package and NumPy, and run

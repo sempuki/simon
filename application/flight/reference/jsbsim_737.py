@@ -82,7 +82,8 @@ def trimmed(altitude, speed, bank=0.0):
 
 
 def fit_drag_polar():
-    """CD0 and K of CD = CD0 + K CL^2, over level and turning trims."""
+    """CD0, K1 and K of CD = CD0 + K1 CL + K CL^2, over level and turning
+    trims."""
     lift, drag = [], []
     for altitude in [3000, 4500, 6000, 7500, 9000]:
         for speed in [160, 180, 200, 220, 240]:
@@ -95,10 +96,10 @@ def fit_drag_polar():
                 lift.append(abs(fdm['forces/fwz-aero-lbs']) / area)
                 drag.append(abs(fdm['forces/fwx-aero-lbs']) / area)
     lift, drag = np.array(lift), np.array(drag)
-    terms = np.c_[np.ones_like(lift), lift**2]
-    (zero_lift, induced), *_ = np.linalg.lstsq(terms, drag, rcond=None)
-    worst = np.abs(terms @ [zero_lift, induced] / drag - 1.0).max()
-    return zero_lift, induced, len(lift), worst
+    terms = np.c_[np.ones_like(lift), lift, lift**2]
+    polar, *_ = np.linalg.lstsq(terms, drag, rcond=None)
+    worst = np.abs(terms @ polar / drag - 1.0).max()
+    return polar, len(lift), worst
 
 
 def command(time):
@@ -177,7 +178,7 @@ def body_to_local(force, phi, theta, psi):
 
 
 def main():
-    zero_lift, induced, trims, worst = fit_drag_polar()
+    polar, trims, worst = fit_drag_polar()
     frames, dt = fly()
     time = frames[:, 0]
     velocity = frames[:, 1:4] * FT * [1, 1, -1]  # East, north, up.
@@ -220,7 +221,8 @@ def main():
     print('wrote', path)
     print('mass %.1f kg, wing area %.3f m^2, thrust %.0f N' %
           (mass[0], 1171.0 * FT**2, THRUST))
-    print('drag polar over %d trims: CD0 %.5f K %.4f, worst error %.1f%%' % (trims, zero_lift, induced, 100 * worst))
+    print('drag polar over %d trims: CD0 %.5f K1 %.5f K %.5f, worst error '
+          '%.1f%%' % (trims, *polar, 100 * worst))
     print('fuel burned: %.1f%% of the mass' % (100 * (1 - mass[-1] / mass[0])))
 
 

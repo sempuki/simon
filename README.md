@@ -272,7 +272,7 @@ regenerate a table, run its script after `pip install jsbsim numpy`.
 
 ### What it does not show yet
 
-- **Point-mass accuracy.** The point-mass model drifts 1.8 km from JSBSim
+- **Point-mass accuracy.** The point-mass model drifts 470 m from JSBSim
   over a 130 km flight (`accuracy_test`). Its fitted drag polar causes most of
   that drift. The model suits traffic at scale, and the rigid model suits
   handling.

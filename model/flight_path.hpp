@@ -129,12 +129,14 @@ struct FlightControls final {
 };
 
 // The properties of an aircraft the dynamics read every step: mass, the drag
-// polar CD = CD0 + K * CL^2 over its wing area, and its sea-level thrust,
-// which falls with air density.
+// polar CD = CD0 + K1 * CL + K * CL^2 over its wing area, and its sea-level
+// thrust, which falls with air density. K1 lets the polar's least drag fall at
+// a lift other than zero, as a cambered wing's does.
 struct Airframe final {
   Mass mass = 1.0 * kilogram;
   Area wing_area = 1.0 * square_meter;
   double zero_lift_drag = 0.02;  // CD0.
+  double lift_drag = 0.0;        // K1.
   double induced_drag = 0.05;    // K.
   Force thrust = 0.0 * newton;   // At full throttle, at sea level.
 };
@@ -173,7 +175,8 @@ inline auto point_mass_rate(const AirState& state,
 
   Force drag = dynamic_pressure_area *
                (airframe.zero_lift_drag +
-                airframe.induced_drag * lift_coefficient * lift_coefficient);
+                lift_coefficient * (airframe.lift_drag +
+                                    airframe.induced_drag * lift_coefficient));
   Force thrust = controls.throttle * airframe.thrust *
                  number_of(air.density / SEA_LEVEL_DENSITY);
 

@@ -35,8 +35,9 @@ constexpr Duration SAMPLE = 200ms;  // Between the reference's rows.
 // The 737, as jsbsim_737.py fitted it.
 constexpr Airframe BOEING_737{.mass = 48534.3 * model::kilogram,
                               .wing_area = 108.789 * model::square_meter,
-                              .zero_lift_drag = 0.02238,
-                              .induced_drag = 0.0807,
+                              .zero_lift_drag = 0.01561,
+                              .lift_drag = 0.03020,
+                              .induced_drag = 0.05189,
                               .thrust = 200000.0 * model::newton};
 
 // One row of the reference: the controls at a time, and where the 737 was.
@@ -196,18 +197,18 @@ TEST_CASE("Accuracy") {
   std::vector<Sample> samples = load_reference();
   REQUIRE(samples.size() > 3000);  // 640 s.
 
-  // The drag polar is most of the drift: about 3 m/s of speed by the end,
-  // which turns into 2 km over 130 km flown. Integration adds little at a
+  // The drag polar is most of the drift: about 2 m/s of speed by the end,
+  // which turns into 470 m over 130 km flown. Integration adds little at a
   // small step.
   SECTION("ShouldFollowJsbsimGivenSmallStep") {
     Drifts drifts = replay(samples, 20ms);
 
     for (const Drift& drift : {drifts.simple, drifts.precise}) {
       CAPTURE(drift.position, drift.altitude, drift.speed, drift.heading);
-      CHECK(drift.position < 2500.0);
+      CHECK(drift.position < 600.0);
       CHECK(drift.altitude < 70.0);
-      CHECK(drift.speed < 4.5);
-      CHECK(drift.heading < 0.03);
+      CHECK(drift.speed < 2.5);
+      CHECK(drift.heading < 0.015);
     }
   }
 
@@ -220,10 +221,10 @@ TEST_CASE("Accuracy") {
             drifts.simple.heading);
     CAPTURE(drifts.precise.position, drifts.precise.altitude,
             drifts.precise.speed, drifts.precise.heading);
-    CHECK(drifts.simple.position < 3000.0);
+    CHECK(drifts.simple.position < 600.0);
     CHECK(drifts.simple.altitude < 130.0);
-    CHECK(drifts.precise.position < 2500.0);
-    CHECK(drifts.precise.altitude < 80.0);
+    CHECK(drifts.precise.position < 600.0);
+    CHECK(drifts.precise.altitude < 70.0);
     CHECK(drifts.precise.altitude < drifts.simple.altitude);
   }
 }
