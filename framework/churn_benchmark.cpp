@@ -606,16 +606,17 @@ class GenerationalStore final {
 
  private:
   struct Arrays final {
-    std::vector<Entity> owner;
-    std::vector<ComponentType> data;
-    std::vector<int> born;
-    std::vector<bool> live;
     auto clear() -> void {
       owner.clear();
       data.clear();
       born.clear();
       live.clear();
     }
+
+    std::vector<Entity> owner;
+    std::vector<ComponentType> data;
+    std::vector<int> born;
+    std::vector<bool> live;
   };
   struct Candidate final {
     std::uint32_t entity_index = 0;

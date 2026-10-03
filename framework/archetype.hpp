@@ -16,8 +16,6 @@ namespace simon::framework {
 // A string usable as a template argument: Archetype<"ball", ...>.
 template <std::size_t Size>
 struct FixedString final {
-  std::array<char, Size> value{};
-
   // A C-array reference, so a string literal binds and deduces Size.
   constexpr FixedString(const char (&text)[Size]) {
     std::copy_n(text, Size, value.begin());
@@ -25,6 +23,8 @@ struct FixedString final {
   constexpr auto view() const -> std::string_view {
     return {value.data(), Size - 1};
   }
+
+  std::array<char, Size> value{};
 };
 
 template <typename... ComponentTypes>

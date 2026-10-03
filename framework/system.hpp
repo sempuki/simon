@@ -29,12 +29,12 @@ namespace simon::framework {
 // so systems built from lambdas with captures can be scheduled).
 template <typename... SystemTypes>
 struct SystemList final {
-  std::tuple<SystemTypes...> systems;
-
   SystemList()
     requires(std::is_default_constructible_v<SystemTypes> && ...)
   = default;
   explicit SystemList(SystemTypes... given) : systems{std::move(given)...} {}
+
+  std::tuple<SystemTypes...> systems;
 };
 
 template <typename... SystemTypes>

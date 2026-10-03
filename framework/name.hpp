@@ -68,14 +68,14 @@ using Identity = TaggedString<IdentityTag>;
 using Alias = TaggedString<AliasTag>;
 
 struct Name final {
-  std::uint32_t kind = static_cast<std::uint32_t>(Kind::NONE);
-  std::uint32_t instance = 0;
-
   constexpr Name() = default;
   constexpr Name(Kind kind_of, std::uint32_t instance_of)
       : kind{static_cast<std::uint32_t>(kind_of)}, instance{instance_of} {}
 
   friend constexpr auto operator<=>(const Name&, const Name&) = default;
+
+  std::uint32_t kind = static_cast<std::uint32_t>(Kind::NONE);
+  std::uint32_t instance = 0;
 };
 
 constexpr auto entity_component_name(std::uint32_t component,

@@ -163,11 +163,6 @@ using CheckSchedule = SystemList<Pilot, Blow, RunFlightControls, RunEngines,
 
 // The distance between two bodies: in position, velocity, attitude and rate.
 struct Apart final {
-  double position = 0.0;  // m.
-  double velocity = 0.0;  // m/s.
-  double attitude = 0.0;  // rad.
-  double rate = 0.0;      // rad/s.
-
   auto widen(const RigidBody& a, const RigidBody& b) -> void {
     position = std::max(
         position,
@@ -181,6 +176,11 @@ struct Apart final {
         magnitude(
             (a.rate - b.rate).numerical_value_in(model::radian_per_second)));
   }
+
+  double position = 0.0;  // m.
+  double velocity = 0.0;  // m/s.
+  double attitude = 0.0;  // rad.
+  double rate = 0.0;      // rad/s.
 };
 
 // The flight controls as the trim leaves them: as JSBSim recorded them in
@@ -449,9 +449,6 @@ TEST_CASE("CheckCasesF16InWind") {
 
 // How far a trimmed aircraft wanders in 30 s: in altitude and in airspeed.
 struct Wander final {
-  double altitude = 0.0;  // m.
-  double speed = 0.0;     // m/s.
-
   // Widens by `body` at `time`, against `start` at time zero, over `earth`.
   auto widen(const model::Earth& earth, const RigidBody& start,
              const RigidBody& body, model::Time time) -> void {
@@ -466,6 +463,9 @@ struct Wander final {
                                            height(start, 0.0 * model::second)));
     speed = std::max(speed, std::abs(airspeed(body) - airspeed(start)));
   }
+
+  double altitude = 0.0;  // m.
+  double speed = 0.0;     // m/s.
 };
 
 // With fuel burning, and with the mass held, as a trim alone is judged.

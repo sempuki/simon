@@ -189,9 +189,6 @@ class SpatialIndex final {
 
   // An inclusive range of cells, clipped to the cells that hold points.
   struct Box final {
-    Cell low{};
-    Cell high{};
-
     // In floating point, since a box can span more cells than fit in 64 bits.
     auto cells() const -> double {
       double count = 1.0;
@@ -200,6 +197,9 @@ class SpatialIndex final {
       }
       return count;
     }
+
+    Cell low{};
+    Cell high{};
   };
 
   // Sizes cells for about one of the unsorted points per cell over the box

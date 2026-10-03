@@ -42,6 +42,13 @@ constexpr Airframe BOEING_737{.mass = 48534.3 * model::kilogram,
 
 // One row of the reference: the controls at a time, and where the 737 was.
 struct Sample final {
+  auto state() const -> AirState {
+    return AirState{.position = model::meters(x, y, z),
+                    .speed = speed * model::meter_per_second,
+                    .flight_path_angle = flight_path_angle * model::radian,
+                    .heading = heading * model::radian};
+  }
+
   double time = 0.0;  // Seconds.
   double load_factor = 1.0;
   double bank = 0.0;
@@ -52,13 +59,6 @@ struct Sample final {
   double speed = 0.0;
   double flight_path_angle = 0.0;
   double heading = 0.0;
-
-  auto state() const -> AirState {
-    return AirState{.position = model::meters(x, y, z),
-                    .speed = speed * model::meter_per_second,
-                    .flight_path_angle = flight_path_angle * model::radian,
-                    .heading = heading * model::radian};
-  }
 };
 
 auto load_reference() -> std::vector<Sample> {
@@ -110,11 +110,6 @@ struct Replay final  //
 
 // The largest differences from the reference over a flight.
 struct Drift final {
-  double position = 0.0;  // Meters.
-  double altitude = 0.0;  // Meters.
-  double speed = 0.0;     // Meters per second.
-  double heading = 0.0;   // Radians.
-
   auto add(const AirState& state, const Sample& sample) -> void {
     AirState expected = sample.state();
     position = std::max(
@@ -132,6 +127,11 @@ struct Drift final {
         std::abs(std::remainder(model::radians(state.heading) - sample.heading,
                                 2.0 * std::numbers::pi)));
   }
+
+  double position = 0.0;  // Meters.
+  double altitude = 0.0;  // Meters.
+  double speed = 0.0;     // Meters per second.
+  double heading = 0.0;   // Radians.
 };
 
 struct Drifts final {

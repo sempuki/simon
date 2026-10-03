@@ -106,21 +106,21 @@ class AeroInputs final {
 
 // A table of one input, or of two: a row and a column.
 struct AeroTable final {
+  auto operator()(const AeroInputs& inputs) const -> double;
+
   AeroInput row = aero_input(AeroVariable::ALPHA);
   std::optional<AeroInput> column;
   std::variant<Table1<>, Table2<>> table;
-
-  auto operator()(const AeroInputs& inputs) const -> double;
 };
 
 // A constant, times its factors, times its tables.
 struct AeroTerm final {
+  auto operator()(const AeroInputs& inputs) const -> double;
+
   std::string name;
   double constant = 1.0;
   std::vector<AeroInput> factors;
   std::vector<AeroTable> tables;
-
-  auto operator()(const AeroInputs& inputs) const -> double;
 };
 
 // Drag, side force and lift are in wind axes; the moments are in body axes,
@@ -145,16 +145,16 @@ auto find_aero_axis(std::string_view name) -> std::optional<AeroAxis>;
 using AeroSums = std::array<double, AERO_AXIS_COUNT>;
 
 struct AeroModel final {
+  auto operator()(const AeroInputs& inputs) const -> AeroSums;
+
+  // Whether a term on `axis` reads `variable`, as a factor or in a table.
+  auto reads(AeroAxis axis, AeroVariable variable) const -> bool;
+
   std::array<std::vector<AeroTerm>, AERO_AXIS_COUNT> axes;
   std::vector<AeroSignal> signals;  // The signals the terms read, in order.
   // Whether drag, side force or lift read the rate of angle of attack, which
   // follows from the forces; found once, when the aircraft is read.
   bool forces_read_alpha_rate = false;
-
-  auto operator()(const AeroInputs& inputs) const -> AeroSums;
-
-  // Whether a term on `axis` reads `variable`, as a factor or in a table.
-  auto reads(AeroAxis axis, AeroVariable variable) const -> bool;
 };
 
 // Body-axis aerodynamic force, and moment about the center of mass.

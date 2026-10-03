@@ -40,6 +40,8 @@ struct FuelTank final {
 // density altitude, as fractions of military thrust, and of maximum thrust
 // for one with reheat.
 struct TurbineData final {
+  auto has_reheat() const -> bool { return max_thrust_factor.has_value(); }
+
   std::string name;
   Displacement location;
   std::vector<std::size_t> feeds;  // The tanks it draws from.
@@ -64,8 +66,6 @@ struct TurbineData final {
   std::optional<AeroTable> idle_thrust;
   std::optional<AeroTable> military_thrust_factor;
   std::optional<AeroTable> max_thrust_factor;  // Only with reheat.
-
-  auto has_reheat() const -> bool { return max_thrust_factor.has_value(); }
 };
 
 struct AircraftData final {

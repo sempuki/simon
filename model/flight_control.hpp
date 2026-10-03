@@ -83,14 +83,14 @@ inline constexpr auto index_of(FlightSignal signal) -> std::size_t {
 
 // The value of every signal, for one aircraft.
 struct FlightSignals final {
-  std::array<double, MAX_FLIGHT_SIGNALS> values{};
-
   auto operator[](FlightSignal signal) -> double& {
     return values[index_of(signal)];
   }
   auto operator[](FlightSignal signal) const -> double {
     return values[index_of(signal)];
   }
+
+  std::array<double, MAX_FLIGHT_SIGNALS> values{};
 };
 
 // One block. Each kind reads the fields it needs:
@@ -224,6 +224,10 @@ struct FlightBlock final {
 };
 
 struct FlightControlData final {
+  auto reads(FlightSignal signal) const -> bool {
+    return read[index_of(signal)];
+  }
+
   std::vector<std::string> signals;  // By index: the fixed ones first.
   std::vector<FlightBlock> blocks;
   // Each engine's throttle, `throttle_<n>`: its command, unless a block
@@ -231,10 +235,6 @@ struct FlightControlData final {
   std::vector<std::size_t> throttles;
   // The fixed signals the blocks read, so an aircraft finds only those.
   std::bitset<FLIGHT_SIGNAL_COUNT> read;
-
-  auto reads(FlightSignal signal) const -> bool {
-    return read[index_of(signal)];
-  }
 };
 
 // The index of the signal `controls` names `name`, if any.

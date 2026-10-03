@@ -349,14 +349,14 @@ auto draw_time_controls(InOut<SessionType> session, InOut<float> speed,
 
 // Positions of one group of markers, in the layout ImPlot wants.
 struct Scatter final {
-  std::vector<double> x;
-  std::vector<double> y;
-
   auto append(double at_x, double at_y) -> void {
     x.push_back(at_x);
     y.push_back(at_y);
   }
   auto size() const -> int { return static_cast<int>(x.size()); }
+
+  std::vector<double> x;
+  std::vector<double> y;
 };
 
 // Plots `scatter` as markers of `size`, filled with `fill` and outlined with

@@ -678,11 +678,6 @@ class World<SpatialType,                  //
     explicit PlanState(std::size_t entity_capacity = 0)
         : change(entity_capacity, 0) {}
 
-    std::vector<std::int8_t>
-        change;  // +1 will be attached, -1 will be detached.
-    std::vector<std::uint32_t> touched;
-    std::int64_t growth = 0;
-
     auto mark(std::uint32_t index, std::int8_t value) -> void {
       if (change[index] == 0) {
         touched.push_back(index);
@@ -696,6 +691,11 @@ class World<SpatialType,                  //
       touched.clear();
       growth = 0;
     }
+
+    std::vector<std::int8_t>
+        change;  // +1 will be attached, -1 will be detached.
+    std::vector<std::uint32_t> touched;
+    std::int64_t growth = 0;
   };
 
   template <typename ComponentType>
