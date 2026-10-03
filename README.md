@@ -310,7 +310,11 @@ from Chrono's as a kinematics and compliance rig would.
 It plays ASAM OpenSCENARIO scenarios, their storyboards, triggers and
 actions running in the ECS: esmini's cut-ins and lane changes play out as
 they do in esmini, every vehicle at every step within its log's six decimals
-on straight roads and 1.2 mm on a curved highway.
+on straight roads and 1.2 mm on a curved highway. Runs are measured by
+nuPlan's comfort and time to collision, matching nuPlan's own code, on
+vehicle boxes that match GEOS. A parameter distribution's permutations run
+in batches on threads, each as it runs in esmini and measured as nuPlan
+measures esmini's.
 
 At scale, 100,000 vehicles on 3,770 km of lanes step in 25 ms on one
 thread, 248 ns a vehicle, where SUMO takes 6.5 µs a vehicle on the same
@@ -321,6 +325,7 @@ bazel test //application/automotive/...
 bazel run -c opt //application/automotive -- 3rd_party/carla/Town01.xodr 60 120
 bazel run -c opt //application/automotive:automotive_benchmark
 bazel run //application/automotive:scenario -- 3rd_party/esmini/xosc/cut-in.xosc
+bazel run -c opt //application/automotive:scenario_batch -- 3rd_party/esmini/xosc/cut-in_parameter_set.xosc
 ```
 
 ## Build

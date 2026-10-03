@@ -31,3 +31,10 @@ cc_library(
     copts = COPTS,
     deps = [":openscenario"],
 )
+
+cc_library(
+    name = "parameter_distribution",
+    srcs = ["parameter_distribution.cpp"],
+    hdrs = ["parameter_distribution.hpp"],
+    copts = COPTS,
+)

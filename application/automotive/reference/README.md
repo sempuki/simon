@@ -12,7 +12,7 @@ OpenDRIVE library that renders and queries road networks, on the roads in
 | `ring.xodr` | `make_test_roads.py` | Two half circles leading into each other, two lanes each way, for traffic |
 | `rings.xodr` | `make_test_roads.py` | 100 rings of 1 km radius, three lanes each way, for the scale benchmark |
 | `3rd_party/chrono/Sedan_Pac02Tire.tir` | Project Chrono's data (BSD-3-Clause, see `3rd_party/chrono/LICENSE`) | The Sedan's tire, a 245/40 R 18, as a TNO property file in the PAC2002 format |
-| `3rd_party/esmini/` | esmini's resources (MPL-2.0, see `3rd_party/esmini/LICENSE`) | Three scenarios, cut-in_simple, cut-in and lane_change_simple, their roads, straight_500m, e6mini and curve_r100, and the vehicle catalog |
+| `3rd_party/esmini/` | esmini's resources (MPL-2.0, see `3rd_party/esmini/LICENSE`) | Three scenarios, cut-in_simple, cut-in and lane_change_simple, cut-in's parameter distribution, cut-in_parameter_set, their roads, straight_500m, e6mini and curve_r100, and the vehicle catalog |
 | `3rd_party/carla/Town01.xodr` | CARLA's [OpenDRIVE test files](https://github.com/carla-simulator/opendrive-test-files) (MIT, see `3rd_party/carla/LICENSE`) | A town of 98 roads, as RoadRunner writes them |
 
 | Script | Table | Test |
@@ -24,9 +24,9 @@ OpenDRIVE library that renders and queries road networks, on the roads in
 | `movsim_reference.js` | `movsim_idm.csv`, `movsim_mobil.csv`: IDM and MOBIL as their authors implement them ([traffic-simulation.de](https://github.com/movsim/traffic-simulation-de), GPL-3.0) | `traffic_test` |
 | `sumo_platoon.py` | `sumo_platoon.csv`: a platoon of IDM followers in [SUMO](https://eclipse.dev/sumo) (EPL-2.0), at 0.1 s and 0.001 s | `traffic_test` |
 | `chrono_reference.cpp` | `chrono_tires.csv`, `chrono_sedan.csv`, `chrono_maneuvers.csv`: [Project Chrono](https://projectchrono.org)'s Pac02 tire, and its Sedan at rest and through the handling maneuvers (BSD-3-Clause, see `3rd_party/chrono/LICENSE`) | `tire_test`, `maneuver_test` |
-| `esmini_scenarios.py` | `esmini_scenarios.csv`: [esmini](https://github.com/esmini/esmini)'s scenarios played in esmini, every entity at every step (MPL-2.0, see `3rd_party/esmini/LICENSE`) | `scenario_test` |
+| `esmini_scenarios.py` | `esmini_scenarios.csv`: [esmini](https://github.com/esmini/esmini)'s scenarios played in esmini, every entity at every step (MPL-2.0, see `3rd_party/esmini/LICENSE`); `esmini_permutations.csv`, `esmini_parameters.csv`: the 12 permutations of cut-in_parameter_set, every entity at every step with its box, and the parameter values esmini gave each | `scenario_test`, `batch_test` |
 | `shapely_boxes.py` | `shapely_boxes.csv`: 2,000 pairs of boxes, whether they intersect and how far apart they are, by [Shapely](https://shapely.readthedocs.io) 2.1.2 on GEOS 3.13.1 (BSD-3-Clause, LGPL-2.1) | `collision_test` |
-| `nuplan_metrics.py` | `nuplan_metrics.csv`: the ego's comfort signals and time to collision in esmini's scenarios, by [nuPlan](https://github.com/motional/nuplan-devkit)'s devkit (Apache-2.0) | `metrics_test` |
+| `nuplan_metrics.py` | `nuplan_metrics.csv`: the ego's comfort signals and time to collision in esmini's scenarios, by [nuPlan](https://github.com/motional/nuplan-devkit)'s devkit 1.2.2 (Apache-2.0); `nuplan_permutations.csv`, `nuplan_verdicts.csv`: its time to collision and gap at every sample of esmini's permutations, and each run's verdicts | `metrics_test`, `batch_test` |
 | `sumo_benchmark.py` | None: SUMO's time per vehicle-step on `rings.xodr`, printed | `automotive_benchmark`, by comparison |
 | `exact_param_poly3.py` | `exact_positions.csv`: the parametric cubics by exact arc length | `opendrive_reference_test` |
 

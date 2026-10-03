@@ -2070,7 +2070,7 @@ simon/
                  vehicles and drivers
   format/        Readers from files into model/ and scenario/ data: OpenDRIVE, OpenSCENARIO, tire
                  property files, converted aircraft
-  scenario/      Scenarios as OpenSCENARIO describes them, and the player that runs their storyboards
+  scenario/      Scenarios and parameter distributions as OpenSCENARIO describes them, and the player that runs their storyboards
   application/
     hello/       Two bouncing balls, the first application
     missile/     Red drones against blue radars, launchers and interceptors
@@ -2815,11 +2815,11 @@ traffic and a vehicle under test, without sensors. It proves the framework
 can carry a driving simulation comparable to the best open source, as
 aeronautic does against JSBSim, with each claim checked against an open
 reference: roads against libOpenDRIVE, vehicles against CommonRoad's models
-and Chrono::Vehicle, traffic against SUMO, scenarios against esmini. It is
-being built in eight steps (see the [Roadmap](#roadmap)); the first six,
-roads, traffic, a scale benchmark, tires and vehicle dynamics against
-CommonRoad, maneuvers against Chrono, and scenarios against esmini, are
-done.
+and Chrono::Vehicle, traffic against SUMO, scenarios against esmini, and
+metrics against nuPlan. It is being built in eight steps (see the
+[Roadmap](#roadmap)); the first seven, roads, traffic, a scale benchmark,
+tires and vehicle dynamics against CommonRoad, maneuvers against Chrono,
+scenarios against esmini, and metrics and batch runs, are done.
 
 #### Roads
 
@@ -3072,6 +3072,11 @@ OpenSCENARIO player:
   a value before it; a trigger that fires starts its conditions over.
 - **A teleport or a parameter set ends after the step's triggers,** and a
   vehicle the storyboard teleports stays where it was put for the step.
+- **A condition measures distance in the triggering entity's own
+  coordinates by default:** along its heading, across it, or straight,
+  signed by whether the other is ahead; or along or across its road. 1.0's
+  alongRoute is longitudinal along the road. Between bounding boxes
+  (freespace), simon measures only along the road and refuses the rest.
 
 simon evaluates every condition of a group each step, where esmini stops at
 the first false one but for those with delays, which keeps every edge's
@@ -3093,6 +3098,69 @@ changes' speed differs in two steps, where esmini reports a vehicle
 teleported away from the end of its road at a standstill for a step; its
 next step and every position agree. Each storyboard stops on the same step
 as esmini's.
+
+#### Metrics and batch runs
+
+`model/collision` treats vehicles as boxes in the plane. Two boxes overlap
+when no axis among their edges' normals separates their projections, the
+separating axis theorem; boxes that touch overlap, as GEOS counts them.
+Apart, their gap is the least distance from a corner of either to an edge
+of the other. `collision_test` checks 2,000 pairs, from a car's size to a
+truck's at any heading, a quarter of them a hair from touching, against
+Shapely 2.1.2 on GEOS 3.13.1, which nuPlan uses: every overlap agrees, and
+every gap to 1e-12 m.
+
+`model/driving_metrics` measures a run as nuPlan's devkit (1.2.2) defines
+it:
+
+- **Comfort.** The accelerations along and across the heading, smoothed by
+  a Savitzky-Golay filter over 8 samples; the jerks, their derivatives over
+  15; the yaw rate and acceleration, the heading's first and second
+  derivatives over 5; each rounded to 8 decimals, and each strictly within
+  nuPlan's bounds at every sample. The filter is SciPy's `savgol_filter`,
+  its edges and even windows included.
+- **Time to collision.** The ego and the vehicles ahead of it, within 30
+  degrees of its heading, carried at constant speed along their headings
+  in steps of 0.1 s up to 3 s, until the ego's box overlaps one's. A run
+  stays within bound while every sample's time exceeds 0.95 s.
+
+`metrics_test` checks both on esmini's three scenarios against nuPlan's own
+code (`application/automotive/reference/nuplan_metrics.py`): the comfort
+signals to 5e-8, a unit of nuPlan's rounding carried through a derivative,
+and every time to collision exactly. nuPlan's map-dependent parts are left
+out: which collisions are at fault, the drivable area, driving direction,
+and choosing tracks by lane, for which simon takes the vehicles ahead as
+nuPlan's `is_agent_ahead` does.
+
+`format/openscenario` reads deterministic parameter value distributions:
+value sets, sets of values, and ranges, whose values are the lower limit
+and each step on it, written to 15 significant digits so the steps'
+rounding does not show. Stochastic distributions are refused.
+`scenario/parameter_distribution` numbers the permutations as esmini does,
+the last distribution varying fastest, and each permutation's values
+replace the scenario file's declarations before it is read.
+`application/automotive/scenario_batch` plays every permutation on a pool
+of threads, each run in its own world, and measures its ego, the scenario's
+first entity, sampled after each step.
+
+`batch_test` runs esmini's parameter distribution over the curved
+highway's cut-in, 12 permutations of two vehicle sets, two ego speeds and
+three speed factors, against esmini 3.8.2 and against nuPlan's code on
+esmini's runs:
+
+| Check | Result |
+|---|---|
+| Each permutation's parameter values | The same as esmini's, in the same order |
+| Every entity at every step, 5,392 steps | 1.1 mm, as the cut-in alone; speeds to esmini's six decimals |
+| Each entity's box, from the vehicle its permutation chose | Exact |
+| Time to collision at every sample | The same at all 5,392 |
+| The gap between the ego's box and the other's at every sample | 1.1 mm |
+| Each run's verdicts: comfort, time to collision within bound | The same |
+| One thread or four | Identical measures |
+
+In every permutation the ego, which has no controller, runs into the
+vehicle that cuts in and brakes, in esmini as in simon. On one thread the
+12 runs take 70 ms.
 
 #### Drivers
 
@@ -3311,7 +3379,10 @@ Each step ends with a working application and passing tests.
      wheel steered, and each axle's tires at half its load.
    - Done: OpenSCENARIO's storyboard, actions and conditions in the ECS,
      against esmini step by step.
-   - Next: metrics and batch runs; a viewer.
+   - Done: nuPlan's comfort and time to collision, on boxes checked against
+     GEOS; parameter distributions played in batches on threads, against
+     esmini and nuPlan.
+   - Next: a viewer.
 
 Later: `LockstepDriver` and a second process, scenario files with two-phase
 loading, parent-child transforms (a radar mounted on a vehicle), and DIS or HLA

@@ -39,6 +39,7 @@ cc_library(
     copts = COPTS,
     deps = [
         "//scenario:openscenario",
+        "//scenario:parameter_distribution",
         "@lib//base:core",
         "@lib//base:status",
         "//3rd_party:pugixml",

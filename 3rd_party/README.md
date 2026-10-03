@@ -27,7 +27,7 @@ through `@lib//base:testing` in `2nd_party/lib`.
 |---|---|---|---|---|
 | `carla/` | `carla` | `Town01.xodr`, a town of 98 roads | CARLA's [OpenDRIVE test files](https://github.com/carla-simulator/opendrive-test-files) | MIT, `carla/LICENSE` |
 | `chrono/` | `chrono` | `Sedan_Pac02Tire.tir`, the Sedan's PAC2002 tire | [Project Chrono](https://projectchrono.org)'s data | BSD-3-Clause, `chrono/LICENSE` |
-| `esmini/` | `esmini` | Three scenarios in `xosc/`, their roads in `xodr/`, and the vehicle catalog | [esmini](https://github.com/esmini/esmini)'s resources | MPL-2.0, `esmini/LICENSE` |
+| `esmini/` | `esmini` | Three scenarios and a parameter distribution in `xosc/`, their roads in `xodr/`, and the vehicle catalog | [esmini](https://github.com/esmini/esmini)'s resources | MPL-2.0, `esmini/LICENSE` |
 | `jsbsim/` | `jsbsim` | `737.aircraft` and `f16.aircraft`, converted by `tools/jsbsim/convert.py` | [JSBSim](https://github.com/JSBSim-Team/jsbsim)'s aircraft (see `jsbsim/README.md`) | GPL, named in each file's header |
 
 ## References

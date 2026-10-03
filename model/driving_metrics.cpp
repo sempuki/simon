@@ -184,8 +184,8 @@ auto check_comfort(const ComfortSignals& signals, const ComfortLimits& limits)
     -> bool {
   auto within = [](const std::vector<double>& values, double least,
                    double most) {
-    return std::ranges::all_of(
-        values, [&](double v) { return v >= least && v <= most; });
+    return std::ranges::all_of(values,
+                               [&](double v) { return v > least && v < most; });
   };
   return within(signals.lon_acceleration, limits.min_lon_acceleration,
                 limits.max_lon_acceleration) &&

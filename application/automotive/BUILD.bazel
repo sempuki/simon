@@ -10,11 +10,13 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "automotive_library",
     srcs = [
+        "scenario_batch.cpp",
         "scenario_simulation.cpp",
         "simulation.cpp",
         "simulation_systems.cpp",
     ],
     hdrs = [
+        "scenario_batch.hpp",
         "scenario_simulation.hpp",
         "simulation.hpp",
         "simulation_components.hpp",
@@ -31,6 +33,9 @@ cc_library(
         "//format:opendrive",
         "//format:openscenario",
         "//scenario:openscenario",
+        "//scenario:parameter_distribution",
+        "//model:collision",
+        "//model:driving_metrics",
         "//model:random",
         "//model:road",
         "//model:road_placement",
@@ -63,6 +68,17 @@ cc_binary(
         ":automotive_library",
         "//engine:driver",
         "//framework:vocabulary",
+    ],
+)
+
+cc_binary(
+    name = "scenario_batch",
+    srcs = ["scenario_batch_main.cpp"],
+    copts = COPTS,
+    data = ["//3rd_party:esmini"],
+    deps = [
+        ":automotive_library",
+        "//format:openscenario",
     ],
 )
 
@@ -100,6 +116,26 @@ cc_library(
     deps = [
         "//model:units",
         "//model:vehicle",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "batch_test",
+    size = "medium",
+    srcs = ["batch_test.cpp"],
+    copts = COPTS,
+    data = [
+        "reference/esmini_parameters.csv",
+        "reference/esmini_permutations.csv",
+        "reference/nuplan_permutations.csv",
+        "reference/nuplan_verdicts.csv",
+        "//3rd_party:esmini",
+    ],
+    deps = [
+        ":automotive_library",
+        ":testing",
+        "//format:openscenario",
         "@lib//base:testing",
     ],
 )

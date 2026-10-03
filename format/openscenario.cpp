@@ -7,6 +7,7 @@
 #include <charconv>
 #include <cmath>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <sstream>
 #include <utility>
@@ -214,7 +215,9 @@ class Expression final {
 // or a catalog entry's, innermost last.
 class Parser final {
  public:
-  explicit Parser(std::string directory) : directory_{std::move(directory)} {}
+  Parser(std::string directory,
+         std::span<const ParameterAssignment> assignments)
+      : directory_{std::move(directory)}, assignments_{assignments} {}
 
   auto parse(std::string_view text) -> std::expected<Scenario, lib::Status> {
     pugi::xml_parse_result result =
@@ -226,6 +229,7 @@ class Parser final {
     if (!root) {
       return fail("no OpenSCENARIO element");
     }
+    RETURN_IF_UNEXPECTED(assign(root.child("ParameterDeclarations")));
     Scenario scenario;
     RETURN_IF_UNEXPECTED(
         declare(root.child("ParameterDeclarations"), Out(scenario.parameters)));
@@ -264,6 +268,19 @@ class Parser final {
                : (std::filesystem::path{directory_} / relative)
                      .lexically_normal()
                      .string();
+  }
+
+  // Replaces the values of the declarations the assignments name.
+  auto assign(pugi::xml_node declarations) -> std::expected<void, lib::Status> {
+    for (const ParameterAssignment& assignment : assignments_) {
+      pugi::xml_node declaration = declarations.find_child_by_attribute(
+          "ParameterDeclaration", "name", assignment.name.c_str());
+      if (!declaration) {
+        return fail("no parameter " + assignment.name + " to assign");
+      }
+      declaration.attribute("value").set_value(assignment.value.c_str());
+    }
+    return {};
   }
 
   // Adds a scope's declarations to `parameters`, each value resolved in the
@@ -732,18 +749,43 @@ class Parser final {
     return fail("unknown rule " + rule);
   }
 
-  // Whether distances are along the road: alongRoute in 1.0, the road or
-  // lane coordinate system after.
-  auto read_along_road(pugi::xml_node node) const
-      -> std::expected<bool, lib::Status> {
+  // How a condition measures distance. In 1.0, alongRoute: longitudinal
+  // along the road, or straight. After, a coordinate system, the entity's by
+  // default, and a relative distance type, straight by default. With
+  // freespace, only along the road, as bounding boxes are not yet measured
+  // otherwise.
+  auto read_relative_distance(pugi::xml_node node) const
+      -> std::expected<RelativeDistance, lib::Status> {
+    RelativeDistance distance;
+    RETURN_OR_ASSIGN(distance.freespace, flag_of(node, "freespace", false));
     if (node.attribute("alongRoute")) {
-      return flag_of(node, "alongRoute", false);
+      RETURN_OR_ASSIGN(distance.along_road, flag_of(node, "alongRoute", false));
+      if (distance.along_road) {
+        distance.kind = RelativeDistance::Kind::LONGITUDINAL;
+      }
+    } else {
+      if (node.attribute("coordinateSystem")) {
+        RETURN_OR_ASSIGN(std::string system, text_of(node, "coordinateSystem"));
+        distance.along_road = system == "road" || system == "lane";
+      }
+      if (node.attribute("relativeDistanceType")) {
+        RETURN_OR_ASSIGN(std::string type,
+                         text_of(node, "relativeDistanceType"));
+        distance.kind = type == "longitudinal"
+                            ? RelativeDistance::Kind::LONGITUDINAL
+                        : type == "lateral" ? RelativeDistance::Kind::LATERAL
+                                            : RelativeDistance::Kind::EUCLIDEAN;
+      }
     }
-    if (node.attribute("coordinateSystem")) {
-      RETURN_OR_ASSIGN(std::string system, text_of(node, "coordinateSystem"));
-      return system == "road" || system == "lane";
+    if (distance.freespace &&
+        !(distance.along_road &&
+          distance.kind == RelativeDistance::Kind::LONGITUDINAL)) {
+      return Failure{
+          lib::raise(ScenarioError::UNSUPPORTED,
+                     "<" + std::string{node.name()} +
+                         "> freespace other than longitudinal along the road")};
     }
-    return false;
+    return distance;
   }
 
   auto read_entity_condition(pugi::xml_node node)
@@ -765,8 +807,7 @@ class Parser final {
       TimeHeadwayCondition headway;
       RETURN_OR_ASSIGN(headway.entity, text_of(node, "entityRef"));
       RETURN_OR_ASSIGN(headway.value, number_of(node, "value"));
-      RETURN_OR_ASSIGN(headway.freespace, flag_of(node, "freespace", false));
-      RETURN_OR_ASSIGN(headway.along_road, read_along_road(node));
+      RETURN_OR_ASSIGN(headway.distance, read_relative_distance(node));
       RETURN_OR_ASSIGN(headway.rule, read_rule(node));
       return headway;
     }
@@ -774,14 +815,8 @@ class Parser final {
       RelativeDistanceCondition distance;
       RETURN_OR_ASSIGN(distance.entity, text_of(node, "entityRef"));
       RETURN_OR_ASSIGN(distance.value, number_of(node, "value"));
-      RETURN_OR_ASSIGN(distance.freespace, flag_of(node, "freespace", false));
-      RETURN_OR_ASSIGN(distance.along_road, read_along_road(node));
+      RETURN_OR_ASSIGN(distance.distance, read_relative_distance(node));
       RETURN_OR_ASSIGN(distance.rule, read_rule(node));
-      RETURN_OR_ASSIGN(std::string type, text_of(node, "relativeDistanceType"));
-      distance.kind =
-          type == "longitudinal" ? RelativeDistanceCondition::Kind::LONGITUDINAL
-          : type == "lateral"    ? RelativeDistanceCondition::Kind::LATERAL
-                                 : RelativeDistanceCondition::Kind::CARTESIAN;
       return distance;
     }
     if (kind == "ReachPositionCondition") {
@@ -1020,6 +1055,7 @@ class Parser final {
   }
 
   std::string directory_;
+  std::span<const ParameterAssignment> assignments_;
   pugi::xml_document document_;
   std::vector<std::unique_ptr<pugi::xml_document>> catalogs_;
   std::vector<Parameter> scope_;
@@ -1033,16 +1069,128 @@ auto evaluate_expression(std::string_view text,
   return Expression{text, parameters}.evaluate();
 }
 
-auto parse_openscenario(std::string_view text, const std::string& directory)
+auto parse_openscenario(std::string_view text, const std::string& directory,
+                        std::span<const ParameterAssignment> assignments)
     -> std::expected<Scenario, lib::Status> {
-  return Parser{directory}.parse(text);
+  return Parser{directory, assignments}.parse(text);
 }
 
-auto load_openscenario(const std::string& path)
+auto load_openscenario(const std::string& path,
+                       std::span<const ParameterAssignment> assignments)
     -> std::expected<Scenario, lib::Status> {
   RETURN_OR_ASSIGN(std::string text, read_file(path));
-  return parse_openscenario(text,
-                            std::filesystem::path{path}.parent_path().string());
+  return parse_openscenario(
+      text, std::filesystem::path{path}.parent_path().string(), assignments);
+}
+
+auto parse_parameter_distribution(std::string_view text,
+                                  const std::string& directory)
+    -> std::expected<ParameterDistribution, lib::Status> {
+  auto fail = [](const std::string& why) {
+    return Failure{lib::raise(ScenarioError::MALFORMED, why)};
+  };
+  auto refuse = [](pugi::xml_node node) {
+    return Failure{lib::raise(ScenarioError::UNSUPPORTED,
+                              "<" + std::string{node.name()} + ">")};
+  };
+  auto number_of = [&](pugi::xml_node node,
+                       const char* name) -> std::expected<double, lib::Status> {
+    auto value = parse_double(node.attribute(name).as_string());
+    if (!value) {
+      return fail("<" + std::string{node.name()} + "> needs a number " + name);
+    }
+    return *value;
+  };
+
+  pugi::xml_document document;
+  if (pugi::xml_parse_result result =
+          document.load_buffer(text.data(), text.size());
+      !result) {
+    return fail(result.description());
+  }
+  pugi::xml_node root =
+      document.child("OpenSCENARIO").child("ParameterValueDistribution");
+  if (!root) {
+    return fail("no ParameterValueDistribution element");
+  }
+  std::string scenario_file =
+      root.child("ScenarioFile").attribute("filepath").as_string();
+  if (scenario_file.empty()) {
+    return fail("<ParameterValueDistribution> needs a ScenarioFile");
+  }
+  ParameterDistribution distribution{
+      .scenario = (std::filesystem::path{directory} / scenario_file)
+                      .lexically_normal()
+                      .string()};
+  if (pugi::xml_node stochastic = root.child("Stochastic")) {
+    return refuse(stochastic);
+  }
+  pugi::xml_node deterministic = root.child("Deterministic");
+  if (!deterministic) {
+    return fail("<ParameterValueDistribution> needs a distribution");
+  }
+  for (pugi::xml_node node : deterministic.children()) {
+    std::vector<ParameterChoice> choices;
+    std::string_view kind = node.name();
+    if (kind == "DeterministicMultiParameterDistribution") {
+      for (pugi::xml_node set :
+           node.child("ValueSetDistribution").children("ParameterValueSet")) {
+        ParameterChoice choice;
+        for (pugi::xml_node assignment : set.children("ParameterAssignment")) {
+          choice.push_back(
+              {.name = assignment.attribute("parameterRef").as_string(),
+               .value = assignment.attribute("value").as_string()});
+        }
+        choices.push_back(std::move(choice));
+      }
+    } else if (kind == "DeterministicSingleParameterDistribution") {
+      std::string name = node.attribute("parameterName").as_string();
+      if (name.empty()) {
+        return fail("<" + std::string{kind} + "> needs a parameterName");
+      }
+      if (pugi::xml_node set = node.child("DistributionSet")) {
+        for (pugi::xml_node element : set.children("Element")) {
+          choices.push_back(
+              {{.name = name,
+                .value = element.attribute("value").as_string()}});
+        }
+      } else if (pugi::xml_node range = node.child("DistributionRange")) {
+        RETURN_OR_ASSIGN(double step, number_of(range, "stepWidth"));
+        pugi::xml_node limits = range.child("Range");
+        RETURN_OR_ASSIGN(double lower, number_of(limits, "lowerLimit"));
+        RETURN_OR_ASSIGN(double upper, number_of(limits, "upperLimit"));
+        if (!(step > 0.0) || upper < lower) {
+          return fail("<DistributionRange> of " + name +
+                      " needs a positive step and a range lowest first");
+        }
+        // The steps that fit, allowing for the limits' rounding.
+        auto steps = static_cast<std::size_t>(
+            std::floor((upper - lower) / step * (1.0 + 1e-12)));
+        for (std::size_t k = 0; k <= steps; ++k) {
+          choices.push_back(
+              {{.name = name,
+                .value = std::format("{:.15g}",
+                                     lower + static_cast<double>(k) * step)}});
+        }
+      } else {
+        return refuse(node.first_child());
+      }
+    } else {
+      return refuse(node);
+    }
+    if (choices.empty()) {
+      return fail("<" + std::string{kind} + "> has no values");
+    }
+    distribution.distributions.push_back(std::move(choices));
+  }
+  return distribution;
+}
+
+auto load_parameter_distribution(const std::string& path)
+    -> std::expected<ParameterDistribution, lib::Status> {
+  RETURN_OR_ASSIGN(std::string text, read_file(path));
+  return parse_parameter_distribution(
+      text, std::filesystem::path{path}.parent_path().string());
 }
 
 }  // namespace simon::format

@@ -1,20 +1,21 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "application/automotive/scenario_simulation.hpp"
-#include "format/openscenario.hpp"
 
 #include <utility>
 
 #include "format/opendrive.hpp"
+#include "format/openscenario.hpp"
 
 namespace simon::automotive {
 
-ScenarioSimulation::ScenarioSimulation(std::string path)
-    : path_{std::move(path)} {}
+ScenarioSimulation::ScenarioSimulation(
+    std::string path, std::vector<scenario::ParameterAssignment> assignments)
+    : path_{std::move(path)}, assignments_{std::move(assignments)} {}
 
 auto ScenarioSimulation::configure() -> engine::PhaseResult {
   RETURN_OR_ASSIGN(scenario::Scenario scenario,
-                   format::load_openscenario(path_));
+                   format::load_openscenario(path_, assignments_));
   scenario_ = std::make_unique<scenario::Scenario>(std::move(scenario));
   RETURN_OR_ASSIGN(model::RoadNetwork roads,
                    format::load_opendrive(scenario_->road_network));

@@ -632,11 +632,7 @@ auto StoryboardPlayer::check(const EntityCondition& condition, double time)
             if (other >= entities_.size()) {
               return false;
             }
-            double gap =
-                kind.along_road
-                    ? compute_road_gap(index, other, kind.freespace)
-                    : std::hypot(entities_[other].pose.x - entity.pose.x,
-                                 entities_[other].pose.y - entity.pose.y);
+            double gap = compute_relative_distance(index, other, kind.distance);
             // Not defined with the other behind, or standing still.
             if (gap < 0.0 || entity.speed < SMALL) {
               return false;
@@ -648,19 +644,8 @@ auto StoryboardPlayer::check(const EntityCondition& condition, double time)
             if (other >= entities_.size()) {
               return false;
             }
-            const EntityState& them = entities_[other];
-            double distance = 0.0;
-            if (kind.kind == RelativeDistanceCondition::Kind::LONGITUDINAL) {
-              distance =
-                  std::abs(compute_road_gap(index, other, kind.freespace));
-            } else if (kind.kind == RelativeDistanceCondition::Kind::LATERAL) {
-              const Road& road = network_->roads[entity.placement.road];
-              distance = std::abs(compute_placement_t(road, them.placement) -
-                                  compute_placement_t(road, entity.placement));
-            } else {
-              distance = std::hypot(them.pose.x - entity.pose.x,
-                                    them.pose.y - entity.pose.y);
-            }
+            double distance = std::abs(
+                compute_relative_distance(index, other, kind.distance));
             return compare(distance, kind.value, kind.rule);
           } else if constexpr (std::is_same_v<Kind, ReachPositionCondition>) {
             RoadPlacement target = locate(kind.position, entities_);
@@ -678,6 +663,40 @@ auto StoryboardPlayer::check(const EntityCondition& condition, double time)
     all = all && holds;
   }
   return condition.all ? all && !condition.triggering.empty() : any;
+}
+
+// esmini's Object::Distance: straight, signed by whether `to` is ahead along
+// `from`'s heading; along or across `from`'s heading in its own coordinates;
+// or along or across its road. Infinite on different roads.
+auto StoryboardPlayer::compute_relative_distance(
+    std::size_t from, std::size_t to, const RelativeDistance& distance) const
+    -> double {
+  const EntityState& a = entities_[from];
+  const EntityState& b = entities_[to];
+  double dx = b.pose.x - a.pose.x;
+  double dy = b.pose.y - a.pose.y;
+  double along = std::cos(a.pose.heading) * dx + std::sin(a.pose.heading) * dy;
+  double across =
+      -std::sin(a.pose.heading) * dx + std::cos(a.pose.heading) * dy;
+  switch (distance.kind) {
+    case RelativeDistance::Kind::LONGITUDINAL:
+      return distance.along_road
+                 ? compute_road_gap(from, to, distance.freespace)
+                 : along;
+    case RelativeDistance::Kind::LATERAL: {
+      if (!distance.along_road) {
+        return across;
+      }
+      if (a.placement.road != b.placement.road) {
+        return std::numeric_limits<double>::infinity();
+      }
+      const Road& road = network_->roads[a.placement.road];
+      return compute_placement_t(road, b.placement) -
+             compute_placement_t(road, a.placement);
+    }
+    default:
+      return (along > 0.0 ? 1.0 : -1.0) * std::hypot(dx, dy);
+  }
 }
 
 // The gap from entity `from` to `to` along `from`'s road, positive with `to`

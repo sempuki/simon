@@ -220,27 +220,32 @@ struct AccelerationCondition final {
   Rule rule = Rule::GREATER_THAN;
 };
 
-// The time to the other entity at this speed: the distance along the road,
-// or straight, between reference points, or between bounding boxes if
-// freespace, over the triggering entity's speed.
+// How a distance from one entity to another is measured: along, across or
+// straight; in the first's road coordinates or its own, along its heading;
+// between reference points or, with freespace, between bounding boxes. A
+// straight distance is the same in either.
+struct RelativeDistance final {
+  enum class Kind : std::uint8_t { LONGITUDINAL, LATERAL, EUCLIDEAN };
+
+  Kind kind = Kind::EUCLIDEAN;
+  bool along_road = false;
+  bool freespace = false;
+};
+
+// The time to the other entity at this speed: the distance to it over the
+// triggering entity's speed.
 struct TimeHeadwayCondition final {
   std::string entity;
   double value = 0.0;
-  bool freespace = false;
-  bool along_road = false;
+  RelativeDistance distance;
   Rule rule = Rule::GREATER_THAN;
 };
 
-// The distance to the other entity, along the road's s, across it, or
-// straight, between reference points or bounding boxes.
+// The distance to the other entity, either way.
 struct RelativeDistanceCondition final {
-  enum class Kind : std::uint8_t { LONGITUDINAL, LATERAL, CARTESIAN };
-
   std::string entity;
-  Kind kind = Kind::CARTESIAN;
   double value = 0.0;
-  bool freespace = false;
-  bool along_road = false;
+  RelativeDistance distance;
   Rule rule = Rule::GREATER_THAN;
 };
 

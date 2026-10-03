@@ -90,8 +90,9 @@ TEST_CASE("OpenScenario") {
     const auto& headway = std::get<osc::TimeHeadwayCondition>(
         std::get<osc::EntityCondition>(condition.condition).condition);
     CHECK(headway.value == 0.4);
-    CHECK(headway.freespace);
-    CHECK(headway.along_road);
+    CHECK(headway.distance.freespace);
+    CHECK(headway.distance.along_road);
+    CHECK(headway.distance.kind == osc::RelativeDistance::Kind::LONGITUDINAL);
     CHECK(storyboard.stop.has_value());
   }
 

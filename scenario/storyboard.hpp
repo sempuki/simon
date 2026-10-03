@@ -143,6 +143,9 @@ class StoryboardPlayer final {
   auto evaluate(const Condition& condition, double time) -> bool;
   auto check(const EntityCondition& condition, double time) -> bool;
   auto check(const ValueCondition& condition, double time) -> bool;
+  auto compute_relative_distance(std::size_t from, std::size_t to,
+                                 const RelativeDistance& distance) const
+      -> double;
   auto compute_road_gap(std::size_t from, std::size_t to, bool freespace) const
       -> double;
 

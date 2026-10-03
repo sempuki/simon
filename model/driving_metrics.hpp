@@ -64,7 +64,8 @@ struct ComfortLimits final {
   double max_yaw_acceleration = 1.93;  // rad/s^2.
 };
 
-// Whether every signal stays within its bounds at every sample.
+// Whether every signal stays strictly within its bounds at every sample,
+// as nuPlan's within-bound metrics check them.
 auto check_comfort(const ComfortSignals& signals,
                    const ComfortLimits& limits = {}) -> bool;
 
