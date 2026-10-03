@@ -2803,8 +2803,9 @@ can carry a driving simulation comparable to the best open source, as
 aeronautic does against JSBSim, with each claim checked against an open
 reference: roads against libOpenDRIVE, vehicles against CommonRoad's models
 and Chrono::Vehicle, traffic against SUMO, scenarios against esmini. It is
-being built in eight steps (see the [Roadmap](#roadmap)); the first three,
-roads, traffic and a scale benchmark, are done.
+being built in eight steps (see the [Roadmap](#roadmap)); the first five,
+roads, traffic, a scale benchmark, tires and vehicle dynamics against
+CommonRoad, and maneuvers against Chrono, are done.
 
 #### Roads
 
@@ -2936,6 +2937,85 @@ vehicles:
 | Multibody rates at 592 states, the suspension displaced about rest | 1.9e-14, relative |
 | Paths through a double lane change, braking and speeding up, 8 s, by the same Runge-Kutta 4 at 0.001 s | 2.9e-14 m |
 | The same paths at 0.001 s against 0.0001 s: dynamic, drift, multibody | 4e-11 m, 4.2 µm, 0.52 mm |
+
+#### Maneuvers against Chrono
+
+Project Chrono's Chrono::Vehicle models a vehicle as a full multibody system.
+Its Sedan has a double wishbone front suspension, a multilink rear, a rack
+and pinion, front-wheel drive through an engine map and gearbox, and Pac02
+tires, Chrono's Magic Formula 5.2. simon drives its own models with the
+Sedan's parameters through the handling maneuvers the standards define, and
+measures both as the standards measure them
+(`application/automotive/reference/chrono_reference.cpp` records Chrono).
+
+**The tire.** `model/tire` holds the whole of the Magic Formula 5.2's steady
+state, pure and combined slip and the aligning moment, and `model/tire_file`
+reads it from TNO tire property files (.tir). A tire on the right is the
+left one mirrored about its wheel plane, so that a pair's asymmetries cancel.
+CommonRoad's subset stays a tire of its own, since its cornering stiffness
+is linear in load and it mirrors through the camber's sign. Chrono's Pac02
+departs from Pacejka in five places, and `tire_test` measures each:
+
+| Check | Agreement |
+|---|---:|
+| Forces and aligning moment, without camber, where Chrono keeps the formula | 2.2e-5 of the load |
+| Beyond Chrono's clamp of B x at pi/2 - 0.01, which flattens the curve past its peak | 7.7% of the load |
+| At a camber of 0.03 rad, where Chrono's lateral friction rises by 1 + p_dy3 gamma^2 rather than falling by 1 - p_dy3 gamma^2 | 0.48% of the load |
+| Combined by Chrono's default friction ellipsis rather than Pacejka's weighting | 60% of the load, at large slips both ways |
+
+The 2.2e-5 is Chrono's 0.1 added to each B's denominator. Chrono also gives
+the trail's equivalent slip angle in combined slip kappa's sign rather than
+the slip angle's, divides its slips by the speed plus 0.1 m/s, and in a
+vehicle holds camber at zero whatever the wheel's lean.
+
+**The models.** Driving the Sedan showed what CommonRoad's models leave out
+once the tire is a real one, and simon adds it, opt in through the tire:
+
+- **Each axle's tires each take half its load.** The Magic Formula's
+  cornering stiffness grows less than linearly with load, so one tire at an
+  axle's whole load corners differently; CommonRoad's linear tire hides it.
+- **The tires' aligning moments yaw the vehicle.** At the Sedan's
+  pneumatic trail they are worth about 0.15 deg/g of understeer, the largest
+  single term.
+- **Each wheel can be steered on its own** in the multibody model, by toe,
+  Ackermann and roll steer. CommonRoad's model steers both front wheels
+  alike and the rear not at all.
+
+The multibody model is in SAE's axes, x forward, y right and z down, as
+CommonRoad writes it; its left wheels sit at -y.
+
+**The Sedan's parameters.** The drift model reads the Sedan's mass, inertia
+and axle positions from Chrono's assembly. The multibody model's suspension
+comes from Chrono's own, measured as a kinematics and compliance rig would:
+the Sedan at rest, braked, pressed down by 3 kN and rolled by 2 kN m, gives
+each corner's rate, 16.3 kN/m front and 61 kN/m rear, and each axle's roll
+stiffness; the ramp at 80 km/h gives each axle's lateral load transfer, and
+so its roll center. The Sedan's tire is used with its camber terms zeroed,
+as Chrono uses it. Each model is steered by Chrono's front wheels' mean
+angle and held to Chrono's speed; the multibody model is also steered, in
+one comparison, as Chrono's suspension steers each wheel.
+
+`maneuver_test` checks them against Chrono, through steady-state circular
+driving at 80 and 100 km/h with a slowly increasing steer (ISO 4138), a step
+steer to 4 m/s^2 at 80 km/h (ISO 7401), and sines with dwell at 80 km/h at
+2.5 and 5 times the steer for 0.3 g (FMVSS 126):
+
+| Metric | Chrono | Multibody, each wheel steered | Multibody | Drift single-track |
+|---|---:|---:|---:|---:|
+| Understeer gradient at 80 km/h, deg/g | 0.159 | 0.151 | 0.131 | 0.132 |
+| Understeer gradient at 100 km/h, deg/g | 0.186 | 0.142 | 0.130 | 0.125 |
+| Step steer's steady yaw rate, rad/s | 0.1783 | 0.1781 | 0.1792 | 0.1803 |
+| Step steer's yaw rate response time, s | 0.08 | 0.08 | 0.08 | 0.08 |
+| Step steer's overshoot | 28.8% | 29.0% | 27.3% | 29.3% |
+| Sine with dwell at 2.5 times: lateral displacement at 1.07 s, m | 2.36 | 2.18 | 2.15 | 2.12 |
+| Sine with dwell at 5 times | Spins | Spins | Spins | Spins |
+
+Both pass FMVSS 126's yaw rate ratios at 2.5 times, near zero 1 s after the
+steer, and neither would pass at 5 times without stability control. Past
+the limit they spin differently: Chrono's clamp holds its tires' force near
+the peak where the formula's falls away, so simon's Sedan spins sooner. At
+100 km/h Chrono understeers more than at 80 km/h and simon's models do
+not; that difference, up to 0.04 deg/g, is not yet explained.
 
 #### Drivers
 
@@ -3148,8 +3228,11 @@ Each step ends with a working application and passing tests.
    - Done: the dynamic and drift single-track models, the Magic Formula
      tire and the multibody model, against CommonRoad's, with four
      corrections.
-   - Next: Chrono::Vehicle through the ISO maneuvers; OpenSCENARIO against esmini; metrics and batch runs; a
-     viewer.
+   - Done: the whole Magic Formula 5.2 and tire property files, against
+     Chrono's Pac02; the Sedan through the ISO handling maneuvers and FMVSS
+     126 against Chrono::Vehicle, with the tires' aligning moments, each
+     wheel steered, and each axle's tires at half its load.
+   - Next: OpenSCENARIO against esmini; metrics and batch runs; a viewer.
 
 Later: `LockstepDriver` and a second process, scenario files with two-phase
 loading, parent-child transforms (a radar mounted on a vehicle), and DIS or HLA

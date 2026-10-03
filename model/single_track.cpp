@@ -123,8 +123,9 @@ auto compute_dynamic_single_track_rate(const DynamicSingleTrack& state,
     return rate;
   }
 
-  double mu = vehicle.tire.p_dy1;
-  double c_sf = -vehicle.tire.p_ky1 / vehicle.tire.p_dy1;
+  LinearTire linear = compute_linear_tire(vehicle.tire);
+  double mu = linear.friction;
+  double c_sf = linear.cornering_stiffness;
   double c_sr = c_sf;
   double h = vehicle.sprung_height.numerical_value_in(meter);
   double m = vehicle.mass.numerical_value_in(kilogram);
@@ -258,16 +259,27 @@ auto compute_drift_single_track_rate(const DriftSingleTrack& state,
   // kappa = (R omega - u) / u, the negative of CommonRoad's slip.
   double kappa_f = r_w * front_wheel / std::max(u_wf, SLIP_SPEED) - 1.0;
   double kappa_r = r_w * rear_wheel / std::max(u_wr, SLIP_SPEED) - 1.0;
-  TireForce front = compute_tire_force(
-      vehicle.tire, {.longitudinal = kappa_f, .lateral = alpha_f * radian},
-      f_zf * newton);
-  TireForce rear = compute_tire_force(
-      vehicle.tire, {.longitudinal = kappa_r, .lateral = alpha_r * radian},
-      f_zr * newton);
+  // Each axle's left and right tires, each at half the axle's load.
+  // CommonRoad's tire is linear in its load and the same on either side, so
+  // to it this is one tire at the whole load; the Magic Formula's is not.
+  auto compute_axle_force = [&](double kappa, double alpha, double load) {
+    TireSlip slip{.longitudinal = kappa, .lateral = alpha * radian};
+    TireForce left = compute_tire_force(vehicle.tire, slip, 0.5 * load * newton,
+                                        TireSide::LEFT);
+    TireForce right = compute_tire_force(vehicle.tire, slip,
+                                         0.5 * load * newton, TireSide::RIGHT);
+    return TireForce{.longitudinal = left.longitudinal + right.longitudinal,
+                     .lateral = left.lateral + right.lateral,
+                     .aligning = left.aligning + right.aligning};
+  };
+  TireForce front = compute_axle_force(kappa_f, alpha_f, f_zf);
+  TireForce rear = compute_axle_force(kappa_r, alpha_r, f_zr);
   double f_xf = front.longitudinal.numerical_value_in(newton);
   double f_yf = front.lateral.numerical_value_in(newton);
   double f_xr = rear.longitudinal.numerical_value_in(newton);
   double f_yr = rear.lateral.numerical_value_in(newton);
+  double m_z =
+      (front.aligning + rear.aligning).numerical_value_in(newton_meter);
 
   double brake = u1 > 0.0 ? 0.0 : m * r_w * u1;  // T_B.
   double drive = u1 > 0.0 ? m * r_w * u1 : 0.0;  // T_E.
@@ -275,9 +287,10 @@ auto compute_drift_single_track_rate(const DriftSingleTrack& state,
   double d_v = 1.0 / m *
                (-f_yf * std::sin(steering - beta) + f_yr * std::sin(beta) +
                 f_xr * std::cos(beta) + f_xf * std::cos(steering - beta));
+  // The tires' aligning moments yaw it too; CommonRoad's tire has none.
   double dd_psi = 1.0 / inertia *
                   (f_yf * std::cos(steering) * lf - f_yr * lr +
-                   f_xf * std::sin(steering) * lf);
+                   f_xf * std::sin(steering) * lf + m_z);
   double d_beta =
       moving ? -yaw_rate + 1.0 / (m * v) *
                                (f_yf * std::cos(steering - beta) +

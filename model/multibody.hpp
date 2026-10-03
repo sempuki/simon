@@ -17,9 +17,10 @@
 // follow the Magic Formula (see model/tire.hpp) at its slip, its camber
 // through the suspension's travel and its load through the tire's spring.
 //
-// The state is in the vehicle's frame: speeds along its x forward and y to
-// its left, heights down from the body's rest. Below 0.1 m/s the body moves
-// as the kinematic model about its center of gravity, as the single-track
+// The state is in the vehicle's frame, in SAE's axes: speeds along its x
+// forward and y to its right, heights down from the body's rest, the left
+// wheels at -y; positive steering and yaw turn it right. Below 0.1 m/s the body
+// moves as the kinematic model about its center of gravity, as the single-track
 // models do.
 namespace simon::model {
 
@@ -122,13 +123,24 @@ auto advance(const MultibodyVehicle& state, const MultibodyVehicleRate& rate,
 auto start_multibody(Speed speed, const VehicleParameters& vehicle)
     -> MultibodyVehicle;
 
+// Each wheel's steer beyond the steering, positive to the right as the
+// model's axes have it: its toe, and how a suspension's kinematics steer it
+// with the steering and the body's roll. CommonRoad's model has none.
+struct WheelSteer final {
+  Angle left_front = 0.0 * radian;
+  Angle right_front = 0.0 * radian;
+  Angle left_rear = 0.0 * radian;
+  Angle right_rear = 0.0 * radian;
+};
+
 // The multibody model's rate under `input` (CommonRoad's
-// vehicle_dynamics_mb). The acceleration asked becomes engine or brake
-// torque, split between the axles and their wheels, and a wheel spinning
-// backward stops.
+// vehicle_dynamics_mb), its wheels steered further by `toe`. The
+// acceleration asked becomes engine or brake torque, split between the axles
+// and their wheels, and a wheel spinning backward stops. A Magic Formula
+// tire is mirrored on the right (see model/tire.hpp).
 auto compute_multibody_rate(const MultibodyVehicle& state,
                             const VehicleInput& input,
-                            const VehicleParameters& vehicle)
-    -> MultibodyVehicleRate;
+                            const VehicleParameters& vehicle,
+                            const WheelSteer& toe = {}) -> MultibodyVehicleRate;
 
 }  // namespace simon::model

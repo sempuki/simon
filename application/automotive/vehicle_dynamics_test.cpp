@@ -8,6 +8,7 @@
 #include <map>
 #include <numbers>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "application/automotive/testing.hpp"
@@ -264,7 +265,8 @@ auto compare_paths(std::string_view name, int id,
 }  // namespace
 
 TEST_CASE("TireAgainstCommonRoad") {
-  model::MagicFormulaTire tire = load_commonroad_vehicles().at(1).tire;
+  model::CommonRoadTire tire =
+      std::get<model::CommonRoadTire>(load_commonroad_vehicles().at(1).tire);
 
   SECTION("ShouldMatchCorrectedMagicFormulaGivenSlipsAndLoads") {
     // simon's forces agree with CommonRoad's, corrected, to rounding.

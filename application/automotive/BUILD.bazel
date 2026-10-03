@@ -83,6 +83,25 @@ cc_library(
 )
 
 cc_test(
+    name = "maneuver_test",
+    size = "small",
+    srcs = ["maneuver_test.cpp"],
+    copts = COPTS,
+    data = glob([
+        "reference/chrono_*.csv",
+        "tires/*.tir",
+    ]),
+    deps = [
+        ":testing",
+        "//framework",
+        "//model:multibody",
+        "//model:single_track",
+        "//model:tire_file",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
     name = "opendrive_reference_test",
     size = "small",
     srcs = ["opendrive_reference_test.cpp"],
@@ -126,6 +145,23 @@ cc_test(
         "//model:multibody",
         "//model:single_track",
         "//model:tire",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "tire_test",
+    size = "small",
+    srcs = ["tire_test.cpp"],
+    copts = COPTS,
+    data = glob([
+        "reference/chrono_*.csv",
+        "tires/*.tir",
+    ]),
+    deps = [
+        ":testing",
+        "//model:tire",
+        "//model:tire_file",
         "@lib//base:testing",
     ],
 )

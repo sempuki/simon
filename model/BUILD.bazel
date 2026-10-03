@@ -377,6 +377,18 @@ cc_library(
 )
 
 cc_library(
+    name = "tire_file",
+    srcs = ["tire_file.cpp"],
+    hdrs = ["tire_file.hpp"],
+    copts = COPTS,
+    deps = [
+        ":tire",
+        "@lib//base:core",
+        "@lib//base:status",
+    ],
+)
+
+cc_library(
     name = "traffic",
     hdrs = ["traffic.hpp"],
     copts = COPTS,

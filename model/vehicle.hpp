@@ -104,7 +104,7 @@ struct VehicleParameters final {
   SteeringLimits steering;
   LongitudinalLimits longitudinal;
   Suspension suspension;
-  MagicFormulaTire tire;
+  Tire tire;  // CommonRoad's by default.
 };
 
 // What drives a vehicle: the steering angle's rate, and the longitudinal

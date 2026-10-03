@@ -148,6 +148,7 @@ using AngularAccelerationMagnitude =
     units::quantity<radian_per_second_squared, double>;
 using Mass = units::quantity<kilogram, double>;
 using Force = units::quantity<newton, double>;
+using Torque = units::quantity<newton_meter, double>;
 using Area = units::quantity<square_meter, double>;
 using Density = units::quantity<kilogram_per_cubic_meter, double>;
 using Temperature = units::quantity<kelvin, double>;

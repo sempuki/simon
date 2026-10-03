@@ -301,6 +301,12 @@ Magic Formula tire and the 29-state multibody model match CommonRoad's to
 rounding, with four of CommonRoad's slips corrected from their sources; one
 of them made its tire brake by 600 N rolling free.
 
+Through the handling maneuvers, ISO 4138, ISO 7401 and FMVSS 126, the
+multibody model with the full Magic Formula 5.2 tire drives Project
+Chrono's Sedan to Chrono's step-steer yaw rate within 0.2% and its
+understeer gradient within 0.01 deg/g at 80 km/h, its suspension measured
+from Chrono's as a kinematics and compliance rig would.
+
 At scale, 100,000 vehicles on 3,770 km of lanes step in 25 ms on one
 thread, 248 ns a vehicle, where SUMO takes 6.5 µs a vehicle on the same
 network and drivers.

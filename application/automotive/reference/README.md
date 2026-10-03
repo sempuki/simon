@@ -11,6 +11,7 @@ OpenDRIVE library that renders and queries road networks, on the roads in
 | `paramPoly3.xodr` | `make_test_roads.py` | Parametric cubics over arcLength and normalized ranges, one at map coordinates 500 km east and 5,400 km north |
 | `ring.xodr` | `make_test_roads.py` | Two half circles leading into each other, two lanes each way, for traffic |
 | `rings.xodr` | `make_test_roads.py` | 100 rings of 1 km radius, three lanes each way, for the scale benchmark |
+| `../tires/Sedan_Pac02Tire.tir` | Project Chrono's data (BSD-3-Clause, see `../tires/LICENSE-CHRONO`) | The Sedan's tire, a 245/40 R 18, as a TNO property file in the PAC2002 format |
 | `Town01.xodr` | CARLA's [OpenDRIVE test files](https://github.com/carla-simulator/opendrive-test-files) (MIT, see `../roads/LICENSE-CARLA`) | A town of 98 roads, as RoadRunner writes them |
 
 | Script | Table | Test |
@@ -21,6 +22,7 @@ OpenDRIVE library that renders and queries road networks, on the roads in
 | `commonroad_dynamic.py` | `commonroad_vehicles.csv`: every parameter of CommonRoad's vehicles; `commonroad_tires.csv`, `commonroad_dynamic_rates.csv`, `commonroad_dynamic_paths.csv`: its tire and its dynamic, drift and multibody models, with four corrections patched in | `single_track_test`, `vehicle_dynamics_test` |
 | `movsim_reference.js` | `movsim_idm.csv`, `movsim_mobil.csv`: IDM and MOBIL as their authors implement them ([traffic-simulation.de](https://github.com/movsim/traffic-simulation-de), GPL-3.0) | `traffic_test` |
 | `sumo_platoon.py` | `sumo_platoon.csv`: a platoon of IDM followers in [SUMO](https://eclipse.dev/sumo) (EPL-2.0), at 0.1 s and 0.001 s | `traffic_test` |
+| `chrono_reference.cpp` | `chrono_tires.csv`, `chrono_sedan.csv`, `chrono_maneuvers.csv`: [Project Chrono](https://projectchrono.org)'s Pac02 tire, and its Sedan at rest and through the handling maneuvers (BSD-3-Clause, see `../tires/LICENSE-CHRONO`) | `tire_test`, `maneuver_test` |
 | `sumo_benchmark.py` | None: SUMO's time per vehicle-step on `rings.xodr`, printed | `automotive_benchmark`, by comparison |
 | `exact_param_poly3.py` | `exact_positions.csv`: the parametric cubics by exact arc length | `opendrive_reference_test` |
 
@@ -30,4 +32,5 @@ OpenDRIVE library that renders and queries road networks, on the roads in
 `pip install eclipse-sumo`. `movsim_reference.js`
 runs under Node.js beside a clone of movsim. Each script says
 how to run it in its docstring; `libopendrive_reference.cpp` is built beside
-libOpenDRIVE with CMake, outside simon's build.
+libOpenDRIVE with CMake, outside simon's build, and `chrono_reference.cpp`
+beside Chrono 10.0.0, built with its vehicle module, the same way.

@@ -18,6 +18,7 @@ constexpr double GRAVITY = 9.81;  // m/s^2, as CommonRoad has it.
 constexpr double CRAWL = 0.1;  // m/s.
 
 auto compute_rate_numbers(const MultibodyNumbers& x, double u0, double u1,
+                          const WheelSteer& toe,
                           const VehicleParameters& vehicle) -> MultibodyNumbers;
 
 }  // namespace
@@ -234,25 +235,27 @@ auto start_multibody(Speed speed, const VehicleParameters& vehicle)
 
 auto compute_multibody_rate(const MultibodyVehicle& state,
                             const VehicleInput& input,
-                            const VehicleParameters& vehicle)
-    -> MultibodyVehicleRate {
+                            const VehicleParameters& vehicle,
+                            const WheelSteer& toe) -> MultibodyVehicleRate {
   VehicleInput limited =
       limit_input(input, state.steering, state.speed, vehicle);
   return convert_numbers_to_multibody_rate(compute_rate_numbers(
       convert_multibody_to_numbers(state),
       limited.steering_rate.numerical_value_in(radian_per_second),
-      limited.acceleration.numerical_value_in(meter_per_second_squared),
+      limited.acceleration.numerical_value_in(meter_per_second_squared), toe,
       vehicle));
 }
 
 namespace {
 
 // vehicle_dynamics_mb, line for line, in CommonRoad's numbering from 0 and
-// its names for the parameters, with two bounds of simon's: a wheel's slip is
-// divided by at least 0.1 m/s of ground speed, as the drift model divides
+// its names for the parameters, with each wheel steered on its own and the
+// tires' aligning moments in the yaw, and two bounds of simon's: a wheel's slip
+// is divided by at least 0.1 m/s of ground speed, as the drift model divides
 // it, where CommonRoad divides by a speed that may be zero; and a tire off
 // the ground pushes nothing (see model/tire.hpp).
 auto compute_rate_numbers(const MultibodyNumbers& x, double u0, double u1,
+                          const WheelSteer& toe,
                           const VehicleParameters& vehicle)
     -> MultibodyNumbers {
   const double g = GRAVITY;
@@ -325,13 +328,21 @@ auto compute_rate_numbers(const MultibodyNumbers& x, double u0, double u1,
       (x[21] + R_w * (std::cos(x[18]) - 1) + 0.5 * T_r * std::sin(x[18])) *
       K_zt;
 
+  // Each wheel's steer: the steering and its toe at the front, its toe at
+  // the rear.
+  double delta_LF = x[2] + radians(toe.left_front);
+  double delta_RF = x[2] + radians(toe.right_front);
+  double delta_LR = radians(toe.left_rear);
+  double delta_RR = radians(toe.right_rear);
+
   // Each tire's ground speed along its wheel, never negative.
-  double u_w_lf = std::max(0.0, (x[3] + 0.5 * T_f * x[5]) * std::cos(x[2]) +
-                                    (x[10] + a * x[5]) * std::sin(x[2]));
-  double u_w_rf = std::max(0.0, (x[3] - 0.5 * T_f * x[5]) * std::cos(x[2]) +
-                                    (x[10] + a * x[5]) * std::sin(x[2]));
-  double u_w_lr = std::max(0.0, x[3] + 0.5 * T_r * x[5]);
-  double u_w_rr = std::max(0.0, x[3] - 0.5 * T_r * x[5]);
+  auto along = [&](double u, double v, double delta) {
+    return std::max(0.0, u * std::cos(delta) + v * std::sin(delta));
+  };
+  double u_w_lf = along(x[3] + 0.5 * T_f * x[5], x[10] + a * x[5], delta_LF);
+  double u_w_rf = along(x[3] - 0.5 * T_f * x[5], x[10] + a * x[5], delta_RF);
+  double u_w_lr = along(x[3] + 0.5 * T_r * x[5], x[10] - b * x[5], delta_LR);
+  double u_w_rr = along(x[3] - 0.5 * T_r * x[5], x[10] - b * x[5], delta_RR);
 
   // Longitudinal slip as kappa = (R omega - u) / u, the negative of
   // CommonRoad's s, and slip angles; none at a crawl.
@@ -349,14 +360,16 @@ auto compute_rate_numbers(const MultibodyNumbers& x, double u0, double u1,
   if (!crawling) {
     alpha_LF = std::atan((x[10] + a * x[5] - x[14] * (R_w - x[16])) /
                          (x[3] + 0.5 * T_f * x[5])) -
-               x[2];
+               delta_LF;
     alpha_RF = std::atan((x[10] + a * x[5] - x[14] * (R_w - x[16])) /
                          (x[3] - 0.5 * T_f * x[5])) -
-               x[2];
+               delta_RF;
     alpha_LR = std::atan((x[10] - b * x[5] - x[19] * (R_w - x[21])) /
-                         (x[3] + 0.5 * T_r * x[5]));
+                         (x[3] + 0.5 * T_r * x[5])) -
+               delta_LR;
     alpha_RR = std::atan((x[10] - b * x[5] - x[19] * (R_w - x[21])) /
-                         (x[3] - 0.5 * T_r * x[5]));
+                         (x[3] - 0.5 * T_r * x[5])) -
+               delta_RR;
   }
 
   // Suspension travel at each corner, and its speed.
@@ -381,19 +394,41 @@ auto compute_rate_numbers(const MultibodyNumbers& x, double u0, double u1,
   double gamma_RR = x[6] - D_r * z_SRR - E_r * z_SRR * z_SRR;
 
   // Tire forces, combined slip.
-  auto tire = [&](double kappa, double alpha, double gamma, double load) {
+  auto tire = [&](double kappa, double alpha, double gamma, double load,
+                  TireSide side) {
     TireForce force = compute_tire_force(vehicle.tire,
                                          {.longitudinal = kappa,
                                           .lateral = alpha * radian,
                                           .camber = gamma * radian},
-                                         load * newton);
+                                         load * newton, side);
     return std::array{force.longitudinal.numerical_value_in(newton),
-                      force.lateral.numerical_value_in(newton)};
+                      force.lateral.numerical_value_in(newton),
+                      force.aligning.numerical_value_in(newton_meter)};
   };
-  auto [F_x_LF, F_y_LF] = tire(kappa_lf, alpha_LF, gamma_LF, F_z_LF);
-  auto [F_x_RF, F_y_RF] = tire(kappa_rf, alpha_RF, gamma_RF, F_z_RF);
-  auto [F_x_LR, F_y_LR] = tire(kappa_lr, alpha_LR, gamma_LR, F_z_LR);
-  auto [F_x_RR, F_y_RR] = tire(kappa_rr, alpha_RR, gamma_RR, F_z_RR);
+  auto [F_x_LF, F_y_LF, M_z_LF] =
+      tire(kappa_lf, alpha_LF, gamma_LF, F_z_LF, TireSide::LEFT);
+  auto [F_x_RF, F_y_RF, M_z_RF] =
+      tire(kappa_rf, alpha_RF, gamma_RF, F_z_RF, TireSide::RIGHT);
+  auto [F_x_LR, F_y_LR, M_z_LR] =
+      tire(kappa_lr, alpha_LR, gamma_LR, F_z_LR, TireSide::LEFT);
+  auto [F_x_RR, F_y_RR, M_z_RR] =
+      tire(kappa_rr, alpha_RR, gamma_RR, F_z_RR, TireSide::RIGHT);
+
+  // Each tire's forces in the body's axes, turned by its wheel's steer.
+  auto body_x = [](double f_x, double f_y, double delta) {
+    return f_x * std::cos(delta) - f_y * std::sin(delta);
+  };
+  auto body_y = [](double f_x, double f_y, double delta) {
+    return f_x * std::sin(delta) + f_y * std::cos(delta);
+  };
+  double X_LF = body_x(F_x_LF, F_y_LF, delta_LF);
+  double X_RF = body_x(F_x_RF, F_y_RF, delta_RF);
+  double X_LR = body_x(F_x_LR, F_y_LR, delta_LR);
+  double X_RR = body_x(F_x_RR, F_y_RR, delta_RR);
+  double Y_LF = body_y(F_x_LF, F_y_LF, delta_LF);
+  double Y_RF = body_y(F_x_RF, F_y_RF, delta_RF);
+  double Y_LR = body_y(F_x_LR, F_y_LR, delta_LR);
+  double Y_RR = body_y(F_x_RR, F_y_RR, delta_RR);
 
   // The compliant pins' travel, and their forces.
   double delta_z_f = h_s - R_w + x[16] - x[11];
@@ -432,16 +467,13 @@ auto compute_rate_numbers(const MultibodyNumbers& x, double u0, double u1,
   double F_SRR = m_s * g * a / (2 * (a + b)) - z_SRR * K_sr - dz_SRR * K_sdr -
                  (x[6] - x[18]) * K_tsr / T_r;
 
-  // The sprung body's forces and moments.
-  double cos_steering = std::cos(x[2]);
-  double sin_steering = std::sin(x[2]);
-  double sumX = F_x_LR + F_x_RR + (F_x_LF + F_x_RF) * cos_steering -
-                (F_y_LF + F_y_RF) * sin_steering;
-  double sumN = (F_y_LF + F_y_RF) * a * cos_steering +
-                (F_x_LF + F_x_RF) * a * sin_steering +
-                (F_y_RF - F_y_LF) * 0.5 * T_f * sin_steering +
-                (F_x_LF - F_x_RF) * 0.5 * T_f * cos_steering +
-                (F_x_LR - F_x_RR) * 0.5 * T_r - (F_y_LR + F_y_RR) * b;
+  // The sprung body's forces and moments. Its axes are SAE's, x forward, y
+  // right and z down, the left wheels at -y.
+  double sumX = X_LF + X_RF + X_LR + X_RR;
+  // The tires' aligning moments yaw it too; CommonRoad's tire has none.
+  double sumN = (Y_LF + Y_RF) * a + (X_LF - X_RF) * 0.5 * T_f +
+                (X_LR - X_RR) * 0.5 * T_r - (Y_LR + Y_RR) * b + M_z_LF +
+                M_z_RF + M_z_LR + M_z_RR;
   double sumY_s = (F_RAF + F_RAR) * std::cos(x[6]) +
                   (F_SLF + F_SLR + F_SRF + F_SRR) * std::sin(x[6]);
   double sumL =
@@ -453,36 +485,32 @@ auto compute_rate_numbers(const MultibodyNumbers& x, double u0, double u1,
           (h_s - x[11] - R_w + x[21] - (h_rar - R_w) * std::cos(x[18]));
   double sumZ_s = (F_SLF + F_SLR + F_SRF + F_SRR) * std::cos(x[6]) -
                   (F_RAF + F_RAR) * std::sin(x[6]);
-  double sumM_s = a * (F_SLF + F_SRF) - b * (F_SLR + F_SRR) +
-                  ((F_x_LF + F_x_RF) * cos_steering -
-                   (F_y_LF + F_y_RF) * sin_steering + F_x_LR + F_x_RR) *
-                      (h_s - x[11]);
+  double sumM_s =
+      a * (F_SLF + F_SRF) - b * (F_SLR + F_SRR) + sumX * (h_s - x[11]);
 
   // The unsprung axles' forces and moments.
-  double sumL_uf =
-      0.5 * F_SRF * T_f - 0.5 * F_SLF * T_f - F_RAF * (h_raf - R_w) +
-      F_z_LF * (R_w * std::sin(x[13]) + 0.5 * T_f * std::cos(x[13]) -
-                K_lt * F_y_LF) -
-      F_z_RF * (-R_w * std::sin(x[13]) + 0.5 * T_f * std::cos(x[13]) +
-                K_lt * F_y_RF) -
-      ((F_y_LF + F_y_RF) * cos_steering + (F_x_LF + F_x_RF) * sin_steering) *
-          (R_w - x[16]);
+  double sumL_uf = 0.5 * F_SRF * T_f - 0.5 * F_SLF * T_f -
+                   F_RAF * (h_raf - R_w) +
+                   F_z_LF * (R_w * std::sin(x[13]) +
+                             0.5 * T_f * std::cos(x[13]) - K_lt * F_y_LF) -
+                   F_z_RF * (-R_w * std::sin(x[13]) +
+                             0.5 * T_f * std::cos(x[13]) + K_lt * F_y_RF) -
+                   (Y_LF + Y_RF) * (R_w - x[16]);
   double sumL_ur = 0.5 * F_SRR * T_r - 0.5 * F_SLR * T_r -
                    F_RAR * (h_rar - R_w) +
                    F_z_LR * (R_w * std::sin(x[18]) +
                              0.5 * T_r * std::cos(x[18]) - K_lt * F_y_LR) -
                    F_z_RR * (-R_w * std::sin(x[18]) +
                              0.5 * T_r * std::cos(x[18]) + K_lt * F_y_RR) -
-                   (F_y_LR + F_y_RR) * (R_w - x[21]);
+                   (Y_LR + Y_RR) * (R_w - x[21]);
   double sumZ_uf = F_z_LF + F_z_RF + F_RAF * std::sin(x[6]) -
                    (F_SLF + F_SRF) * std::cos(x[6]);
   double sumZ_ur = F_z_LR + F_z_RR + F_RAR * std::sin(x[6]) -
                    (F_SLR + F_SRR) * std::cos(x[6]);
-  double sumY_uf = (F_y_LF + F_y_RF) * cos_steering +
-                   (F_x_LF + F_x_RF) * sin_steering - F_RAF * std::cos(x[6]) -
-                   (F_SLF + F_SRF) * std::sin(x[6]);
-  double sumY_ur = (F_y_LR + F_y_RR) - F_RAR * std::cos(x[6]) -
-                   (F_SLR + F_SRR) * std::sin(x[6]);
+  double sumY_uf =
+      Y_LF + Y_RF - F_RAF * std::cos(x[6]) - (F_SLF + F_SRF) * std::sin(x[6]);
+  double sumY_ur =
+      Y_LR + Y_RR - F_RAR * std::cos(x[6]) - (F_SLR + F_SRR) * std::sin(x[6]);
 
   MultibodyNumbers f{};
   if (crawling) {
@@ -490,6 +518,7 @@ auto compute_rate_numbers(const MultibodyNumbers& x, double u0, double u1,
     // models crawl (see model/single_track.cpp), with the slip angle, zero
     // at a crawl, where CommonRoad reads the roll angle.
     double l = a + b;
+    double cos_steering = std::cos(x[2]);
     double tangent = std::tan(x[2]);
     double kinematic_beta = std::atan(tangent * b / l);
     double ratio = tangent * b / l;
