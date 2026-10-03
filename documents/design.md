@@ -2803,9 +2803,10 @@ can carry a driving simulation comparable to the best open source, as
 aeronautic does against JSBSim, with each claim checked against an open
 reference: roads against libOpenDRIVE, vehicles against CommonRoad's models
 and Chrono::Vehicle, traffic against SUMO, scenarios against esmini. It is
-being built in eight steps (see the [Roadmap](#roadmap)); the first five,
+being built in eight steps (see the [Roadmap](#roadmap)); the first six,
 roads, traffic, a scale benchmark, tires and vehicle dynamics against
-CommonRoad, and maneuvers against Chrono, are done.
+CommonRoad, maneuvers against Chrono, and scenarios against esmini, are
+done.
 
 #### Roads
 
@@ -3017,6 +3018,69 @@ the peak where the formula's falls away, so simon's Sedan spins sooner. At
 100 km/h Chrono understeers more than at 80 km/h and simon's models do
 not; that difference, up to 0.04 deg/g, is not yet explained.
 
+#### Scenarios against esmini
+
+`model/openscenario` reads ASAM OpenSCENARIO 1.x scenarios with pugixml:
+parameters, substituted as $name and evaluated as ${...} expressions;
+vehicles from catalogs; positions on lanes and roads, relative to entities
+and in the world; speed, lane change, lane offset, teleport and parameter
+actions; and conditions on time, speed, acceleration, headway, distance,
+position, the end of the road, parameters and the storyboard's own states.
+Anything else that changes what happens, a controller, a route or a
+trajectory among them, is refused. A vehicle towing a
+trailer is refused too, since esmini makes the trailer an entity of its own.
+
+`model/storyboard` runs the storyboard: its elements' states and
+transitions, events by priority and execution count, and triggers, each
+condition on its edge and after its delay. `model/road_placement` places a
+vehicle by road, lane, s and offset, either way along any lane, and moves it
+along its path at its t, s changing by the distance over 1 - kappa t. In the
+ECS, `RunStoryboard` evaluates the storyboard and gives each vehicle its
+orders, `ControlSpeed` runs speed actions, `MoveOnRoad` runs lateral actions
+and teleports or carries a vehicle along its lane, and `PlaceOnRoad` puts it
+in the world (`application/automotive/scenario_simulation.hpp`).
+
+Where the standard leaves the details open, simon follows esmini, the open
+OpenSCENARIO player:
+
+- **Each step evaluates every trigger on the world as the last step left
+  it**, and an action started in a step also runs in it, in the storyboard's
+  order. A lane change before a speed action in the storyboard moves at the
+  speed before it.
+- **A transition is stretched to the vehicle's limits.** A speed action
+  whose shape would accelerate or decelerate past the vehicle's performance
+  takes longer, its peak rate at the limit; a rate dimension is the
+  transition's peak rate.
+- **A lane change keeps the vehicle's path length,** its speed times the
+  step, and takes its lateral motion from it, the heading turned along the
+  path.
+- **A storyboard element's transition counts at a condition's next
+  evaluation,** in the same step if the condition comes later; an edge needs
+  a value before it; a trigger that fires starts its conditions over.
+- **A teleport or a parameter set ends after the step's triggers,** and a
+  vehicle the storyboard teleports stays where it was put for the step.
+
+simon evaluates every condition of a group each step, where esmini stops at
+the first false one but for those with delays, which keeps every edge's
+history current.
+
+`scenario_test` plays three of esmini's scenarios and checks every entity
+at every step against esmini 3.8.2 at 0.05 s
+(`application/automotive/reference/esmini_scenarios.py`):
+
+| Scenario | Steps | Position | Heading | Speed |
+|---|---:|---:|---:|---:|
+| A cut-in on a straight road: a headway trigger, a sinusoidal lane change and braking | 322 | 6.8e-7 m | 4.9e-7 rad | 4.6e-14 m/s |
+| A cut-in on a curved highway, at a speed relative to the ego's | 440 | 1.2 mm | 8.3e-7 rad | 8.3e-14 m/s |
+| Lane changes across a curve, into the oncoming lane, over and over: reaching positions, the end of the road, teleports, two acts, repeated events | 3,669 | 7.0e-7 m | 1.3e-6 rad | 0.0033 m/s |
+
+esmini logs to six decimals, which bounds the agreement on straight roads.
+On e6mini's curves the 1.2 mm is the two road models' geometry. The lane
+changes' speed differs in two steps, where esmini reports a vehicle
+teleported away from the end of its road at a standstill for a step; its
+next step and every position agree. Each storyboard stops on the same step
+as esmini's.
+
 #### Drivers
 
 `model/traffic` holds the drivers' models: the Intelligent Driver Model for
@@ -3138,7 +3202,7 @@ depends on the accelerator it runs on, so no figure for it is quoted here.
 | Benchmarks | A small `std::chrono` harness per benchmark, printing one table per question. Benchmarks sit beside what they measure, like tests; only ones that measure several things go in a common directory. |
 | UI | Dear ImGui, and ImPlot (0.17) for the viewers' maps and charts |
 | Window and input | SDL2 now; SDL3 when it is in the Bazel Central Registry |
-| XML, for OpenDRIVE | pugixml |
+| XML, for OpenDRIVE and OpenSCENARIO | pugixml |
 | Profiling, later | Tracy |
 
 C++26 reflection would eliminate some boilerplate, but GCC 16 supports it and
@@ -3232,7 +3296,9 @@ Each step ends with a working application and passing tests.
      Chrono's Pac02; the Sedan through the ISO handling maneuvers and FMVSS
      126 against Chrono::Vehicle, with the tires' aligning moments, each
      wheel steered, and each axle's tires at half its load.
-   - Next: OpenSCENARIO against esmini; metrics and batch runs; a viewer.
+   - Done: OpenSCENARIO's storyboard, actions and conditions in the ECS,
+     against esmini step by step.
+   - Next: metrics and batch runs; a viewer.
 
 Later: `LockstepDriver` and a second process, scenario files with two-phase
 loading, parent-child transforms (a radar mounted on a vehicle), and DIS or HLA

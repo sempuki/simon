@@ -9,8 +9,13 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "automotive_library",
-    srcs = ["simulation.cpp"],
+    srcs = [
+        "scenario_simulation.cpp",
+        "simulation.cpp",
+        "simulation_systems.cpp",
+    ],
     hdrs = [
+        "scenario_simulation.hpp",
         "simulation.hpp",
         "simulation_components.hpp",
         "simulation_systems.hpp",
@@ -24,9 +29,13 @@ cc_library(
         "//model:kinematics",
         "//model:lane_graph",
         "//model:opendrive",
+        "//model:openscenario",
         "//model:random",
         "//model:road",
+        "//model:road_placement",
+        "//model:storyboard",
         "//model:traffic",
+        "//model:transition",
         "//model:units",
         "@lib//base:core",
     ],
@@ -37,6 +46,18 @@ cc_binary(
     srcs = ["main.cpp"],
     copts = COPTS,
     data = glob(["roads/*.xodr"]),
+    deps = [
+        ":automotive_library",
+        "//engine:driver",
+        "//framework:vocabulary",
+    ],
+)
+
+cc_binary(
+    name = "scenario",
+    srcs = ["scenario_main.cpp"],
+    copts = COPTS,
+    data = glob(["scenarios/**"]),
     deps = [
         ":automotive_library",
         "//engine:driver",
@@ -129,6 +150,20 @@ cc_test(
         "//model:lane_graph",
         "//model:opendrive",
         "//model:road",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "scenario_test",
+    size = "small",
+    srcs = ["scenario_test.cpp"],
+    copts = COPTS,
+    data = glob(["scenarios/**"]) + ["reference/esmini_scenarios.csv"],
+    deps = [
+        ":automotive_library",
+        ":testing",
+        "//framework:vocabulary",
         "@lib//base:testing",
     ],
 )

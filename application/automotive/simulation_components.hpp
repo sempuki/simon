@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 #include "framework/archetype.hpp"
 #include "framework/entity.hpp"
@@ -13,7 +14,10 @@
 #include "model/kinematics.hpp"
 #include "model/lane_graph.hpp"
 #include "model/road.hpp"
+#include "model/road_placement.hpp"
+#include "model/storyboard.hpp"
 #include "model/traffic.hpp"
+#include "model/transition.hpp"
 #include "model/units.hpp"
 
 // Vehicles drive a network of roads, each following its lane by the
@@ -92,6 +96,90 @@ inline auto pose(const VehiclePose& vehicle) -> model::Pose {
                          model::radians(vehicle.heading), Vector3::UnitZ()}}};
 }
 
+//-- Scenarios ----------------------------------------------------------------
+
+// What a scenario's systems share, outside the world: the roads, the
+// scenario and the player running its storyboard, and each entity's state
+// and orders as the storyboard saw and gave them this step. It outlives the
+// world.
+struct ScenarioContext final {
+  const model::RoadNetwork* roads = nullptr;
+  const model::openscenario::Scenario* scenario = nullptr;
+  model::openscenario::StoryboardPlayer* player = nullptr;
+  std::vector<model::openscenario::EntityState> states;  // By entity.
+  bool started = false;
+};
+
+// A vehicle an OpenSCENARIO scenario drives: its entity's index in the
+// scenario. The storyboard drives it, by its actions on speed and on the
+// lateral position, and between them it holds its speed and keeps its lane.
+struct ScenarioActor final {
+  std::size_t entity = 0;
+};
+
+// What the storyboard asked of a vehicle this step: actions to stop, by
+// handle, and actions to start.
+struct ScenarioOrders final {
+  std::vector<std::uint32_t> stops;
+  std::vector<model::openscenario::ActionOrder> starts;
+  // Where each teleport puts the vehicle, in the order given, each found
+  // after the teleports before it, as a relative position needs.
+  std::vector<model::RoadPlacement> teleports;
+  // Whether the storyboard teleported the vehicle this step, which then
+  // stays where it was put; esmini's init teleports come before the first
+  // step, and do not hold it.
+  bool held = false;
+};
+
+// A running speed action: its transition over time, and the entity its
+// target follows, for a relative target.
+struct SpeedChange final {
+  std::uint32_t handle = 0;
+  model::openscenario::Transition transition;
+  std::optional<std::size_t> relative_to;
+  model::openscenario::RelativeTargetSpeed::Kind kind =
+      model::openscenario::RelativeTargetSpeed::Kind::DELTA;
+  double relative_value = 0.0;
+  bool continuous = false;
+  bool reached = false;
+};
+
+// A vehicle's speed, the action changing it, and the speed actions it
+// finished this step.
+struct ScenarioSpeed final {
+  double speed = 0.0;         // m/s, along its heading.
+  double acceleration = 0.0;  // m/s^2.
+  std::optional<SpeedChange> change;
+  std::vector<std::uint32_t> finished;
+  // The speed before its action ran this step, and that action's handle:
+  // actions run in the storyboard's order, so a lateral action before the
+  // speed action moves at the speed before it.
+  double unstepped = 0.0;
+  std::optional<std::uint32_t> stepped_by;
+};
+
+// A running lateral action: a lane change to `lane`, or a lane offset, its
+// offset from the target lane's middle, positive to the left of the lane's
+// travel, moving by its transition over time or distance.
+struct LateralChange final {
+  std::uint32_t handle = 0;
+  bool lane_change = true;
+  int lane = 0;
+  model::openscenario::DynamicsDimension dimension =
+      model::openscenario::DynamicsDimension::TIME;
+  model::openscenario::Transition transition;
+};
+
+// A vehicle on the road: where it is, the lateral action moving it, how long
+// it has been at the end of its road, and the lateral actions it finished
+// this step.
+struct ScenarioMotion final {
+  model::RoadPlacement placement;
+  std::optional<LateralChange> change;
+  double end_of_road = -1.0;  // s, -1 if not there.
+  std::vector<std::uint32_t> finished;
+};
+
 namespace archetype {
 
 using framework::Archetype;
@@ -101,11 +189,24 @@ struct Vehicle final                                                         //
     : Archetype<"vehicle",                                                   //
                 Requires<VehiclePose, LaneState, Driver, DriveCommand>> {};  //
 
+struct ScenarioVehicle final                             //
+    : Archetype<"scenario vehicle",                      //
+                Requires<VehiclePose, ScenarioActor,     //
+                         ScenarioOrders, ScenarioSpeed,  //
+                         ScenarioMotion>> {};            //
+
 }  // namespace archetype
 
 using World =
     framework::World<VehiclePose,
                      framework::TypeList<LaneState, Driver, DriveCommand>,
                      framework::TypeList<archetype::Vehicle>>;
+
+// The world an OpenSCENARIO scenario plays in.
+using ScenarioWorld =
+    framework::World<VehiclePose,
+                     framework::TypeList<ScenarioActor, ScenarioOrders,
+                                         ScenarioSpeed, ScenarioMotion>,
+                     framework::TypeList<archetype::ScenarioVehicle>>;
 
 }  // namespace simon::automotive

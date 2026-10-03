@@ -422,6 +422,38 @@ cc_library(
 )
 
 cc_library(
+    name = "road_placement",
+    srcs = ["road_placement.cpp"],
+    hdrs = ["road_placement.hpp"],
+    copts = COPTS,
+    deps = [
+        ":road",
+        ":units",
+        "@lib//base:core",
+    ],
+)
+
+cc_library(
+    name = "storyboard",
+    srcs = ["storyboard.cpp"],
+    hdrs = ["storyboard.hpp"],
+    copts = COPTS,
+    deps = [
+        ":openscenario",
+        ":road",
+        ":road_placement",
+        ":units",
+    ],
+)
+
+cc_library(
+    name = "transition",
+    hdrs = ["transition.hpp"],
+    copts = COPTS,
+    deps = [":openscenario"],
+)
+
+cc_library(
     name = "random",
     hdrs = ["random.hpp"],
     copts = COPTS,

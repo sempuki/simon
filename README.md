@@ -307,6 +307,11 @@ Chrono's Sedan to Chrono's step-steer yaw rate within 0.2% and its
 understeer gradient within 0.01 deg/g at 80 km/h, its suspension measured
 from Chrono's as a kinematics and compliance rig would.
 
+It plays ASAM OpenSCENARIO scenarios, their storyboards, triggers and
+actions running in the ECS: esmini's cut-ins and lane changes play out as
+they do in esmini, every vehicle at every step within its log's six decimals
+on straight roads and 1.2 mm on a curved highway.
+
 At scale, 100,000 vehicles on 3,770 km of lanes step in 25 ms on one
 thread, 248 ns a vehicle, where SUMO takes 6.5 µs a vehicle on the same
 network and drivers.
@@ -315,6 +320,7 @@ network and drivers.
 bazel test //application/automotive/...
 bazel run -c opt //application/automotive -- application/automotive/roads/Town01.xodr 60 120
 bazel run -c opt //application/automotive:automotive_benchmark
+bazel run //application/automotive:scenario -- application/automotive/scenarios/xosc/cut-in.xosc
 ```
 
 ## Build

@@ -33,6 +33,10 @@ says the math is derived here, it shows the derivation.
 | `tire_file.cpp` | The TNO tire property file (.tir) in the PAC2002 format: its sections, keys and coefficients | As MSC ADAMS and Project Chrono read it; Chrono's ChPac02Tire, version 10.0.0 |
 | `tire.cpp` | Mirroring a tire about its wheel plane for the other side | Derived here: forces at (kappa, -alpha, -gamma), the lateral force and aligning moment turned; Chrono flips the same asymmetric coefficients |
 | `multibody.cpp`, `single_track.cpp` | Each wheel's forces turned by its own steer, and the tires' aligning moments, in the yaw moment about the center of gravity | Derived here, as the moments of each wheel's forces about the center of gravity |
+| `openscenario.hpp` | Scenarios: parameters and expressions, catalogs, positions, actions, conditions, triggers and the storyboard | *ASAM OpenSCENARIO XML*, version 1.3, ASAM e.V., 2024; expressions as version 1.1 defines them |
+| `storyboard.hpp` | The storyboard's element states and transitions, event priorities, condition edges and delays | ASAM OpenSCENARIO, above; where it leaves the order open, esmini 3.8.2's ScenarioEngine |
+| `transition.hpp` | The transition shapes, step, linear, cubic and sinusoidal, and their peak rates | ASAM OpenSCENARIO, above, TransitionDynamics; esmini's OSCPrivateAction for the peak rates |
+| `road_placement.cpp` | Moving at t from a reference line of curvature kappa: s changes by the distance over 1 - kappa t | Derived here, from an arc's length at radius 1 / kappa - t |
 | `maneuver_test.cpp` | Steady-state circular driving and the understeer gradient | *Passenger cars: Steady-state circular driving behaviour, Open-loop test methods*, ISO 4138 |
 | `maneuver_test.cpp` | The step steer and its yaw rate response time and overshoot | *Road vehicles: Lateral transient response test methods, Open-loop test methods*, ISO 7401 |
 | `maneuver_test.cpp` | The sine with dwell, its yaw rate ratios 1 s and 1.75 s after the steer and its lateral displacement 1.07 s after it begins | *Federal Motor Vehicle Safety Standard No. 126: Electronic stability control systems*, 49 CFR 571.126 |

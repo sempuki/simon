@@ -501,4 +501,183 @@ struct FollowLane final    //
 using Schedule = SystemList<Decide, Drive, FollowLane>;
 using Scheduler = framework::Scheduler<World, Schedule>;
 
+//-- Scenarios ----------------------------------------------------------------
+
+template <typename SystemType>
+using ScenarioProjectedWorld =
+    framework::ProjectedWorld<SystemType, ScenarioWorld>;
+
+// Each step, the storyboard's turn: it learns which actions every vehicle
+// finished last step and where every vehicle is, evaluates its triggers, and
+// orders each vehicle's actions to stop and start. The first step starts the
+// storyboard, its init actions, and then evaluates it as any other.
+struct RunStoryboard final    //
+    : System<ScenarioOrders,  //
+             const ScenarioActor> {
+  using SystemWorld = ScenarioProjectedWorld<RunStoryboard>;
+  using AllowComponentList =
+      TypeList<ScenarioActor, ScenarioSpeed, ScenarioMotion>;
+
+  explicit RunStoryboard(ScenarioContext& context) : context_{&context} {}
+
+  auto prepare(SystemWorld& world, Step step) -> bool {
+    ScenarioContext& context = *context_;
+    double time =
+        std::chrono::duration<double>(step.time.time_since_epoch()).count();
+    std::size_t count = context.scenario->entities.size();
+    context.states.resize(count);
+    std::vector<std::uint32_t> finished;
+    const auto& speeds = world.template store_of<ScenarioSpeed>();
+    const auto& motions = world.template store_of<ScenarioMotion>();
+    world.template store_of<ScenarioActor>().for_each(
+        [&](Entity owner, const ScenarioActor& actor) {
+          const ScenarioSpeed* speed = speeds.maybe_component_of(owner);
+          const ScenarioMotion* motion = motions.maybe_component_of(owner);
+          if (speed == nullptr || motion == nullptr || actor.entity >= count) {
+            return;
+          }
+          context.states[actor.entity] = model::openscenario::EntityState{
+              .placement = motion->placement,
+              .pose = model::compute_placement_pose(*context.roads,
+                                                    motion->placement),
+              .speed = speed->speed,
+              .acceleration = speed->acceleration,
+              .end_of_road = motion->end_of_road};
+          finished.insert(finished.end(), speed->finished.begin(),
+                          speed->finished.end());
+          finished.insert(finished.end(), motion->finished.begin(),
+                          motion->finished.end());
+        });
+    orders_.assign(count, {});
+    if (!context.started) {
+      context.started = true;
+      deal(context.player->start(time), false);
+    }
+    deal(context.player->step(time, context.states, finished), true);
+    return true;
+  }
+
+  auto operator()(SystemWorld&, Entity,    //
+                  ScenarioOrders& orders,  //
+                  const ScenarioActor* actor) const -> void {
+    if (actor == nullptr || actor->entity >= orders_.size()) {
+      orders = {};
+      return;
+    }
+    orders = orders_[actor->entity];
+  }
+
+ private:
+  // Hands each order to its entity, a stop to every entity, since a handle
+  // names its action alone.
+  // A teleport is found where it is given, so that a position relative to
+  // an entity teleported before it finds that entity where it went.
+  auto deal(model::openscenario::StoryboardOrders given, bool holding)
+      -> void {
+    ScenarioContext& context = *context_;
+    for (ScenarioOrders& orders : orders_) {
+      orders.stops.insert(orders.stops.end(), given.stops.begin(),
+                          given.stops.end());
+    }
+    for (const model::openscenario::ActionOrder& order : given.starts) {
+      if (order.entity >= orders_.size()) {
+        continue;
+      }
+      orders_[order.entity].starts.push_back(order);
+      if (const auto* teleport =
+              std::get_if<model::openscenario::TeleportAction>(order.action)) {
+        model::RoadPlacement placement =
+            context.player->locate(teleport->position, context.states);
+        orders_[order.entity].teleports.push_back(placement);
+        orders_[order.entity].held = orders_[order.entity].held || holding;
+        context.states[order.entity].placement = placement;
+        context.states[order.entity].pose =
+            model::compute_placement_pose(*context.roads, placement);
+      }
+    }
+  }
+
+  ScenarioContext* context_ = nullptr;
+  std::vector<ScenarioOrders> orders_;
+};
+
+// Each step, a vehicle's speed: its speed action started, stopped or run, as
+// esmini runs it. The transition moves on by the step and gives the speed,
+// within the vehicle's acceleration and deceleration, the transition held
+// back where they limit it; once the transition ends the speed closes on the
+// target within the same limits. A relative target follows its entity's
+// speed at the step's start. A vehicle stuck at the end of its road stops.
+struct ControlSpeed final    //
+    : System<ScenarioSpeed,  //
+             const ScenarioActor, const ScenarioOrders, const ScenarioMotion> {
+  using SystemWorld = ScenarioProjectedWorld<ControlSpeed>;
+  using SequenceAfterSystemList = SystemList<RunStoryboard>;
+
+  explicit ControlSpeed(ScenarioContext& context) : context_{&context} {}
+
+  auto operator()(SystemWorld&, Entity,          //
+                  ScenarioSpeed& speed,          //
+                  const ScenarioActor* actor,    //
+                  const ScenarioOrders* orders,  //
+                  const ScenarioMotion* motion,  //
+                  Step step) const -> void;
+
+ private:
+  ScenarioContext* context_ = nullptr;
+};
+
+// Each step, a vehicle's place on the road: teleported, moved by its lateral
+// action, a lane change or lane offset, as esmini moves it, or else carried
+// along its lane at its speed. A lateral action keeps the vehicle's path as
+// long as its speed allows, its lateral motion taken from it, and turns its
+// heading to its path.
+struct MoveOnRoad final       //
+    : System<ScenarioMotion,  //
+             const ScenarioActor, const ScenarioOrders, const ScenarioSpeed> {
+  using SystemWorld = ScenarioProjectedWorld<MoveOnRoad>;
+  using SequenceAfterSystemList = SystemList<ControlSpeed>;
+
+  explicit MoveOnRoad(ScenarioContext& context) : context_{&context} {}
+
+  auto operator()(SystemWorld&, Entity,          //
+                  ScenarioMotion& motion,        //
+                  const ScenarioActor* actor,    //
+                  const ScenarioOrders* orders,  //
+                  const ScenarioSpeed* speed,    //
+                  Step step) const -> void;
+
+ private:
+  ScenarioContext* context_ = nullptr;
+};
+
+// After MoveOnRoad, each vehicle's place in the world: its reference point,
+// the middle of its rear axle, at its road placement.
+struct PlaceOnRoad final   //
+    : System<VehiclePose,  //
+             const ScenarioMotion> {
+  using SystemWorld = ScenarioProjectedWorld<PlaceOnRoad>;
+  using SequenceAfterSystemList = SystemList<MoveOnRoad>;
+
+  explicit PlaceOnRoad(ScenarioContext& context) : context_{&context} {}
+
+  auto operator()(SystemWorld&, Entity,  //
+                  VehiclePose& pose,     //
+                  const ScenarioMotion* motion) const -> void {
+    if (motion == nullptr) {
+      return;
+    }
+    model::PlacementPose at =
+        model::compute_placement_pose(*context_->roads, motion->placement);
+    pose = VehiclePose{.position = model::meters(at.x, at.y, at.z),
+                       .heading = at.heading * model::radian};
+  }
+
+ private:
+  ScenarioContext* context_ = nullptr;
+};
+
+using ScenarioSchedule =
+    SystemList<RunStoryboard, ControlSpeed, MoveOnRoad, PlaceOnRoad>;
+using ScenarioScheduler = framework::Scheduler<ScenarioWorld, ScenarioSchedule>;
+
 }  // namespace simon::automotive
