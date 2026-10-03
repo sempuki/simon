@@ -2909,6 +2909,54 @@ SUMO's Euler update is first order: at its usual 0.1 s step it is 1.06 m from
 its own converged platoon, so the 1.07 cm is its error at 0.001 s; simon at
 0.1 s is within 0.1 mm of its own converged platoon.
 
+#### Traffic
+
+`application/automotive` drives vehicles on a network read from OpenDRIVE.
+A vehicle's state is in lane coordinates: its lane, the s of its front bumper,
+its speed, and how many lanes it has entered. It follows its lane's middle,
+which is the kinematic single-track model with its steering set by the lane's
+curvature, so lane coordinates lose nothing, and its place in the world
+follows from the road's geometry.
+
+Components (`application/automotive/simulation_components.hpp`):
+
+| Component | Holds |
+|---|---|
+| `VehiclePose` | The world's spatial component: the front bumper's position and the heading |
+| `LaneState` | The lane, s, speed and lanes entered |
+| `Driver` | The IDM and MOBIL drivers, the vehicle's length, and the seed that picks its way at forks |
+| `DriveCommand` | The step's acceleration, and a lane to change to |
+
+Schedule (`application/automotive/simulation_systems.hpp`):
+
+| System | Does |
+|---|---|
+| `Decide` | Every step, finds each driver's leader and accelerates by IDM; once a second, weighs the lanes beside it by MOBIL |
+| `Drive` | Every step, changes lane if decided and moves along the lane, entering the next lane on the vehicle's way past its end |
+| `FollowLane` | Every step, puts each vehicle in the world at its lane's middle |
+
+- **A driver reads its neighbors from an index.** `Decide` writes only the
+  command, so it may read every vehicle's lane state; its `prepare` sorts
+  them by lane and distance along, and leaders and followers are binary
+  searches. A leader is the next vehicle in the lane, else the first in the
+  lanes the vehicle's way leads into, within 250 m; a dead end is a leader
+  standing still.
+- **A vehicle's way is fixed by its seed.** At a fork the lane is picked by
+  SplitMix64 of the driver's seed and the number of lanes it has entered, so
+  the same lane is picked each time it is looked ahead to and taken.
+- **The step holds the acceleration** and moves exactly under it, never
+  backward: a vehicle that would stop within the step stops where it would.
+- **Merges at junctions are not resolved.** Vehicles on different incoming
+  lanes see each other only once in the same lane, and nothing gives way.
+  Signals, priorities and pedestrians are later work.
+
+`automotive_test` drives a ring of two roads, two lanes each way, and CARLA's
+Town01. On the ring, 40 vehicles circulate for 300 s at 18.4 m/s, never
+closer than 1.09 m, and change lanes 129 times, more of them ending in the
+right lane than the left; the same seed repeats exactly. In Town01, 60
+vehicles enter 1,573 lanes through its junctions in 120 s, at 10.2 of their
+11 m/s.
+
 ## Libraries
 
 | Need | Library |
@@ -3001,9 +3049,11 @@ Each step ends with a working application and passing tests.
    each claim checked against an open reference (see
    [automotive](#automotive)):
    - Done: roads, read from OpenDRIVE and checked against libOpenDRIVE.
-   - Next: kinematic traffic on lanes under IDM and MOBIL, against SUMO; a
-     scale benchmark against SUMO and Waymax; single-track and multibody
-     vehicles against CommonRoad's models; Chrono::Vehicle through the ISO
+   - Done: the lane graph, against libOpenDRIVE's routing graph; the
+     kinematic single-track model, against CommonRoad's; IDM and MOBIL,
+     against movsim and SUMO; traffic on lanes in the ECS.
+   - Next: a scale benchmark against SUMO and Waymax; single-track with tires
+     and multibody vehicles against CommonRoad's models; Chrono::Vehicle through the ISO
      maneuvers; OpenSCENARIO against esmini; metrics and batch runs; a
      viewer.
 

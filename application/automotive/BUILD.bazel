@@ -1,10 +1,61 @@
 # Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
 package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "automotive_library",
+    srcs = ["simulation.cpp"],
+    hdrs = [
+        "simulation.hpp",
+        "simulation_components.hpp",
+        "simulation_systems.hpp",
+    ],
+    copts = COPTS,
+    deps = [
+        "//engine:lifecycle",
+        "//engine:rate_gate",
+        "//framework",
+        "//framework:vocabulary",
+        "//model:kinematics",
+        "//model:lane_graph",
+        "//model:opendrive",
+        "//model:random",
+        "//model:road",
+        "//model:traffic",
+        "//model:units",
+        "@lib//base:core",
+    ],
+)
+
+cc_binary(
+    name = "automotive",
+    srcs = ["main.cpp"],
+    copts = COPTS,
+    data = glob(["roads/*.xodr"]),
+    deps = [
+        ":automotive_library",
+        "//engine:driver",
+        "//framework:vocabulary",
+    ],
+)
+
+cc_test(
+    name = "automotive_test",
+    size = "small",
+    srcs = ["automotive_test.cpp"],
+    copts = COPTS,
+    data = glob(["roads/*.xodr"]),
+    deps = [
+        ":automotive_library",
+        "//framework:vocabulary",
+        "@lib//base:testing",
+    ],
+)
 
 cc_library(
     name = "testing",

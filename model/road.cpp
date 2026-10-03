@@ -251,8 +251,12 @@ auto find_lane_section(const Road& road, Length s) -> const LaneSection& {
 }
 
 auto compute_lane_border(const Road& road, Length s, int id) -> Length {
+  return compute_lane_border(road, find_lane_section(road, s), s, id);
+}
+
+auto compute_lane_border(const Road& road, const LaneSection& section, Length s,
+                         int id) -> Length {
   double at = s.numerical_value_in(meter);
-  const LaneSection& section = find_lane_section(road, s);
   double ds = at - section.s0;
   double border = road.lane_offset.evaluate(at);
   const std::vector<Lane>& side = id > 0 ? section.left : section.right;

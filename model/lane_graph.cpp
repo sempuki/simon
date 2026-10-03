@@ -8,6 +8,8 @@
 #include <string>
 #include <utility>
 
+#include "base/core.hpp"
+
 namespace simon::model {
 
 namespace {
@@ -75,6 +77,31 @@ auto adjacent_section(const RoadIndex& roads, std::uint32_t road,
 }
 
 }  // namespace
+
+auto find_section_end(const RoadNetwork& network, const LaneKey& key)
+    -> double {
+  const Road& road = network.roads[key.road];
+  return key.section + 1 < road.lane_sections.size()
+             ? road.lane_sections[key.section + 1].s0
+             : road.length;
+}
+
+auto find_lane(const RoadNetwork& network, const LaneKey& key) -> const Lane& {
+  const LaneSection& section =
+      network.roads[key.road].lane_sections[key.section];
+  CHECK_PRECONDITION(has_lane(section, key.lane));
+  const std::vector<Lane>& side = key.lane > 0 ? section.left : section.right;
+  return side[static_cast<std::size_t>(std::abs(key.lane)) - 1];
+}
+
+auto compute_lane_middle(const RoadNetwork& network, const LaneKey& key,
+                         Length s) -> Length {
+  const Road& road = network.roads[key.road];
+  const LaneSection& section = road.lane_sections[key.section];
+  int inner = key.lane > 0 ? key.lane - 1 : key.lane + 1;
+  return 0.5 * (compute_lane_border(road, section, s, key.lane) +
+                compute_lane_border(road, section, s, inner));
+}
 
 auto LaneGraph::successors_of(const LaneKey& lane) const
     -> std::span<const LaneKey> {

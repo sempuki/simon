@@ -49,6 +49,17 @@ class LaneGraph final {
   std::vector<LaneKey> to_;
 };
 
+// Where `key`'s lane section ends in s: at the next section's start, or at
+// the road's end.
+auto find_section_end(const RoadNetwork& network, const LaneKey& key) -> double;
+
+// The lane `key` names.
+auto find_lane(const RoadNetwork& network, const LaneKey& key) -> const Lane&;
+
+// The t of the middle of `key`'s lane at `s`, between its borders.
+auto compute_lane_middle(const RoadNetwork& network, const LaneKey& key,
+                         Length s) -> Length;
+
 // The lane graph of every lane of `network`, of every type. A link to a lane
 // or road the network lacks adds no edge.
 auto build_lane_graph(const RoadNetwork& network) -> LaneGraph;

@@ -326,7 +326,10 @@ cc_library(
     srcs = ["lane_graph.cpp"],
     hdrs = ["lane_graph.hpp"],
     copts = COPTS,
-    deps = [":road"],
+    deps = [
+        ":road",
+        "@lib//base:core",
+    ],
 )
 
 cc_library(

@@ -287,10 +287,18 @@ Its roads come first: read from ASAM OpenDRIVE, their positions, lane
 borders and lanes match [libOpenDRIVE](https://github.com/pageldev/libOpenDRIVE)
 to 8e-14 m on test roads of every geometry and on CARLA's Town01. On
 parametric cubics simon follows the exact arc length to 1e-13 m, where
-libOpenDRIVE's table of chords is 5.4 mm off.
+libOpenDRIVE's table of chords is 5.4 mm off. Its lane graph matches
+libOpenDRIVE's routing graph edge for edge.
+
+Traffic drives those lanes. Its vehicle model matches CommonRoad's kinematic
+single-track model to 2e-16, its drivers follow by the Intelligent Driver
+Model and change lanes by MOBIL, matching their authors' implementation, and
+a platoon follows SUMO's to its converged solution: 1 cm, where SUMO at its
+usual step is 1 m off.
 
 ```sh
-bazel test //application/automotive:opendrive_reference_test
+bazel test //application/automotive/...
+bazel run -c opt //application/automotive -- application/automotive/roads/Town01.xodr 60 120
 ```
 
 ## Build

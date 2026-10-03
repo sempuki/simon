@@ -192,8 +192,11 @@ auto compute_road_position(const Road& road, Length s, Length t,
 // The lane section in force at `s`: the last that starts at or before it.
 auto find_lane_section(const Road& road, Length s) -> const LaneSection&;
 
-// The t of lane `id`'s outer border at `s`, or of the center lane for id 0.
+// The t of lane `id`'s outer border at `s`, or of the center lane for id 0:
+// in the lane section in force at s, or in `section`, even at its end.
 auto compute_lane_border(const Road& road, Length s, int id) -> Length;
+auto compute_lane_border(const Road& road, const LaneSection& section, Length s,
+                         int id) -> Length;
 
 // The lane at (`s`, `t`): the one whose borders hold t, its inner border
 // included. None beyond the outermost border.
