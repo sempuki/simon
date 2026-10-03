@@ -11,6 +11,7 @@
 #include <tuple>
 #include <vector>
 
+#include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
 #include "framework/vocabulary.hpp"
 #include "model/lane_graph.hpp"
@@ -27,48 +28,7 @@ namespace {
 
 using model::meter;
 
-constexpr std::string_view ROADS = "application/automotive/roads/";
-constexpr std::string_view REFERENCE = "application/automotive/reference/";
-
-// One row of a table, as text by column name.
-using Row = std::map<std::string, std::string, std::less<>>;
-
-auto load_rows(std::string_view name) -> std::vector<Row> {
-  std::ifstream file{std::string{REFERENCE} + std::string{name}};
-  REQUIRE(file);
-  auto split = [](const std::string& line) {
-    std::vector<std::string> cells;
-    for (std::size_t at = 0; at <= line.size();) {
-      std::size_t comma = std::min(line.find(',', at), line.size());
-      cells.emplace_back(line.substr(at, comma - at));
-      at = comma + 1;
-    }
-    return cells;
-  };
-  std::string line;
-  std::getline(file, line);
-  std::vector<std::string> names = split(line);
-  std::vector<Row> rows;
-  while (std::getline(file, line)) {
-    std::vector<std::string> cells = split(line);
-    REQUIRE(cells.size() == names.size());
-    Row row;
-    for (std::size_t i = 0; i < names.size(); ++i) {
-      row[names[i]] = cells[i];
-    }
-    rows.push_back(std::move(row));
-  }
-  return rows;
-}
-
-auto number(const Row& row, std::string_view column) -> double {
-  const std::string& text = row.find(column)->second;
-  double value = 0.0;
-  auto [end, error] =
-      std::from_chars(text.data(), text.data() + text.size(), value);
-  REQUIRE(error == std::errc{});
-  return value;
-}
+using namespace testing;
 
 // Each file's road network, read once.
 auto network_of(std::string_view file) -> const model::RoadNetwork& {

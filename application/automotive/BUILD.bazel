@@ -1,9 +1,18 @@
 # Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
 package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "testing",
+    testonly = True,
+    hdrs = ["testing.hpp"],
+    copts = COPTS,
+    deps = ["@lib//base:testing"],
+)
 
 cc_test(
     name = "opendrive_reference_test",
@@ -12,13 +21,28 @@ cc_test(
     copts = COPTS,
     data = glob([
         "roads/*.xodr",
-        "reference/*.csv",
+        "reference/exact_positions.csv",
+        "reference/libopendrive_*.csv",
     ]),
     deps = [
+        ":testing",
+        "//framework:vocabulary",
         "//model:lane_graph",
         "//model:opendrive",
-        "//framework:vocabulary",
         "//model:road",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "single_track_test",
+    size = "small",
+    srcs = ["single_track_test.cpp"],
+    copts = COPTS,
+    data = glob(["reference/commonroad_*.csv"]),
+    deps = [
+        ":testing",
+        "//model:single_track",
         "@lib//base:testing",
     ],
 )

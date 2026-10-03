@@ -24,6 +24,7 @@ says the math is derived here, it shows the derivation.
 | `road.cpp` | Gauss-Legendre quadrature's nodes and weights | M. Abramowitz and I. A. Stegun, *Handbook of Mathematical Functions*, NBS, 1964, table 25.4 |
 | `road_test.cpp` | The Fresnel integrals, for the clothoid | Abramowitz and Stegun, above, table 7.7 |
 | `road.cpp` | Turning the road's normal about its tangent by the superelevation | Rodrigues' rotation formula, Goldstein, Poole and Safko, above, section 4.7 |
+| `single_track.hpp` | The kinematic single-track model, its steering and acceleration limits, and its three vehicles' parameters | M. Althoff and G. Wuersching, "CommonRoad: Vehicle Models", version 2020a, Technical University of Munich, 2020 |
 | `wind.hpp` | Turbulence intensities and scale lengths, and the Dryden spectra of the linear and angular gusts | *Military Specification: Flying Qualities of Piloted Airplanes*, MIL-F-8785C, 1980, section 3.7 |
 | `wind.hpp` | Sampling a filter driven by white noise exactly over a step | C. F. Van Loan, "Computing integrals involving the matrix exponential", *IEEE Transactions on Automatic Control* 23(3), 1978 |
 | `wind.hpp` | The signs of the air's rotation in gusts | B. Etkin, *Dynamics of Atmospheric Flight*, Wiley, 1972 |

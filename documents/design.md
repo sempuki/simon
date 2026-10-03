@@ -2863,6 +2863,25 @@ The one lane they disagree on is where a lane opens from no width: libOpenDRIVE
 keys lanes by their outer border, so a lane of no width that shares its
 neighbor's border can take a point in the neighbor's middle.
 
+#### Vehicles
+
+`model/single_track` holds CommonRoad's single-track models, each axle's
+wheels lumped into one on the center line. The kinematic model rolls without
+slip: its state is the rear axle's position, the steering angle, the speed and
+the heading, and it is driven by a steering rate and an acceleration, which
+the vehicle's limits bound as CommonRoad bounds them: the steering's range and
+rate, braking, the engine's power above a switching speed, and the speed's
+range. Its state and rate plug into `Continuous`.
+
+`single_track_test` checks it against CommonRoad's reference model, for its
+three vehicles, a Ford Escort, a BMW 320i and a VW Vanagon:
+
+| Check | Agreement |
+|---|---:|
+| Rates at 1,200 states and inputs, a quarter on a limit | 2.3e-16, relative |
+| Paths over 20 s of steering and acceleration steps, by the same Runge-Kutta 4 at 0.05 s | 1.9e-13 m |
+| The same paths at 0.05 s against 0.0005 s | 0.23 mm |
+
 ## Libraries
 
 | Need | Library |
