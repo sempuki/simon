@@ -5,19 +5,22 @@
 #include <cmath>
 #include <fstream>
 #include <map>
+#include <set>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 #include "base/testing.hpp"
 #include "framework/vocabulary.hpp"
+#include "model/lane_graph.hpp"
 #include "model/opendrive.hpp"
 #include "model/road.hpp"
 
 // simon's roads against libOpenDRIVE's, on the roads in
 // application/automotive/roads: positions on and off each road's surface,
-// each lane's outer border, and the lane at each lane's middle, from the
-// tables reference/libopendrive_reference.cpp recorded.
+// each lane's outer border, the lane at each lane's middle, and the lane
+// graph, from the tables reference/libopendrive_reference.cpp recorded.
 namespace simon::automotive {
 
 namespace {
@@ -161,6 +164,35 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
       CAPTURE(file, most);
       CHECK(most < 1e-12);
     }
+  }
+
+  SECTION("ShouldMatchLaneGraph") {
+    // Every edge, by road id, lane section start and lane id, in each file.
+    using Edge = std::tuple<std::string, std::string, double, int, std::string,
+                            double, int>;
+    std::set<Edge> theirs;
+    std::set<std::string> files;
+    for (const Row& row : load_rows("libopendrive_successors.csv")) {
+      files.insert(row.at("file"));
+      theirs.emplace(
+          row.at("file"), row.at("from_road"), number(row, "from_section"),
+          static_cast<int>(number(row, "from_lane")), row.at("to_road"),
+          number(row, "to_section"), static_cast<int>(number(row, "to_lane")));
+    }
+    std::set<Edge> ours;
+    for (const std::string& file : files) {
+      const model::RoadNetwork& network = network_of(file);
+      for (const model::LaneGraph::Edge& edge :
+           model::build_lane_graph(network).edges()) {
+        const model::Road& from = network.roads[edge.from.road];
+        const model::Road& to = network.roads[edge.to.road];
+        ours.emplace(file, from.id, from.lane_sections[edge.from.section].s0,
+                     edge.from.lane, to.id,
+                     to.lane_sections[edge.to.section].s0, edge.to.lane);
+      }
+    }
+    CHECK(theirs.size() == 285);
+    CHECK(ours == theirs);
   }
 
   SECTION("ShouldFindLaneGivenLaneMiddle") {

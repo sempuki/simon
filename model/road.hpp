@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -113,6 +114,10 @@ struct Lane final {
   int id = 0;  // Positive to the left of the reference line, negative right.
   std::string type;  // As OpenDRIVE names it: driving, shoulder, sidewalk...
   std::vector<Width> widths;
+  // The lanes this one continues from and into, by s: in the lane section
+  // before and after, or across the road's link at either end.
+  std::optional<int> predecessor;
+  std::optional<int> successor;
 };
 
 // The lanes from `s0` to the next section: left ones in increasing id from
@@ -121,6 +126,17 @@ struct LaneSection final {
   double s0 = 0.0;
   std::vector<Lane> left;
   std::vector<Lane> right;
+};
+
+// What a road's end joins: nothing, another road's start or end, or a
+// junction.
+struct RoadLink final {
+  enum class Kind : std::uint8_t { NONE, ROAD, JUNCTION };
+  enum class Contact : std::uint8_t { START, END };
+
+  Kind kind = Kind::NONE;
+  std::string id;
+  Contact contact = Contact::START;  // The joined road's end, for a road.
 };
 
 struct Road final {
@@ -132,6 +148,28 @@ struct Road final {
   CubicProfile superelevation;             // rad, about the reference line.
   CubicProfile lane_offset;                // The center lane's t.
   std::vector<LaneSection> lane_sections;  // In increasing s0.
+  RoadLink predecessor;                    // At s = 0.
+  RoadLink successor;                      // At s = length.
+};
+
+// Where traffic from an incoming road enters a junction: a connecting road,
+// entered at its start or end, and which of the incoming road's lanes lead
+// into which of the connecting road's.
+struct JunctionConnection final {
+  struct LaneLink final {
+    int from = 0;
+    int to = 0;
+  };
+
+  std::string incoming_road;
+  std::string connecting_road;
+  RoadLink::Contact contact = RoadLink::Contact::START;
+  std::vector<LaneLink> lane_links;
+};
+
+struct Junction final {
+  std::string id;
+  std::vector<JunctionConnection> connections;
 };
 
 struct RoadNetwork final {
@@ -139,6 +177,7 @@ struct RoadNetwork final {
   auto find_road(std::string_view id) const -> const Road*;
 
   std::vector<Road> roads;
+  std::vector<Junction> junctions;
 };
 
 // The reference line's point at `s`.

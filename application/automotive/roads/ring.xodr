@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OpenDRIVE>
+  <header revMajor="1" revMinor="6" name="simon test" version="1"/>
+  <road name="ring 10" id="10" length="314.15926535897933" junction="-1">
+    <link>
+      <predecessor elementType="road" elementId="11" contactPoint="end"/>
+      <successor elementType="road" elementId="11" contactPoint="start"/>
+    </link>
+    <planView>
+        <geometry s="0" x="0" y="-100" hdg="0" length="314.15926535897933">
+          <arc curvature="0.01"/>
+        </geometry>
+    </planView>
+    <lanes>
+      <laneSection s="0">
+        <left><lane id="1" type="driving"><link><predecessor id="1"/><successor id="1"/></link><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane><lane id="2" type="driving"><link><predecessor id="2"/><successor id="2"/></link><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></left>
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><link><predecessor id="-1"/><successor id="-1"/></link><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane><lane id="-2" type="driving"><link><predecessor id="-2"/><successor id="-2"/></link><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+    </lanes>
+  </road>
+  <road name="ring 11" id="11" length="314.15926535897933" junction="-1">
+    <link>
+      <predecessor elementType="road" elementId="10" contactPoint="end"/>
+      <successor elementType="road" elementId="10" contactPoint="start"/>
+    </link>
+    <planView>
+        <geometry s="0" x="0" y="100" hdg="3.1415926535897931" length="314.15926535897933">
+          <arc curvature="0.01"/>
+        </geometry>
+    </planView>
+    <lanes>
+      <laneSection s="0">
+        <left><lane id="1" type="driving"><link><predecessor id="1"/><successor id="1"/></link><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane><lane id="2" type="driving"><link><predecessor id="2"/><successor id="2"/></link><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></left>
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><link><predecessor id="-1"/><successor id="-1"/></link><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane><lane id="-2" type="driving"><link><predecessor id="-2"/><successor id="-2"/></link><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+    </lanes>
+  </road>
+</OpenDRIVE>

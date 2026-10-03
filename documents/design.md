@@ -2833,6 +2833,13 @@ libOpenDRIVE does.
   at the file's length.
 - **Lane borders sum the lanes' widths** from the center out, each evaluated
   at s, plus the lane offset.
+- **The lane graph follows travel.** `model/lane_graph` links each lane to
+  the lanes traffic moves into from it: across lane sections, across road
+  links by their contact points, and from a junction's incoming lanes into its
+  connecting roads, as OpenDRIVE's links give them. Traffic keeps right, so a
+  lane right of the reference line runs with s and one left of it against s.
+  A lane's successors are a contiguous run of a sorted array, found by binary
+  search.
 - **Road coordinates are found by projection.** Each piece is sampled every 2
   m and every tenth of a radian, and the nearest sample refined by Newton's
   method on the tangent's component of the offset.
@@ -2847,6 +2854,7 @@ as RoadRunner writes them (see `application/automotive/reference/README.md`):
 | Positions on lines, arcs and spirals, through elevation and superelevation, on and off the surface | 8e-14 m |
 | Lane borders | 8e-14 m |
 | The lane at each lane's middle | 4,329 of 4,330 |
+| The lane graph, on Town01, the test roads and a ring | All 285 edges |
 | Positions on parametric cubics, against an exact arc length | 1.2e-13 m |
 
 libOpenDRIVE finds a parametric cubic's arc length through a table of chords

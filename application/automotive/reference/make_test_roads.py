@@ -12,7 +12,8 @@ a right arc and a spiral out, with an elevation, a superelevation, a lane
 offset, and lane widths that change along the road, over three lane sections,
 the second opening a right lane. paramPoly3.xodr has two parametric cubic roads,
 one over arcLength, whose arc length over its range is its length, and one
-normalized, at map coordinates, 500 km east and 5,400 km north.
+normalized, at map coordinates, 500 km east and 5,400 km north. ring.xodr is
+two half circles leading into each other, two lanes each way, for traffic.
 
   pip install numpy
   python application/automotive/reference/make_test_roads.py
@@ -83,10 +84,14 @@ def geometry_xml(piece):
     return '        %s\n          %s\n        </geometry>\n' % (head, body)
 
 
-def lane_xml(lane_id, kind, widths):
+def lane_xml(lane_id, kind, widths, predecessor=None, successor=None):
     rows = ''.join('<width sOffset="%g" a="%.17g" b="%.17g" c="%.17g" d="%.17g"/>' % w
                    for w in widths)
-    return '<lane id="%d" type="%s">%s</lane>' % (lane_id, kind, rows)
+    links = ''.join('<%s id="%d"/>' % (name, linked)
+                    for name, linked in (('predecessor', predecessor), ('successor', successor))
+                    if linked is not None)
+    link = '<link>%s</link>' % links if links else ''
+    return '<lane id="%d" type="%s">%s%s</lane>' % (lane_id, kind, link, rows)
 
 
 def opening(width, length):
@@ -107,19 +112,19 @@ def curves():
     ])
     plan = ''.join(geometry_xml(p) for p in pieces)
     sections = [
-        (0.0, [lane_xml(1, 'driving', [(0, 3.5, 0, 0, 0)]),
-               lane_xml(2, 'shoulder', [(0, 1.0, 0.004, 0, 0), (100, 1.4, 0, 0, 0)])],
-              [lane_xml(-1, 'driving', [(0, 3.5, 0, 0, 0)]),
-               lane_xml(-2, 'sidewalk', [(0, 2.0, 0, 0, 0)])]),
-        (120.0, [lane_xml(1, 'driving', [(0, 3.5, 0, 0, 0)]),
-                 lane_xml(2, 'shoulder', [(0, 1.4, 0, 0, 0)])],
-                [lane_xml(-1, 'driving', [(0, 3.5, 0, 0, 0)]),
+        (0.0, [lane_xml(1, 'driving', [(0, 3.5, 0, 0, 0)], successor=1),
+               lane_xml(2, 'shoulder', [(0, 1.0, 0.004, 0, 0), (100, 1.4, 0, 0, 0)], successor=2)],
+              [lane_xml(-1, 'driving', [(0, 3.5, 0, 0, 0)], successor=-1),
+               lane_xml(-2, 'sidewalk', [(0, 2.0, 0, 0, 0)], successor=-3)]),
+        (120.0, [lane_xml(1, 'driving', [(0, 3.5, 0, 0, 0)], 1, 1),
+                 lane_xml(2, 'shoulder', [(0, 1.4, 0, 0, 0)], predecessor=2)],
+                [lane_xml(-1, 'driving', [(0, 3.5, 0, 0, 0)], -1, -1),
                  lane_xml(-2, 'driving', [(0,) + opening(3.25, 60.0)[:1] + opening(3.25, 60.0)[1:],
-                                          (60, 3.25, 0, 0, 0)]),
-                 lane_xml(-3, 'sidewalk', [(0, 2.0, 0, 0, 0)])]),
-        (300.0, [lane_xml(1, 'driving', [(0, 3.5, 0, 0, 0)])],
-                [lane_xml(-1, 'driving', [(0, 3.5, 0.002, -1e-5, 2e-8)]),
-                 lane_xml(-2, 'driving', [(0, 3.25, 0, 0, 0)])]),
+                                          (60, 3.25, 0, 0, 0)], successor=-2),
+                 lane_xml(-3, 'sidewalk', [(0, 2.0, 0, 0, 0)], predecessor=-2)]),
+        (300.0, [lane_xml(1, 'driving', [(0, 3.5, 0, 0, 0)], predecessor=1)],
+                [lane_xml(-1, 'driving', [(0, 3.5, 0.002, -1e-5, 2e-8)], predecessor=-1),
+                 lane_xml(-2, 'driving', [(0, 3.25, 0, 0, 0)], predecessor=-2)]),
     ]
     lanes = ''.join(
         '      <laneSection s="%g">\n        <left>%s</left>\n'
@@ -199,6 +204,34 @@ def poly_road(road_id, start, u, v, normalized):
             % (road_id, road_id, piece['length'], geometry_xml(piece), lanes))
 
 
+def ring():
+    """Two half circles of 100 m radius, each road leading into the other at
+    both ends, with two lanes each way linked across."""
+    def half(road_id, other, start):
+        x, y, hdg = start
+        piece = {'kind': 'arc', 's': 0.0, 'x': x, 'y': y, 'hdg': hdg,
+                 'length': math.pi * 100.0, 'curvature': 0.01}
+        lanes = ('      <laneSection s="0">\n'
+                 '        <left>%s%s</left>\n'
+                 '        <center><lane id="0" type="none"/></center>\n'
+                 '        <right>%s%s</right>\n      </laneSection>\n'
+                 % (lane_xml(1, 'driving', [(0, 3.5, 0, 0, 0)], 1, 1),
+                    lane_xml(2, 'driving', [(0, 3.5, 0, 0, 0)], 2, 2),
+                    lane_xml(-1, 'driving', [(0, 3.5, 0, 0, 0)], -1, -1),
+                    lane_xml(-2, 'driving', [(0, 3.5, 0, 0, 0)], -2, -2)))
+        return ('  <road name="ring %s" id="%s" length="%.17g" junction="-1">\n'
+                '    <link>\n'
+                '      <predecessor elementType="road" elementId="%s" contactPoint="end"/>\n'
+                '      <successor elementType="road" elementId="%s" contactPoint="start"/>\n'
+                '    </link>\n'
+                '    <planView>\n%s    </planView>\n'
+                '    <lanes>\n%s    </lanes>\n  </road>\n'
+                % (road_id, road_id, piece['length'], other, other,
+                   geometry_xml(piece), lanes))
+    return [half('10', '11', (0.0, -100.0, 0.0)),
+            half('11', '10', (0.0, 100.0, math.pi))]
+
+
 def document(roads):
     return ('<?xml version="1.0" encoding="UTF-8"?>\n<OpenDRIVE>\n'
             '  <header revMajor="1" revMinor="6" name="simon test" version="1"/>\n'
@@ -210,6 +243,8 @@ def main():
     roads = os.path.join(here, '..', 'roads')
     with open(os.path.join(roads, 'curves.xodr'), 'w') as f:
         f.write(document([curves()]))
+    with open(os.path.join(roads, 'ring.xodr'), 'w') as f:
+        f.write(document(ring()))
     with open(os.path.join(roads, 'paramPoly3.xodr'), 'w') as f:
         f.write(document([
             poly_road('2', (5.0, -3.0, 0.1), arc_length_u((0.0, 0.0, 0.004, -3e-5)),

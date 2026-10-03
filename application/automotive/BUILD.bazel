@@ -15,6 +15,7 @@ cc_test(
         "reference/*.csv",
     ]),
     deps = [
+        "//model:lane_graph",
         "//model:opendrive",
         "//framework:vocabulary",
         "//model:road",

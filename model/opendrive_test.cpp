@@ -19,6 +19,10 @@ constexpr std::string_view ROAD = R"(<?xml version="1.0"?>
 <OpenDRIVE>
   <header revMajor="1" revMinor="6"/>
   <road id="7" length="150" junction="-1">
+    <link>
+      <predecessor elementType="road" elementId="3" contactPoint="end"/>
+      <successor elementType="junction" elementId="9"/>
+    </link>
     <planView>
       <geometry s="100" x="100" y="0" hdg="0" length="50">
         <arc curvature="0.01"/>
@@ -44,12 +48,17 @@ constexpr std::string_view ROAD = R"(<?xml version="1.0"?>
       <laneSection s="80">
         <center><lane id="0" type="none"/></center>
         <right>
-          <lane id="-2" type="shoulder"><width sOffset="0" a="1"/></lane>
+          <lane id="-2" type="shoulder"><link><predecessor id="-1"/></link><width sOffset="0" a="1"/></lane>
           <lane id="-1" type="driving"><width sOffset="0" a="3.5"/></lane>
         </right>
       </laneSection>
     </lanes>
   </road>
+  <junction id="9">
+    <connection id="0" incomingRoad="7" connectingRoad="8" contactPoint="end">
+      <laneLink from="-1" to="1"/>
+    </connection>
+  </junction>
 </OpenDRIVE>
 )";
 
@@ -79,13 +88,34 @@ TEST_CASE("OpenDrive") {
     CHECK(second.right[0].id == -1);  // Ordered from the center out.
     CHECK(second.right[1].type == "shoulder");
     CHECK(second.left.empty());
+    CHECK(second.right[1].predecessor == -1);
+    CHECK_FALSE(second.right[1].successor);
+    CHECK(road->predecessor.kind == RoadLink::Kind::ROAD);
+    CHECK(road->predecessor.contact == RoadLink::Contact::END);
+    CHECK(road->successor.kind == RoadLink::Kind::JUNCTION);
+    CHECK(road->successor.id == "9");
+    REQUIRE(network->junctions.size() == 1);
+    const JunctionConnection& connection =
+        network->junctions[0].connections.at(0);
+    CHECK(connection.connecting_road == "8");
+    CHECK(connection.contact == RoadLink::Contact::END);
+    CHECK(connection.lane_links.at(0).from == -1);
+    CHECK(connection.lane_links.at(0).to == 1);
+  }
+
+  SECTION("ShouldRefuseGivenUnknownContactPoint") {
+    auto network = parse_opendrive(
+        edited(R"(contactPoint="end"/>)", R"(contactPoint="middle"/>)"));
+    REQUIRE_FALSE(network);
+    CHECK_THAT(std::string{network.error().message()},
+               ContainsSubstring("middle"));
   }
 
   SECTION("ShouldSayWhereGivenMissingAttribute") {
     auto network = parse_opendrive(edited(R"(curvature="0.01")", ""));
     REQUIRE_FALSE(network);
     CHECK_THAT(std::string{network.error().message()},
-               ContainsSubstring("line 7") && ContainsSubstring("curvature"));
+               ContainsSubstring("line 11") && ContainsSubstring("curvature"));
   }
 
   SECTION("ShouldRefuseGivenBadNumber") {

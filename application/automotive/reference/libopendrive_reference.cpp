@@ -23,6 +23,8 @@
 //   libopendrive_borders.csv    each lane's outer border at s
 //   libopendrive_lanes.csv      the lane libOpenDRIVE finds at each lane's
 //                               middle at s
+//   libopendrive_successors.csv every edge of its routing graph: each lane
+//                               and a lane traffic moves into from it
 //
 // It keeps the map's coordinates (center_map false), and reads lateral
 // profiles but not lane heights, which simon leaves out.
@@ -32,6 +34,7 @@
 #include <vector>
 
 #include "OpenDriveMap.h"
+#include "RoutingGraph.h"
 
 namespace {
 
@@ -59,7 +62,8 @@ int main(int argc, char** argv) {
   std::string roads = argv[1];
   std::string out = argv[2];
   std::vector<File> files = {
-      {"curves.xodr", 2.5}, {"paramPoly3.xodr", 2.5}, {"Town01.xodr", 5.0}};
+      {"curves.xodr", 2.5}, {"paramPoly3.xodr", 2.5}, {"ring.xodr", 5.0},
+      {"Town01.xodr", 5.0}};
   const double ts[] = {-6.0, -2.5, 0.0, 1.75, 5.0};
 
   FILE* positions = std::fopen((out + "/libopendrive_positions.csv").c_str(), "w");
@@ -68,9 +72,19 @@ int main(int argc, char** argv) {
   std::fprintf(positions, "file,road,s,t,h,x,y,z\n");
   std::fprintf(borders, "file,road,s,lane,t\n");
   std::fprintf(lanes, "file,road,s,t,lane\n");
+  FILE* successors =
+      std::fopen((out + "/libopendrive_successors.csv").c_str(), "w");
+  std::fprintf(successors,
+               "file,from_road,from_section,from_lane,to_road,to_section,to_lane\n");
 
   for (const File& file : files) {
     odr::OpenDriveMap map(roads + "/" + file.name, false, false, true, false);
+    for (const odr::RoutingGraphEdge& edge : map.get_routing_graph().edges) {
+      std::fprintf(successors, "%s,%s,%.17g,%d,%s,%.17g,%d\n", file.name.c_str(),
+                   edge.from.road_id.c_str(), edge.from.lanesection_s0,
+                   edge.from.lane_id, edge.to.road_id.c_str(),
+                   edge.to.lanesection_s0, edge.to.lane_id);
+    }
     for (const odr::Road& road : map.get_roads()) {
       for (double s : samples(road.length, file.step)) {
         for (double t : ts) {
@@ -106,5 +120,6 @@ int main(int argc, char** argv) {
   std::fclose(positions);
   std::fclose(borders);
   std::fclose(lanes);
+  std::fclose(successors);
   return 0;
 }

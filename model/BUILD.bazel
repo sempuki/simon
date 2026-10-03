@@ -322,6 +322,14 @@ cc_library(
 )
 
 cc_library(
+    name = "lane_graph",
+    srcs = ["lane_graph.cpp"],
+    hdrs = ["lane_graph.hpp"],
+    copts = COPTS,
+    deps = [":road"],
+)
+
+cc_library(
     name = "opendrive",
     srcs = ["opendrive.cpp"],
     hdrs = ["opendrive.hpp"],
@@ -358,6 +366,7 @@ cc_library(
     "control",
     "flight_path",
     "guidance",
+    "lane_graph",
     "opendrive",
     "random",
     "road",

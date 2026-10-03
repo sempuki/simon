@@ -14,7 +14,8 @@
 // Reads roads from ASAM OpenDRIVE files (see model/REFERENCES.md): each
 // road's reference line (lines, arcs, spirals and parametric cubics), its
 // elevation and superelevation, its lane offset, and its lane sections with
-// their lanes' widths. Those are what the road's geometry needs. A road's
+// their lanes' widths, and how roads, lanes and junctions link. Those are what
+// the roads' geometry and the lanes' connections need. A road's
 // lateral shape, lane heights, road marks, objects and signals are left out.
 // The deprecated poly3 geometry and lanes given by their borders rather than
 // their widths are refused, as libOpenDRIVE refuses them.

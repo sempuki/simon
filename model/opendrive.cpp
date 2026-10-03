@@ -47,6 +47,10 @@ class Parser final {
       RETURN_OR_ASSIGN(Road road, read_road(node));
       network.roads.push_back(std::move(road));
     }
+    for (pugi::xml_node node : root.children("junction")) {
+      RETURN_OR_ASSIGN(Junction junction, read_junction(node));
+      network.junctions.push_back(std::move(junction));
+    }
     return network;
   }
 
@@ -91,6 +95,92 @@ class Parser final {
                             "` is not a finite number");
     }
     return value;
+  }
+
+  auto read_contact(pugi::xml_node node, std::string_view value) const
+      -> std::expected<RoadLink::Contact, lib::Status> {
+    if (value == "start") {
+      return RoadLink::Contact::START;
+    }
+    if (value == "end") {
+      return RoadLink::Contact::END;
+    }
+    return fail(node, "contactPoint `" + std::string{value} +
+                          "` is neither start nor end");
+  }
+
+  // The road link `node` describes, or none if there is no node.
+  auto read_road_link(pugi::xml_node node) const
+      -> std::expected<RoadLink, lib::Status> {
+    RoadLink link;
+    if (!node) {
+      return link;
+    }
+    std::string_view kind = node.attribute("elementType").as_string();
+    link.id = node.attribute("elementId").as_string();
+    if (link.id.empty()) {
+      return fail(node, "needs elementId");
+    }
+    if (kind == "road") {
+      link.kind = RoadLink::Kind::ROAD;
+      RETURN_OR_ASSIGN(
+          link.contact,
+          read_contact(node, node.attribute("contactPoint").as_string()));
+    } else if (kind == "junction") {
+      link.kind = RoadLink::Kind::JUNCTION;
+    } else {
+      return fail(node, "elementType `" + std::string{kind} +
+                            "` is neither road nor junction");
+    }
+    return link;
+  }
+
+  // The lane id in `node`'s attribute `name`, if it has one.
+  auto read_lane_id(pugi::xml_node node, const char* name) const
+      -> std::expected<std::optional<int>, lib::Status> {
+    if (!node || !node.attribute(name)) {
+      return std::optional<int>{};
+    }
+    RETURN_OR_ASSIGN(double id, read_number(node, name));
+    if (static_cast<int>(id) != id) {
+      return fail(node, std::string{name} + " is not a whole number");
+    }
+    return std::optional<int>{static_cast<int>(id)};
+  }
+
+  auto read_junction(pugi::xml_node node) const
+      -> std::expected<Junction, lib::Status> {
+    Junction junction;
+    junction.id = node.attribute("id").as_string();
+    if (junction.id.empty()) {
+      return fail(node, "needs id");
+    }
+    for (pugi::xml_node connection_node : node.children("connection")) {
+      JunctionConnection connection;
+      connection.incoming_road =
+          connection_node.attribute("incomingRoad").as_string();
+      connection.connecting_road =
+          connection_node.attribute("connectingRoad").as_string();
+      if (connection.incoming_road.empty() ||
+          connection.connecting_road.empty()) {
+        return fail(connection_node, "needs incomingRoad and connectingRoad");
+      }
+      RETURN_OR_ASSIGN(
+          connection.contact,
+          read_contact(connection_node,
+                       connection_node.attribute("contactPoint").as_string()));
+      for (pugi::xml_node link_node : connection_node.children("laneLink")) {
+        RETURN_OR_ASSIGN(std::optional<int> from,
+                         read_lane_id(link_node, "from"));
+        RETURN_OR_ASSIGN(std::optional<int> to, read_lane_id(link_node, "to"));
+        if (!from || !to) {
+          return fail(link_node, "needs from and to");
+        }
+        connection.lane_links.push_back({.from = *from, .to = *to});
+      }
+      junction.connections.push_back(std::move(connection));
+    }
+    return junction;
   }
 
   auto read_cubic(pugi::xml_node node) const
@@ -188,6 +278,11 @@ class Parser final {
       return fail(node.child("border"),
                   "is not supported; give lanes by their widths");
     }
+    RETURN_OR_ASSIGN(
+        lane.predecessor,
+        read_lane_id(node.child("link").child("predecessor"), "id"));
+    RETURN_OR_ASSIGN(lane.successor,
+                     read_lane_id(node.child("link").child("successor"), "id"));
     for (pugi::xml_node width_node : node.children("width")) {
       Lane::Width width;
       RETURN_OR_ASSIGN(width.start, read_number(width_node, "sOffset", 0.0));
@@ -235,6 +330,10 @@ class Parser final {
     }
     road.junction = node.attribute("junction").as_string("-1");
     RETURN_OR_ASSIGN(road.length, read_number(node, "length"));
+    RETURN_OR_ASSIGN(road.predecessor,
+                     read_road_link(node.child("link").child("predecessor")));
+    RETURN_OR_ASSIGN(road.successor,
+                     read_road_link(node.child("link").child("successor")));
 
     for (pugi::xml_node geometry :
          node.child("planView").children("geometry")) {
