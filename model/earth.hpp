@@ -59,19 +59,29 @@ inline auto geodetic_to_fixed(const Geodetic& where) -> Position {
                 (normal * (1.0 - ECCENTRICITY_SQUARED) + h) * sin_latitude);
 }
 
-// The geodetic position of an ECEF one, by Heikkinen's closed form (1982),
-// exact to a few nanometers for any point not near the Earth's center.
-inline auto fixed_to_geodetic(const Position& fixed) -> Geodetic {
+// Where an ECEF position is on the ellipsoid, by Heikkinen's closed form
+// (1982), exact to a few nanometers for any point not near the Earth's
+// center: its altitude, and the sines and cosines of its latitude and
+// longitude, which the local frame needs without the angles themselves.
+struct Location final {
+  Length altitude = 0.0 * meter;
+  double sin_latitude = 0.0;
+  double cos_latitude = 1.0;
+  double sin_longitude = 0.0;
+  double cos_longitude = 1.0;
+};
+
+inline auto locate(const Position& fixed) -> Location {
   constexpr double a = SEMIMAJOR_AXIS;
   constexpr double b = SEMIMINOR_AXIS;
   constexpr double e2 = ECCENTRICITY_SQUARED;
   constexpr double second_e2 = (a * a - b * b) / (b * b);
 
-  QuantityVector xyz = fixed.numerical_value_in(meter);
-  double x = xyz.eigen().x();
-  double y = xyz.eigen().y();
-  double z = xyz.eigen().z();
-  double p = std::hypot(x, y);
+  Vector3 xyz = eigen(fixed);
+  double x = xyz.x();
+  double y = xyz.y();
+  double z = xyz.z();
+  double p = std::sqrt(x * x + y * y);
 
   double f = 54.0 * b * b * z * z;
   double g = p * p + (1.0 - e2) * z * z - e2 * (a * a - b * b);
@@ -84,14 +94,31 @@ inline auto fixed_to_geodetic(const Position& fixed) -> Geodetic {
               std::sqrt(0.5 * a * a * (1.0 + 1.0 / q) -
                         big_p * (1.0 - e2) * z * z / (q * (1.0 + q)) -
                         0.5 * big_p * p * p);
-  double u = std::hypot(p - e2 * r0, z);
-  double v = std::sqrt((p - e2 * r0) * (p - e2 * r0) + (1.0 - e2) * z * z);
+  double across = p - e2 * r0;
+  double u = std::sqrt(across * across + z * z);
+  double v = std::sqrt(across * across + (1.0 - e2) * z * z);
   double z0 = b * b * z / (a * v);
 
-  return Geodetic{
-      .latitude = std::atan2(z + second_e2 * z0, p) * radian,
-      .longitude = std::atan2(y, x) * radian,
+  // tan(latitude) = (z + e'^2 z0) / p.
+  double rise = z + second_e2 * z0;
+  double slant = std::sqrt(rise * rise + p * p);
+  return Location{
       .altitude = u * (1.0 - b * b / (a * v)) * meter,
+      .sin_latitude = rise / slant,
+      .cos_latitude = p / slant,
+      .sin_longitude = p > 0.0 ? y / p : 0.0,
+      .cos_longitude = p > 0.0 ? x / p : 1.0,
+  };
+}
+
+// The geodetic position of an ECEF one (see locate).
+inline auto fixed_to_geodetic(const Position& fixed) -> Geodetic {
+  Location where = locate(fixed);
+  return Geodetic{
+      .latitude = std::atan2(where.sin_latitude, where.cos_latitude) * radian,
+      .longitude =
+          std::atan2(where.sin_longitude, where.cos_longitude) * radian,
+      .altitude = where.altitude,
   };
 }
 

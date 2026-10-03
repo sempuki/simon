@@ -8,18 +8,20 @@ namespace simon::model {
 
 namespace {
 
-// From the north-east-down frame at a geodetic latitude and longitude to
-// ECEF: its columns are north, east and down.
-auto north_east_down_to_fixed(Angle latitude, Angle longitude) -> Matrix3 {
-  double sin_lat = sin(latitude);
-  double cos_lat = cos(latitude);
-  double sin_lon = sin(longitude);
-  double cos_lon = cos(longitude);
+// From the north-east-down frame at a place on the ellipsoid to ECEF: its
+// columns are north, east and down.
+auto north_east_down_to_fixed(double sin_lat, double cos_lat, double sin_lon,
+                              double cos_lon) -> Matrix3 {
   Matrix3 basis;
   basis << -sin_lat * cos_lon, -sin_lon, -cos_lat * cos_lon,  //
       -sin_lat * sin_lon, cos_lon, -cos_lat * sin_lon,        //
       cos_lat, 0.0, -sin_lat;
   return basis;
+}
+
+auto north_east_down_to_fixed(const wgs84::Location& where) -> Matrix3 {
+  return north_east_down_to_fixed(where.sin_latitude, where.cos_latitude,
+                                  where.sin_longitude, where.cos_longitude);
 }
 
 }  // namespace
@@ -29,7 +31,9 @@ auto Earth::round(const wgs84::Geodetic& origin) -> Earth {
   earth.round_ = true;
   earth.origin_fixed_ = wgs84::geodetic_to_fixed(origin);
   // East, north and up, as rows.
-  Matrix3 ned = north_east_down_to_fixed(origin.latitude, origin.longitude);
+  Matrix3 ned =
+      north_east_down_to_fixed(sin(origin.latitude), cos(origin.latitude),
+                               sin(origin.longitude), cos(origin.longitude));
   earth.fixed_to_local_.row(0) = ned.col(1).transpose();
   earth.fixed_to_local_.row(1) = ned.col(0).transpose();
   earth.fixed_to_local_.row(2) = -ned.col(2).transpose();
@@ -65,14 +69,14 @@ auto Earth::place(const RigidBody& body, Time time) const -> Place {
   }
   Matrix3 to_fixed = wgs84::inertial_to_fixed(angle(time));
   Position fixed = QuantityVector{to_fixed * eigen(body.position)} * meter;
-  wgs84::Geodetic where = wgs84::fixed_to_geodetic(fixed);
+  wgs84::Location where = wgs84::locate(fixed);
   return Place{
       .inertial_to_fixed = to_fixed,
       .fixed = fixed,
       .altitude = where.altitude,
-      .north_east_down =
-          to_fixed.transpose() *
-          north_east_down_to_fixed(where.latitude, where.longitude),
+      .north_east_down = to_fixed.transpose() * north_east_down_to_fixed(where),
+      .sin_latitude = where.sin_latitude,
+      .cos_latitude = where.cos_latitude,
   };
 }
 
@@ -119,7 +123,7 @@ auto Earth::altitude(const RigidBody& body, Time time) const -> Length {
   if (!round_) {
     return altitude_of(body.position);
   }
-  return wgs84::fixed_to_geodetic(find_fixed(body, time)).altitude;
+  return wgs84::locate(find_fixed(body, time)).altitude;
 }
 
 auto Earth::north_east_down(const Position& fixed, Time time) const -> Matrix3 {
@@ -131,9 +135,8 @@ auto Earth::north_east_down(const Position& fixed, Time time) const -> Matrix3 {
         0.0, 0.0, -1.0;
     return basis;
   }
-  wgs84::Geodetic where = wgs84::fixed_to_geodetic(fixed);
   return wgs84::inertial_to_fixed(angle(time)).transpose() *
-         north_east_down_to_fixed(where.latitude, where.longitude);
+         north_east_down_to_fixed(wgs84::locate(fixed));
 }
 
 auto Earth::level_rate(const RigidBody& body, Time time) const
@@ -142,23 +145,22 @@ auto Earth::level_rate(const RigidBody& body, Time time) const
     return QuantityVector{} * radian_per_second;
   }
   Place here = place(body, time);
-  wgs84::Geodetic where = wgs84::fixed_to_geodetic(here.fixed);
   Matrix3 to_north_east_down =
       here.north_east_down.transpose() * body.attitude.toRotationMatrix();
   Vector3 velocity = to_north_east_down * eigen(air_velocity(body));
 
   // The ellipsoid's radii of curvature: in the prime vertical, and along
   // the meridian.
-  double sin_lat = sin(where.latitude);
+  double sin_lat = here.sin_latitude;
   double w = 1.0 - wgs84::ECCENTRICITY_SQUARED * sin_lat * sin_lat;
-  double height = where.altitude.numerical_value_in(meter);
+  double height = here.altitude.numerical_value_in(meter);
   double prime = wgs84::SEMIMAJOR_AXIS / std::sqrt(w) + height;
   double meridian = wgs84::SEMIMAJOR_AXIS *
                         (1.0 - wgs84::ECCENTRICITY_SQUARED) /
                         (w * std::sqrt(w)) +
                     height;
   Vector3 turning{velocity.y() / prime, -velocity.x() / meridian,
-                  -velocity.y() * std::tan(radians(where.latitude)) / prime};
+                  -velocity.y() * sin_lat / here.cos_latitude / prime};
   return QuantityVector{to_north_east_down.transpose() * turning} *
          radian_per_second;
 }

@@ -220,7 +220,7 @@ inline auto fly(const AirState& state, const AirStateRate& rate,
   QuantityVector along = number_of(rate.velocity / state.speed);
 
   double sin_gamma = along.z();
-  double cos_gamma = std::hypot(along.x(), along.y());
+  double cos_gamma = std::sqrt(along.x() * along.x() + along.y() * along.y());
   double sin_chi = cos_gamma > 0.0 ? along.x() / cos_gamma : 0.0;
   double cos_chi = cos_gamma > 0.0 ? along.y() / cos_gamma : 1.0;
 

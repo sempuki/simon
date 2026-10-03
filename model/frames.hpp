@@ -22,6 +22,8 @@ struct Place final {
   Length altitude = 0.0 * meter;
   // From the local north-east-down frame to the inertial frame.
   Matrix3 north_east_down = Matrix3::Identity();
+  double sin_latitude = 0.0;  // Geodetic; none over a flat Earth.
+  double cos_latitude = 1.0;
 };
 
 // The Earth that rigid aircraft fly over. Over a flat Earth, the inertial

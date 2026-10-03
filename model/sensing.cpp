@@ -44,7 +44,8 @@ auto sense_flight_state(const RigidBody& body, const BodyAcceleration& felt,
   values[BODY_VELOCITY_X] = uvw.x();
   values[BODY_VELOCITY_Y] = uvw.y();
   values[ALPHA] = std::atan2(uvw.z(), uvw.x());
-  values[BETA] = std::atan2(uvw.y(), std::hypot(uvw.x(), uvw.z()));
+  values[BETA] =
+      std::atan2(uvw.y(), std::sqrt(uvw.x() * uvw.x() + uvw.z() * uvw.z()));
   if (reads_rates) {
     values[ROLL_RATE] = rates.x();
     values[PITCH_RATE] = rates.y();
@@ -69,7 +70,8 @@ auto sense_flight_state(const RigidBody& body, const BodyAcceleration& felt,
       Vector3 north_east_down =
           to_north_east_down * uvw + eigen(wind.north_east_down);
       values[GROUND_SPEED] =
-          std::hypot(north_east_down.x(), north_east_down.y());
+          std::sqrt(north_east_down.x() * north_east_down.x() +
+                    north_east_down.y() * north_east_down.y());
       values[PITCH] =
           -std::asin(std::clamp(to_north_east_down(2, 0), -1.0, 1.0));
       values[ROLL] =
