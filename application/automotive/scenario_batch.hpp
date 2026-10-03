@@ -6,11 +6,14 @@
 #include <expected>
 #include <limits>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
+#include "application/automotive/scenario_simulation.hpp"
 #include "base/status.hpp"
 #include "framework/step.hpp"
+#include "scenario/openscenario.hpp"
 #include "scenario/parameter_distribution.hpp"
 
 // Scenarios run in batches: every permutation of a parameter distribution
@@ -33,6 +36,27 @@ struct RunBox final {
   double width = 0.0;
   double center = 0.0;  // m, ahead of the reference point.
 };
+
+// Each entity's box, in the scenario's order.
+auto convert_entities_to_boxes(const scenario::Scenario& scenario)
+    -> std::vector<RunBox>;
+
+// Each entity of a configured simulation where it is now, in the scenario's
+// order.
+auto sample_entities(const ScenarioSimulation& simulation)
+    -> std::vector<RunSample>;
+
+// The ego's measures at one sample: its time to collision with the vehicles
+// ahead, within 30 degrees of its heading as nuPlan's is_agent_ahead counts
+// them, none if none comes within reach; and the least gap between its box
+// and another's.
+struct SampleMeasures final {
+  std::optional<double> time_to_collision;
+  double gap = std::numeric_limits<double>::infinity();
+};
+
+auto measure_sample(std::span<const RunSample> samples,
+                    std::span<const RunBox> boxes) -> SampleMeasures;
 
 // A run of a scenario: each entity's box, in the scenario's order, and
 // every entity after each step, in the same order, but for the step on which
@@ -70,9 +94,8 @@ struct RunMeasures final {
 
 // The ego's samples as nuPlan reads them: its acceleration along its
 // heading the change in speed over the step, and across it its speed times
-// its rate of turn over the step, both 0 at the first sample. The tracks it
-// follows for time to collision are the vehicles whose box's center lies
-// within 30 degrees of its heading, as nuPlan's is_agent_ahead counts them.
+// its rate of turn over the step, both 0 at the first sample; and each
+// sample measured as measure_sample does.
 auto measure_run(const RunRecord& run) -> RunMeasures;
 
 // One permutation's run.

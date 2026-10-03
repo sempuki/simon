@@ -11,7 +11,6 @@
 #include <thread>
 #include <utility>
 
-#include "application/automotive/scenario_simulation.hpp"
 #include "model/collision.hpp"
 #include "model/driving_metrics.hpp"
 
@@ -35,20 +34,65 @@ auto convert_sample_to_box(const RunSample& sample, const RunBox& box)
 
 }  // namespace
 
+auto convert_entities_to_boxes(const scenario::Scenario& scenario)
+    -> std::vector<RunBox> {
+  std::vector<RunBox> boxes;
+  for (const scenario::Entity& entity : scenario.entities) {
+    const scenario::Vehicle& vehicle = entity.vehicle;
+    boxes.push_back({.length = vehicle.dimensions[0],
+                     .width = vehicle.dimensions[1],
+                     .center = vehicle.center[0]});
+  }
+  return boxes;
+}
+
+auto sample_entities(const ScenarioSimulation& simulation)
+    -> std::vector<RunSample> {
+  const ScenarioWorld& world = simulation.world();
+  std::vector<RunSample> samples(simulation.scenario().entities.size());
+  world.store_of<ScenarioActor>().for_each([&](Entity owner,
+                                               const ScenarioActor& actor) {
+    const VehiclePose& pose = world.store_of<VehiclePose>().component_of(owner);
+    Vector3 at = model::eigen(pose.position);
+    samples[actor.entity] = {
+        .x = at.x(),
+        .y = at.y(),
+        .heading = model::radians(pose.heading),
+        .speed = world.store_of<ScenarioSpeed>().component_of(owner).speed};
+  });
+  return samples;
+}
+
+auto measure_sample(std::span<const RunSample> samples,
+                    std::span<const RunBox> boxes) -> SampleMeasures {
+  SampleMeasures measures;
+  if (samples.empty()) {
+    return measures;
+  }
+  const RunSample& own = samples[0];
+  model::OrientedBox own_box = convert_sample_to_box(own, boxes[0]);
+  std::vector<model::MovingBox> tracks;
+  for (std::size_t i = 1; i < samples.size(); ++i) {
+    model::OrientedBox box = convert_sample_to_box(samples[i], boxes[i]);
+    measures.gap = std::min(measures.gap, model::compute_gap(own_box, box));
+    if (model::check_ahead(own.x, own.y, own.heading, {.x = box.x, .y = box.y},
+                           AHEAD)) {
+      tracks.push_back({.box = box, .speed = samples[i].speed});
+    }
+  }
+  measures.time_to_collision = model::compute_time_to_collision(
+      {.box = own_box, .speed = own.speed}, tracks);
+  return measures;
+}
+
 auto record_run(const std::string& path,
                 std::vector<scenario::ParameterAssignment> assignments,
                 framework::Duration step, std::size_t limit)
     -> std::expected<RunRecord, lib::Status> {
   ScenarioSimulation simulation{path, std::move(assignments)};
   RETURN_IF_UNEXPECTED(simulation.configure());
-  RunRecord run{.step = std::chrono::duration<double>(step).count()};
-  for (const scenario::Entity& entity : simulation.scenario().entities) {
-    const scenario::Vehicle& vehicle = entity.vehicle;
-    run.boxes.push_back({.length = vehicle.dimensions[0],
-                         .width = vehicle.dimensions[1],
-                         .center = vehicle.center[0]});
-  }
-  const ScenarioWorld& world = simulation.world();
+  RunRecord run{.step = std::chrono::duration<double>(step).count(),
+                .boxes = convert_entities_to_boxes(simulation.scenario())};
   for (std::size_t k = 0; k < limit; ++k) {
     framework::Step now{.time = framework::TimePoint{} + k * step, .dt = step};
     RETURN_OR_ASSIGN(engine::Flow flow, simulation.step(now));
@@ -57,19 +101,7 @@ auto record_run(const std::string& path,
     if (flow == engine::Flow::STOP || !simulation.player().running()) {
       break;
     }
-    std::vector<RunSample> samples(run.boxes.size());
-    world.store_of<ScenarioActor>().for_each([&](Entity owner,
-                                                 const ScenarioActor& actor) {
-      const VehiclePose& pose =
-          world.store_of<VehiclePose>().component_of(owner);
-      Vector3 at = model::eigen(pose.position);
-      samples[actor.entity] = {
-          .x = at.x(),
-          .y = at.y(),
-          .heading = model::radians(pose.heading),
-          .speed = world.store_of<ScenarioSpeed>().component_of(owner).speed};
-    });
-    run.samples.push_back(std::move(samples));
+    run.samples.push_back(sample_entities(simulation));
   }
   return run;
 }
@@ -104,24 +136,11 @@ auto measure_run(const RunRecord& run) -> RunMeasures {
 
   measures.time_to_collision_within_bound = true;
   for (const std::vector<RunSample>& samples : run.samples) {
-    const RunSample& own = samples[0];
-    model::OrientedBox own_box = convert_sample_to_box(own, run.boxes[0]);
-    std::vector<model::MovingBox> tracks;
-    double gap = std::numeric_limits<double>::infinity();
-    for (std::size_t i = 1; i < samples.size(); ++i) {
-      model::OrientedBox box = convert_sample_to_box(samples[i], run.boxes[i]);
-      gap = std::min(gap, model::compute_gap(own_box, box));
-      if (model::check_ahead(own.x, own.y, own.heading,
-                             {.x = box.x, .y = box.y}, AHEAD)) {
-        tracks.push_back({.box = box, .speed = samples[i].speed});
-      }
-    }
-    std::optional<double> ttc = model::compute_time_to_collision(
-        {.box = own_box, .speed = own.speed}, tracks);
-    measures.gaps.push_back(gap);
-    measures.min_gap = std::min(measures.min_gap, gap);
-    measures.times_to_collision.push_back(ttc);
-    if (ttc) {
+    SampleMeasures sample = measure_sample(samples, run.boxes);
+    measures.gaps.push_back(sample.gap);
+    measures.min_gap = std::min(measures.min_gap, sample.gap);
+    measures.times_to_collision.push_back(sample.time_to_collision);
+    if (std::optional<double> ttc = sample.time_to_collision) {
       measures.min_time_to_collision =
           std::min(*ttc, measures.min_time_to_collision.value_or(*ttc));
       measures.time_to_collision_within_bound &= *ttc > LEAST_TIME_TO_COLLISION;

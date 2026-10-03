@@ -71,6 +71,17 @@ cc_binary(
     ],
 )
 
+cc_library(
+    name = "road_drawing",
+    srcs = ["road_drawing.cpp"],
+    hdrs = ["road_drawing.hpp"],
+    copts = COPTS,
+    deps = [
+        "//model:collision",
+        "//model:road",
+    ],
+)
+
 cc_binary(
     name = "scenario_batch",
     srcs = ["scenario_batch_main.cpp"],
@@ -219,6 +230,20 @@ cc_test(
 )
 
 cc_test(
+    name = "road_drawing_test",
+    size = "small",
+    srcs = ["road_drawing_test.cpp"],
+    copts = COPTS,
+    data = glob(["roads/*.xodr"]) + ["//3rd_party:carla"],
+    deps = [
+        ":road_drawing",
+        ":testing",
+        "//format:opendrive",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
     name = "scenario_test",
     size = "small",
     srcs = ["scenario_test.cpp"],
@@ -292,4 +317,59 @@ cc_test(
         "//model:traffic",
         "@lib//base:testing",
     ],
+)
+
+VIEWER_DEPS = [
+    ":automotive_library",
+    ":road_drawing",
+    "//application:viewing",
+    "//engine:driver",
+    "//framework:vocabulary",
+    "//model:collision",
+    "//3rd_party:imgui",
+    "//3rd_party:implot",
+    "@lib//base:core",
+]
+
+VIEWER_DATA = glob(["roads/*.xodr"]) + [
+    "//3rd_party:carla",
+    "//3rd_party:esmini",
+]
+
+cc_binary(
+    name = "viewer",
+    srcs = ["viewer.cpp"],
+    copts = COPTS,
+    data = VIEWER_DATA,
+    deps = VIEWER_DEPS,
+)
+
+cc_test(
+    name = "viewer_traffic_test",
+    size = "small",
+    srcs = ["viewer.cpp"],
+    args = [
+        "3rd_party/carla/Town01.xodr",
+        "60",
+        "1",
+        "--frames=60",
+    ],
+    copts = COPTS,
+    data = VIEWER_DATA,
+    env = {"SDL_VIDEODRIVER": "dummy"},
+    deps = VIEWER_DEPS,
+)
+
+cc_test(
+    name = "viewer_scenario_test",
+    size = "small",
+    srcs = ["viewer.cpp"],
+    args = [
+        "3rd_party/esmini/xosc/cut-in.xosc",
+        "--frames=60",
+    ],
+    copts = COPTS,
+    data = VIEWER_DATA,
+    env = {"SDL_VIDEODRIVER": "dummy"},
+    deps = VIEWER_DEPS,
 )

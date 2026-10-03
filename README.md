@@ -278,7 +278,7 @@ regenerate a table, run its script after `pip install jsbsim numpy`.
   handling.
 - **Ground and stall.** Routes stay between 3 and 9 km.
 
-## In progress: automotive
+## Automotive
 
 simon's second application, closed-loop driving at the level of objects,
 checks each claim against an open reference, as the aeronautic one checks
@@ -328,6 +328,18 @@ bazel run //application/automotive:scenario -- 3rd_party/esmini/xosc/cut-in.xosc
 bazel run -c opt //application/automotive:scenario_batch -- 3rd_party/esmini/xosc/cut-in_parameter_set.xosc
 ```
 
+![The automotive viewer](documents/images/automotive_viewer.png)
+
+The viewer watches traffic on any OpenDRIVE network, here 80 vehicles in
+CARLA's Town01 colored by speed, or plays an OpenSCENARIO scenario with the
+ego's gap and time to collision charted under the map. A click on a vehicle
+follows it.
+
+```sh
+bazel run -c opt //application/automotive:viewer -- 3rd_party/carla/Town01.xodr 80
+bazel run -c opt //application/automotive:viewer -- 3rd_party/esmini/xosc/cut-in.xosc
+```
+
 ## Build
 
 Requires [Bazelisk](https://github.com/bazelbuild/bazelisk) (installed as
@@ -344,6 +356,7 @@ bazel test //...
 bazel run //application/hello
 bazel run //application/missile:viewer   # watch a missile scenario
 bazel run -c opt //application/aeronautic:viewer   # watch the aeronautic world
+bazel run -c opt //application/automotive:viewer   # watch traffic on a ring
 bazel run //application/missile -- 7    # run seed 7 headless
 bazel run //application/aeronautic -- 1000 100   # 1,000 aircraft, 100 on RK4
 bazel run -c opt //application/aeronautic:aeronautic_benchmark

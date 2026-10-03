@@ -2722,7 +2722,7 @@ attitude, load factor, engine and surfaces, and strip charts of its altitude
 and airspeed sit under the map. The aeronautic viewer's panel also sets the
 scenario's wind and turbulence.
 
-Both viewers share `application/viewing.hpp`: the window and its frame loop,
+The viewers share `application/viewing.hpp`: the window and its frame loop,
 which take `--scale`, and `--frames` and `--screenshot` for running a viewer
 with nobody watching; a `Session` that runs a scenario under `RealTimeDriver`
 and finishes it when replaced; the side panel with its Restart, Quit, pause
@@ -2816,10 +2816,10 @@ can carry a driving simulation comparable to the best open source, as
 aeronautic does against JSBSim, with each claim checked against an open
 reference: roads against libOpenDRIVE, vehicles against CommonRoad's models
 and Chrono::Vehicle, traffic against SUMO, scenarios against esmini, and
-metrics against nuPlan. It is being built in eight steps (see the
-[Roadmap](#roadmap)); the first seven, roads, traffic, a scale benchmark,
-tires and vehicle dynamics against CommonRoad, maneuvers against Chrono,
-scenarios against esmini, and metrics and batch runs, are done.
+metrics against nuPlan. It was built in eight steps (see the
+[Roadmap](#roadmap)): roads, traffic, a scale benchmark, tires and vehicle
+dynamics against CommonRoad, maneuvers against Chrono, scenarios against
+esmini, metrics and batch runs, and a viewer.
 
 #### Roads
 
@@ -3238,6 +3238,30 @@ right lane than the left; the same seed repeats exactly. In Town01, 60
 vehicles enter 1,573 lanes through its junctions in 120 s, at 10.2 of their
 11 m/s.
 
+#### Viewer
+
+`bazel run -c opt //application/automotive:viewer -- <file>` watches traffic
+on an OpenDRIVE network, or plays an OpenSCENARIO scenario, under
+`RealTimeDriver`; the file's extension decides which. The map draws each
+lane by its OpenDRIVE type, the center line where lanes run either way, and
+every vehicle as its box; a box smaller than a few pixels becomes a dot, and
+the lanes are sampled no closer than two pixels apart, so a network as large
+as the scale benchmark's 100 rings draws whole. Traffic is colored by speed.
+In a scenario the ego is blue, the others orange, and a vehicle touching the
+ego red, and the map starts 200 m wide about the ego. A click on a vehicle
+follows it, the map keeping it in the middle; the panel reads out its lane,
+s, speed and acceleration in traffic, and in a scenario every vehicle's
+speed and the ego's gap and time to collision, which charts under the map
+trace as nuPlan measures them (`measure_sample`, shared with the batch
+runs).
+
+`road_drawing` samples each lane section's lane borders along the road, at
+most a spacing apart on the reference line, without the UI. `road_drawing_test`
+checks the ring's driving lanes against the exact area of the polygon their
+chords inscribe, to 1e-12, that every lane of Town01 is drawn, and that the
+ring's halves meet. `viewer_traffic_test` and `viewer_scenario_test` run the
+viewer for 60 frames on Town01's traffic and on the curved highway's cut-in.
+
 #### Scale
 
 `automotive_benchmark` drives 1,000, 10,000 and 100,000 vehicles on 100
@@ -3361,7 +3385,7 @@ Each step ends with a working application and passing tests.
      run offline, stays the reference each level's accuracy is measured
      against.
 
-7. **Automotive (in progress).** Closed-loop driving at the level of objects,
+7. **Automotive (done).** Closed-loop driving at the level of objects,
    each claim checked against an open reference (see
    [automotive](#automotive)):
    - Done: roads, read from OpenDRIVE and checked against libOpenDRIVE.
@@ -3382,7 +3406,7 @@ Each step ends with a working application and passing tests.
    - Done: nuPlan's comfort and time to collision, on boxes checked against
      GEOS; parameter distributions played in batches on threads, against
      esmini and nuPlan.
-   - Next: a viewer.
+   - Done: a viewer for traffic and for scenarios.
 
 Later: `LockstepDriver` and a second process, scenario files with two-phase
 loading, parent-child transforms (a radar mounted on a vehicle), and DIS or HLA
