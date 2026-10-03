@@ -23,7 +23,15 @@ namespace simon::automotive::testing {
 inline constexpr std::string_view ROADS = "application/automotive/roads/";
 inline constexpr std::string_view REFERENCE =
     "application/automotive/reference/";
-inline constexpr std::string_view TIRES = "application/automotive/tires/";
+inline constexpr std::string_view TIRES = "3rd_party/chrono/";
+inline constexpr std::string_view CARLA = "3rd_party/carla/";
+
+// The path of a road the tests read: CARLA's Town01 from 3rd_party, the
+// rest from ROADS.
+inline auto find_road_path(std::string_view file) -> std::string {
+  std::string_view directory = file == "Town01.xodr" ? CARLA : ROADS;
+  return std::string{directory} + std::string{file};
+}
 
 // One row of a table, as text by column name.
 using Row = std::map<std::string, std::string, std::less<>>;

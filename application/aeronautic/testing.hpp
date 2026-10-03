@@ -24,9 +24,9 @@
 namespace simon::aeronautic::testing {
 
 inline constexpr std::string_view BOEING_737 =
-    "application/aeronautic/aircraft/737.aircraft";
+    "3rd_party/jsbsim/737.aircraft";
 inline constexpr std::string_view F16 =
-    "application/aeronautic/aircraft/f16.aircraft";
+    "3rd_party/jsbsim/f16.aircraft";
 
 // One row of a recording, as columns by name.
 using Row = std::map<std::string, double, std::less<>>;

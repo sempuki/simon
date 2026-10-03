@@ -7,7 +7,7 @@
 #include "base/testing.hpp"
 #include "format/openscenario.hpp"
 
-// Reading esmini's scenarios (see scenarios/LICENSE-ESMINI): their entities
+// Reading esmini's scenarios (see 3rd_party/esmini/LICENSE): their entities
 // from the vehicle catalog, parameters and expressions, and storyboards.
 namespace simon::automotive {
 
@@ -15,7 +15,7 @@ namespace {
 
 namespace osc = scenario;
 
-constexpr std::string_view SCENARIOS = "application/automotive/scenarios/xosc/";
+constexpr std::string_view SCENARIOS = "3rd_party/esmini/xosc/";
 
 auto load(std::string_view name) -> osc::Scenario {
   auto scenario =
@@ -43,7 +43,7 @@ TEST_CASE("OpenScenario") {
 
   SECTION("ShouldReadEntitiesFromTheCatalog") {
     osc::Scenario scenario = load("cut-in_simple.xosc");
-    CHECK(scenario.road_network.ends_with("scenarios/xodr/straight_500m.xodr"));
+    CHECK(scenario.road_network.ends_with("esmini/xodr/straight_500m.xodr"));
     REQUIRE(scenario.entities.size() == 2);
     const osc::Entity* ego = scenario.find_entity("Ego");
     REQUIRE(ego != nullptr);

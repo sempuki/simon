@@ -22,7 +22,7 @@ namespace {
 using namespace std::chrono_literals;
 using namespace testing;
 
-constexpr std::string_view SCENARIOS = "application/automotive/scenarios/xosc/";
+constexpr std::string_view SCENARIOS = "3rd_party/esmini/xosc/";
 
 // An entity's state at a step.
 struct Sample final {

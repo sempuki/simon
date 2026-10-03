@@ -1,0 +1,70 @@
+# Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+
+package(default_visibility = ["//visibility:public"])
+
+# Libraries, from the Bazel Central Registry at the versions in MODULE.bazel.
+
+alias(
+    name = "eigen",
+    actual = "@eigen",
+)
+
+alias(
+    name = "mp-units",
+    actual = "@mp-units",
+)
+
+alias(
+    name = "pugixml",
+    actual = "@pugixml",
+)
+
+alias(
+    name = "imgui",
+    actual = "@imgui",
+)
+
+alias(
+    name = "imgui_platform_sdl2",
+    actual = "@imgui//backends:platform-sdl2",
+)
+
+alias(
+    name = "imgui_renderer_sdl2",
+    actual = "@imgui//backends:renderer-sdl2",
+)
+
+alias(
+    name = "implot",
+    actual = "@implot",
+)
+
+alias(
+    name = "sdl2",
+    actual = "@sdl2",
+)
+
+# Data, vendored here with each source's license.
+
+filegroup(
+    name = "carla",
+    srcs = glob(["carla/*.xodr"]),
+)
+
+filegroup(
+    name = "chrono",
+    srcs = glob(["chrono/*.tir"]),
+)
+
+filegroup(
+    name = "esmini",
+    srcs = glob([
+        "esmini/xodr/**",
+        "esmini/xosc/**",
+    ]),
+)
+
+filegroup(
+    name = "jsbsim",
+    srcs = glob(["jsbsim/*.aircraft"]),
+)

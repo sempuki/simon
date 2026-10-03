@@ -172,7 +172,7 @@ auto main(int argc, char** argv) -> int {
     populations = {1'000, 10'000, 100'000};
   }
   auto rigid = simon::format::load_aircraft(
-      "application/aeronautic/aircraft/737.aircraft");
+      "3rd_party/jsbsim/737.aircraft");
   if (!rigid) {
     std::println(stderr, "{}", rigid.error().message());
     return 1;

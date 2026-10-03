@@ -2079,6 +2079,8 @@ simon/
   tools/         Offline converters, such as JSBSim aircraft to simon's data
   documents/     This document
   2nd_party/lib  Shared core libraries (submodule)
+  3rd_party/     Every outside library, by alias, and vendored data with its license: CARLA's Town01,
+                 Chrono's tire, esmini's scenarios, JSBSim's aircraft
 ```
 
 The prototype (`framework/`, `component/` and the top-level `simulation.hpp`)
@@ -2432,11 +2434,10 @@ excludes rigid bodies.
 
 An aircraft comes from JSBSim. `tools/jsbsim/convert.py` turns a JSBSim
 aircraft's XML into simon's aircraft format, in SI units, and
-`model/aircraft_data` reads it back, refusing bad files with the line at
+`format/aircraft_file` reads it back, refusing bad files with the line at
 fault. A converted aircraft holds its metrics, mass balance, fuel tanks,
 turbines, flight control system and aerodynamics. The 737 is
-`application/aeronautic/aircraft/737.aircraft`, and the F-16 is `f16.aircraft`
-beside it (see [The F-16](#the-f-16)).
+`3rd_party/jsbsim/737.aircraft`, and the F-16 is `f16.aircraft` beside it (see [The F-16](#the-f-16)).
 
 | Layer | Holds |
 |---|---|

@@ -46,7 +46,7 @@ cc_binary(
     name = "automotive",
     srcs = ["main.cpp"],
     copts = COPTS,
-    data = glob(["roads/*.xodr"]),
+    data = glob(["roads/*.xodr"]) + ["//3rd_party:carla"],
     deps = [
         ":automotive_library",
         "//engine:driver",
@@ -58,7 +58,7 @@ cc_binary(
     name = "scenario",
     srcs = ["scenario_main.cpp"],
     copts = COPTS,
-    data = glob(["scenarios/**"]),
+    data = ["//3rd_party:esmini"],
     deps = [
         ":automotive_library",
         "//engine:driver",
@@ -84,7 +84,7 @@ cc_test(
     size = "small",
     srcs = ["automotive_test.cpp"],
     copts = COPTS,
-    data = glob(["roads/*.xodr"]),
+    data = glob(["roads/*.xodr"]) + ["//3rd_party:carla"],
     deps = [
         ":automotive_library",
         "//framework:vocabulary",
@@ -138,10 +138,7 @@ cc_test(
     size = "small",
     srcs = ["maneuver_test.cpp"],
     copts = COPTS,
-    data = glob([
-        "reference/chrono_*.csv",
-        "tires/*.tir",
-    ]),
+    data = glob(["reference/chrono_*.csv"]) + ["//3rd_party:chrono"],
     deps = [
         ":testing",
         "//framework",
@@ -157,7 +154,7 @@ cc_test(
     size = "small",
     srcs = ["openscenario_test.cpp"],
     copts = COPTS,
-    data = glob(["scenarios/**"]),
+    data = ["//3rd_party:esmini"],
     deps = [
         "//format:openscenario",
         "//scenario:openscenario",
@@ -174,7 +171,7 @@ cc_test(
         "roads/*.xodr",
         "reference/exact_positions.csv",
         "reference/libopendrive_*.csv",
-    ]),
+    ]) + ["//3rd_party:carla"],
     deps = [
         ":testing",
         "//framework:vocabulary",
@@ -190,7 +187,10 @@ cc_test(
     size = "small",
     srcs = ["scenario_test.cpp"],
     copts = COPTS,
-    data = glob(["scenarios/**"]) + ["reference/esmini_scenarios.csv"],
+    data = [
+        "reference/esmini_scenarios.csv",
+        "//3rd_party:esmini",
+    ],
     deps = [
         ":automotive_library",
         ":testing",
@@ -232,10 +232,7 @@ cc_test(
     size = "small",
     srcs = ["tire_test.cpp"],
     copts = COPTS,
-    data = glob([
-        "reference/chrono_*.csv",
-        "tires/*.tir",
-    ]),
+    data = glob(["reference/chrono_*.csv"]) + ["//3rd_party:chrono"],
     deps = [
         ":testing",
         "//model:tire",

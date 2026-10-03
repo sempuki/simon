@@ -28,7 +28,7 @@ cc_library(
         "//model:road",
         "@lib//base:core",
         "@lib//base:status",
-        "@pugixml",
+        "//3rd_party:pugixml",
     ],
 )
 
@@ -41,7 +41,7 @@ cc_library(
         "//scenario:openscenario",
         "@lib//base:core",
         "@lib//base:status",
-        "@pugixml",
+        "//3rd_party:pugixml",
     ],
 )
 

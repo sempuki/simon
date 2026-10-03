@@ -359,7 +359,7 @@ TEST_CASE("Simulation") {
 namespace {
 
 constexpr std::string_view BOEING_737 =
-    "application/aeronautic/aircraft/737.aircraft";
+    "3rd_party/jsbsim/737.aircraft";
 
 // A 737 trimmed in cruise at 6 km and 200 m/s, heading north from the
 // world's origin toward a waypoint 500 km ahead.

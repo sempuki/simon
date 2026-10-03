@@ -64,8 +64,8 @@ cc_binary(
         ":missile_library",
         "//application:viewing",
         "//engine:driver",
-        "@imgui",
-        "@implot",
+        "//3rd_party:imgui",
+        "//3rd_party:implot",
         "@lib//base:core",
     ],
 )
@@ -82,8 +82,8 @@ cc_test(
         ":missile_library",
         "//application:viewing",
         "//engine:driver",
-        "@imgui",
-        "@implot",
+        "//3rd_party:imgui",
+        "//3rd_party:implot",
         "@lib//base:core",
     ],
 )

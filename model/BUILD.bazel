@@ -12,8 +12,8 @@ cc_library(
     copts = COPTS,
     deps = [
         "//framework:vocabulary",
-        "@eigen",
-        "@mp-units",
+        "//3rd_party:eigen",
+        "//3rd_party:mp-units",
     ],
 )
 
@@ -36,7 +36,7 @@ cc_library(
         "//framework:vocabulary",
         ":units",
         "//framework",
-        "@eigen",
+        "//3rd_party:eigen",
         "@lib//base:core",
     ],
 )
@@ -131,7 +131,7 @@ cc_library(
     copts = COPTS,
     deps = [
         ":units",
-        "@eigen",
+        "//3rd_party:eigen",
     ],
 )
 
@@ -143,7 +143,7 @@ cc_library(
         ":kinematics",
         ":units",
         "//framework",
-        "@eigen",
+        "//3rd_party:eigen",
     ],
 )
 
@@ -170,7 +170,7 @@ cc_library(
         ":rigid_body",
         ":units",
         ":wind",
-        "@eigen",
+        "//3rd_party:eigen",
     ],
 )
 
@@ -236,7 +236,7 @@ cc_library(
         ":sensing",
         ":units",
         ":wind",
-        "@eigen",
+        "//3rd_party:eigen",
         "@lib//base:core",
     ],
 )
@@ -264,7 +264,7 @@ cc_library(
         ":rigid_aircraft",
         ":rigid_body",
         ":units",
-        "@eigen",
+        "//3rd_party:eigen",
         "@lib//base:core",
         "@lib//base:status",
     ],
@@ -291,7 +291,7 @@ cc_library(
         ":kinematics",
         ":units",
         "//framework",
-        "@eigen",
+        "//3rd_party:eigen",
     ],
 )
 
@@ -303,7 +303,7 @@ cc_library(
     deps = [
         ":units",
         "//framework:vocabulary",
-        "@eigen",
+        "//3rd_party:eigen",
     ],
 )
 
@@ -314,7 +314,7 @@ cc_library(
     copts = COPTS,
     deps = [
         ":units",
-        "@eigen",
+        "//3rd_party:eigen",
         "@lib//base:core",
     ],
 )

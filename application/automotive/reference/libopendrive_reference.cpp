@@ -1,9 +1,9 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-// Records libOpenDRIVE's geometry of each road in application/automotive/roads,
-// for opendrive_reference_test. libOpenDRIVE
-// (https://github.com/pageldev/libOpenDRIVE, Apache-2.0) is not part of
-// simon's build; build this beside it with CMake:
+// Records libOpenDRIVE's geometry of each road in application/automotive/roads
+// and of CARLA's Town01 in 3rd_party/carla, for opendrive_reference_test.
+// libOpenDRIVE (https://github.com/pageldev/libOpenDRIVE, Apache-2.0) is not
+// part of simon's build; build this beside it with CMake:
 //
 //   git clone https://github.com/pageldev/libOpenDRIVE
 //   cmake -S libOpenDRIVE -B libOpenDRIVE/build -DCMAKE_BUILD_TYPE=Release
@@ -14,7 +14,8 @@
 //       libOpenDRIVE/build/libOpenDrive.a \
 //       libOpenDRIVE/build/_deps/pugixml-build/libpugixml.a \
 //       -o libopendrive_reference
-//   ./libopendrive_reference application/automotive/roads application/automotive/reference
+//   ./libopendrive_reference application/automotive/roads 3rd_party/carla \
+//       application/automotive/reference
 //
 // For each road it samples s every `step` meters and at the road's end, and
 // writes three tables:
@@ -41,6 +42,7 @@ namespace {
 struct File {
   std::string name;
   double step;  // m between samples.
+  bool carla = false;  // In CARLA_DIR rather than ROADS_DIR.
 };
 
 std::vector<double> samples(double length, double step) {
@@ -55,15 +57,16 @@ std::vector<double> samples(double length, double step) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  if (argc != 3) {
-    std::fprintf(stderr, "usage: %s ROADS_DIR OUT_DIR\n", argv[0]);
+  if (argc != 4) {
+    std::fprintf(stderr, "usage: %s ROADS_DIR CARLA_DIR OUT_DIR\n", argv[0]);
     return 1;
   }
   std::string roads = argv[1];
-  std::string out = argv[2];
+  std::string carla = argv[2];
+  std::string out = argv[3];
   std::vector<File> files = {
       {"curves.xodr", 2.5}, {"paramPoly3.xodr", 2.5}, {"ring.xodr", 5.0},
-      {"Town01.xodr", 5.0}};
+      {"Town01.xodr", 5.0, true}};
   const double ts[] = {-6.0, -2.5, 0.0, 1.75, 5.0};
 
   FILE* positions = std::fopen((out + "/libopendrive_positions.csv").c_str(), "w");
@@ -78,7 +81,8 @@ int main(int argc, char** argv) {
                "file,from_road,from_section,from_lane,to_road,to_section,to_lane\n");
 
   for (const File& file : files) {
-    odr::OpenDriveMap map(roads + "/" + file.name, false, false, true, false);
+    std::string directory = file.carla ? carla : roads;
+    odr::OpenDriveMap map(directory + "/" + file.name, false, false, true, false);
     for (const odr::RoutingGraphEdge& edge : map.get_routing_graph().edges) {
       std::fprintf(successors, "%s,%s,%.17g,%d,%s,%.17g,%d\n", file.name.c_str(),
                    edge.from.road_id.c_str(), edge.from.lanesection_s0,

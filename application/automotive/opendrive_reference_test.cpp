@@ -19,9 +19,10 @@
 #include "model/road.hpp"
 
 // simon's roads against libOpenDRIVE's, on the roads in
-// application/automotive/roads: positions on and off each road's surface,
-// each lane's outer border, the lane at each lane's middle, and the lane
-// graph, from the tables reference/libopendrive_reference.cpp recorded.
+// application/automotive/roads and CARLA's Town01: positions on and off each
+// road's surface, each lane's outer border, the lane at each lane's middle,
+// and the lane graph, from the tables reference/libopendrive_reference.cpp
+// recorded.
 namespace simon::automotive {
 
 namespace {
@@ -35,8 +36,7 @@ auto network_of(std::string_view file) -> const model::RoadNetwork& {
   static std::map<std::string, model::RoadNetwork, std::less<>> networks;
   auto found = networks.find(file);
   if (found == networks.end()) {
-    auto network =
-        format::load_opendrive(std::string{ROADS} + std::string{file});
+    auto network = format::load_opendrive(find_road_path(file));
     REQUIRE(network);
     found = networks.emplace(std::string{file}, std::move(*network)).first;
   }

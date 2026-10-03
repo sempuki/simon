@@ -6,6 +6,8 @@ module(
 )
 
 bazel_dep(name = "rules_cc", version = "0.2.25")
+
+# Third-party libraries, depended on through //3rd_party (see 3rd_party/README.md).
 bazel_dep(name = "catch2", version = "3.15.1")
 bazel_dep(name = "eigen", version = "5.0.1.bcr.2")
 bazel_dep(name = "mp-units", version = "2.5.0.bcr.0")

@@ -32,8 +32,8 @@ struct Scenario final {
   int fighters = 0;
   // The rigid aircraft's data, as tools/jsbsim/convert.py writes it, and the
   // gains their autopilots fly by.
-  std::string rigid_aircraft = "application/aeronautic/aircraft/737.aircraft";
-  std::string fighter_aircraft = "application/aeronautic/aircraft/f16.aircraft";
+  std::string rigid_aircraft = "3rd_party/jsbsim/737.aircraft";
+  std::string fighter_aircraft = "3rd_party/jsbsim/f16.aircraft";
   SurfaceGains airliner_gains;
   // A fighter's fly-by-wire turns a stick into rates and load, which the
   // airliner's gains fly as well; it banks to 60 degrees, so it turns on

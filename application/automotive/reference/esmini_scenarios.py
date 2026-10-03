@@ -3,7 +3,7 @@
 """Plays esmini's scenarios in esmini, for scenario_test.
 
 esmini (https://github.com/esmini/esmini, MPL-2.0), an OpenSCENARIO player,
-plays each scenario in ../scenarios/xosc headless, at fixed steps of 0.05 s,
+plays each scenario in 3rd_party/esmini/xosc headless, at fixed steps of 0.05 s,
 logging every entity each step. This script writes esmini_scenarios.csv:
 for each scenario, step and entity, its position and heading in the world,
 its speed, and its road, lane, s and offset from the lane's middle.
@@ -29,7 +29,8 @@ STEP = 0.05
 def main():
     esmini = sys.argv[1]
     here = os.path.dirname(os.path.abspath(__file__))
-    scenarios = os.path.join(here, '..', 'scenarios', 'xosc')
+    scenarios = os.path.join(here, '..', '..', '..', '3rd_party', 'esmini',
+                             'xosc')
     with open(os.path.join(here, 'esmini_scenarios.csv'), 'w', newline='') as out:
         out.write('scenario,time,entity,x,y,heading,speed,lane,s,offset\n')
         for name in SCENARIOS:

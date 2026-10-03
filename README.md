@@ -318,9 +318,9 @@ network and drivers.
 
 ```sh
 bazel test //application/automotive/...
-bazel run -c opt //application/automotive -- application/automotive/roads/Town01.xodr 60 120
+bazel run -c opt //application/automotive -- 3rd_party/carla/Town01.xodr 60 120
 bazel run -c opt //application/automotive:automotive_benchmark
-bazel run //application/automotive:scenario -- application/automotive/scenarios/xosc/cut-in.xosc
+bazel run //application/automotive:scenario -- 3rd_party/esmini/xosc/cut-in.xosc
 ```
 
 ## Build

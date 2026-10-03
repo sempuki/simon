@@ -55,8 +55,7 @@ cc_test(
     srcs = ["aeronautic_test.cpp"],
     copts = COPTS,
     data = [
-        "aircraft/737.aircraft",
-        "aircraft/f16.aircraft",
+        "//3rd_party:jsbsim",
     ],
     deps = [
         "//format:aircraft_file",
@@ -87,8 +86,7 @@ cc_test(
     srcs = ["aero_test.cpp"],
     copts = COPTS,
     data = [
-        "aircraft/737.aircraft",
-        "aircraft/f16.aircraft",
+        "//3rd_party:jsbsim",
         "reference/jsbsim_737_aero.csv",
         "reference/jsbsim_f16_aero.csv",
     ],
@@ -108,7 +106,7 @@ cc_test(
     srcs = ["rigid_body_test.cpp"],
     copts = COPTS,
     data = [
-        "aircraft/737.aircraft",
+        "//3rd_party:jsbsim",
         "reference/jsbsim_737_rigid_body.csv",
     ],
     deps = [
@@ -129,8 +127,7 @@ cc_test(
     srcs = ["turbine_test.cpp"],
     copts = COPTS,
     data = [
-        "aircraft/737.aircraft",
-        "aircraft/f16.aircraft",
+        "//3rd_party:jsbsim",
         "reference/jsbsim_737_turbine.csv",
         "reference/jsbsim_f16_turbine.csv",
     ],
@@ -150,8 +147,7 @@ cc_test(
     srcs = ["flight_control_test.cpp"],
     copts = COPTS,
     data = [
-        "aircraft/737.aircraft",
-        "aircraft/f16.aircraft",
+        "//3rd_party:jsbsim",
         "reference/jsbsim_737_flight_control.csv",
         "reference/jsbsim_f16_flight_control.csv",
     ],
@@ -171,8 +167,7 @@ cc_test(
     srcs = ["check_case_test.cpp"],
     copts = COPTS,
     data = [
-        "aircraft/737.aircraft",
-        "aircraft/f16.aircraft",
+        "//3rd_party:jsbsim",
         "reference/jsbsim_737_check_cases.csv",
         "reference/jsbsim_737_check_initial.csv",
         "reference/jsbsim_f16_check_cases.csv",
@@ -194,16 +189,15 @@ cc_binary(
     srcs = ["viewer.cpp"],
     copts = COPTS,
     data = [
-        "aircraft/737.aircraft",
-        "aircraft/f16.aircraft",
+        "//3rd_party:jsbsim",
     ],
     deps = [
         "//framework:vocabulary",
         ":aeronautic_library",
         "//application:viewing",
         "//engine:driver",
-        "@imgui",
-        "@implot",
+        "//3rd_party:imgui",
+        "//3rd_party:implot",
         "@lib//base:core",
     ],
 )
@@ -221,8 +215,7 @@ cc_test(
     ],
     copts = COPTS,
     data = [
-        "aircraft/737.aircraft",
-        "aircraft/f16.aircraft",
+        "//3rd_party:jsbsim",
     ],
     env = {"SDL_VIDEODRIVER": "dummy"},
     deps = [
@@ -230,8 +223,8 @@ cc_test(
         ":aeronautic_library",
         "//application:viewing",
         "//engine:driver",
-        "@imgui",
-        "@implot",
+        "//3rd_party:imgui",
+        "//3rd_party:implot",
         "@lib//base:core",
     ],
 )
@@ -241,8 +234,7 @@ cc_binary(
     srcs = ["main.cpp"],
     copts = COPTS,
     data = [
-        "aircraft/737.aircraft",
-        "aircraft/f16.aircraft",
+        "//3rd_party:jsbsim",
     ],
     deps = [
         "//framework:vocabulary",
@@ -255,7 +247,7 @@ cc_binary(
     name = "aeronautic_benchmark",
     srcs = ["aeronautic_benchmark.cpp"],
     copts = COPTS,
-    data = ["aircraft/737.aircraft"],
+    data = ["//3rd_party:jsbsim"],
     deps = [
         "//format:aircraft_file",
         "//framework:vocabulary",
@@ -270,7 +262,7 @@ cc_binary(
     name = "rigid_benchmark",
     srcs = ["rigid_benchmark.cpp"],
     copts = COPTS,
-    data = ["aircraft/737.aircraft"],
+    data = ["//3rd_party:jsbsim"],
     deps = [
         "//format:aircraft_file",
         "//framework:vocabulary",
@@ -286,8 +278,7 @@ cc_test(
     srcs = ["trim_test.cpp"],
     copts = COPTS,
     data = [
-        "aircraft/737.aircraft",
-        "aircraft/f16.aircraft",
+        "//3rd_party:jsbsim",
         "reference/jsbsim_737_check_initial.csv",
         "reference/jsbsim_f16_check_initial.csv",
     ],

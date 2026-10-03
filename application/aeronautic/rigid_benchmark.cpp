@@ -38,7 +38,7 @@ using namespace std::chrono_literals;
 using WallClock = std::chrono::steady_clock;
 
 constexpr std::string_view BOEING_737 =
-    "application/aeronautic/aircraft/737.aircraft";
+    "3rd_party/jsbsim/737.aircraft";
 constexpr Duration DT = 8ms;
 constexpr int DEFAULT_STEPS = 250;  // 2 s simulated.
 

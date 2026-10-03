@@ -43,9 +43,9 @@ cc_binary(
         "//framework:vocabulary",
         ":hello_library",
         "//engine:driver",
-        "@imgui",
-        "@imgui//backends:platform-sdl2",
-        "@imgui//backends:renderer-sdl2",
-        "@sdl2",
+        "//3rd_party:imgui",
+        "//3rd_party:imgui_platform_sdl2",
+        "//3rd_party:imgui_renderer_sdl2",
+        "//3rd_party:sdl2",
     ],
 )

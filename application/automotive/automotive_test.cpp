@@ -126,7 +126,7 @@ TEST_CASE("Automotive") {
     // CARLA's Town01: one lane each way through twelve junctions.
     Simulation simulation{Scenario{
         .seed = 5,
-        .roads = "application/automotive/roads/Town01.xodr",
+        .roads = "3rd_party/carla/Town01.xodr",
         .vehicles = 60,
         .following = {.desired_speed = 11.0 * model::meter_per_second}}};
     REQUIRE(simulation.configure());

@@ -11,7 +11,7 @@ cc_library(
     hdrs = ["vocabulary.hpp"],
     copts = COPTS,
     deps = [
-        "@eigen",
+        "//3rd_party:eigen",
         "@lib//base:core",
     ],
 )
