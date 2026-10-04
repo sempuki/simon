@@ -93,6 +93,8 @@ full where it first appears, and as "above" after.
 | `walking_graph.cpp` | The walking graph from sidewalk lanes and crosswalk objects | *ASAM OpenDRIVE*, version 1.8, above |
 | `walking_graph.cpp` | Shortest routes | E. W. Dijkstra, "A note on two problems in connexion with graphs", *Numerische Mathematik* 1, 1959, pp. 269-271 |
 | `application/automotive/simulation.hpp` | Free walking speeds: normal, mean 1.34 m/s, standard deviation 0.26 m/s | U. Weidmann, *Transporttechnik der Fussgänger*, Schriftenreihe des IVT 90, ETH Zürich, 1993 |
+| `application/automotive/simulation_systems.hpp` | A pedestrian's critical gap at an unsignalized crossing, t_c = L / S_p + t_s, its length over the walking speed plus a start-up time; checked against the delay where drivers do not yield, (e^(v t_c) - v t_c - 1) / v | Transportation Research Board, *Highway Capacity Manual*, 7th edition, 2022, chapter 20, two-way stop control, pedestrian mode; after D. Adams, "Road traffic considered as a random series", *Journal of the Institution of Civil Engineers* 4, 1936, pp. 121-130 |
+| `application/automotive/crossing_test.cpp` | A pedestrian's delay at a signalized crossing, (C - g)^2 / 2C, for pedestrians arriving evenly | Transportation Research Board, *Highway Capacity Manual*, 7th edition, 2022, chapter 19, signalized intersections, pedestrian mode |
 
 ## Scenarios
 

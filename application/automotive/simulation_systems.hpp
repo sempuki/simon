@@ -321,7 +321,8 @@ struct Decide final            //
              const Driver,     //
              Tactical> {
   using SystemWorld = ProjectedWorld<Decide>;
-  using AllowComponentList = TypeList<LaneState, Driver, SignalState, Stopped>;
+  using AllowComponentList =
+      TypeList<LaneState, Driver, SignalState, Stopped, WalkCommand>;
   using SequenceAfterSystemList = SystemList<RunSignals>;
 
   // How far ahead a driver looks for a leader across its lane's end, and for
@@ -332,6 +333,20 @@ struct Decide final            //
 
   auto prepare(SystemWorld& world, Step step) -> bool {
     lights_ = !network_->control.stop_lines().empty();
+    walks_ = !network_->walking.zones().empty();
+    if (walks_) {
+      std::size_t crosswalks = network_->walking.crosswalks().size();
+      on_.assign(crosswalks, 0.0);
+      coming_.assign(crosswalks, 0.0);
+      world.template store_of<WalkCommand>().for_each(
+          [&](Entity, const WalkCommand& walking) {
+            if (walking.crossing < crosswalks) {
+              double& until = (walking.on ? on_ : coming_)[walking.crossing];
+              until = std::max(until,
+                               walking.clear.numerical_value_in(model::second));
+            }
+          });
+    }
     yields_ = !network_->rights.conflicts().empty();
     if (yields_) {
       occupancy_.collect<true>(world, *network_);
@@ -366,6 +381,12 @@ struct Decide final            //
                 ? find_wait(*state, *driver, along, self, *tactical)
                 : std::nullopt) {
       light = light ? std::min(*light, *wait) : *wait;
+    }
+    if (std::optional<Length> walkers =
+            walks_ && tactical
+                ? find_crosswalk(*state, *driver, along, *tactical)
+                : std::nullopt) {
+      light = light ? std::min(*light, *walkers) : *walkers;
     }
     auto obey = [&](AccelerationMagnitude acceleration) {
       return light ? std::min(acceleration,
@@ -576,6 +597,55 @@ struct Decide final            //
     return approach.toward == 0 && stop.since != TimePoint::max() &&
            !stop.committed &&
            foe.along >= lane_length(*network_, approach.lane) - line_gap - 0.5;
+  }
+
+  // How far ahead the driver stops for the first crosswalk on its way,
+  // within the lookahead, that a pedestrian is on, or, where vehicles yield,
+  // is about to step onto: its line gap short of the crosswalk; none if it
+  // need not stop, or cannot.
+  [[gnu::noinline]] auto find_crosswalk(const LaneState& state,
+                                        const Driver& driver, double along,
+                                        const Tactical& tactical) const
+      -> std::optional<Length> {
+    double before = -along;  // From the vehicle to the lane's start.
+    LaneKey key = state.lane;
+    std::uint32_t turns = state.turns;
+    double v = state.speed.numerical_value_in(model::meter_per_second);
+    double maximum = tactical.braking.maximum.numerical_value_in(
+        model::meter_per_second_squared);
+    double line_gap =
+        tactical.braking.line_gap.numerical_value_in(model::meter);
+    while (before < LOOKAHEAD) {
+      for (const model::CrosswalkZone& zone : network_->walking.zones_on(key)) {
+        double distance = before + zone.near;
+        if (distance <= 0.0 || distance >= LOOKAHEAD) {
+          continue;
+        }
+        // It stops for one it would reach the crosswalk before, with a
+        // second to spare, or, where vehicles yield, one about to step on.
+        double reaching = distance / std::max(v, 1.0);
+        bool blocked =
+            (on_[zone.crosswalk] > 0.0 &&
+             reaching < on_[zone.crosswalk] + 1.0) ||
+            (network_->vehicles_yield && coming_[zone.crosswalk] > 0.0);
+        if (!blocked) {
+          continue;
+        }
+        double to_stop = std::max(distance - line_gap, 0.0);
+        if (v * v / (2.0 * maximum) >= to_stop && to_stop > 0.0) {
+          continue;  // Too near to stop.
+        }
+        return to_stop * model::meter;
+      }
+      before += lane_length(*network_, key);
+      std::optional<LaneKey> next =
+          choose_next_lane(*network_, key, driver.seed, turns++);
+      if (!next) {
+        break;
+      }
+      key = *next;
+    }
+    return std::nullopt;
   }
 
   // How far ahead the driver stops for the first light, within the lookahead
@@ -847,6 +917,11 @@ struct Decide final            //
   bool changing_ = false;
   bool lights_ = false;  // Whether the network has any.
   bool yields_ = false;  // Whether its junctions have any conflicts.
+  bool walks_ = false;   // Whether its roads have any crosswalks.
+  // By crosswalk: when, in s from now, the last pedestrian on it will be
+  // off it, and the last that has decided to step onto it; 0 if none.
+  std::vector<double> on_;
+  std::vector<double> coming_;
 };
 
 // Each step, each vehicle changes lane if its driver decided to, and moves
@@ -1051,23 +1126,76 @@ class WalkOccupancy final {
 
 // Each step, each pedestrian walks at its own speed, slowing behind the one
 // ahead on its edge, or on its next leg's: so as never to come nearer than
-// half a meter, it walks the gap beyond that in a second at most.
+// half a meter, it walks the gap beyond that in a second at most. At the
+// kerb before a crosswalk it decides whether to cross, and waits there until
+// it may. Where a light stands just before the crosswalk, a pedestrian that
+// complies crosses while the traffic it crosses has red, and only if the red
+// lasts as long as it takes to cross. Elsewhere, or if it does not comply,
+// it crosses when every vehicle coming to the crosswalk would reach it no
+// sooner than its critical gap, its time to cross and its start-up time, as
+// the Highway Capacity Manual has it, or, where vehicles yield, could still
+// stop before it comfortably. Once it decides, it goes.
 struct Pace final              //
     : System<WalkCommand,      //
              const WalkState,  //
              const Walker,     //
              const WalkRoute> {
   using SystemWorld = ProjectedWorld<Pace>;
-  using AllowComponentList = TypeList<WalkState, WalkRoute>;
+  using AllowComponentList = TypeList<WalkState, WalkRoute, LaneState, Driver,
+                                      SignalState, model::SignalPlan>;
 
   static constexpr double SPACE = 0.5;      // m kept to the one ahead.
   static constexpr double HEADWAY = 1.0;    // s to close the rest.
   static constexpr double LOOKAHEAD = 5.0;  // m into the next leg.
+  static constexpr double KERB = 1.5;       // m from the kerb it decides.
+  static constexpr double WAIT = 0.2;       // m from the kerb it waits.
+  static constexpr double GROUP = 3.0;      // m behind one it crosses with.
+  static constexpr double REACH = 200.0;    // m it looks up the road.
 
-  explicit Pace(const Network& network) : network_{&network} {}
+  explicit Pace(const Network& network) : network_{&network} {
+    // Each zone's lanes, back up the road: a lane and how far its start is
+    // from the zone's near edge.
+    std::span<const model::CrosswalkZone> zones = network.walking.zones();
+    for (std::uint32_t z = 0; z < zones.size(); ++z) {
+      first_.push_back(static_cast<std::uint32_t>(upstream_.size()));
+      upstream_.emplace_back(zones[z].lane, zones[z].near);
+      for (std::size_t k = first_.back(); k < upstream_.size(); ++k) {
+        auto [lane, to] = upstream_[k];
+        if (to >= REACH) {
+          continue;
+        }
+        for (const LaneKey& before : network.graph.predecessors_of(lane)) {
+          if (model::find_lane(network.roads, before).type == "driving" &&
+              std::none_of(upstream_.begin() + first_.back(), upstream_.end(),
+                           [&](const auto& u) { return u.first == before; })) {
+            upstream_.emplace_back(before, to + lane_length(network, before));
+          }
+        }
+      }
+      by_crosswalk_.emplace_back(zones[z].crosswalk, z);
+    }
+    first_.push_back(static_cast<std::uint32_t>(upstream_.size()));
+    std::ranges::sort(by_crosswalk_);
+  }
 
-  auto prepare(SystemWorld& world) -> bool {
+  auto prepare(SystemWorld& world, Step step) -> bool {
     occupancy_.collect(world);
+    crossings_ = !network_->walking.zones().empty();
+    if (crossings_) {
+      vehicles_.collect(world, *network_);
+      now_ = step.time.time_since_epoch();
+      std::size_t groups = network_->control.groups().size();
+      aspects_.assign(groups, model::Aspect::GREEN);
+      plans_.assign(groups, nullptr);
+      const auto& plans = world.template store_of<model::SignalPlan>();
+      world.template store_of<SignalState>().for_each(
+          [&](Entity owner, const SignalState& signal) {
+            if (signal.group < groups) {
+              aspects_[signal.group] = signal.aspect;
+              plans_[signal.group] = plans.maybe_component_of(owner);
+            }
+          });
+    }
     return true;
   }
 
@@ -1079,31 +1207,119 @@ struct Pace final              //
     if (!state || !walker || !route || state->leg >= route->legs.size()) {
       return;
     }
+    std::span<const model::WalkEdge> edges = network_->walking.edges();
     double along = state->along.numerical_value_in(model::meter);
     const model::Leg& leg = route->legs[state->leg];
+    double left = edges[leg.edge].length() - along;
     std::optional<double> gap;
-    if (const WalkOccupancy::Walking* ahead =
-            occupancy_.find_ahead(leg, along, self)) {
+    const WalkOccupancy::Walking* ahead =
+        occupancy_.find_ahead(leg, along, self);
+    if (ahead) {
       gap = ahead->along - along;
-    } else if (state->leg + 1 < route->legs.size()) {
-      double left = network_->walking.edges()[leg.edge].length() - along;
-      if (left < LOOKAHEAD) {
-        if (const WalkOccupancy::Walking* next = occupancy_.find_ahead(
-                route->legs[state->leg + 1], -1.0, self)) {
-          gap = left + next->along;
-        }
+    } else if (state->leg + 1 < route->legs.size() && left < LOOKAHEAD) {
+      ahead = occupancy_.find_ahead(route->legs[state->leg + 1], -1.0, self);
+      if (ahead) {
+        gap = left + ahead->along;
       }
     }
     double desired =
         walker->desired_speed.numerical_value_in(model::meter_per_second);
     double speed =
         gap ? std::clamp((*gap - SPACE) / HEADWAY, 0.0, desired) : desired;
+
+    std::uint32_t decided = command.crossing;
+    command = WalkCommand{};
+    if (edges[leg.edge].kind == model::WalkEdge::Kind::CROSSING) {
+      command.crossing = edges[leg.edge].crosswalk;
+      command.on = true;
+      command.clear = left / desired * model::second;
+    } else if (crossings_ && state->leg + 1 < route->legs.size() &&
+               edges[route->legs[state->leg + 1].edge].kind ==
+                   model::WalkEdge::Kind::CROSSING) {
+      const model::WalkEdge& crossing = edges[route->legs[state->leg + 1].edge];
+      // One waiting close behind another goes with it as it steps on.
+      bool go = decided == crossing.crosswalk ||
+                (ahead && *gap <= GROUP &&
+                 ahead->edge == route->legs[state->leg + 1].edge);
+      if (!go && left <= KERB) {
+        go = may_cross(crossing, *walker);
+      }
+      if (go) {
+        command.crossing = crossing.crosswalk;
+        command.clear = (left + crossing.length()) / desired * model::second;
+      } else {
+        // Waits at the kerb.
+        speed =
+            std::min(speed, std::clamp((left - WAIT) / HEADWAY, 0.0, desired));
+      }
+    }
     command.speed = speed * model::meter_per_second;
   }
 
  private:
+  // Whether a pedestrian may step onto `crossing` now.
+  auto may_cross(const model::WalkEdge& crossing, const Walker& walker) const
+      -> bool {
+    double speed =
+        walker.desired_speed.numerical_value_in(model::meter_per_second);
+    double across = crossing.length() / speed;  // s.
+    const std::optional<std::uint32_t>& group =
+        network_->crosswalk_groups[crossing.crosswalk];
+    if (group && walker.complies) {
+      const model::SignalPlan* plan = plans_[*group];
+      return aspects_[*group] == model::Aspect::RED && plan &&
+             std::chrono::duration<double>(plan->keeps_aspect(now_)).count() >=
+                 across;
+    }
+    double critical =
+        across + walker.start_up.numerical_value_in(model::second);
+    auto [first, last] = std::ranges::equal_range(
+        by_crosswalk_, crossing.crosswalk, {},
+        &std::pair<std::uint32_t, std::uint32_t>::first);
+    for (auto it = first; it != last; ++it) {
+      const model::CrosswalkZone& zone = network_->walking.zones()[it->second];
+      for (std::uint32_t k = first_[it->second]; k < first_[it->second + 1];
+           ++k) {
+        auto [lane, to] = upstream_[k];
+        for (const LaneOccupancy::Occupant& vehicle :
+             vehicles_.occupants_of(lane)) {
+          double distance = to - vehicle.along;  // To the near edge.
+          if (lane == zone.lane && distance <= 0.0) {
+            if (vehicle.along - vehicle.length < zone.far) {
+              return false;  // On the crosswalk.
+            }
+            continue;  // Past it.
+          }
+          const model::IntelligentDriver& driver = vehicle.driver->following;
+          double arrival = model::compute_soonest_arrival(
+                               distance * model::meter,
+                               vehicle.speed * model::meter_per_second,
+                               driver.acceleration, driver.desired_speed)
+                               .numerical_value_in(model::second);
+          double comfortable = driver.deceleration.numerical_value_in(
+              model::meter_per_second_squared);
+          bool stops = network_->vehicles_yield &&
+                       vehicle.speed * vehicle.speed / (2.0 * comfortable) <=
+                           distance - 1.0;
+          if (arrival < critical && !stops) {
+            return false;
+          }
+        }
+      }
+    }
+    return true;
+  }
+
   const Network* network_ = nullptr;
   WalkOccupancy occupancy_;
+  LaneOccupancy vehicles_;
+  std::vector<model::Aspect> aspects_;  // By signal group.
+  std::vector<const model::SignalPlan*> plans_;
+  std::vector<std::pair<LaneKey, double>> upstream_;  // By zone.
+  std::vector<std::uint32_t> first_;                  // Each zone's start.
+  std::vector<std::pair<std::uint32_t, std::uint32_t>> by_crosswalk_;
+  std::chrono::nanoseconds now_{};
+  bool crossings_ = false;
 };
 
 // Each step, each pedestrian walks its route at the speed it set, leg after
@@ -1191,12 +1407,12 @@ struct PlaceWalker final       //
 };
 
 using Schedule =
-    SystemList<RunSignals, Decide, Drive, FollowLane, Pace, Walk, PlaceWalker>;
+    SystemList<RunSignals, Pace, Decide, Drive, FollowLane, Walk, PlaceWalker>;
 
 // The schedule's systems on `network`.
 inline auto make_schedule(const Network& network) -> Schedule {
-  return Schedule{RunSignals{},        Decide{network}, Drive{network},
-                  FollowLane{network}, Pace{network},   Walk{network},
+  return Schedule{RunSignals{},        Pace{network},       Decide{network},
+                  Drive{network},      FollowLane{network}, Walk{network},
                   PlaceWalker{network}};
 }
 using Scheduler = framework::Scheduler<World, Schedule>;

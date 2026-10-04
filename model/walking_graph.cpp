@@ -8,6 +8,7 @@
 #include <map>
 #include <optional>
 #include <queue>
+#include <tuple>
 #include <utility>
 
 #include "base/core.hpp"
@@ -107,6 +108,13 @@ class Builder final {
 auto WalkingGraph::edges_at(std::uint32_t node) const
     -> std::span<const std::uint32_t> {
   return std::span{at_}.subspan(first_[node], first_[node + 1] - first_[node]);
+}
+
+auto WalkingGraph::zones_on(const LaneKey& lane) const
+    -> std::span<const CrosswalkZone> {
+  auto [first, last] =
+      std::ranges::equal_range(zones_, lane, {}, &CrosswalkZone::lane);
+  return {first, last};
 }
 
 auto WalkingGraph::find_route(std::uint32_t from, std::uint32_t to) const
@@ -220,12 +228,37 @@ auto build_walking_graph(const RoadNetwork& network, double corner_reach)
       if (!left || !right) {
         continue;
       }
+      auto index = static_cast<std::uint32_t>(graph.crosswalks_.size());
+      double depth = object.length > 0.0 ? object.length : 3.0;
       graph.crosswalks_.push_back(
           Crosswalk{.road = r,
                     .object = o,
                     .s = object.s,
                     .t_from = lane_middle(road, object.s, *right),
-                    .t_to = lane_middle(road, object.s, *left)});
+                    .t_to = lane_middle(road, object.s, *left),
+                    .depth = depth});
+      double s0 = section.s0;
+      double s1 = find_section_end(network, {.road = r, .section = k});
+      for (const std::vector<Lane>* side : {&section.left, &section.right}) {
+        for (const Lane& lane : *side) {
+          if (lane.type != "driving" ||
+              std::abs(lane.id) >= std::abs(lane.id > 0 ? *left : *right)) {
+            continue;
+          }
+          LaneKey key{.road = r, .section = k, .lane = lane.id};
+          // Into the lane, the way it runs.
+          auto into = [&](double s) {
+            return runs_with_s(key) ? s - s0 : s1 - s;
+          };
+          double before = object.s - depth / 2.0;
+          double after = object.s + depth / 2.0;
+          graph.zones_.push_back(CrosswalkZone{
+              .lane = key,
+              .near = runs_with_s(key) ? into(before) : into(after),
+              .far = runs_with_s(key) ? into(after) : into(before),
+              .crosswalk = index});
+        }
+      }
       splits[{.road = r, .section = k, .lane = *left}].push_back(object.s);
       splits[{.road = r, .section = k, .lane = *right}].push_back(object.s);
     }
@@ -346,6 +379,10 @@ auto build_walking_graph(const RoadNetwork& network, double corner_reach)
     }
   }
 
+  std::ranges::sort(
+      graph.zones_, [](const CrosswalkZone& a, const CrosswalkZone& b) {
+        return std::tie(a.lane, a.near) < std::tie(b.lane, b.near);
+      });
   graph.nodes_ = std::move(builder.nodes_);
   graph.edges_ = std::move(builder.edges_);
   std::vector<std::vector<std::uint32_t>> at(graph.nodes_.size());

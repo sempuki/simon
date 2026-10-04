@@ -21,7 +21,9 @@ minor road gives way, with junction priorities and signs; crosswalks.xodr a
 climbing, leaning curve with a crosswalk in its own frame and one in road
 coordinates; light.xodr one lane with a traffic light halfway; crossing.xodr a
 one-way major road crossed by a one-way minor road that gives way; and
-crossroads.xodr four arms meeting with nothing to say who goes first.
+crossroads.xodr four arms meeting with nothing to say who goes first;
+midblock.xodr a straight road, 400 m, with a crosswalk halfway and a light
+each way before it; and zebra.xodr the same without the lights.
 
   pip install numpy
   python application/automotive/reference/make_test_roads.py
@@ -574,6 +576,33 @@ def crossroads():
     return roads + [junction_xml('1', connections)] + turns
 
 
+def midblock(light):
+    """A straight road, 400 m, one lane each way with sidewalks, and a
+    crosswalk at 200 m, far enough from either end that a pedestrian there
+    sees every vehicle that could reach it within its gap; with `light`, a
+    traffic light on each side just before it that a controller groups."""
+    piece = dict(kind='line', s=0.0, x=0.0, y=0.0, hdg=0.0, length=400.0)
+    corners = [(198.0, -LANE, 0.0), (202.0, -LANE, 0.0), (202.0, LANE, 0.0), (198.0, LANE, 0.0)]
+    signals = ''
+    if light:
+        signals = (signal_xml('light_east', 197.0, -(LANE + SIDEWALK + 0.5), True, 'DE',
+                              '1000001', '-1', (-1, -1), name='light east')
+                   + signal_xml('light_west', 203.0, LANE + SIDEWALK + 0.5, True, 'DE',
+                                '1000001', '-1', (1, 1), name='light west')
+                   .replace('orientation="+"', 'orientation="-"'))
+    road = ('  <road name="midblock" id="1" length="400" junction="-1">\n'
+            '    <planView>\n%s    </planView>\n'
+            '    <lanes>\n%s    </lanes>\n'
+            '    <objects>\n%s    </objects>\n'
+            '    <signals>\n%s    </signals>\n  </road>\n'
+            % (geometry_xml(piece), arm_lanes(), crosswalk_xml('walk', 200.0, 0.0, corners, False),
+               signals))
+    roads = [road]
+    if light:
+        roads.append(controller_xml('1', 'midblock', 0, ['light_east', 'light_west']))
+    return roads
+
+
 def document(roads):
     return ('<?xml version="1.0" encoding="UTF-8"?>\n<OpenDRIVE>\n'
             '  <header revMajor="1" revMinor="6" name="simon test" version="1"/>\n'
@@ -607,6 +636,10 @@ def main():
         f.write(document(crossing()))
     with open(os.path.join(roads, 'crossroads.xodr'), 'w') as f:
         f.write(document(crossroads()))
+    with open(os.path.join(roads, 'midblock.xodr'), 'w') as f:
+        f.write(document(midblock(True)))
+    with open(os.path.join(roads, 'zebra.xodr'), 'w') as f:
+        f.write(document(midblock(False)))
     print('wrote', roads)
 
 

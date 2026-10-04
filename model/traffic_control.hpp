@@ -36,6 +36,11 @@ struct SignalPlan final {
   // What the group shows at `time` from the start of the run.
   auto aspect_at(std::chrono::nanoseconds time) const -> Aspect;
 
+  // How long after `time` the group goes on showing what it shows then: to
+  // the end of the run of phases with its aspect, at most a cycle.
+  auto keeps_aspect(std::chrono::nanoseconds time) const
+      -> std::chrono::nanoseconds;
+
   std::vector<Phase> phases;
   std::chrono::nanoseconds offset{};
 };

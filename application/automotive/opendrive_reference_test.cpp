@@ -232,7 +232,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
       CHECK(ours == validities);
     }
     CAPTURE(farthest);
-    CHECK(theirs.size() == 22);
+    CHECK(theirs.size() == 24);
     CHECK(farthest < 1e-12);
   }
 
@@ -272,7 +272,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
       farthest = std::max(farthest, apart.norm());
     }
     CAPTURE(farthest);
-    CHECK(objects.size() == 6);
+    CHECK(objects.size() == 7);
     CHECK(farthest < 1e-12);
   }
 

@@ -435,9 +435,10 @@ Schedule (`application/automotive/simulation_systems.hpp`):
   the same lane is picked each time it is looked ahead to and taken.
 - **The step holds the acceleration** and moves exactly under it, never
   backward: a vehicle that would stop within the step stops where it would.
-- **Merges at junctions are not resolved.** Vehicles on different incoming
-  lanes see each other only once in the same lane, and nothing gives way.
-  Signals, priorities and pedestrians are later work.
+- **Junctions are the tactical layer's.** On its own, IDM sees a vehicle on
+  another incoming lane only once the two share a lane; the
+  [tactical layer](#tactical-layer) gives way at junctions, stops at lights
+  and yields at crosswalks.
 
 `automotive_test` drives a ring of two roads, two lanes each way, and CARLA's
 Town01. On the ring, 40 vehicles circulate for 300 s at 18.4 m/s, never
@@ -450,9 +451,9 @@ vehicles enter 1,573 lanes through its junctions in 120 s, at 10.2 of their
 
 IDM decides how hard to accelerate behind one leader; the tactical layer
 decides where a vehicle must stop, and pedestrians decide when to cross.
-Traffic lights, right of way at junctions and pedestrians walking are
-built; pedestrians deciding when to cross come next (see the
-[Roadmap](#roadmap)).
+Traffic lights, right of way at junctions, pedestrians walking and
+crossing, and vehicles yielding to them are built; OpenSCENARIO's
+controllers and pedestrians come next (see the [Roadmap](#roadmap)).
 
 **Everything a vehicle stops for is a point to stop at.** The tactical layer
 finds the first point ahead where the vehicle must stop, and the vehicle's
@@ -466,7 +467,7 @@ is read and sorted by s along each lane:
 |---|---|---|
 | Stop line | Where a traffic light stands, on each driving lane its orientation and validity hold for | Its group shows red and the driver can stop at all, or yellow and it can stop comfortably |
 | Conflict area | Where a junction's connecting lane crosses or merges with a foe | A foe with priority would arrive within the driver's critical gap |
-| Crosswalk | Where a crosswalk's outline crosses the lane | A pedestrian is on it or has committed to it |
+| Crosswalk | Where a crosswalk's outline crosses the lane | A pedestrian will still be on it when the vehicle arrives, or, where vehicles yield, has decided to step onto it |
 
 - **Zones are model data, not entities.** They never move and are many, so
   they live in a table keyed by lane, as the lane graph does. What changes,
@@ -641,8 +642,7 @@ the world.
   node its seed picks among those it can reach. Pedestrians start at random
   along the sidewalks, by length, at least a meter apart.
 
-For now pedestrians cross on crosswalks without looking and vehicles do not
-yet stop for them; that is step 5. `walking_test` checks:
+`walking_test` checks:
 
 | Check | Result |
 |---|---|
@@ -651,21 +651,54 @@ yet stop for them; that is step 5. `walking_test` checks:
 | Town01's, with no crosswalks | 52 sidewalks, 36 corners, eight pieces, one a block |
 | Every route, against Floyd and Warshall's shortest distances, at the junction and on Town01 | 552 and 984 routes, to 1.1e-13 m |
 | A walker at 1.6 m/s behind one at 0.8 m/s | Settles 1.30 m behind at 0.80 m/s |
-| 2,000 pedestrians' speeds | 1.32 m/s, spread 0.27 m/s |
-| 60 pedestrians for 10 min at the junction | 455 trips, every one walking, none closing within half a meter of one ahead |
+| 2,000 pedestrians' speeds | 1.34 m/s, spread 0.26 m/s |
+| 60 pedestrians for 10 min at the junction, waiting at its lights | 410 trips, every one walking, none closing within half a meter of one ahead |
 
-Planned for step 5, the decisions in full:
+### Crossing
 
-| Layer | Decision | Model |
+A pedestrian decides whether to cross 1.5 m before the kerb, and if not,
+waits at it and decides again each step. Once it decides, it goes.
+
+- **At a light it walks on the road's red** if the red lasts long enough to
+  walk across. Each pedestrian complies with the signal or not, drawn from
+  the scenario's compliance, by default every one; one who does not
+  crosses as at a crosswalk without a light.
+- **Elsewhere it accepts a gap,** as the Highway Capacity Manual has it:
+  the critical gap t_c is the crossing's length over its walking speed
+  plus a start-up time, 2 s by default. It crosses if no vehicle is on the
+  crosswalk and every vehicle up to 200 m up each lane would reach it after
+  t_c, at the soonest its acceleration allows. Where vehicles yield, it
+  also crosses in front of one that can still stop comfortably.
+- **A group goes together.** One waiting within 3 m behind another steps
+  off as that one does, then follows it across single file.
+- **Vehicles stop for it** short of the crosswalk, at the stop-line gap,
+  while it will still be on the crosswalk when they would arrive, with a
+  second to spare. Where vehicles yield, they also stop for one who has
+  decided to step on, unless they are too near to stop. Whether vehicles
+  yield, and which side traffic drives on, are parameters of the network,
+  by default right-hand traffic that yields.
+
+A light governs a crosswalk when a stop line is on one of its lanes within
+15 m before it. `crossing_test` runs a 400 m road with one lane each way, a
+crosswalk halfway and sidewalks, with and without lights for it, and checks
+against the Highway Capacity Manual's pedestrian delays:
+
+| Check | Simulated | Manual |
 |---|---|---|
-| Strategic | Where to go | A destination and the shortest path on the walking graph, from the seed |
-| Tactical | Whether to cross now | At a signal, walk or don't walk, with each person's compliance; elsewhere, gap acceptance against the next vehicle, the critical gap the crossing's length over the walking speed plus a start-up time, as in the Highway Capacity Manual |
-| Operational | How to move | Each person's desired speed, slowing behind the person ahead on the same edge |
+| 600 pedestrians arriving evenly through a 60 s cycle with 27 s of red for the road, waiting (C - g)^2 / 2C, with g the red less the time to walk across | 13.28 s | 13.14 s |
+| The manual's gap rule, against 600 vehicles an hour arriving at random and passing in no time, waiting (e^(q t_c) - q t_c - 1) / q, with t_c 8.7 s | 10.95 s | 10.88 s |
+| 2,000 pedestrians against 300 vehicles an hour each way that do not yield, waiting as the manual's gap rule has it against the vehicles as they passed, each on the crosswalk from its front reaching it to its rear leaving it | 16.52 s | 16.00 s |
+| 300 pedestrians against the same traffic, yielding | Every one crosses, vehicles stop 33 times, none touches a pedestrian |
 
-A pedestrian who commits to a crossing occupies it in the next index, and
-vehicles see a stopped leader there. Whether vehicles yield at an
-unsignalized crosswalk, and which side traffic drives on, are parameters of
-the network, by default right-hand traffic that yields.
+The manual's formula for unsignalized delay assumes vehicles arriving at
+random and passing in no time; that run's vehicles, 595 an hour, would
+give 10.8 s. Vehicles following each other keep their distance, so short
+headways are rarer than at random, which leaves fewer long gaps, and each
+takes half a second to pass. The test therefore applies the manual's rule
+to the gaps as they happened. The 3% left over is pedestrians judging each
+vehicle's arrival by how soon it could get there.
+
+SUMO's pedestrian crossing model has not been compared yet.
 
 ## Viewer
 
@@ -777,8 +810,8 @@ who decide when to cross (see [Tactical layer](#tactical-layer)):
    right; gap acceptance against Harders' rule; first to stop goes first;
    junctions kept clear; merging and parting lanes.
 4. Done: the walking graph, and pedestrians walking routes on it.
-5. Crossing decisions and vehicles yielding, against the Highway Capacity
-   Manual's pedestrian delay and SUMO.
+5. Done: crossing decisions, groups and vehicles yielding, against the
+   Highway Capacity Manual's pedestrian delays.
 6. OpenSCENARIO's signal controllers and pedestrians, against esmini.
 7. The scale benchmark with signals and pedestrians, against SUMO, and the
    viewer.

@@ -60,6 +60,32 @@ auto SignalPlan::aspect_at(std::chrono::nanoseconds time) const -> Aspect {
   return phases.back().aspect;
 }
 
+auto SignalPlan::keeps_aspect(std::chrono::nanoseconds time) const
+    -> std::chrono::nanoseconds {
+  std::chrono::nanoseconds length = cycle();
+  CHECK_PRECONDITION(length > std::chrono::nanoseconds{});
+  std::chrono::nanoseconds into = (time - offset) % length;
+  if (into < std::chrono::nanoseconds{}) {
+    into += length;
+  }
+  // Find the phase in force, then add phases while the aspect holds.
+  std::size_t at = 0;
+  while (into >= phases[at].duration) {
+    into -= phases[at].duration;
+    ++at;
+  }
+  Aspect aspect = phases[at].aspect;
+  std::chrono::nanoseconds left = phases[at].duration - into;
+  for (std::size_t k = 1; k < phases.size(); ++k) {
+    const Phase& next = phases[(at + k) % phases.size()];
+    if (next.aspect != aspect) {
+      return left;
+    }
+    left += next.duration;
+  }
+  return length;  // It always shows this.
+}
+
 auto plan_in_turn(std::size_t groups, std::chrono::nanoseconds green,
                   std::chrono::nanoseconds yellow,
                   std::chrono::nanoseconds all_red) -> std::vector<SignalPlan> {

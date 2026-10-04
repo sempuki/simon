@@ -78,17 +78,28 @@ auto load_network(const std::string& path)
   model::RightOfWay rights = model::build_right_of_way(roads, graph, control);
   model::WalkingGraph walking = model::build_walking_graph(roads);
   std::vector<std::uint32_t> components = walking.find_components();
+  // A crosswalk's light: one on a lane it crosses, within 15 m before it.
+  std::vector<std::optional<std::uint32_t>> groups(walking.crosswalks().size());
+  for (const model::CrosswalkZone& zone : walking.zones()) {
+    for (const model::StopLine& line : control.stop_lines_on(zone.lane)) {
+      if (line.along <= zone.near && line.along >= zone.near - 15.0) {
+        groups[zone.crosswalk] = line.group;
+      }
+    }
+  }
   return Network{.roads = std::move(roads),
                  .graph = std::move(graph),
                  .control = std::move(control),
                  .rights = std::move(rights),
                  .walking = std::move(walking),
-                 .walking_components = std::move(components)};
+                 .walking_components = std::move(components),
+                 .crosswalk_groups = std::move(groups)};
 }
 
 auto is_tactical(const Network& network) -> bool {
   return !network.control.stop_lines().empty() ||
-         !network.rights.conflicts().empty();
+         !network.rights.conflicts().empty() ||
+         !network.walking.zones().empty();
 }
 
 auto build_world(const Scenario& scenario, const Network& network,
@@ -252,7 +263,9 @@ auto build_scenario(const Scenario& scenario, const Network& network,
             .with(PlaceWalker::locate_walker(network, route, state))
             .with(state)
             .with(Walker{.desired_speed = speed * model::meter_per_second,
-                         .seed = seed})
+                         .start_up = scenario.start_up,
+                         .seed = seed,
+                         .complies = random.unit() < scenario.compliance})
             .with(std::move(route))
             .with(WalkCommand{})
             .build());
@@ -272,6 +285,7 @@ Simulation::Simulation(Scenario scenario) : scenario_{std::move(scenario)} {}
 
 auto Simulation::configure() -> engine::PhaseResult {
   RETURN_OR_ASSIGN(Network network, load_network(scenario_.roads));
+  network.vehicles_yield = scenario_.vehicles_yield;
   network_ = std::make_unique<Network>(std::move(network));
   scheduler_ = std::make_unique<Scheduler>(make_schedule(*network_));
   RETURN_IF_UNEXPECTED(build_world(scenario_, *network_, Out(world_)));

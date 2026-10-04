@@ -242,6 +242,21 @@ cc_test(
 )
 
 cc_test(
+    name = "crossing_test",
+    size = "medium",
+    srcs = ["crossing_test.cpp"],
+    copts = COPTS,
+    data = glob(["roads/*.xodr"]),
+    deps = [
+        ":automotive_library",
+        ":testing",
+        "//framework:vocabulary",
+        "//model:collision",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
     name = "signal_test",
     size = "small",
     srcs = ["signal_test.cpp"],

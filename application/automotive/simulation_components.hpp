@@ -52,6 +52,10 @@ struct Network final {
   model::RightOfWay rights;
   model::WalkingGraph walking;
   std::vector<std::uint32_t> walking_components;  // Each node's.
+  // Each crosswalk's signal group, if a light stands just before it, and
+  // whether vehicles yield to pedestrians at crosswalks without one.
+  std::vector<std::optional<std::uint32_t>> crosswalk_groups;
+  bool vehicles_yield = true;
 };
 
 // Where a vehicle is in the network and how fast it goes: its lane, the s of
@@ -235,16 +239,27 @@ struct WalkState final {
   Speed speed = 0.0 * model::meter_per_second;
 };
 
-// A pedestrian's walking speed, as it would walk alone, and its seed, which
-// picks where it goes.
+// A pedestrian's walking speed, as it would walk alone; its start-up time,
+// which with the time to walk across makes the gap it needs to cross; its
+// seed, which picks where it goes; and whether it waits for a light that
+// tells it to.
 struct Walker final {
   Speed desired_speed = 1.34 * model::meter_per_second;
+  model::Time start_up = 2.0 * model::second;
   std::uint64_t seed = 0;
+  bool complies = true;
 };
 
-// How fast a pedestrian walks this step.
+// How fast a pedestrian walks this step, the crosswalk, by its place, it
+// has decided to cross or is crossing, if any, and how soon it will be off
+// it.
 struct WalkCommand final {
+  static constexpr std::uint32_t NONE = ~std::uint32_t{0};
+
   Speed speed = 0.0 * model::meter_per_second;
+  model::Time clear = 0.0 * model::second;
+  std::uint32_t crossing = NONE;
+  bool on = false;  // On the crosswalk already.
 };
 
 namespace archetype {

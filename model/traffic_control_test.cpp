@@ -56,6 +56,10 @@ TEST_CASE("TrafficControl") {
     CHECK(plan.aspect_at(54s) == Aspect::RED);
     CHECK(plan.aspect_at(55s) == Aspect::GREEN);
     CHECK(plan.aspect_at(0s) == Aspect::RED);  // Before the offset too.
+    CHECK(plan.keeps_aspect(5s) == 20s);
+    CHECK(plan.keeps_aspect(26s) == 2s);
+    CHECK(plan.keeps_aspect(30s) == 25s);
+    CHECK(plan.keeps_aspect(4s) == 1s);
   }
 
   SECTION("ShouldGiveOneGroupGreenAtATimeGivenTurns") {

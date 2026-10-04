@@ -48,6 +48,11 @@ struct Scenario final {
   // Free walking speeds, normal, clipped to 0.5 to 2.5 m/s: Weidmann's.
   Speed walking_speed = 1.34 * model::meter_per_second;
   Speed walking_spread = 0.26 * model::meter_per_second;
+  // The share of pedestrians that wait for a light, and the start-up time
+  // that with the time to walk across makes the gap a pedestrian needs.
+  double compliance = 1.0;
+  model::Time start_up = 2.0 * model::second;
+  bool vehicles_yield = true;  // At crosswalks without a light.
   double speed_spread = 0.1;
   Duration green = std::chrono::seconds{30};
   Duration yellow = std::chrono::seconds{3};
