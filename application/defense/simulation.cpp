@@ -1,6 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-#include "application/missile/simulation.hpp"
+#include "application/defense/simulation.hpp"
 #include "framework/vocabulary.hpp"
 
 #include <algorithm>
@@ -10,7 +10,7 @@
 #include <numbers>
 #include <optional>
 
-namespace simon::missile {
+namespace simon::defense {
 
 auto build_world(const Scenario& scenario, Out<World> world)
     -> std::expected<void, framework::Status> {
@@ -215,17 +215,17 @@ auto destruct_interceptors(const Sector& sector, InOut<World> world)
 
 auto Simulation::hold_weapons(const Sector& sector)
     -> std::expected<std::size_t, framework::Status> {
-  return missile::hold_weapons(sector, InOut(world_));
+  return defense::hold_weapons(sector, InOut(world_));
 }
 
 auto Simulation::free_weapons(const Sector& sector)
     -> std::expected<std::size_t, framework::Status> {
-  return missile::free_weapons(sector, {}, InOut(world_));
+  return defense::free_weapons(sector, {}, InOut(world_));
 }
 
 auto Simulation::destruct_interceptors(const Sector& sector)
     -> std::expected<std::size_t, framework::Status> {
-  return missile::destruct_interceptors(sector, InOut(world_));
+  return defense::destruct_interceptors(sector, InOut(world_));
 }
 
 // Holds and frees cannot be refused: launchers allow WeaponsHold, the store
@@ -233,7 +233,7 @@ auto Simulation::destruct_interceptors(const Sector& sector)
 // held or freed.
 auto Simulation::start_hold(TimePoint now, std::size_t hold) -> void {
   const TimedHold& order = scenario_.holds[hold];
-  auto held = missile::hold_weapons(order.sector, InOut(world_));
+  auto held = defense::hold_weapons(order.sector, InOut(world_));
   CHECK_INVARIANT(held.has_value());
   events_.start_timer(now + order.lasting, [this, hold](TimePoint expiry) {
     events_.publish<WeaponsHoldExpired>(expiry,
@@ -249,7 +249,7 @@ auto Simulation::end_hold(TimePoint now, const WeaponsHoldExpired& expired)
       in_force.push_back(order.sector);
     }
   }
-  auto freed = missile::free_weapons(scenario_.holds[expired.hold].sector,
+  auto freed = defense::free_weapons(scenario_.holds[expired.hold].sector,
                                      in_force, InOut(world_));
   CHECK_INVARIANT(freed.has_value());
 }
@@ -266,4 +266,4 @@ auto Simulation::remaining_interceptors() const -> std::uint32_t {
   return remaining;
 }
 
-}  // namespace simon::missile
+}  // namespace simon::defense

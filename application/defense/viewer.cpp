@@ -1,8 +1,8 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-// Watches a missile scenario in real time:
+// Watches a defense scenario in real time:
 //
-//   bazel run //application/missile:viewer -- [seed] [--scale=N]
+//   bazel run //application/defense:viewer -- [seed] [--scale=N]
 //       [--frames=N] [--screenshot=PATH]
 //
 // Space pauses and resumes; Esc or Ctrl+Q quits. The map pans with the left
@@ -21,7 +21,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "application/missile/simulation.hpp"
+#include "application/defense/simulation.hpp"
 #include "application/viewing.hpp"
 #include "base/core.hpp"
 #include "engine/driver.hpp"
@@ -29,7 +29,7 @@
 #include "imgui/imgui.h"
 #include "implot/implot.h"
 
-namespace simon::missile {
+namespace simon::defense {
 namespace {
 
 using namespace std::chrono_literals;
@@ -90,7 +90,7 @@ class Viewer final {
     session_->tick();
     notice_disappearances();
     viewing::draw_window(
-        "Missile", 280.0f * scale_, [&] { draw_controls(); },
+        "Defense", 280.0f * scale_, [&] { draw_controls(); },
         [&] { draw_map(); });
   }
 
@@ -296,15 +296,15 @@ class Viewer final {
 };
 
 }  // namespace
-}  // namespace simon::missile
+}  // namespace simon::defense
 
 auto main(int argc, char** argv) -> int {
   using namespace simon;
-  viewing::WindowOptions options{.title = "Missile"};
+  viewing::WindowOptions options{.title = "Defense"};
   std::vector<std::string_view> arguments =
       viewing::parse_window_options(argc, argv, InOut(options));
   auto seed =
       static_cast<std::uint64_t>(viewing::parse_integer(arguments, 0, 1));
   return viewing::run(
-      options, [&](float scale) { return missile::Viewer{seed, scale}; });
+      options, [&](float scale) { return defense::Viewer{seed, scale}; });
 }

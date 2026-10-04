@@ -3,8 +3,10 @@
 simon is a toolkit for building entity-component simulations, plus the
 applications that drive its development.
 
-This document records the architecture, the decisions behind it, and the
-roadmap. Update it when a decision changes.
+This document records the framework's architecture, the decisions behind
+it, and its roadmap. Update it when a decision changes. Each application's
+design, and its comparisons with other simulators, are in that
+application's own `design.md` (see [Applications](#applications)).
 
 ## Goals
 
@@ -24,9 +26,9 @@ element, an archetype's components or a trait. It may be slower for whoever
 uses it, but a simulation that does not use it runs no slower, holds no more
 bytes per entity and compiles no more code. Such features add their own types
 instead of fields to shared ones (`Step`, `Entity`, `Kinematics`), keep no
-world-wide bookkeeping, and live in their own Bazel targets. missile uses none
-of them, so `missile_benchmark` and `bytes_per_entity_v` check the rule: a
-feature missile does not use must not change either.
+world-wide bookkeeping, and live in their own Bazel targets. defense uses none
+of them, so `defense_benchmark` and `bytes_per_entity_v` check the rule: a
+feature defense does not use must not change either.
 
 ## How we work
 
@@ -303,7 +305,7 @@ Times are nanoseconds per live entity (iterate) or per random lookup.
   slower at 75% churn from 100,000 entities up.
 - **Lookup** is 10 to 35% faster in the stable-slot store, which saves one load.
 
-Systems iterate far more than they look up, and a missile run is mostly agents
+Systems iterate far more than they look up, and a defense run is mostly agents
 dying, so the dense store wins. Run the benchmark with
 `bazel run -c opt //framework:component_store_benchmark`.
 
@@ -470,7 +472,7 @@ the archetype's segment):
 | 1,000,000 | 6.03 | 13.46 | 5.18 | 5.54 | 5.17 |
 
 A required sibling costs what a handle or a structural walk costs. Over 3,000
-steps at 10,000 drones, the missile step takes 0.66 ms with segments, against
+steps at 10,000 drones, the defense step takes 0.66 ms with segments, against
 0.738 ms with a lookup per sibling: `Integrate` 0.041 against 0.060,
 `TriggerWarheads` 0.070 against 0.105 and `SteerRedDrones` 0.067 against
 0.078. A segmented walk has more fixed cost than an array, so `ApplyBlasts`
@@ -722,7 +724,7 @@ erase types internally (a query, a set of archetypes), and the caller never
 sees those details. What leaves the builder is always a list of typed commands,
 so nothing is lost.
 
-Domain builders extend the same grammar with verbs of their own. Missile builds
+Domain builders extend the same grammar with verbs of their own. Defense builds
 each defended site with one:
 
 ```cpp
@@ -1156,7 +1158,7 @@ using Blasts  = SystemList<TriggerWarheads, ApplyBlasts, ExpireBlasts>;
 
 // Application schedules.
 using HelloSystems   = SystemList<ApplyWind, Motion, DetectCollisions>;
-using MissileSystems = SystemList<Sensing, ProposeEngagements, ResolveEngagements,
+using DefenseSystems = SystemList<Sensing, ProposeEngagements, ResolveEngagements,
                                LaunchInterceptors, GuideInterceptors, SteerRedDrones,
                                Motion, Blasts, CheckOutcome>;
 ```
@@ -1297,7 +1299,7 @@ using World = framework::World<
     the one description of how a configuration makes a world.
   - Applications hold their world as a member and build it in the `configure`
     phase, so a plan too big for a world fails that phase with the builder's
-    Status: missile's `build_world(scenario, Out(world))` says how many of each
+    Status: defense's `build_world(scenario, Out(world))` says how many of each
     archetype a scenario holds.
 - **The archetype list says what the world can create,** and orders each
   store's segments. It is checked against the component list at compile time:
@@ -1354,9 +1356,9 @@ last sync. Queries are not const on the world, because they may rebuild.
 
 The grid is also a toolkit class that a system can own over positions that are
 not the world's spatial component. `ProposeEngagements` indexes track
-estimates this way (see [missile](#missile)).
+estimates this way (see [defense](../application/defense/design.md)).
 
-Measured with the missile benchmark over the same 100 steps at 100,000 drones
+Measured with the defense benchmark over the same 100 steps at 100,000 drones
 (ms per step):
 
 | | Total | ScanRadars | ProposeEngagements |
@@ -1408,7 +1410,7 @@ with 250 m cells, and 0.021 against 0.054 at 10,000. The radar index's 4 km
 cells are as good as the chosen size. The world's own index sizes
 itself the same way unless `cells_of` fixes it.
 
-Under contention (`missile_benchmark --contend=N`, N threads each streaming
+Under contention (`defense_benchmark --contend=N`, N threads each streaming
 over 256 MB), over 200 steps including the first radar scan, ms per step and
 the slowdown against an idle machine:
 
@@ -1439,7 +1441,7 @@ query finds a red drone whether red is simulated locally or remotely.
 #### Several worlds
 
 A world is an object, so a process can hold several. One use stands out for
-the missile application: the blue side's track picture as its own world, holding tracks built
+the defense application: the blue side's track picture as its own world, holding tracks built
 from sensor reports and queried the same way as ground truth. It is a natural
 home for perception error later.
 
@@ -1471,7 +1473,7 @@ A run is reproducible from its scenario and seed. That requires:
 
 The applications are examples of how to use the framework, so they follow
 these practices, and the framework tries to make each one the easy path. They
-come from measuring the missile simulation at 100,000 drones on an idle and a
+come from measuring the defense simulation at 100,000 drones on an idle and a
 contended machine (see [Indexes](#indexes)). At scale the simulation is bound
 by memory bandwidth, so most of them are about the bytes each entity touches
 per step.
@@ -1521,13 +1523,13 @@ the few things near it, never "for each X, visit every Y".
   own `SpatialIndex` for other positions,** as `ProposeEngagements` does for
   track estimates. Let the index size its cells: built without a cell size,
   it sizes them to the points at every rebuild. Hand-picked sizes were wrong
-  both ways in missile: cells a quarter of the radar range made `UpdateTracks`
+  both ways in defense: cells a quarter of the radar range made `UpdateTracks`
   twice as slow, and `ProposeEngagements`' 250 m cells made it 2.4 times
   slower than cells sized to its tracks.
 - **Invert a loop when the side being written is the side with sparse work.**
   A sensor that visits every target in range, to change a few of them, is the
   inverted loop: the targets that need changing should ask the sensors. In
-  missile, `DetectDrones` lets each untracked drone ask an index of the radars
+  defense, `DetectDrones` lets each untracked drone ask an index of the radars
   that scanned, then create its own track.
 
 ### Do nothing on steps with nothing to do
@@ -1629,7 +1631,7 @@ segment and no entity branches on how accurate it is:
 
 | Level | State | Use |
 |---|---|---|
-| Kinematic | `Kinematics` and a commanded acceleration in `Control` | Crowds, distant traffic, missile's drones |
+| Kinematic | `Kinematics` and a commanded acceleration in `Control` | Crowds, distant traffic, defense's drones |
 | Point-mass flight path | Above, plus speed, flight-path angle, heading and bank that follow commands with a lag | Most aircraft and missiles |
 | 6-DOF | Above, plus attitude, body rates and full aerodynamics, often under `Continuous` | The few entities whose handling matters |
 
@@ -1649,13 +1651,13 @@ practices above already give:
 - Packing several components into one struct to keep them together.
 - Giving up units or `double` for speed.
 
-### Missile follows these practices
+### Defense follows these practices
 
-The missile simulation follows these practices, and measures what they are
+The defense simulation follows these practices, and measures what they are
 worth against a layout that does not:
 
 - **`Kinematics` is position and velocity, 48 bytes.** Orientation is a
-  separate `Orientation` component, which nothing in missile needs, and the
+  separate `Orientation` component, which nothing in defense needs, and the
   commanded acceleration is in `Control`. With both inside, it is 112 bytes.
 - **`Track` is three components its archetype requires:** `Track` (target and
   when it was last seen, 16 bytes), `Estimate` (position and velocity, 48) and
@@ -1692,7 +1694,7 @@ scan then runs out of entity capacity and tracks 5,000 of 10,000 drones.
 `framework::bytes_per_entity_v<System>` gives the bytes a system's loop can
 read per entity: the owner, the driving component and every other component it
 names. It is an upper bound, since a sibling the entity's archetype cannot have
-costs nothing, and reads of other entities come on top. `missile_benchmark`
+costs nothing, and reads of other entities come on top. `defense_benchmark`
 prints it beside each system's time:
 
 | System | B/entity | System | B/entity |
@@ -2024,7 +2026,7 @@ entity created. It is not for anything that happens every step, which belongs
 in components.
 
 Events are delivered in time order, ties in publish order, with the event's own
-time. simon's current `EventQueue` already does this. missile's timed weapons
+time. simon's current `EventQueue` already does this. defense's timed weapons
 holds use it: a timer starts each hold, and a second timer raises
 `WeaponsHoldExpired` when it ends.
 
@@ -2071,13 +2073,13 @@ simon/
   format/        Readers from files into model/ and scenario/ data: OpenDRIVE, OpenSCENARIO, tire
                  property files, converted aircraft
   scenario/      Scenarios and parameter distributions as OpenSCENARIO describes them, and the player that runs their storyboards
-  application/
+  application/   Each with a README.md of its results and a design.md
     hello/       Two bouncing balls, the first application
-    missile/     Red drones against blue radars, launchers and interceptors
-    aeronautic/  Aircraft flying routes, at several fidelity levels, checked against JSBSim
-    automotive/  Traffic, vehicle dynamics and scenarios on OpenDRIVE roads, checked against open references
+    defense/     Red drones against blue radars, launchers and interceptors
+    aeronautic/  Aircraft flying routes, at several fidelity levels
+    automotive/  Traffic, vehicle dynamics and scenarios on OpenDRIVE roads
   tools/         Offline converters, such as JSBSim aircraft to simon's data
-  documents/     This document
+  documents/     This document, the framework's design
   2nd_party/lib  Shared core libraries (submodule)
   3rd_party/     Every outside library, by alias, and vendored data with its license: CARLA's Town01,
                  Chrono's tire, esmini's scenarios, JSBSim's aircraft
@@ -2093,1209 +2095,16 @@ player keeps a storyboard's states from step to step. `scenario/` depends on
 
 ## Applications
 
-### hello
+Each application keeps a `README.md` of what it shows, with the commands
+that check it, and a `design.md` of how it is built and how it compares with
+other simulators of its domain:
 
-Two balls under gravity and wind that stop when they collide. It is the
-smallest complete use of the architecture: a handful of components, a motion
-schedule, a collision system and a real-time driver.
-
-### missile
-
-Red drones fly toward a protected asset. Blue radars track them, blue launchers
-fire interceptors, and the run ends when red is defeated or the asset is
-destroyed. `bazel run //application/missile -- <seed>` runs one scenario as
-fast as possible and prints the outcome.
-
-Components (`application/missile/simulation_components.hpp`):
-
-| Component | Holds |
+| Application | Design |
 |---|---|
-| `Kinematics`, `Control` | From `model/`: position and velocity, and the commanded acceleration |
-| `Health` | Hit points |
-| `Warhead` | Fuse distance, blast radius, damage |
-| `Blast` | Radius, damage, the warhead's Name; lives for one step |
-| `Target` | What a red drone (the asset) or an interceptor (a drone) flies at |
-| `RedDrone` | Cruise speed, agility |
-| `Tracked` | Marks a red drone that has a track, and names the track |
-| `Asset` | Marks the protected asset |
-| `Radar` | Range, a `RateGate` for the scan, whether it scanned this step |
-| `Track` | Target entity and when a radar last saw it |
-| `Estimate` | A track's estimated position and velocity |
-| `Engagement` | The launcher engaging a track, if any, and until when |
-| `Launcher` | Range, inventory, reload time, ready time, this step's proposal |
-| `WeaponsHold` | Marks a launcher an operator has held; launchers allow it |
-| `Interceptor` | Navigation gain, speed, agility, seeker range, flight time |
-
-Each component has an archetype in `missile::archetype` (asset, radar,
-launcher, red drone, interceptor, track, blast).
-
-Tracks are entities, with `Track`, `Estimate` and `Engagement` required by
-their archetype. A drone creates its own track when a scanning radar covers it,
-tracks update themselves from the radars that scanned their target, launchers
-engage them, and later they are what an interop layer would publish.
-
-Interceptors and red drones both carry a `Warhead`. An interceptor reaching its
-target and a drone reaching the asset are the same event: a blast, applied to
-every `Health` within its radius.
-
-Schedule (`application/missile/simulation_systems.hpp`):
-
-| System | Does |
-|---|---|
-| `ScanRadars` | Each radar decides whether its scan fires this step |
-| `DetectDrones` | Each untracked red drone that a scanning radar covers creates its track and marks itself `Tracked`. Skips steps without a scan. |
-| `UpdateTracks` | Each track updates its own estimate from a radar that scanned its target. Radars are perfect for now. Skips steps without a scan. |
-| `DropStaleTracks` | Destroys tracks whose target is gone or unseen for 5 s, and unmarks a surviving target |
-| `ProposeEngagements` | Each ready launcher with inventory and no `WeaponsHold` proposes the nearest unengaged track in range |
-| `ResolveEngagements` | Each unengaged track accepts the nearest launcher that proposed it, for 30 s |
-| `LaunchInterceptors` | Launchers whose proposal was accepted build an interceptor under themselves, aimed at the track |
-| `GuideInterceptors` | Proportional navigation plus speed hold into `Control`. Retargets the nearest red drone within seeker range when the target is gone; self-destructs when there is none or its flight time is up. |
-| `SteerRedDrones` | Steers drones at their target at cruise speed into `Control` |
-| `Motion` | Integrates `Control` into `Kinematics` |
-| `TriggerWarheads` | A warhead within fuse distance of its target creates a Blast and destroys itself |
-| `ApplyBlasts` | Every `Health` inside a blast takes its damage, and is destroyed at zero |
-| `ExpireBlasts` | Destroys every blast; they live for one step |
-
-Operator commands (`application/missile/simulation.hpp`) are query forms. Each
-selects what it applies to, changes all of it or none, and returns how many
-entities it affected:
-
-```cpp
-// Holds every launcher in a sector, so none engages until freed.
-world->change()
-    .each<archetype::Launcher>()
-    .within(Kinematics{.position = sector.center}, sector.radius)
-    .lacking<WeaponsHold>()  // Already held, or held by a pending command.
-    .attach(WeaponsHold{})
-    .build();
-```
-
-`free_weapons` detaches `WeaponsHold` from the held launchers in a sector,
-except those inside sectors it is told to keep held, and
-`destruct_interceptors` destroys every interceptor in flight in one. A hold is
-a component, so holding a launcher is a structural change, and
-`ProposeEngagements` reads it as an optional sibling. `Simulation` forwards
-each command to its world. Like every builder, a command applies at the next
-sync point.
-
-A scenario can order weapons holds ahead of time (`Scenario::holds`), which
-exercises the event queue:
-
-```cpp
-scenario.holds = {TimedHold{.sector = {.radius = 1000.0 * meter},
-                            .from = TimePoint{20s}, .lasting = 30s}};
-```
-
-`configure` starts a timer for each hold. When it fires, the simulation holds
-the sector and starts a second timer for `lasting`. That timer publishes
-`WeaponsHoldExpired`, and the simulation's subscriber frees the sector, except
-where another hold is still in force, so overlapping holds end with the last of
-them. `Simulation::step` delivers the events due by the step's time before it
-runs the schedule, and `Simulation::events()` lets anyone else subscribe.
-
-Launchers under another hold are never freed, rather than freed and held again
-in the same batch, so nothing churns through the `WeaponsHold` store.
-
-Decisions made while building it:
-
-- **The outcome is decided by the simulation, not a system.** Systems cannot
-  stop a run, so `Simulation::step` checks the world after each step: red wins
-  when the asset is gone, blue when no red drones remain.
-- **No `Team` component yet.** Red is already expressed by `RedDrone`, and
-  nothing needs a team separately.
-- **Engagements expire.** A track stays engaged for about an interceptor's
-  flight time, so a missed intercept frees it to be engaged again.
-- **Retargeting policy:** an interceptor whose target is gone takes the nearest
-  red drone within its seeker range, and otherwise self-destructs.
-- **Reload is a ready time, not a `RateGate`,** because it means "not before
-  time T", not periodic work.
-- **Randomness is `model::Random`,** which converts `std::mt19937_64`'s raw
-  bits itself: the engine's output is fixed by the standard, but the standard
-  distributions are not, so this is the same on every platform.
-- **Spatial queries use the world's index.** `GuideInterceptors` retargets with
-  `nearest()`. Detection and track updates ask an index of the radars that
-  scanned this step (`ScanningRadars`).
-- **Tracks are not in the world's spatial index.** A track's position is blue's
-  estimate. Giving tracks a `Kinematics` would have them coast between radar
-  updates, but `UpdateTracks` would then write track `Kinematics` while reading
-  its target's, which the rule against writing and reading one component
-  forbids. `ProposeEngagements` owns a `SpatialIndex` over the estimates
-  instead, rebuilt on the first query of each step.
-- **`UpdateTracks` indexes the radars that scanned,** in `prepare`, so a track
-  checks only the radars near its target.
-- **Radars scan together unless a site asks otherwise.** `SiteBuilder::
-  scanning_in_turn()` (`Scenario::radars_in_turn`, `missile_benchmark
-  --in-turn`) staggers each site's radars over the scan period. At 100,000
-  drones over 500 steps it lowers the slowest step from 137 to 105 ms, but
-  raises the average from 2.21 to 2.89 ms. Every step with a scan walks every
-  track and every untracked drone, and in turn there are ten such steps per
-  period instead of one: `UpdateTracks` goes from 0.19 to 0.90 ms per step.
-  The slowest step barely moves because it is the first scan, when every
-  drone creates its track, and each site's first radar still covers most of
-  them. Marking the covered tracks in `prepare`, from the scanning radars'
-  side, only brought `UpdateTracks` back to 0.76 ms, so it was not kept.
-- **Systems name their projected world** with a member alias,
-  `using SystemWorld = ProjectedWorld<ThisSystem>;`, so builder
-  calls with explicit template arguments, such as `detach<Tracked>()`, need no
-  `template` keyword. It is `SystemWorld`, not `LocalWorld`, because "local"
-  already means the local Cartesian frame and, across processes, what this
-  process owns as against replicas.
-
-The test runs whole scenarios under `BatchDriver` (blue wins by default, red
-wins without launchers or with too few interceptors, and the same seed repeats
-exactly) and each rule on a small world (one track per drone however many radars
-see it, one launch per contested track, reload, retargeting, self-destruct,
-blast damage).
-
-`bazel run //application/missile:viewer -- <seed>` watches a scenario under
-`RealTimeDriver`. An ImPlot map shows the asset, radars and launchers with
-their coverage, red drones, interceptors, tracks at their estimated positions,
-and explosions. A side panel shows time, counts, the asset's health and the
-outcome, with pause (also Space), a speed slider and restart with a seed.
-Blasts last a single step, so the viewer never sees one; it draws an
-explosion wherever a drone or interceptor disappears. That is presentation
-only and changes nothing in the simulation.
-
-### aeronautic
-
-Aircraft fly closed routes of waypoints under an autopilot, spread over an
-area that grows with their number so traffic density stays the same. It is
-the application for flight control algorithms of the class JSBSim runs, and
-it shows fidelity as an opt-in: most aircraft fly a single-pass model, and
-those whose archetype opts in are integrated with Runge-Kutta 4.
-`bazel run //application/aeronautic -- <aircraft> <precise> <seed>` flies one
-scenario headless and prints how many waypoints were reached.
-
-The code is in three layers:
-
-| Layer | Holds |
-|---|---|
-| `framework/continuous.hpp` | `Continuous`, generic over any `ContinuousState` |
-| `model/` | `flight_path.hpp` (the point-mass state, its rate equations, a single-pass integrator and autopilot laws), `atmosphere.hpp`, `control.hpp` (lags, rate limits, PI control, tables) |
-| `application/aeronautic/` | The aircraft components and archetypes, the systems, the scenario and the simulation |
-
-The model is point-mass flight path: an `AirState` of position, speed,
-flight-path angle and heading, flown by commanding load factor, bank and
-throttle. Lift is a load factor times weight, drag comes from a drag polar,
-and thrust falls with the standard atmosphere's density. The atmosphere's
-layers are in geopotential altitude, as the 1976 standard and JSBSim have
-them, so its density is within 10^-5 of JSBSim's up to 20 km. `AirState` is the
-world's spatial component, so no copy of the position is kept anywhere else.
-
-Components (`application/aeronautic/simulation_components.hpp`):
-
-| Component | Holds |
-|---|---|
-| `AirState` | From `model/`: position, speed, flight-path angle, heading |
-| `AirStateRate` | Its rate; only precise aircraft have it |
-| `FlightControls` | The load factor, bank and throttle the airframe has actually reached |
-| `Commands` | What the autopilot commands |
-| `Airframe` | What the dynamics read: mass, wing area, drag polar, thrust |
-| `Handling` | What the autopilot and actuators read: limits, roll rate, lags |
-| `Autopilot` | The altitude, heading and speed it holds, and its throttle integral |
-| `Route` | Four waypoints, the speed to fly them, the next one and how many were reached |
-
-Schedule (`application/aeronautic/simulation_systems.hpp`):
-
-| System | Does |
-|---|---|
-| `FollowRoute` | Once a second, aims each autopilot at its route's next waypoint, and moves on within 3 km of it |
-| `FlyAutopilot` | Ten times a second, turns targets into commands: bank for heading, load factor for altitude through a commanded flight-path angle, throttle for speed by PI control |
-| `Actuate` | Every step, moves the controls toward the commands through exact lags and a roll-rate limit |
-| `Fly` | Every step, advances each single-pass aircraft in one semi-implicit pass |
-| `Precise` | `Continuous<RungeKutta4, TypeList<AirState>, SystemList<PointMassRates>>` for precise aircraft |
-
-Decisions made while building it:
-
-- **Fidelity is per archetype.** `Aircraft` and `PreciseAircraft` require
-  the same components, and the precise one also requires `AirStateRate`.
-  `Continuous` integrates only archetypes that can have the rate, and `Fly`
-  excludes the rate, so the runner skips the precise segment whole. Naming
-  the rate as an optional sibling and returning when it is present would cost
-  a call per precise aircraft under Clang, which does not inline the call
-  operator: 0.23 ms per step at 100,000, against 0.06 ms with GCC. Excluding
-  costs nothing under both.
-- **Guidance and control run at their own rates, gated once per system** in
-  `prepare`, so the steps in between skip their loops. Per-entity staggered
-  gates would spread the work, at the cost of a gate in each component and a
-  check per entity per step.
-- **Speed comes first.** The steepest climb the autopilot commands shrinks as
-  the aircraft falls below its target speed, and is zero 20 m/s below it, so
-  a long climb at altitude never trades away more speed than that.
-- **No ground and no stall.** Routes stay between 3 and 9 km. Wind is opt
-  in (see [Wind and turbulence](#wind-and-turbulence)).
-
-The test checks the autopilot (holding altitude, speed and heading, and
-turning the short way to a waypoint behind), that a closed route is flown,
-that a single-pass and a Runge-Kutta aircraft flying the same route end within
-100 m of each other after five minutes, and that a scenario repeats exactly
-from its seed. `accuracy_test` compares the model with JSBSim (see
-[Accuracy against JSBSim](#accuracy-against-jsbsim)).
-
-`bazel run -c opt //application/aeronautic:aeronautic_benchmark` flies 500 steps of
-20 ms at each population, once with every aircraft on the single-pass model
-and once with every aircraft on Runge-Kutta 4. GCC, ms per step:
-
-| Aircraft | Single pass | ns per entity-step | Runge-Kutta 4 | ns per entity-step |
-|---:|---:|---:|---:|---:|
-| 1,000 | 0.06 | 59 | 0.17 | 170 |
-| 10,000 | 0.63 | 63 | 1.89 | 189 |
-| 100,000 | 6.27 | 63 | 19.2 | 192 |
-| 100,000, 4 contending threads | 7.25 | 73 | 32.1 | 321 |
-
-- **The single-pass model is bound by computation.** Cost per aircraft is
-  nearly flat from 1,000 to 100,000, and four contending threads slow it only
-  1.2 times. `Fly` is three quarters of the step, and three `sincos` calls are
-  most of `Fly`.
-- **Runge-Kutta 4 costs 3.1 times as much,** and is bound by memory under
-  contention (1.7 times slower), because its copies of the start state and
-  four stages' rates stream through memory every step.
-- **The single pass takes 6.27 ms and Runge-Kutta 4 19.2 ms.** The rates
-  take each sine and cosine once, and `fly` gets the new velocity from the
-  rate's derivative, not more trigonometry, and its direction's cosine by a
-  square root rather than `hypot`. `wrap` calls `std::remainder` only when a heading
-  leaves [-π, π]. `StandardAirTable`, the atmosphere tabulated every 100 m of
-  geopotential altitude (within a few parts in 10^5), stands in for the
-  power and exponential of `standard_air`, which would cost 6% more in `Fly`
-  and 20% more in Runge-Kutta 4, which evaluates the air four times.
-- **Clang is about 13% slower** (8.3 and 22.7 ms at 100,000).
-
-#### Accuracy against JSBSim
-
-`accuracy_test` measures how far the point-mass model drifts from JSBSim's
-737. `reference/jsbsim_737.py` trims the 737 at 6000 m and 200 m/s and flies
-it for 640 s under a small autopilot of its own. It flies level, turns at 30°
-of bank, climbs at 3°, makes a descending turn at 25° and accelerates to
-220 m/s. Every 0.2 s it records where the 737 is, and the load factor, bank
-and throttle a point mass needs to fly the same path. The test replays those
-controls through `Fly` and `Precise` and compares the paths. Both see the same
-controls, so simon's autopilot and actuators play no part, and the drift
-belongs to the model and the integrator.
-
-The replay keeps three effects out of the comparison:
-
-- **The Earth.** Load factor and bank come from the rates of flight-path angle
-  and heading that the 737 flew, so simon's flat, non-rotating Earth sees the
-  same turns. Taken from JSBSim's forces instead, they need 0.056 m/s² less
-  lift on average than a flat Earth expects. Gravity falling with altitude is
-  0.012 m/s² of that, and the Earth's rotation and curvature most of the
-  rest. Replayed open loop, that error puts the aircraft 10 km off in
-  altitude after 640 s. In a running simulation the autopilot closes the loop
-  and absorbs it.
-- **Fuel.** The 737 burns 1.2% of its mass, and `Airframe` has a fixed one,
-  so the throttle replays thrust per kilogram of the starting mass.
-- **The engine.** The throttle is JSBSim's thrust along the velocity, scaled
-  to simon's thrust law, so drag is the only force left to simon.
-
-The airframe is the 737's mass and wing area, with a drag polar
-CD = CD0 + K1 CL + K CL^2 fitted to 100 JSBSim trims over the scenario's
-envelope (3 to 9 km, 160 to 240 m/s, level and in turns up to 45° of bank).
-CD0 is 0.0156, K1 is 0.0302 and K is 0.0519, and the worst trim is 3.4% off.
-The largest drift over the flight, which covers 130 km:
-
-| Step | Model | Position | Altitude | Speed | Heading |
-|---:|---|---:|---:|---:|---:|
-| 20 ms | Single pass | 472 m | 53 m | 2.0 m/s | 0.7° |
-| 20 ms | Runge-Kutta 4 | 476 m | 52 m | 2.0 m/s | 0.7° |
-| 200 ms | Single pass | 434 m | 65 m | 1.8 m/s | 0.5° |
-| 200 ms | Runge-Kutta 4 | 470 m | 52 m | 2.0 m/s | 0.7° |
-| 1 s | Single pass | 436 m | 100 m | 2.5 m/s | 0.9° |
-| 1 s | Runge-Kutta 4 | 475 m | 55 m | 2.2 m/s | 0.9° |
-
-- **The drag polar is most of the drift.** Its speed error changes the turn
-  rate, which bends the path away. A Python copy of the replay that takes
-  JSBSim's own drag drifts 55 m, so the equations and integrators are not
-  the limit.
-- **The polar has a linear term.** The 737's least drag falls at a lift
-  other than zero, as a cambered wing's does, so CD0 + K CL^2 fits the trims
-  only to 9.7% and drifts 1.8 km. K1 costs one multiply-add a step, and
-  aircraft without it set it to zero.
-- **The polar leaves out pitch rate.** A turn holds elevator against its
-  pitch rate, and a drag term in pitch rate brings the speed error down to
-  1.2 m/s, but the path drifts further, 640 m, and every aircraft would pay
-  for it.
-- **Runge-Kutta 4 buys little at the steps simon runs.** At 20 ms the two
-  models differ by 4 m against a drift of 470 m. At 1 s Runge-Kutta 4 holds
-  altitude to 55 m against 100 m.
-
-The test holds the drift at 20 ms and 1 s with about 25% headroom. To
-regenerate the reference, install JSBSim's Python package and NumPy, and run
-`python application/aeronautic/reference/jsbsim_737.py`. It prints the fitted
-airframe, which the test keeps as constants.
-
-#### Rigid aircraft
-
-The rigid aircraft archetype is the highest fidelity level: six degrees of
-freedom, flown by control surfaces, engines and fuel, from an aircraft
-described as data. It is opt in. Point-mass aircraft in the same world cost
-what they cost alone (see [Mixed fidelity](#mixed-fidelity)), because each
-rigid system is driven by a component only rigid aircraft have, and `Fly`
-excludes rigid bodies.
-
-An aircraft comes from JSBSim. `tools/jsbsim/convert.py` turns a JSBSim
-aircraft's XML into simon's aircraft format, in SI units, and
-`format/aircraft_file` reads it back, refusing bad files with the line at
-fault. A converted aircraft holds its metrics, mass balance, fuel tanks,
-turbines, flight control system and aerodynamics. The 737 is
-`3rd_party/jsbsim/737.aircraft`, and the F-16 is `f16.aircraft` beside it (see [The F-16](#the-f-16)).
-
-| Layer | Holds |
-|---|---|
-| `model/aerodynamics` | The coefficient build-up: terms of a constant, inputs and tables of inputs, summed by axis, and turned into body loads about the center of mass. An input is a state variable or a flight control signal, such as a surface's deflection, so an aircraft's surfaces need no code |
-| `model/flight_control` | Flight control blocks over named signals: summers, gains, scheduled gains, surface scales, kinematic actuators, switches, PIDs and functions |
-| `model/turbine` | JSBSim's turbine: spools, thrust from idle to military and through reheat to maximum, fuel flow |
-| `model/earth` | The WGS84 ellipsoid, J2 gravitation, the Earth's rotation, geodetic conversion |
-| `model/rigid_body` | Stevens and Lewis's equations of motion in an inertial frame, as a `ContinuousState` |
-| `model/frames` | The flat or round Earth, a body's place on it, and its motion relative to the air and the wind |
-| `model/mass_balance` | Fuel tanks, and the mass, center of mass and inertia they give with the empty aircraft |
-| `model/propulsion` | The engines' air, their spools and thrust at the throttles, and the fuel they burn |
-| `model/sensing` | The air data, attitude, motion and pilot's accelerations the flight controls read |
-| `model/rigid_aircraft` | The aerodynamics' inputs and the body's rate, and a header that includes the four above |
-| `application/aeronautic` | The archetype and its systems |
-
-Each step a rigid aircraft runs `RunFlightControls`, `RunEngines`, then
-`Rigid` (Runge-Kutta 4 over `RigidAircraftRates`), then `BurnFuel` and
-`FollowRigidBody`, which keeps its `AirState` on its body for the rest of
-the world. `RunFlightControls` runs every step, or at a fixed period if it is
-given one, as a digital flight control computer runs at its own rate. Each
-engine's throttle is a flight control signal, `throttle_<n>`, set from its
-command before the blocks run, as JSBSim sets it, so a block may change it. The Earth is flat unless the systems are built with a round
-one; round, the inertial frame is ECI and the world's local frame is the
-plane tangent to the ellipsoid at an origin.
-
-Each layer is checked against JSBSim's 737 (see
-`application/aeronautic/reference/README.md`):
-
-| Test | Checks | Agreement |
-|---|---|---|
-| `aero_test` | Aerodynamic forces and moments at 240 states, from ground effect to Mach 0.94 | 5e-14 |
-| `rigid_body_test` | Equations of motion, air data and mass balance at 480 states, at the equator and 60° north | 7e-16 to 5e-13; see below |
-| `turbine_test` | Spools, thrust and fuel flow, frame by frame through throttle steps | 1e-13 |
-| `flight_control_test` | Surface positions, frame by frame through command sweeps and extensions | 4e-15 |
-| `check_case_test` | The whole aircraft, open loop for 30 s from JSBSim's trim | See below |
-
-The check cases fly from JSBSim's trim at 6 km, 30° north, through a trim
-hold, elevator, aileron and rudder doublets, and a throttle step, round the
-turning Earth. The reference is JSBSim at 0.5 ms, where its integrators and
-frame lags have converged. The largest distance from it over 30 s:
-
-| Case | simon at 0.5 ms | simon at 8 ms | JSBSim at 8 ms |
-|---|---:|---:|---:|
-| Trim hold | 2.1 mm | 2.8 mm | 1.6 mm |
-| Elevator doublet | 0.9 mm | 1.3 mm | 8.9 mm |
-| Aileron doublet | 2.2 mm | 6.1 mm | 11.7 mm |
-| Rudder doublet | 2.4 cm | 3.8 cm | 41.5 cm |
-| Throttle step | 3.9 mm | 6.0 cm | 11.9 cm |
-
-simon's physics and JSBSim's agree to millimeters, the first column. At the
-same step, simon's Runge-Kutta 4 is closer to the converged answer than
-JSBSim's mixed Euler and Adams-Bashforth integrators in every case with an
-input, by 11 times after the rudder doublet.
-
-Matching JSBSim is how simon's physics is checked, and it is the starting
-point. Where JSBSim takes a shortcut, simon does not, and the difference is
-measured:
-
-- **No frame lags.** JSBSim's induced drag reads the frame before's lift
-  coefficient, its rate of angle of attack the frame before's acceleration,
-  and its flight controls the frame before's air data. simon sums lift
-  before drag and forces before moments, so all three are the step's own.
-- **Exact geodetic altitude.** JSBSim's is a one-step approximation, 2.5 cm
-  off at 60° north and 6 km up. simon's is Heikkinen's closed form, which
-  agrees with an iteration run to convergence.
-- **Exact units.** JSBSim turns pounds into slugs by a rounded 32.174049,
-  1.4e-8 off, and keeps its atmosphere's constants in English units, 8.5e-6
-  off in density. simon uses the definitions and the 1976 standard.
-
-`bazel run -c opt //application/aeronautic:rigid_benchmark` flies rigid 737s
-at 8 ms steps, each on its own. GCC, per aircraft per step:
-
-| Aircraft | Flat Earth | Round Earth |
-|---:|---:|---:|
-| 100 | 1.22 µs | 2.03 µs |
-| 1,000 | 1.16 µs | 2.02 µs |
-| 10,000 | 1.19 µs | 2.06 µs |
-
-- **The cost is flat with population,** so one thread flies about 6,900
-  rigid 737s in real time over a flat Earth, and 3,900 round one. `Rigid`
-  is two thirds to seven tenths of it: four stages, each building up the
-  aerodynamics.
-- **A stage finds the body's motion once.** It turns the attitude into a
-  matrix and finds the air velocity and rate from it, takes the wind angles'
-  sines and cosines as ratios of the air velocity, and finds the rate of
-  angle of attack from the force per unit mass and a remainder the stage
-  fixes. Whether an aircraft's forces read that rate is found when it is
-  read.
-- **JSBSim takes 9.2 µs a frame** for one 737, timed through its Python
-  module from its own trim, with one instance per aircraft. Its frame does
-  work simon's does not, such as ground reactions and its property tree, so
-  the comparison is rough; simon evaluates the aircraft four times a step to
-  JSBSim's once and is still 4.6 times faster round the Earth, and 7.9
-  times over a flat one.
-- **The round Earth costs 75% more.** Each stage finds the body's place on
-  it once, its altitude, local frame and the Earth's turn, in `Earth::place`.
-  `wgs84::locate` gives the local frame's sines and cosines straight from
-  Heikkinen's closed form, with no angles to take them of.
-- **The mass balance sums six terms.** `BurnFuel` recomputes it every step
-  as the fuel burns, summing the inertia tensor's six distinct terms rather
-  than a matrix per mass: 50 ns a step for the 737.
-
-Building it turned up JSBSim behaviors that a comparison has to allow for,
-all noted where they matter: a frame starts by moving the state on, so
-everything read after a frame belongs together; its mass balance runs
-before its engines burn; its `inertia/ixy` and `iyz` properties are the
-tensor's elements negated but `ixz` is not; and its kinematic actuators keep
-the frame time the model loaded with.
-
-#### The F-16
-
-JSBSim's F-16 shows that the converter and the models were not fitted to
-the 737. The same code converts it, and the same tests check it. It brings
-what the 737 lacks:
-
-- **Fly-by-wire flight controls.** They close loops on roll rate, on pitch
-  rate and load factor, and on yaw rate and lateral acceleration, through
-  three PIDs, eleven switches and a function. `model/flight_control` gains those three
-  kinds of block.
-- **Reheat.** A throttle past 1 lights it, and the flight controls double
-  the pilot's throttle, so half throttle is military power.
-- **A pilot.** The pilot is a point mass in the mass balance, and the flight
-  controls feel the pilot's accelerations at the eye point.
-
-The aerodynamics read flight control signals by name, so the F-16's
-surfaces (combined aileron, leading-edge flaps, flaperons, speedbrake) are
-data and need no code. The converter maps JSBSim's built-in surfaces:
-`-rad` and `-deg` to the deflection in radians, `-norm` to
-`<surface>_norm`, and `mag-` to `|surface|`, the magnitude. A block works in
-the aircraft's own units, and where a signal it reads or writes is in other
-units, such as knots or degrees, the converter gives it a scale, and turns
-the numbers a switch compares into SI. Ground contacts, the hook, pushback
-and the canopy are left out: weight on wheels is always 0.
-
-The flight controls read the state they need, which `sense_flight_state`
-finds: air data, calibrated airspeed by JSBSim's pitot formulas, ground
-speed, body velocity, attitude, and the pilot's accelerations. An aircraft
-finds only what its flight controls read, so the 737 pays nothing for the
-F-16's. The pilot's accelerations come from the step before:
-`RigidAircraftRates` keeps what each body feels at every stage, and the last
-stage's is left after `Rigid`. A step's own would need the surfaces the
-flight controls are about to set. JSBSim's flight controls read the frame
-before's air data and accelerations two frames old.
-
-Two of JSBSim's behaviors are part of the model. A kinematic block with an
-output starts each frame from the output's value, and the F-16's yaw PID
-writes the rudder's position just before its actuator moves it. JSBSim's
-trim runs the PIDs before it has an airspeed, so they integrate, and their
-integral cannot be read; the references zero it after the trim, as simon
-starts. The F-16's PID triggers
-hold their integrals in flight, so in flight its PIDs are proportional and
-derivative.
-
-Each layer agrees with JSBSim to rounding: the aerodynamics to 9e-15 at 300
-states up to Mach 1.36, every one of the 60 flight control blocks to 2e-16
-on every frame of three flights, the engine to 1e-13 through reheat and out,
-and the mass balance to JSBSim's rounded slug.
-
-The F-16's flight controls run at a fixed rate. Its control laws
-differentiate the pilot's commands and then clip them, so run at every frame
-they change with the frame and do not converge. A digital flight control
-computer runs at its own rate whatever the dynamics do: the F-16's runs
-every 8 ms in simon (`RunFlightControls` given a period) and in the
-reference, which flies JSBSim at 0.125 ms with each channel run every 64th
-frame. The throttle's channel runs every frame, because JSBSim sets the
-throttle to its command each frame before the channels run; the command
-changes only on the computer's frames, so the result is the same. Every
-flight starts from JSBSim's trim at 8 ms, because JSBSim's trim depends on
-its frame: at 0.125 ms its pitch trim differs by 6e-5.
-
-The largest distance from JSBSim at 0.125 ms over 30 s:
-
-| Case | simon at 0.5 ms | simon at 8 ms | JSBSim at 8 ms |
-|---|---:|---:|---:|
-| Trim hold | 3.7 mm | 3.7 mm | 0.05 mm |
-| Pitch doublet | 2.1 mm | 2.1 mm | 1.5 cm |
-| Roll doublet | 5.6 cm | 5.6 cm | 3.53 m |
-| Rudder doublet | 3.7 mm | 3.7 mm | 0.8 mm |
-| Throttle step into reheat | 1.1 cm | 14.7 cm | 63.2 cm |
-
-- **simon has converged at 8 ms** in every case but the step into reheat,
-  where the engine's thrust, held for a step, is the error.
-- **The physics agrees to millimeters,** as the 737's does, and to 6 cm after
-  the roll doublet, where JSBSim has itself converged only to about 5 cm.
-- **At 8 ms simon is closer than JSBSim** after the roll doublet, by 63
-  times, and the throttle step, by 4 times. In the hold and the rudder
-  doublet JSBSim at 8 ms is closer, both being under simon's floor of 4 mm.
-
-A rigid 737 costs 1.16 µs per aircraft-step flat and 2.02 µs round at 1,000;
-the F-16's sensing costs it nothing.
-
-#### Trim
-
-`model/trim` finds the attitude, controls and throttle at which a rigid
-aircraft flies a steady, straight path. Six unknowns balance six
-accelerations, paired as JSBSim's full trim pairs them: angle of attack the
-acceleration along body z, throttle along body x, pitch trim the pitch, bank
-the acceleration along body y, aileron the roll and rudder the yaw. There is
-no sideslip. Newton's method solves them together, with a numerical Jacobian
-and a line search, to residual accelerations of 1e-13. A trim that needs a
-control past its limit fails as saturated.
-
-Each evaluation settles the flight controls with the airframe.
-`settle_flight_controls` runs every block as it stands when its inputs hold
-still, kinematic blocks at their inputs and PIDs seeing no rate. The F-16's
-flight controls feel the accelerations their own surfaces make, so the blocks
-and the airframe are settled in turn until they agree.
-
-Round the Earth a trim is level over the Earth: the body turns as the local
-north-east-down frame turns under it as it moves (`Earth::level_rate`), so
-its altitude and speed hold. Straight in space, as JSBSim's trim is, the path
-climbs as the Earth curves away, 2.8 m in 6 km. A `FlightCondition` asks for
-either.
-
-Trimmed straight in space at the check cases' condition, simon's controls
-agree with JSBSim's to a few parts in 10^5, the tolerance JSBSim's trim stops
-at (`trim_test`). Flown level for 30 s at 8 ms, the largest change in
-altitude and airspeed (`check_case_test`):
-
-| Trim | 737 | F-16 |
-|---|---:|---:|
-| JSBSim's | 4.0 m, 0.19 m/s | 2.1 m, 0.081 m/s |
-| simon's | 2.0 m, 0.10 m/s | 16 cm, 0.013 m/s |
-| simon's, mass held | 3.7 mm, 0.2 mm/s | 2.4 mm, 0.1 mm/s |
-
-Burning fuel lightens the aircraft, which climbs and speeds up; with the mass
-held, the trim alone is measured.
-
-#### Mixed fidelity
-
-Every level flies in one world. A scenario's `rigid` and `fighters` counts
-make some of its aircraft rigid 737s and rigid F-16s, and they fly the same
-kind of routes as the rest: `FollowRoute` sets their autopilot's targets as it
-sets every aircraft's. `bazel run //application/aeronautic -- <aircraft>
-<precise> <rigid> <fighters> <seed>` flies one, over a flat Earth so that
-every level shares the world's frame.
-
-Rigid aircraft start from simon's trim in cruise (`trim_in_cruise`; see
-[Trim](#trim)), one for each type, since over a flat Earth a trim holds
-wherever an aircraft is and whichever way it heads. They fly their
-surfaces with `FlySurfaces`, an autopilot kept small on purpose. It takes the
-point-mass autopilot's laws for the bank a heading needs, the flight-path
-angle an altitude needs and putting speed first, and flies them with three
-lines: aileron from the bank error with roll damping, elevator from the
-flight-path angle error with pitch damping, the pull a turn needs and a
-bounded integral, and throttle from the speed error about the trim. Each
-aircraft carries its gains in its `SurfaceAutopilot`. A 737 banks up to 45°,
-so at 200 m/s it turns on about 4 km, near the 3 km at which `FollowRoute`
-captures a waypoint. An F-16 flies the same gains through its fly-by-wire,
-whose stick commands rates and load, and banks up to 60°, turning on about
-2 km. Its flight controls run every 20 ms step.
-
-At the world's 20 ms step, rigid aircraft stay within 15 cm of the converged
-JSBSim reference after the 30 s check cases, and within 9 cm after the rudder
-doublet, against JSBSim's 41.5 cm at 8 ms. Over 10 minutes of routes they
-keep between 3 and 8.3 km and between 197 and 236 m/s, and reach about 4.4
-waypoints each to the point-mass aircraft's 6.5: a 737 turns wider than the
-point-mass jet. F-16s keep between 4.0 and 7.7 km and between 200 and 238
-m/s, and reach about 6 waypoints each.
-
-`aeronautic_benchmark` adds a mixed population, 1% on Runge-Kutta 4 and 0.1%
-rigid. At 100,000 aircraft, GCC, 20 ms steps:
-
-| Aircraft | Systems | ms per step | Share |
-|---|---|---:|---:|
-| 98,900 single pass | `FollowRoute`, `FlyAutopilot`, `Actuate`, `Fly` | 6.20 | 95.3% |
-| 1,000 Runge-Kutta 4 | `Continuous(AirState)` | 0.18 | 2.7% |
-| 100 rigid 737s | `FlySurfaces` to `FollowRigidBody` | 0.13 | 2.0% |
-| All | | 6.50 | |
-
-One thread runs it 3.1 times faster than real time. Each level costs what
-its own aircraft cost, and nothing more: the single-pass aircraft run as
-fast as they do alone (6.27 ms at 100,000), because each level's systems are
-driven by components only its aircraft have.
-
-`bazel run -c opt //application/aeronautic:viewer` watches a mixed world under
-`RealTimeDriver`, by default 2,000 aircraft with 20 on Runge-Kutta 4, four
-rigid 737s and four rigid F-16s, at ten times real time. An ImPlot map draws
-each level its own way, rigid aircraft with trails, and the route of the
-rigid aircraft the panel follows. The panel shows that aircraft's air data,
-attitude, load factor, engine and surfaces, and strip charts of its altitude
-and airspeed sit under the map. The aeronautic viewer's panel also sets the
-scenario's wind and turbulence.
-
-The viewers share `application/viewing.hpp`: the window and its frame loop,
-which take `--scale`, and `--frames` and `--screenshot` for running a viewer
-with nobody watching; a `Session` that runs a scenario under `RealTimeDriver`
-and finishes it when replaced; the side panel with its Restart, Quit, pause
-and speed controls; and scatter plots of markers. A viewer draws only what is
-its own. Each viewer's `viewer_test` runs it for 60 frames under SDL's dummy video
-driver, so a viewer that no longer builds, starts or draws fails the tests.
-
-#### Wind and turbulence
-
-Wind is opt in, like every level. A scenario's `wind` is a
-`model::WindField`: a steady wind, the same everywhere, and turbulence of a
-severity. By default the air is still, no aircraft has a `Wind`, and every
-level costs what it would without wind: 1.16 µs per rigid aircraft-step at
-1,000 over a flat Earth, and 6.50 ms per step for the mixed 100,000.
-
-In moving air each aircraft has a `Wind`: the air's velocity relative to the
-Earth, in the local north-east-down frame, and the rotation turbulence gives
-it, held over a step. `MoveAir` sets it each step. A point-mass aircraft's
-`AirState` is its motion through the air, so `DriftWithWind` adds the wind to
-its position after `Fly` and `Precise`. Rigid aircraft in wind are an
-archetype of their own, `RigidAircraftInWind`, which requires a `Wind`. The
-rigid systems read it as a sibling that the still archetype lacks, so a rigid
-aircraft in still air never looks for one. The rate, the flight controls' air
-data and the engines' air are compiled apart for still air for the same
-reason. A rigid aircraft in wind that also has `Gusts` flies through
-turbulence. It starts trimmed for still air and moving with the air, which
-over a flat Earth is the same trim.
-
-A rigid aircraft's air velocity is its velocity less the air's,
-R^T (v - W x r - u) with u the wind in the inertial frame, and its rate
-relative to the air leaves out the turbulence's rotation. The rate of angle
-of attack reads the rate of the air velocity in body axes, which counts the
-wind turning in body axes as the body turns:
-
-    d/dt R^T (v - W x r - u) = f / m + R^T (g - W x v - W x u) - w x R^T (v - W x r - u)
-
-`rigid_aircraft_test` checks it against a central difference along a body's
-motion, over a flat Earth and a round one. JSBSim's `FGAuxiliary` takes the
-rate of angle of attack from the rate of the velocity over the ground, which
-leaves out w x R^T u.
-
-The check cases add a wind: from JSBSim's trim, a wind of 8 m/s north,
-12 m/s west and 2 m/s down starts at 1.004 s, between two of the F-16's
-flight control frames, and holds. The largest distance from JSBSim's
-converged flight over 30 s:
-
-| Aircraft | simon at 0.5 ms | simon at 8 ms | JSBSim at 8 ms |
-|---|---:|---:|---:|
-| 737 | 92 cm | 96 cm | 11.7 cm |
-| F-16 | 4.4 mm | 3.8 cm | 2.4 cm |
-
-The F-16's aerodynamics do not read the rate of angle of attack, and in wind
-it agrees with JSBSim to millimeters, as in still air. The 737's pitching
-moment does, and it parts from JSBSim by 92 cm; flown with JSBSim's rate, it
-agrees to 1.7 cm. The wind starts between 8 ms steps, so at 8 ms simon and
-JSBSim each start it 4 ms off the reference.
-
-Turbulence follows MIL-F-8785C. The gusts along the path (u), across it (v)
-and down (w) have its Dryden spectra, and the roll, pitch and yaw gusts
-follow from them over the wing span. The intensities come from its
-low-altitude model up to 1,000 ft and its table of intensities by
-probability of exceedance above 2,000 ft. Light, moderate and severe are
-exceeded with probabilities of 10^-2, 10^-3 and 10^-5. The turbulence is
-frozen in the air, and each aircraft meets it along its own path at its
-airspeed, from its own seed.
-
-- **Each filter is sampled exactly.** A step draws the filter's next state
-  from the distribution the continuous filter reaches over the step, so the
-  gusts' variance and correlation are the specification's at any step.
-  `wind_test` checks them against Dryden's at 20 ms and at 250 ms. JSBSim's
-  MIL-F-8785C turbulence advances its filters by Euler steps and takes the
-  second-order v and w spectra as first-order, so its turbulence changes
-  with its frame.
-- **Turbulence needs no time to build up.** The first draw starts each filter
-  from its steady distribution.
-- **The pitch and yaw gusts have the air's own signs,** q = -dw/dx and
-  r = dv/dx, through lags of 4b / (pi V) and 3b / (pi V).
-- **The noise needs no generator state.** It is SplitMix64, counted by step
-  from the aircraft's seed, so a run repeats exactly from its seed.
-
-`aeronautic_test` flies 737s, F-16s and point-mass aircraft in a 15 m/s wind and
-moderate turbulence for five minutes, and checks that they keep to the
-routes' envelope and reach waypoints. It also checks that a point-mass
-aircraft in wind flies as it does in still air, carried by the wind.
-
-### automotive
-
-Vehicles drive a network of roads, closed loop at the level of objects:
-traffic and a vehicle under test, without sensors. It proves the framework
-can carry a driving simulation comparable to the best open source, as
-aeronautic does against JSBSim, with each claim checked against an open
-reference: roads against libOpenDRIVE, vehicles against CommonRoad's models
-and Chrono::Vehicle, traffic against SUMO, scenarios against esmini, and
-metrics against nuPlan. It was built in eight steps (see the
-[Roadmap](#roadmap)): roads, traffic, a scale benchmark, tires and vehicle
-dynamics against CommonRoad, maneuvers against Chrono, scenarios against
-esmini, metrics and batch runs, and a viewer.
-
-#### Roads
-
-`model/road` holds roads as ASAM OpenDRIVE describes them, and
-`format/opendrive` reads them from OpenDRIVE files with pugixml. A road is a
-reference line of lines, arcs, spirals and parametric cubics, with an
-elevation, a superelevation and a lane offset along it, and lane sections
-whose lanes have widths that are cubics in s. A point on a road is (s, t, h):
-s along the reference line in the plane, t across it to the left, h up from
-the surface. simon finds a point's position, each lane's borders, the lane
-at a point, and the road coordinates of a position. It reads what geometry
-needs, and refuses the deprecated poly3 and lanes given by borders, as
-libOpenDRIVE does.
-
-- **Each geometry is evaluated exactly.** A line and an arc are in closed
-  form, the arc's chord written so it holds as its curvature goes to zero. A
-  spiral's position is the integral of its tangent, whose heading is
-  quadratic in s: the Fresnel integral, by 8-point Gauss-Legendre quadrature
-  in parts that turn at most half a radian, where the rule's error is far
-  below rounding. It matches the Fresnel integrals' tabulated values to
-  1e-15.
-- **s is arc length on a parametric cubic too.** A paramPoly3's s is its arc
-  length, found by quadrature of its speed and Newton's method. A file's
-  length and the curve's arc length often differ a little, so s runs over
-  the curve in proportion to its arc length, from its start at 0 to its end
-  at the file's length.
-- **Lane borders sum the lanes' widths** from the center out, each evaluated
-  at s, plus the lane offset.
-- **The lane graph follows travel.** `model/lane_graph` links each lane to
-  the lanes traffic moves into from it: across lane sections, across road
-  links by their contact points, and from a junction's incoming lanes into its
-  connecting roads, as OpenDRIVE's links give them. Traffic keeps right, so a
-  lane right of the reference line runs with s and one left of it against s.
-  A lane's successors are a contiguous run of a sorted array, found by binary
-  search.
-- **Road coordinates are found by projection.** Each piece is sampled every 2
-  m and every tenth of a radian, and the nearest sample refined by Newton's
-  method on the tangent's component of the offset.
-
-`opendrive_reference_test` checks simon against libOpenDRIVE on three
-networks: test roads with every geometry, elevation, superelevation and
-changing lanes, one of them at map coordinates, and CARLA's Town01, 98 roads
-as RoadRunner writes them (see `application/automotive/reference/README.md`):
-
-| Check | Agreement |
-|---|---:|
-| Positions on lines, arcs and spirals, through elevation and superelevation, on and off the surface | 8e-14 m |
-| Lane borders | 8e-14 m |
-| The lane at each lane's middle | 4,329 of 4,330 |
-| The lane graph, on Town01, the test roads and a ring | All 285 edges |
-| Positions on parametric cubics, against an exact arc length | 1.2e-13 m |
-
-libOpenDRIVE finds a parametric cubic's arc length through a table of chords
-made to 1 cm, and is 5.4 mm from the exact arc length; simon is at rounding.
-The one lane they disagree on is where a lane opens from no width: libOpenDRIVE
-keys lanes by their outer border, so a lane of no width that shares its
-neighbor's border can take a point in the neighbor's middle.
-
-#### Vehicles
-
-`model/single_track` holds CommonRoad's single-track models, each axle's
-wheels lumped into one on the center line. The kinematic model rolls without
-slip: its state is the rear axle's position, the steering angle, the speed and
-the heading, and it is driven by a steering rate and an acceleration, which
-the vehicle's limits bound as CommonRoad bounds them: the steering's range and
-rate, braking, the engine's power above a switching speed, and the speed's
-range. Its state and rate plug into `Continuous`.
-
-`single_track_test` checks it against CommonRoad's reference model, for its
-three vehicles, a Ford Escort, a BMW 320i and a VW Vanagon:
-
-| Check | Agreement |
-|---|---:|
-| Rates at 1,200 states and inputs, a quarter on a limit | 2.3e-16, relative |
-| Paths over 20 s of steering and acceleration steps, by the same Runge-Kutta 4 at 0.05 s | 1.9e-13 m |
-| The same paths at 0.05 s against 0.0005 s | 0.23 mm |
-
-Three dynamic models follow CommonRoad's, for fidelity where the kinematic
-model is not enough, each opt in:
-
-- **The dynamic single-track model** (`model/single_track`) follows the
-  center of gravity, which slips sideways and yaws under each axle's lateral
-  force, linear in its slip angle, with the axle's load shifted by braking
-  and speeding up.
-- **The drift model** adds each axle's wheel spin, and its tires follow the
-  Magic Formula in combined slip, so it brakes, spins its wheels and drifts.
-- **The multibody model** (`model/multibody`), after the US Department of
-  Transportation's vehicle dynamics, has a sprung body that yaws, rolls,
-  pitches and heaves on its suspension over two unsprung axles, four wheels,
-  and compliant pins at each axle's roll axis: 29 states.
-
-`model/tire` holds the Magic Formula 5.2 in CommonRoad's subset: pure and
-combined slip, every scaling factor 1, turn slip left out. `model/vehicle`
-holds every parameter of CommonRoad's vehicles, and the limits on how they
-are driven. At a crawl, where slips are undefined, each model drives as the
-kinematic model about the center of gravity.
-
-simon implements four corrections to CommonRoad, each from its source:
-
-- **The tire's vertical shift is added after the sine**, as Pacejka has it.
-  CommonRoad adds F_z p_vx1 inside the sine, as an angle, which brakes a tire
-  rolling free with about 600 N under 8 kN.
-- **The side force longitudinal slip induces turns with kappa**, the Magic
-  Formula's slip. CommonRoad passes its own slip, -kappa, there, though it
-  negates it for the pure longitudinal force.
-- **At a crawl the slip angle changes at its derivative.** beta =
-  atan(tan(delta) b / l), and CommonRoad's rate squares tan(delta) a second
-  time.
-- **The multibody model's crawling yaw rate changes with the slip angle**,
-  where CommonRoad reads the roll angle.
-
-simon also bounds two cases where CommonRoad's multibody model has no
-answer: a tire off the ground pushes nothing, where CommonRoad's pulls with
-a negative load, and a wheel's slip is divided by at least 0.1 m/s of ground
-speed, as CommonRoad's drift model divides it, where the multibody model
-divides by zero when reversing.
-
-`vehicle_dynamics_test` checks all of it against CommonRoad, its models
-patched with the four corrections (see
-`application/automotive/reference/commonroad_dynamic.py`), for its three
-vehicles:
-
-| Check | Agreement |
-|---|---:|
-| Tire forces at 2,000 slips, slip angles, cambers and loads | 2.9e-15, relative |
-| CommonRoad's own tire forces, uncorrected | 618 N longitudinal, 885 N lateral |
-| Dynamic single-track rates at 900 states, from a crawl to 45 m/s and reversing | 6.4e-15, relative |
-| Drift rates at 900 states, wheels slipping and locked | 3.3e-14, relative |
-| Multibody rates at 592 states, the suspension displaced about rest | 1.9e-14, relative |
-| Paths through a double lane change, braking and speeding up, 8 s, by the same Runge-Kutta 4 at 0.001 s | 2.9e-14 m |
-| The same paths at 0.001 s against 0.0001 s: dynamic, drift, multibody | 4e-11 m, 4.2 µm, 0.52 mm |
-
-#### Maneuvers against Chrono
-
-Project Chrono's Chrono::Vehicle models a vehicle as a full multibody system.
-Its Sedan has a double wishbone front suspension, a multilink rear, a rack
-and pinion, front-wheel drive through an engine map and gearbox, and Pac02
-tires, Chrono's Magic Formula 5.2. simon drives its own models with the
-Sedan's parameters through the handling maneuvers the standards define, and
-measures both as the standards measure them
-(`application/automotive/reference/chrono_reference.cpp` records Chrono).
-
-**The tire.** `model/tire` holds the whole of the Magic Formula 5.2's steady
-state, pure and combined slip and the aligning moment, and `format/tire_file`
-reads it from TNO tire property files (.tir). A tire on the right is the
-left one mirrored about its wheel plane, so that a pair's asymmetries cancel.
-CommonRoad's subset stays a tire of its own, since its cornering stiffness
-is linear in load and it mirrors through the camber's sign. Chrono's Pac02
-departs from Pacejka in five places, and `tire_test` measures each:
-
-| Check | Agreement |
-|---|---:|
-| Forces and aligning moment, without camber, where Chrono keeps the formula | 2.2e-5 of the load |
-| Beyond Chrono's clamp of B x at pi/2 - 0.01, which flattens the curve past its peak | 7.7% of the load |
-| At a camber of 0.03 rad, where Chrono's lateral friction rises by 1 + p_dy3 gamma^2 rather than falling by 1 - p_dy3 gamma^2 | 0.48% of the load |
-| Combined by Chrono's default friction ellipsis rather than Pacejka's weighting | 60% of the load, at large slips both ways |
-
-The 2.2e-5 is Chrono's 0.1 added to each B's denominator. Chrono also gives
-the trail's equivalent slip angle in combined slip kappa's sign rather than
-the slip angle's, divides its slips by the speed plus 0.1 m/s, and in a
-vehicle holds camber at zero whatever the wheel's lean.
-
-**The models.** Driving the Sedan showed what CommonRoad's models leave out
-once the tire is a real one, and simon adds it, opt in through the tire:
-
-- **Each axle's tires each take half its load.** The Magic Formula's
-  cornering stiffness grows less than linearly with load, so one tire at an
-  axle's whole load corners differently; CommonRoad's linear tire hides it.
-- **The tires' aligning moments yaw the vehicle.** At the Sedan's
-  pneumatic trail they are worth about 0.15 deg/g of understeer, the largest
-  single term.
-- **Each wheel can be steered on its own** in the multibody model, by toe,
-  Ackermann and roll steer. CommonRoad's model steers both front wheels
-  alike and the rear not at all.
-
-The multibody model is in SAE's axes, x forward, y right and z down, as
-CommonRoad writes it; its left wheels sit at -y.
-
-**The Sedan's parameters.** The drift model reads the Sedan's mass, inertia
-and axle positions from Chrono's assembly. The multibody model's suspension
-comes from Chrono's own, measured as a kinematics and compliance rig would:
-the Sedan at rest, braked, pressed down by 3 kN and rolled by 2 kN m, gives
-each corner's rate, 16.3 kN/m front and 61 kN/m rear, and each axle's roll
-stiffness; the ramp at 80 km/h gives each axle's lateral load transfer, and
-so its roll center. The Sedan's tire is used with its camber terms zeroed,
-as Chrono uses it. Each model is steered by Chrono's front wheels' mean
-angle and held to Chrono's speed; the multibody model is also steered, in
-one comparison, as Chrono's suspension steers each wheel.
-
-`maneuver_test` checks them against Chrono, through steady-state circular
-driving at 80 and 100 km/h with a slowly increasing steer (ISO 4138), a step
-steer to 4 m/s^2 at 80 km/h (ISO 7401), and sines with dwell at 80 km/h at
-2.5 and 5 times the steer for 0.3 g (FMVSS 126):
-
-| Metric | Chrono | Multibody, each wheel steered | Multibody | Drift single-track |
-|---|---:|---:|---:|---:|
-| Understeer gradient at 80 km/h, deg/g | 0.159 | 0.151 | 0.131 | 0.132 |
-| Understeer gradient at 100 km/h, deg/g | 0.186 | 0.142 | 0.130 | 0.125 |
-| Step steer's steady yaw rate, rad/s | 0.1783 | 0.1781 | 0.1792 | 0.1803 |
-| Step steer's yaw rate response time, s | 0.08 | 0.08 | 0.08 | 0.08 |
-| Step steer's overshoot | 28.8% | 29.0% | 27.3% | 29.3% |
-| Sine with dwell at 2.5 times: lateral displacement at 1.07 s, m | 2.36 | 2.18 | 2.15 | 2.12 |
-| Sine with dwell at 5 times | Spins | Spins | Spins | Spins |
-
-Both pass FMVSS 126's yaw rate ratios at 2.5 times, near zero 1 s after the
-steer, and neither would pass at 5 times without stability control. Past
-the limit they spin differently: Chrono's clamp holds its tires' force near
-the peak where the formula's falls away, so simon's Sedan spins sooner. At
-100 km/h Chrono understeers more than at 80 km/h and simon's models do
-not; that difference, up to 0.04 deg/g, is not yet explained.
-
-#### Scenarios against esmini
-
-`format/openscenario` reads ASAM OpenSCENARIO 1.x scenarios with pugixml:
-parameters, substituted as $name and evaluated as ${...} expressions;
-vehicles from catalogs; positions on lanes and roads, relative to entities
-and in the world; speed, lane change, lane offset, teleport and parameter
-actions; and conditions on time, speed, acceleration, headway, distance,
-position, the end of the road, parameters and the storyboard's own states.
-Anything else that changes what happens, a controller, a route or a
-trajectory among them, is refused. A vehicle towing a
-trailer is refused too, since esmini makes the trailer an entity of its own.
-
-`scenario/storyboard` runs the storyboard: its elements' states and
-transitions, events by priority and execution count, and triggers, each
-condition on its edge and after its delay. `model/road_placement` places a
-vehicle by road, lane, s and offset, either way along any lane, and moves it
-along its path at its t, s changing by the distance over 1 - kappa t. In the
-ECS, `RunStoryboard` evaluates the storyboard and gives each vehicle its
-orders, `ControlSpeed` runs speed actions, `MoveOnRoad` runs lateral actions
-and teleports or carries a vehicle along its lane, and `PlaceOnRoad` puts it
-in the world (`application/automotive/scenario_simulation.hpp`).
-
-Where the standard leaves the details open, simon follows esmini, the open
-OpenSCENARIO player:
-
-- **Each step evaluates every trigger on the world as the last step left
-  it**, and an action started in a step also runs in it, in the storyboard's
-  order. A lane change before a speed action in the storyboard moves at the
-  speed before it.
-- **A transition is stretched to the vehicle's limits.** A speed action
-  whose shape would accelerate or decelerate past the vehicle's performance
-  takes longer, its peak rate at the limit; a rate dimension is the
-  transition's peak rate.
-- **A lane change keeps the vehicle's path length,** its speed times the
-  step, and takes its lateral motion from it, the heading turned along the
-  path.
-- **A storyboard element's transition counts at a condition's next
-  evaluation,** in the same step if the condition comes later; an edge needs
-  a value before it; a trigger that fires starts its conditions over.
-- **A teleport or a parameter set ends after the step's triggers,** and a
-  vehicle the storyboard teleports stays where it was put for the step.
-- **A condition measures distance in the triggering entity's own
-  coordinates by default:** along its heading, across it, or straight,
-  signed by whether the other is ahead; or along or across its road. 1.0's
-  alongRoute is longitudinal along the road. Between bounding boxes
-  (freespace), simon measures only along the road and refuses the rest.
-
-simon evaluates every condition of a group each step, where esmini stops at
-the first false one but for those with delays, which keeps every edge's
-history current.
-
-`scenario_test` plays three of esmini's scenarios and checks every entity
-at every step against esmini 3.8.2 at 0.05 s
-(`application/automotive/reference/esmini_scenarios.py`):
-
-| Scenario | Steps | Position | Heading | Speed |
-|---|---:|---:|---:|---:|
-| A cut-in on a straight road: a headway trigger, a sinusoidal lane change and braking | 322 | 6.8e-7 m | 4.9e-7 rad | 4.6e-14 m/s |
-| A cut-in on a curved highway, at a speed relative to the ego's | 440 | 1.2 mm | 8.3e-7 rad | 8.3e-14 m/s |
-| Lane changes across a curve, into the oncoming lane, over and over: reaching positions, the end of the road, teleports, two acts, repeated events | 3,669 | 7.0e-7 m | 1.3e-6 rad | 0.0033 m/s |
-
-esmini logs to six decimals, which bounds the agreement on straight roads.
-On e6mini's curves the 1.2 mm is the two road models' geometry. The lane
-changes' speed differs in two steps, where esmini reports a vehicle
-teleported away from the end of its road at a standstill for a step; its
-next step and every position agree. Each storyboard stops on the same step
-as esmini's.
-
-#### Metrics and batch runs
-
-`model/collision` treats vehicles as boxes in the plane. Two boxes overlap
-when no axis among their edges' normals separates their projections, the
-separating axis theorem; boxes that touch overlap, as GEOS counts them.
-Apart, their gap is the least distance from a corner of either to an edge
-of the other. `collision_test` checks 2,000 pairs, from a car's size to a
-truck's at any heading, a quarter of them a hair from touching, against
-Shapely 2.1.2 on GEOS 3.13.1, which nuPlan uses: every overlap agrees, and
-every gap to 1e-12 m.
-
-`model/driving_metrics` measures a run as nuPlan's devkit (1.2.2) defines
-it:
-
-- **Comfort.** The accelerations along and across the heading, smoothed by
-  a Savitzky-Golay filter over 8 samples; the jerks, their derivatives over
-  15; the yaw rate and acceleration, the heading's first and second
-  derivatives over 5; each rounded to 8 decimals, and each strictly within
-  nuPlan's bounds at every sample. The filter is SciPy's `savgol_filter`,
-  its edges and even windows included.
-- **Time to collision.** The ego and the vehicles ahead of it, within 30
-  degrees of its heading, carried at constant speed along their headings
-  in steps of 0.1 s up to 3 s, until the ego's box overlaps one's. A run
-  stays within bound while every sample's time exceeds 0.95 s.
-
-`metrics_test` checks both on esmini's three scenarios against nuPlan's own
-code (`application/automotive/reference/nuplan_metrics.py`): the comfort
-signals to 5e-8, a unit of nuPlan's rounding carried through a derivative,
-and every time to collision exactly. nuPlan's map-dependent parts are left
-out: which collisions are at fault, the drivable area, driving direction,
-and choosing tracks by lane, for which simon takes the vehicles ahead as
-nuPlan's `is_agent_ahead` does.
-
-`format/openscenario` reads deterministic parameter value distributions:
-value sets, sets of values, and ranges, whose values are the lower limit
-and each step on it, written to 15 significant digits so the steps'
-rounding does not show. Stochastic distributions are refused.
-`scenario/parameter_distribution` numbers the permutations as esmini does,
-the last distribution varying fastest, and each permutation's values
-replace the scenario file's declarations before it is read.
-`application/automotive/scenario_batch` plays every permutation on a pool
-of threads, each run in its own world, and measures its ego, the scenario's
-first entity, sampled after each step.
-
-`batch_test` runs esmini's parameter distribution over the curved
-highway's cut-in, 12 permutations of two vehicle sets, two ego speeds and
-three speed factors, against esmini 3.8.2 and against nuPlan's code on
-esmini's runs:
-
-| Check | Result |
-|---|---|
-| Each permutation's parameter values | The same as esmini's, in the same order |
-| Every entity at every step, 5,392 steps | 1.1 mm, as the cut-in alone; speeds to esmini's six decimals |
-| Each entity's box, from the vehicle its permutation chose | Exact |
-| Time to collision at every sample | The same at all 5,392 |
-| The gap between the ego's box and the other's at every sample | 1.1 mm |
-| Each run's verdicts: comfort, time to collision within bound | The same |
-| One thread or four | Identical measures |
-
-In every permutation the ego, which has no controller, runs into the
-vehicle that cuts in and brakes, in esmini as in simon. On one thread the
-12 runs take 70 ms.
-
-#### Drivers
-
-`model/traffic` holds the drivers' models: the Intelligent Driver Model for
-following, in the form of Treiber and Kesting's *Traffic Flow Dynamics*, its
-desired gap never less than the minimum gap, and MOBIL for changing lanes, by
-its symmetric criterion with a bias toward the right lane. MOBIL weighs a
-change by the accelerations it brings this driver and, by its politeness,
-both followers, and refuses one that brakes the new follower harder than its
-safe deceleration.
-
-Its authors' own implementation, movsim's traffic-simulation.de, is a
-variant: a linear free-road term above the desired speed, the gap held at
-the minimum gap, braking capped at 18 m/s^2, and a MOBIL whose safe
-deceleration changes with speed and which leaves out the old follower.
-`traffic_test` checks simon against it where the two agree with the published
-models, and checks a platoon against SUMO:
-
-| Check | Agreement |
-|---|---:|
-| IDM accelerations at 1,000 gaps and speeds, for four drivers, against movsim | 1e-14 |
-| MOBIL decisions at 1,000 sets of accelerations, to either side, against movsim | All 1,000 |
-| Five IDM followers behind a leader that brakes and speeds up, 80 s, simon by Runge-Kutta 4 at 0.1 s against SUMO at 0.001 s | 1.07 cm |
-
-SUMO's Euler update is first order: at its usual 0.1 s step it is 1.06 m from
-its own converged platoon, so the 1.07 cm is its error at 0.001 s; simon at
-0.1 s is within 0.1 mm of its own converged platoon.
-
-#### Traffic
-
-`application/automotive` drives vehicles on a network read from OpenDRIVE.
-A vehicle's state is in lane coordinates: its lane, the s of its front bumper,
-its speed, and how many lanes it has entered. It follows its lane's middle,
-which is the kinematic single-track model with its steering set by the lane's
-curvature, so lane coordinates lose nothing, and its place in the world
-follows from the road's geometry.
-
-Components (`application/automotive/simulation_components.hpp`):
-
-| Component | Holds |
-|---|---|
-| `VehiclePose` | The world's spatial component: the front bumper's position and the heading |
-| `LaneState` | The lane, s, speed and lanes entered |
-| `Driver` | The IDM and MOBIL drivers, the vehicle's length, and the seed that picks its way at forks |
-| `DriveCommand` | The step's acceleration, and a lane to change to |
-
-Schedule (`application/automotive/simulation_systems.hpp`):
-
-| System | Does |
-|---|---|
-| `Decide` | Every step, finds each driver's leader and accelerates by IDM; once a second, weighs the lanes beside it by MOBIL |
-| `Drive` | Every step, changes lane if decided and moves along the lane, entering the next lane on the vehicle's way past its end |
-| `FollowLane` | Every step, puts each vehicle in the world at its lane's middle |
-
-- **A driver reads its neighbors from an index.** `Decide` writes only the
-  command, so it may read every vehicle's lane state; its `prepare` sorts
-  them by lane and distance along. A vehicle's leader and follower in its own
-  lane sit beside it in the index, found through a table from entity to
-  place; in other lanes they are binary searches. A leader is the next vehicle in the lane, else the first in the
-  lanes the vehicle's way leads into, within 250 m; a dead end is a leader
-  standing still.
-- **A vehicle's way is fixed by its seed.** At a fork the lane is picked by
-  SplitMix64 of the driver's seed and the number of lanes it has entered, so
-  the same lane is picked each time it is looked ahead to and taken.
-- **The step holds the acceleration** and moves exactly under it, never
-  backward: a vehicle that would stop within the step stops where it would.
-- **Merges at junctions are not resolved.** Vehicles on different incoming
-  lanes see each other only once in the same lane, and nothing gives way.
-  Signals, priorities and pedestrians are later work.
-
-`automotive_test` drives a ring of two roads, two lanes each way, and CARLA's
-Town01. On the ring, 40 vehicles circulate for 300 s at 18.4 m/s, never
-closer than 1.09 m, and change lanes 129 times, more of them ending in the
-right lane than the left; the same seed repeats exactly. In Town01, 60
-vehicles enter 1,573 lanes through its junctions in 120 s, at 10.2 of their
-11 m/s.
-
-#### Viewer
-
-`bazel run -c opt //application/automotive:viewer -- <file>` watches traffic
-on an OpenDRIVE network, or plays an OpenSCENARIO scenario, under
-`RealTimeDriver`; the file's extension decides which. The map draws each
-lane by its OpenDRIVE type, the center line where lanes run either way, and
-every vehicle as its box; a box smaller than a few pixels becomes a dot, and
-the lanes are sampled no closer than two pixels apart, so a network as large
-as the scale benchmark's 100 rings draws whole. Traffic is colored by speed.
-In a scenario the ego is blue, the others orange, and a vehicle touching the
-ego red, and the map starts 200 m wide about the ego. A click on a vehicle
-follows it, the map keeping it in the middle; the panel reads out its lane,
-s, speed and acceleration in traffic, and in a scenario every vehicle's
-speed and the ego's gap and time to collision, which charts under the map
-trace as nuPlan measures them (`measure_sample`, shared with the batch
-runs).
-
-`road_drawing` samples each lane section's lane borders along the road, at
-most a spacing apart on the reference line, without the UI. `road_drawing_test`
-checks the ring's driving lanes against the exact area of the polygon their
-chords inscribe, to 1e-12, that every lane of Town01 is drawn, and that the
-ring's halves meet. `viewer_traffic_test` and `viewer_scenario_test` run the
-viewer for 60 frames on Town01's traffic and on the curved highway's cut-in.
-
-#### Scale
-
-`automotive_benchmark` drives 1,000, 10,000 and 100,000 vehicles on 100
-rings of 1 km radius, three lanes each way, 3,770 km of lanes in all
-(`roads/rings.xodr`). Drivers want 30 m/s, spread uniformly by 10%, and
-start at 25 m/s; steps are 0.1 s. After 60 s of settling it times 300 steps,
-each system on its own, on one thread. `reference/sumo_benchmark.py` drives
-the same network, converted by netconvert, in SUMO 1.27.1: the same IDM
-drivers, SUMO's LC2013 for changing lanes, one thread, no output, no
-teleporting and no TraCI, timed by SUMO's own duration over the same 300
-steps. Both run on an AMD Ryzen 9 5900XT.
-
-| Vehicles | simon, ns per vehicle-step | SUMO, ns per vehicle-step | SUMO / simon | Mean speed at the end, simon / SUMO |
-|---:|---:|---:|---:|---:|
-| 1,000 | 174 | 1,433 | 8.2 | 29.9 / 29.8 m/s |
-| 10,000 | 234 | 7,140 | 31 | 29.3 / 29.5 m/s |
-| 100,000 | 248 | 6,510 | 26 | 20.4 / 22.2 m/s |
-
-At 100,000 vehicles simon steps in 25 ms, four times faster than real time
-at 0.1 s steps; SUMO takes 651 ms, 6.5 times slower than real time. simon's
-step splits into `Decide` 57%, `FollowLane` 39% and `Drive` 3%. `Decide`'s
-cost is mostly its index, sorted each step, and the IDM's arithmetic;
-`FollowLane`'s is the road geometry, each vehicle's place found from its
-lane's middle on an arc.
-
-The two drive differently in detail, so the comparison is of cost at the
-same load. SUMO's lane changing is LC2013, simon's
-MOBIL, and SUMO updates by Euler where simon holds the acceleration over the
-step. At 100,000 vehicles, 26.5 vehicles a lane-kilometer, traffic is near
-the IDM's capacity at 30 m/s, and both slow down.
-
-Waymax is not measured. Its scenarios come from the Waymo Open Motion
-Dataset, whose license allows only non-commercial use, and its throughput
-depends on the accelerator it runs on, so no figure for it is quoted here.
+| hello | [application/hello](../application/hello/README.md) |
+| defense | [application/defense/design.md](../application/defense/design.md) |
+| aeronautic | [application/aeronautic/design.md](../application/aeronautic/design.md) |
+| automotive | [application/automotive/design.md](../application/automotive/design.md) |
 
 ## Libraries
 
@@ -3315,7 +2124,8 @@ Clang 22 does not. We will revisit it when both compilers do.
 
 ## Roadmap
 
-Each step ends with a working application and passing tests.
+Each step ends with a working application and passing tests. Each
+application's own steps are in its `design.md`.
 
 1. **Framework (done).** `Entity`, `ComponentStore`, `World`, systems, schedules, builders and
    commands, with tests. Benchmark the dense store against the stable-slot
@@ -3326,87 +2136,34 @@ Each step ends with a working application and passing tests.
 2. **Drivers (done).** Replace `lib::SimClock` with the `SimTime` tag and `int64`
    nanoseconds. Add `Step`, the lifecycle, `advance_to`, `BatchDriver`,
    `RealTimeDriver` and `RateGate`. Run `hello` under the real-time driver.
-3. **Missile, headless (done).** The components and schedule above, with a
-   `BatchDriver` test that checks a deterministic outcome for a fixed seed.
-4. **Missile viewer (done).** An ImGui and ImPlot view under `RealTimeDriver`.
-5. **Performance (in progress).** The bar is not "thousands of agents on the
+3. **Performance (in progress).** The bar is not "thousands of agents on the
    development machine". It is scale on cloud machines whose cache and memory
    bandwidth are contended by other heavy loads, and we have not met it yet.
    Benchmarks run idle and under `--contend`.
-   - Done: `missile_benchmark` (per-system cost at 1k to 100k drones, at
+   - Done: `defense_benchmark` (per-system cost at 1k to 100k drones, at
      constant density),
      prepare-time indexes in `UpdateTracks` and `ResolveEngagements`, the
      spatial index, `system_benchmark` (the cost of reaching a sibling) and
      `churn_benchmark` (layouts under churn).
    - Done: archetype segments (see [Stores](#stores)).
-   - Done: the missile simulation measured idle and contended (see
+   - Done: the defense simulation measured idle and contended (see
      [Indexes](#indexes)). At 100,000 drones, 4 contending threads slow it
      4.3 times.
-   - Done: missile follows the practices in
+   - Done: defense follows the practices in
      [Using the framework well](#using-the-framework-well): 2.2 times faster
      idle and 7.7 times faster under contention at 100,000 drones.
-   - Done: `bytes_per_entity_v`, reported per system by `missile_benchmark`.
+   - Done: `bytes_per_entity_v`, reported per system by `defense_benchmark`.
    Consider struct-of-arrays layout inside hot components only if measurements
    call for it.
-6. **Flight dynamics (in progress).** Run flight control algorithms of the
-   class JSBSim runs, at scale, with fidelity as an opt-in (see
-   [Choose fidelity per archetype](#choose-fidelity-per-archetype)).
+4. **Fidelity (in progress).** Precision as an opt-in per archetype (see
+   [Choose fidelity per archetype](#choose-fidelity-per-archetype)), driven
+   by the aeronautic application.
    - Done: staggered rate gates.
-   - Done: control blocks in `model/`: exact first-order lags, rate limits,
-     PI control, and lookup tables with linear interpolation.
    - Done: `Continuous` with Euler, midpoint and Runge-Kutta 4 (see
-     [Continuous state](#continuous-state)). missile, which does not use it,
+     [Continuous state](#continuous-state)). defense, which does not use it,
      pays nothing for it.
-   - Done: the standard atmosphere, a point-mass flight-path model, and the
-     [aeronautic](#aeronautic) application flying it at two fidelity levels.
-   - Done: `aeronautic_benchmark`, idle and contended, for both levels (see
-     [aeronautic](#aeronautic)).
-   - Done: accuracy against JSBSim's 737 (see
-     [Accuracy against JSBSim](#accuracy-against-jsbsim)).
-   - Done: rigid aircraft, six degrees of freedom from JSBSim aircraft
-     converted to data, round a WGS84 Earth or over a flat one, checked
-     against JSBSim layer by layer and whole (see
-     [Rigid aircraft](#rigid-aircraft)).
-   - Done: every level in one world, rigid aircraft flying routes by a small
-     surface autopilot (see [Mixed fidelity](#mixed-fidelity)).
-   - Done: a second, very different aircraft, JSBSim's F-16, with
-     fly-by-wire flight controls and reheat, converted by the same code and
-     checked the same way (see [The F-16](#the-f-16)).
-   - Done: a trim of simon's own, level over the round Earth (see
-     [Trim](#trim)).
-   - Done: an aeronautic viewer for the mixed world (see
-     [Mixed fidelity](#mixed-fidelity)).
-   - Done: wind and MIL-F-8785C turbulence, opt in (see
-     [Wind and turbulence](#wind-and-turbulence)).
-   - Parked: many rigid aircraft batched in one segment, until more than the
-     6,900 one thread flies in real time are needed.
    - Later: Adams-Bashforth with rate history, many replicas of a scenario
-     in one world, world snapshots, and trim tables computed offline. JSBSim,
-     run offline, stays the reference each level's accuracy is measured
-     against.
-
-7. **Automotive (done).** Closed-loop driving at the level of objects,
-   each claim checked against an open reference (see
-   [automotive](#automotive)):
-   - Done: roads, read from OpenDRIVE and checked against libOpenDRIVE.
-   - Done: the lane graph, against libOpenDRIVE's routing graph; the
-     kinematic single-track model, against CommonRoad's; IDM and MOBIL,
-     against movsim and SUMO; traffic on lanes in the ECS.
-   - Done: a scale benchmark against SUMO, 26 times SUMO's speed at 100,000
-     vehicles.
-   - Done: the dynamic and drift single-track models, the Magic Formula
-     tire and the multibody model, against CommonRoad's, with four
-     corrections.
-   - Done: the whole Magic Formula 5.2 and tire property files, against
-     Chrono's Pac02; the Sedan through the ISO handling maneuvers and FMVSS
-     126 against Chrono::Vehicle, with the tires' aligning moments, each
-     wheel steered, and each axle's tires at half its load.
-   - Done: OpenSCENARIO's storyboard, actions and conditions in the ECS,
-     against esmini step by step.
-   - Done: nuPlan's comfort and time to collision, on boxes checked against
-     GEOS; parameter distributions played in batches on threads, against
-     esmini and nuPlan.
-   - Done: a viewer for traffic and for scenarios.
+     in one world, and world snapshots.
 
 Later: `LockstepDriver` and a second process, scenario files with two-phase
 loading, parent-child transforms (a radar mounted on a vehicle), and DIS or HLA

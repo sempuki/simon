@@ -15,7 +15,7 @@
 
 // Red drones fly at a protected asset. Blue radars track them, blue launchers
 // fire interceptors, and every kill is a blast applied to Health.
-namespace simon::missile {
+namespace simon::defense {
 
 using framework::Duration;
 using framework::Entity;
@@ -122,13 +122,13 @@ using framework::Requires;
 
 struct Asset final                                                   //
     : Archetype<"asset",                                             //
-                Requires<Kinematics, Health, missile::Asset>> {};    //
+                Requires<Kinematics, Health, defense::Asset>> {};    //
 struct Radar final                                                   //
     : Archetype<"radar",                                             //
-                Requires<Kinematics, missile::Radar>> {};            //
+                Requires<Kinematics, defense::Radar>> {};            //
 struct Launcher final                                                //
     : Archetype<"launcher",                                          //
-                Requires<Kinematics, missile::Launcher>,             //
+                Requires<Kinematics, defense::Launcher>,             //
                 Allows<WeaponsHold>> {};                             //
 struct RedDrone final                                                //
     : Archetype<"red drone",                                         //
@@ -137,7 +137,7 @@ struct RedDrone final                                                //
                          Health,                                     //
                          Warhead,                                    //
                          Target,                                     //
-                         missile::RedDrone>,                         //
+                         defense::RedDrone>,                         //
                 Allows<Tracked>> {};                                 //
 struct Interceptor final                                             //
     : Archetype<"interceptor",                                       //
@@ -145,13 +145,13 @@ struct Interceptor final                                             //
                          Control,                                    //
                          Warhead,                                    //
                          Target,                                     //
-                         missile::Interceptor>> {};                  //
+                         defense::Interceptor>> {};                  //
 struct Track final                                                   //
     : Archetype<"track",                                             //
-                Requires<missile::Track, Estimate, Engagement>> {};  //
+                Requires<defense::Track, Estimate, Engagement>> {};  //
 struct Blast final                                                   //
     : Archetype<"blast",                                             //
-                Requires<Kinematics, missile::Blast>> {};            //
+                Requires<Kinematics, defense::Blast>> {};            //
 
 }  // namespace archetype
 
@@ -164,4 +164,4 @@ using World = framework::World<
                         archetype::RedDrone, archetype::Interceptor,
                         archetype::Track, archetype::Blast>>;
 
-}  // namespace simon::missile
+}  // namespace simon::defense

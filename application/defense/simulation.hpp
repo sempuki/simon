@@ -9,15 +9,15 @@
 #include <span>
 #include <vector>
 
-#include "application/missile/simulation_components.hpp"
-#include "application/missile/simulation_systems.hpp"
+#include "application/defense/simulation_components.hpp"
+#include "application/defense/simulation_systems.hpp"
 #include "base/core.hpp"
 #include "engine/event_queue.hpp"
 #include "engine/lifecycle.hpp"
 #include "framework/vocabulary.hpp"
 #include "model/random.hpp"
 
-namespace simon::missile {
+namespace simon::defense {
 
 // A circle an operator command applies to.
 struct Sector final {
@@ -213,7 +213,7 @@ auto free_weapons(const Sector& sector, std::span<const Sector> keeping,
 auto destruct_interceptors(const Sector& sector, InOut<World> world)
     -> std::expected<std::size_t, framework::Status>;
 
-// The missile simulation: builds the scenario when configured, and stops when
+// The defense simulation: builds the scenario when configured, and stops when
 // red is defeated or the asset is destroyed. Any driver can run it.
 class Simulation final {
  public:
@@ -263,4 +263,4 @@ class Simulation final {
   std::uint32_t stock_ = 0;  // Interceptors the launchers held when built.
 };
 
-}  // namespace simon::missile
+}  // namespace simon::defense

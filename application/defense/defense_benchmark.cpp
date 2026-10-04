@@ -1,8 +1,8 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-// Times the missile simulation at growing populations, system by system.
+// Times the defense simulation at growing populations, system by system.
 //
-//   bazel run -c opt //application/missile:missile_benchmark [-- --steps N]
+//   bazel run -c opt //application/defense:defense_benchmark [-- --steps N]
 //       [--contend[=N]] [--in-turn] [drones...]
 //
 // --in-turn has each site's radars scan in turn (Scenario::radars_in_turn).
@@ -32,13 +32,13 @@
 #include <tuple>
 #include <vector>
 
-#include "application/missile/simulation.hpp"
+#include "application/defense/simulation.hpp"
 #include "base/core.hpp"
 #include "framework/benchmarking.hpp"
 #include "framework/type_list.hpp"
 #include "framework/vocabulary.hpp"
 
-namespace simon::missile {
+namespace simon::defense {
 namespace {
 
 using namespace std::chrono_literals;
@@ -159,9 +159,9 @@ auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
 }
 
 }  // namespace
-}  // namespace simon::missile
+}  // namespace simon::defense
 
-// missile_benchmark [--steps N] [--contend[=N]] [--in-turn] [drones...]
+// defense_benchmark [--steps N] [--contend[=N]] [--in-turn] [drones...]
 //
 // Without --steps, each population runs up to 500 steps or 30 s of wall time,
 // whichever comes first. Radars scan once a second, so compare runs only over
@@ -169,7 +169,7 @@ auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
 auto main(int argc, char** argv) -> int {
   using simon::framework::benchmark::Contention;
   using simon::framework::benchmark::parse_count;
-  int steps = simon::missile::DEFAULT_STEPS;
+  int steps = simon::defense::DEFAULT_STEPS;
   bool budgeted = true;
   bool in_turn = false;
   unsigned threads = 0;
@@ -199,6 +199,6 @@ auto main(int argc, char** argv) -> int {
   Contention contention{threads};
   std::println("{}", Contention::describe(threads));
   for (int drones : populations) {
-    simon::missile::measure(drones, steps, budgeted, in_turn);
+    simon::defense::measure(drones, steps, budgeted, in_turn);
   }
 }

@@ -10,13 +10,13 @@
 #include <utility>
 #include <vector>
 
-#include "application/missile/simulation_components.hpp"
+#include "application/defense/simulation_components.hpp"
 #include "base/core.hpp"
 #include "framework/system.hpp"
 #include "model/guidance.hpp"
 #include "model/motion.hpp"
 
-namespace simon::missile {
+namespace simon::defense {
 
 using framework::System;
 using framework::SystemList;
@@ -599,4 +599,4 @@ using Schedule = SystemList<Sensing, Engaging, GuideInterceptors,
                             SteerRedDrones, model::Motion, Blasts>;
 using Scheduler = framework::Scheduler<World, Schedule>;
 
-}  // namespace simon::missile
+}  // namespace simon::defense

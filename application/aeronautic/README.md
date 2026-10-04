@@ -1,0 +1,273 @@
+# aeronautic
+
+The aeronautic application shows that simon's framework can carry a flight
+simulation comparable to [JSBSim](https://github.com/JSBSim-Team/jsbsim), a
+widely used open-source flight dynamics model. The application's physics matches JSBSim's layer by
+layer for two very different aircraft, a 737 airliner and an F-16 fighter,
+and one thread flies a hundred thousand aircraft at mixed fidelity.
+Each claim below names the command that checks it. Timings are GCC builds on
+one core of an AMD Ryzen 9 5900XT. The details are in
+[design.md](design.md), and the framework it is built on is described in
+[documents/design.md](../../documents/design.md).
+
+## The physics matches JSBSim
+
+An offline converter (`tools/jsbsim/convert.py`) turns JSBSim's aircraft
+into simon's own format, and the same code converts both. The F-16 brings
+what the 737 lacks: fly-by-wire flight controls that close loops on roll
+rate, pitch rate and load factor through PIDs and switches, an afterburning
+engine, and a pilot whose accelerations the flight controls feel. The
+application rebuilds each layer of each aircraft, and each layer is tested
+against tables recorded from JSBSim:
+
+| Test | Checks | 737 | F-16 |
+|---|---|---:|---:|
+| `aero_test` | Aerodynamic forces and moments at 240 and 300 states, from ground effect to Mach 1.36 | 5e-14 | 9e-15 |
+| `rigid_body_test` | Equations of motion, air data and mass balance at 480 states, at the equator and 60° north | 5e-13 | |
+| `turbine_test` | Spools, thrust and fuel flow, frame by frame through throttle steps, and for the F-16 into reheat and out | 1e-13 | 1e-13 |
+| `flight_control_test` | Every block's output, frame by frame: the 737's surfaces through command sweeps, and all 60 blocks of the F-16's fly-by-wire through three flights | 4e-15 | 2e-16 |
+
+These differences are rounding in double precision. Both aircraft share the
+equations of motion, and the F-16's mass, center of mass and inertia, its
+pilot included, match JSBSim's to within JSBSim's rounded slug, 1.4e-8.
+
+```sh
+bazel test //application/aeronautic:aero_test //application/aeronautic:rigid_body_test \
+    //application/aeronautic:turbine_test //application/aeronautic:flight_control_test
+```
+
+## Both whole aircraft match JSBSim
+
+`check_case_test` flies the 737 open loop for 30 s from JSBSim's trim at 6 km,
+round the rotating WGS84 Earth, through three doublets and a throttle step.
+The reference is JSBSim at 0.5 ms, where its integrators have converged. The
+largest distance from that reference over 30 s:
+
+| Case | simon at 0.5 ms | simon at 8 ms | JSBSim at 8 ms |
+|---|---:|---:|---:|
+| Trim hold | 2.1 mm | 2.8 mm | 1.6 mm |
+| Elevator doublet | 0.9 mm | 1.3 mm | 8.9 mm |
+| Aileron doublet | 2.2 mm | 6.1 mm | 11.7 mm |
+| Rudder doublet | 2.4 cm | 3.8 cm | 41.5 cm |
+| Throttle step | 3.9 mm | 6.0 cm | 11.9 cm |
+
+The first column shows the application's physics agreeing with JSBSim's to
+millimeters. At the same 8 ms step, the framework's Runge-Kutta 4 lands closer
+to the converged answer in every case with an input, and 11 times closer after
+the rudder doublet. The application also leaves out three of JSBSim's
+shortcuts. It has no one-frame lags in induced drag, angle-of-attack rate or
+flight-control inputs, it computes geodetic altitude exactly, and it uses exact
+unit constants.
+
+The F-16 flies the same five cases from its own trim, with the stick in
+place of the elevator and aileron, and its throttle step into reheat. Its
+flight controls run every 8 ms in simon and in the reference alike, as a
+digital flight control computer runs at its own rate. Its control laws
+differentiate the pilot's commands and then clip them, so run at every frame
+they change with the frame and never converge. The reference is JSBSim at
+0.125 ms:
+
+| Case | simon at 0.5 ms | simon at 8 ms | JSBSim at 8 ms |
+|---|---:|---:|---:|
+| Trim hold | 3.7 mm | 3.7 mm | 0.05 mm |
+| Pitch doublet | 2.1 mm | 2.1 mm | 1.5 cm |
+| Roll doublet | 5.6 cm | 5.6 cm | 3.53 m |
+| Rudder doublet | 3.7 mm | 3.7 mm | 0.8 mm |
+| Throttle step into reheat | 1.1 cm | 14.7 cm | 63.2 cm |
+
+simon has converged at 8 ms in every case but the step into reheat. It stays
+within 4 mm of the reference, and within 6 cm after the roll doublet, where
+JSBSim has itself converged only to about 5 cm. At 8 ms simon is 63 times
+closer than JSBSim after the roll doublet, and 4 times closer after the
+throttle step.
+
+```sh
+bazel test //application/aeronautic:check_case_test   # about 3 minutes
+```
+
+## It flies the 737 through its flight controls
+
+The 737's flight controls are JSBSim's model of the airliner's, converted
+block for block. They move the surfaces where the pilot's controls and trims
+put them, with one loop, a yaw damper:
+
+| Channel | What the controls do |
+|---|---|
+| Pitch | Stick and pitch trim, together, move the elevator up to 17° each way |
+| Roll | Wheel and roll trim move the ailerons up to 20°, one up as the other goes down |
+| Yaw | Pedals, yaw trim and a yaw damper, which feeds back the yaw rate above Mach 0.11, move the rudder up to 20° |
+| Flaps | An actuator moves them through eight detents, taking 2 to 5 s for each |
+| Gear | An actuator takes 5 s to lower or raise it |
+| Spoilers | Actuators move the flight and ground spoilers, each fully in 0.6 s |
+
+That is 18 blocks: summers, scheduled gains, surface scales and actuators.
+Replayed through 15 s of recorded commands, which sweep the stick, wheel and
+pedals, step the trims, and move the flaps, gear, speedbrake and spoilers,
+every surface agrees with JSBSim's to 4e-15 on every frame.
+
+```sh
+bazel test //application/aeronautic:flight_control_test
+```
+
+## It flies the F-16 through its fly-by-wire
+
+The F-16's flight controls are JSBSim's model of its fly-by-wire, converted
+block for block. The pilot's stick and rudder command rates and load, and the
+controls close the loops:
+
+| Channel | Loop |
+|---|---|
+| Roll | A PID on the commanded roll rate less the aircraft's |
+| Pitch | A PID on the commanded pitch rate and load factor, the stick's nose-down travel limited to 44% for 9 g up and 4 g down, and its authority falling to zero at 30° angle of attack |
+| Yaw | A PID on the commanded yaw rate and the pilot's lateral acceleration |
+| Flaps | Leading-edge flaps by angle of attack and Mach, trailing-edge flaps below 250 kt |
+| Speedbrake | Out when commanded, or above 53° angle of attack with little sideways velocity |
+| Throttle | Doubled, so the second half of its travel lights the reheat |
+
+That is 60 blocks: summers, gains, scheduled gains, surface scales and
+actuators, with 11 switches, 3 PIDs and a function. The controls read the
+state a real flight control computer senses: calibrated airspeed, by JSBSim's
+pitot formulas, ground speed, body velocity, attitude, and the accelerations
+the pilot feels at the eye point. The flight controls can run at a fixed
+period, as a digital flight control computer does, whatever step the dynamics
+take; the check cases run them every 8 ms.
+
+Replayed through three recorded flights, every block's output agrees with
+JSBSim's to 2e-16 on every frame. The flights cruise while the stick, rudder
+and throttle sweep, pull to high angle of attack below 250 kt, and fly
+supersonic.
+
+```sh
+bazel test //application/aeronautic:flight_control_test
+```
+
+## It trims its own aircraft
+
+simon finds its own trim. Angle of attack, throttle, pitch trim, bank, aileron
+and rudder balance every acceleration, solved together by Newton's method to
+1e-13, with the F-16's fly-by-wire settled in the balance. Trimmed straight in
+space, as JSBSim trims, simon's controls agree with JSBSim's to a few parts in
+10^5, the tolerance JSBSim's trim stops at. By default simon trims level over
+the round Earth instead, turning with the horizon, so the aircraft holds its
+altitude where a straight path climbs as the Earth curves away.
+
+The largest change in altitude and airspeed in 30 s, at 6 km and 200 m/s:
+
+| Trim | 737 | F-16 |
+|---|---:|---:|
+| JSBSim's | 4.0 m, 0.19 m/s | 2.1 m, 0.081 m/s |
+| simon's | 2.0 m, 0.10 m/s | 16 cm, 0.013 m/s |
+| simon's, mass held | 3.7 mm, 0.2 mm/s | 2.4 mm, 0.1 mm/s |
+
+Burning fuel lightens the aircraft, which climbs and speeds up. With the mass
+held, the trim alone is measured.
+
+```sh
+bazel test //application/aeronautic:trim_test
+bazel test //application/aeronautic:check_case_test --test_arg=HoldsTrim
+```
+
+## It flies through wind and turbulence
+
+Wind is opt in. In still air every aircraft costs what it did. In wind, the
+F-16 agrees with JSBSim to 4.4 mm over 30 s, as it does in still air. The 737
+parts from JSBSim by 92 cm, because JSBSim's rate of angle of attack leaves
+out the wind turning in body axes as the aircraft pitches, and the 737's
+pitching moment reads that rate. simon's rate is checked against a numerical
+derivative, and flown with JSBSim's rate the 737 agrees to 1.7 cm.
+
+Turbulence follows MIL-F-8785C's Dryden spectra. Each filter is sampled
+exactly, so the turbulence's variance and correlation are the
+specification's at any step. JSBSim's change with its frame.
+
+```sh
+bazel test //application/aeronautic:check_case_test //model:rigid_aircraft_test
+bazel test //model:wind_test
+```
+
+## It runs faster than JSBSim
+
+| Rigid 737s | Flat Earth | Round Earth |
+|---:|---:|---:|
+| 100 | 1.22 µs | 2.03 µs |
+| 1,000 | 1.16 µs | 2.02 µs |
+| 10,000 | 1.19 µs | 2.06 µs |
+
+The cost per aircraft-step stays flat with population. JSBSim takes 9.2 µs a
+frame for one 737, timed through its Python module. The comparison is rough,
+since JSBSim's frame also runs ground reactions and its property tree. Even so,
+the application evaluates the aircraft four times a step to JSBSim's once and
+is 4.6 times faster round the Earth, and 7.9 times over a flat one. One
+thread flies about 6,900 rigid 737s in real time over a flat Earth.
+
+```sh
+bazel run -c opt //application/aeronautic:rigid_benchmark
+```
+
+## It scales
+
+Point-mass aircraft fly routes under an autopilot, at 20 ms steps:
+
+| Aircraft | Single pass | Runge-Kutta 4 |
+|---:|---:|---:|
+| 1,000 | 0.06 ms | 0.17 ms |
+| 10,000 | 0.63 ms | 1.89 ms |
+| 100,000 | 6.27 ms | 19.2 ms |
+
+A single-pass aircraft costs about 63 ns a step at any population, so 100,000
+of them run 3.2 times faster than real time.
+
+```sh
+bazel run -c opt //application/aeronautic:aeronautic_benchmark
+```
+
+## Fidelity costs only the aircraft that use it
+
+The framework makes fidelity a choice per archetype. A level's systems run
+only on entities whose components opt in, so a simulation pays nothing for a
+level it doesn't use. One world at 100,000 aircraft:
+
+| Aircraft | ms per step | Share |
+|---|---:|---:|
+| 98,900 single pass | 6.20 | 95.3% |
+| 1,000 Runge-Kutta 4 | 0.18 | 2.7% |
+| 100 rigid 737s | 0.13 | 2.0% |
+| All | 6.50 | |
+
+The single-pass aircraft cost the same per aircraft as they do alone. The
+rigid 737s fly the same routes as everyone else, under a deliberately small
+autopilot, and at the world's 20 ms step they stay within 15 cm of the
+converged JSBSim reference.
+
+```sh
+bazel run -c opt //application/aeronautic:aeronautic_benchmark   # the mixed population
+bazel run -c opt //application/aeronautic -- 10000 100 10 10 # and 10 F-16s: 10 min in 25 s
+```
+
+## You can watch it
+
+![The aeronautic viewer](../../documents/images/aeronautic_viewer.png)
+
+The viewer flies a mixed world in real time: 2,000 point-mass aircraft, 20 of
+them on Runge-Kutta 4, with four rigid 737s and four rigid F-16s among them.
+Its panel follows one rigid aircraft, with its route, air data, attitude,
+engine and surfaces, and charts of its altitude and airspeed.
+
+```sh
+bazel run -c opt //application/aeronautic:viewer
+```
+
+## Anyone can regenerate the references
+
+Each JSBSim table comes from a script in
+[application/aeronautic/reference](reference/README.md). The
+tests compare against the committed tables, so they run without JSBSim. To
+regenerate a table, run its script after `pip install jsbsim numpy`.
+
+## What it does not show yet
+
+- **Point-mass accuracy.** The point-mass model drifts 470 m from JSBSim
+  over a 130 km flight (`accuracy_test`). Its fitted drag polar causes most of
+  that drift. The model suits traffic at scale, and the rigid model suits
+  handling.
+- **Ground and stall.** Routes stay between 3 and 9 km.

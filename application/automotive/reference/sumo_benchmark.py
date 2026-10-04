@@ -1,7 +1,7 @@
 # Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 """Times SUMO driving the traffic automotive_benchmark drives, for the
-comparison in design.md.
+comparison in application/automotive/design.md.
 
 SUMO (https://eclipse.dev/sumo, EPL-2.0) converts rings.xodr with netconvert,
 with a speed limit of 30 m/s, and drives 1,000, 10,000 and 100,000 vehicles on it, each following by SUMO's

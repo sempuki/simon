@@ -4,12 +4,12 @@
 #include <expected>
 #include <vector>
 
-#include "application/missile/simulation.hpp"
+#include "application/defense/simulation.hpp"
 #include "base/testing.hpp"
 #include "engine/driver.hpp"
 #include "framework/vocabulary.hpp"
 
-namespace simon::missile {
+namespace simon::defense {
 
 namespace {
 
@@ -140,7 +140,7 @@ auto owners_of(const World& world) -> std::vector<Entity> {
 
 }  // namespace
 
-TEST_CASE("MissileSimulation") {
+TEST_CASE("DefenseSimulation") {
   SECTION("ShouldBlueWinGivenDefaultScenario") {
     Run result = run(Scenario{});
     CHECK(result.outcome == Outcome::BLUE_WINS);
@@ -631,4 +631,4 @@ TEST_CASE("Blasts") {
   }
 }
 
-}  // namespace simon::missile
+}  // namespace simon::defense
