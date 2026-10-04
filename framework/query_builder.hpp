@@ -271,7 +271,6 @@ class [[nodiscard]] DestroyQueryBuilder final {
 //       .each<archetype::RedDrone>()
 //       .within(asset_kinematics, 4000.0 * meter)
 //       .attach(Tracked{})
-//       .detach<Health>()
 //       .alias("hostile")
 //       .build();
 //

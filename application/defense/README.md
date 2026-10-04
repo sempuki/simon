@@ -4,7 +4,7 @@ Red drones fly toward a protected asset. Blue radars track them, blue
 launchers fire interceptors, and the run ends when red is defeated or the
 asset is destroyed. It is the workload the framework's performance is
 measured on: the store layouts, indexes and practices in
-[documents/design.md](../../documents/design.md) were each chosen by
+[framework/design.md](../../framework/design.md) were each chosen by
 measuring it, idle and under contention, at up to 100,000 drones. The
 details are in [design.md](design.md).
 

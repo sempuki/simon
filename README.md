@@ -26,7 +26,7 @@ carries its unit in its type, and time is integer nanoseconds, so runs
 repeat exactly.
 
 The architecture, its decisions and the roadmap are in
-[documents/design.md](documents/design.md).
+[framework/design.md](framework/design.md).
 
 ## The applications
 

@@ -155,6 +155,64 @@ Blasts last a single step, so the viewer never sees one; it draws an
 explosion wherever a drone or interceptor disappears. That is presentation
 only and changes nothing in the simulation.
 
+## Following the framework's practices
+
+defense follows the practices in
+[Using the framework well](../../framework/design.md#using-the-framework-well),
+and measures what they are worth against a layout that does not:
+
+- **`Kinematics` is position and velocity, 48 bytes.** Orientation is a
+  separate `Orientation` component, which nothing in defense needs, and the
+  commanded acceleration is in `Control`. With both inside, it is 112 bytes.
+- **`Track` is three components its archetype requires:** `Track` (target and
+  when it was last seen, 16 bytes), `Estimate` (position and velocity, 48) and
+  `Engagement` (launcher and until when, 16). `DropStaleTracks` reads only
+  `Track`, `ResolveEngagements` only `Engagement` and, for proposed tracks,
+  `Estimate`.
+- **Drones detect themselves.** `ScanRadars` only decides which radars scan.
+  `DetectDrones` lets each untracked drone ask an index of the radars that
+  scanned, and create its own track; `UpdateTracks` uses the same index.
+- **Idle steps do nothing.** `DetectDrones`, `UpdateTracks`,
+  `ResolveEngagements` and `ApplyBlasts` skip their loops when no radar scanned,
+  no launcher proposed or nothing exploded.
+
+At 100,000 drones (ms per step), against fat components and radars that create
+tracks:
+
+| | Without them | With them |
+|---|---:|---:|
+| Idle, 500 steps | 6.33 | 2.87 |
+| Idle, 200 steps | 9.49 | 3.01 |
+| 4 contending threads, 200 steps | 42.4 | 5.53 |
+
+The step is 2.2 times faster idle and 7.7 times faster under contention, where
+it slows 1.8 times rather than 4.5. The cost per entity is flat from 1,000 to
+100,000 drones (12.9 to 13.4 ns per entity-step), and the outcomes are the
+same.
+
+Drones creating their own tracks also means each drone has at most one. When
+radars create tracks, ten radars that cover a drone on one scan each create a
+track before marking it `Tracked`; the nine that lose destroy theirs, but a
+destroyed entity's slot is freed only at the next sync. At ten sites the first
+scan then runs out of entity capacity and tracks 5,000 of 10,000 drones.
+
+`defense_benchmark` prints `framework::bytes_per_entity_v`, the bytes a
+system's loop can read per entity, beside each system's time:
+
+| System | B/entity | System | B/entity |
+|---|---:|---|---:|
+| `SteerRedDrones` | 104 | `TriggerWarheads` | 88 |
+| `Integrate` | 80 | `DropStaleTracks` | 24 |
+| `DetectDrones` | 88 | `ResolveEngagements` | 72 |
+
+A `Target` component that both archetypes require holds a warhead's target,
+so `TriggerWarheads` names `Warhead`, `Kinematics` and `Target`: 88 bytes,
+against 152 when it names `Interceptor` (48 bytes) and `RedDrone` (24) for
+their targets. The time is the same within noise (0.57 to 0.60 ms per step at
+100,000 drones): the runner passes a null `Interceptor` to drones without
+reading it, and most of the time is each drone looking up its target's
+`Kinematics`. The gain is a simpler system and one copy of the target.
+
 ## Roadmap
 
 1. **Headless (done).** The components and schedule above, with a

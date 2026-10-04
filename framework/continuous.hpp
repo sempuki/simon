@@ -20,9 +20,9 @@
 // Continuous state, integrated by an explicit Runge-Kutta method. Opt in by
 // scheduling a Continuous element; a simulation that does not pays nothing.
 //
-//   using Dynamics = Continuous<RungeKutta4, TypeList<Kinematics>,
-//                               SystemList<Gravity, EquationsOfMotion>>;
-//   using Systems = SystemList<FlightControl, Dynamics, CheckOutcome>;
+//   using Rigid = Continuous<RungeKutta4, TypeList<RigidBody>,
+//                            SystemList<RigidAircraftRates>>;
+//   using Schedule = SystemList<RunFlightControls, RunEngines, Rigid, BurnFuel>;
 //
 // The derivative systems are ordinary systems that write rate components. For
 // each stage of the method, the integrator sets every entity's state to the

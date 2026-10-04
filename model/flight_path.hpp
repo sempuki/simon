@@ -17,7 +17,7 @@
 // A point-mass flight-path model: an aircraft as a point with a speed, a
 // flight-path angle and a heading, flown by commanding its load factor, bank
 // and throttle. It is the middle fidelity level between kinematics and 6-DOF
-// (see "Choose fidelity per archetype" in documents/design.md): turns, climbs
+// (see "Choose fidelity per archetype" in framework/design.md): turns, climbs
 // and energy behave as they should, and rotational dynamics are left out.
 //
 // The frame is local Cartesian: x east, y north, z up, so z is altitude.

@@ -8,7 +8,7 @@ and one thread flies a hundred thousand aircraft at mixed fidelity.
 Each claim below names the command that checks it. Timings are GCC builds on
 one core of an AMD Ryzen 9 5900XT. The details are in
 [design.md](design.md), and the framework it is built on is described in
-[documents/design.md](../../documents/design.md).
+[framework/design.md](../../framework/design.md).
 
 ## The physics matches JSBSim
 

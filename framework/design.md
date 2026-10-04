@@ -48,11 +48,11 @@ and handle rules are the point of the project.
 | Wrapper | The callee | Call site |
 |---|---|---|
 | `Out<T>` | writes the argument, and may ignore it | `parse(text, Out(result))` |
-| `InOut<T>` | reads and writes the argument | `scheduler.step(InOut(world), step)` |
-| `Depend<T>` | keeps a reference that can dangle | `BatchDriver{Depend(simulation), timing}` |
+| `InOut<T>` | reads and writes the argument | `scheduler.step(step, InOut(world))` |
+| `Depend<T>` | keeps a reference that can dangle | `BatchDriver{timing, Depend(simulation)}` |
 
-Call sites use the constructor function, `Out(x)`, `InOut(x)` or `Depend(x)`,
-and let it deduce the type; only parameters name it.
+Call sites write `Out(x)`, `InOut(x)` or `Depend(x)` and let class template
+argument deduction find the type; only parameters name it.
 
 **Parameters read inputs first, then what the callee writes or keeps, then what
 it only writes:** `(In..., InOut..., Out)`, with `Depend` among the `InOut`s.
@@ -74,11 +74,14 @@ RETURN_OR_ASSIGN(asset_, build_scenario(scenario_, lib::InOut(world_)));
 
 `RETURN_IF_UNEXPECTED` returns the error, if any, from the enclosing function.
 `RETURN_OR_ASSIGN` does the same and otherwise moves the value into an existing
-variable or a new declaration (`Entity asset`).
+variable or a new declaration (`Entity asset`). The enclosing function must
+return a `std::expected` whose error type the error converts to.
+`RETURN_OR_ASSIGN` expands to several statements, so it goes only where a
+statement can, at most once per line.
 
 **Functions declare a trailing return type:** `auto f(X) -> Y`, `void` ones
-included (`auto step(const Step& step) -> void`). Constructors, destructors and
-conversion operators cannot, and lambdas keep their deduced returns. lib's
+included (`auto integrate_midpoint(..., InOut<Kinematics> kinematics) ->
+void`). Constructors, destructors and conversion operators cannot, and lambdas keep their deduced returns. lib's
 `.clang-tidy`, which simon and volcano link to, checks it with
 `modernize-use-trailing-return-type`; that check skips `void` functions.
 
@@ -128,7 +131,7 @@ property they check, as adjectives where they read well: `Spatial`,
 `write_list_of_t<SystemType>`.
 
 **Accessors are named for what they return, never `get`:** `component_of` and
-`maybe_component_of` (the `try_` form returns a pointer that may be null),
+`maybe_component_of` (the `maybe_` form returns a pointer that may be null),
 `store_of`, `name_of`. Where arguments of different strong types ask different
 questions, one name is overloaded: `find_name_of(Identity)` and
 `find_name_of(Alias)`.
@@ -173,7 +176,7 @@ Anything that does not fit one of these rows needs a design change recorded
 here before it goes in.
 
 ```
-          Driver ── advance_to(T) ──▶ Simulation::step(time, dt)
+          Driver ── advance_to(T) ──▶ Simulation::step(Step{time, dt})
                                             │
                                             ▼
                                   Schedule<SystemA, SystemB, ...>
@@ -189,9 +192,14 @@ here before it goes in.
 An `Entity` is 8 bytes and trivially copyable:
 
 ```cpp
-struct Entity {
-  std::uint32_t index;
-  std::uint32_t generation;
+struct Entity final {
+  static constexpr std::uint32_t INVALID_INDEX =
+      std::numeric_limits<std::uint32_t>::max();
+
+  std::uint32_t index = INVALID_INDEX;
+  std::uint32_t generation = 0;
+
+  friend constexpr auto operator<=>(const Entity&, const Entity&) = default;
 };
 ```
 
@@ -230,18 +238,18 @@ State and the commands that change it are separate components. Guidance writes
 a `Control`, and `Integrate` turns `Control` into motion:
 
 ```cpp
-struct Control {
-  Vec3 acceleration = Vec3::Zero();
+struct Control final {
+  Acceleration acceleration = meters_per_second_squared(0.0, 0.0, 0.0);
 };
 ```
 
-A component that depends on another entity stores that `Entity`:
+A component that depends on another entity stores that `Entity`. A red
+drone's and an interceptor's target is its own component, so a system that
+needs only the target reads 8 bytes:
 
 ```cpp
-struct Interceptor {
-  Entity target;
-  double navigation_gain = 4.0;
-  double max_acceleration = 80.0;
+struct Target final {
+  Entity entity;
 };
 ```
 
@@ -249,9 +257,9 @@ struct Interceptor {
 
 Each component has one `ComponentStore<T>`, which holds all of its entity-components.
 Stores keep that array dense so that large simulations fit in cache. On the development machine (Zen
-3, 512 KiB L2 per core, 32 MiB L3 per chiplet), 5,000 agents with a 72-byte
-`Kinematics` take 360 KiB. That fits in one core's L2. With 50% holes the same
-store takes 720 KiB and spills into L3.
+3, 512 KiB L2 per core, 32 MiB L3 per chiplet), 5,000 agents with a 48-byte
+`Kinematics` take 234 KiB. That fits in one core's L2. With 50% holes the same
+store takes 469 KiB and barely fits; at 10,000 agents it spills into L3.
 
 A store keeps holes out of its data by indexing through the entity, and
 divides the data into segments, one per archetype that requires the component
@@ -284,30 +292,10 @@ A hole costs 8 bytes in the index, instead of a whole component in the array.
 
 **Decided by measurement: dense.** The alternative was a stable-slot store,
 where each entity index has a fixed slot, nothing moves, and a lookup is one
-load, but destroyed entities leave holes. `framework/component_store_benchmark.cpp`
-compares the two with a 72-byte component, destroying a random fraction of the
-population (as when drones are shot down). On the development machine, with
-`-c opt`:
-
-| Entities | Churn | Dense iterate | Stable iterate | Dense lookup | Stable lookup |
-|---:|---:|---:|---:|---:|---:|
-| 10,000 | 0% | 0.88 | 1.17 | 1.25 | 1.19 |
-| 10,000 | 75% | 0.72 | 2.73 | 0.95 | 0.94 |
-| 100,000 | 0% | 0.85 | 1.13 | 1.67 | 1.13 |
-| 100,000 | 50% | 0.93 | 4.86 | 1.52 | 1.14 |
-| 100,000 | 75% | 0.84 | 6.16 | 1.50 | 1.16 |
-| 1,000,000 | 75% | 1.06 | 14.78 | 7.34 | 5.99 |
-
-Times are nanoseconds per live entity (iterate) or per random lookup.
-
-- **Iteration** stays near 1 ns per entity in the dense store at every churn
-  level. The stable-slot store slows in proportion to its holes: 3 to 7 times
-  slower at 75% churn from 100,000 entities up.
-- **Lookup** is 10 to 35% faster in the stable-slot store, which saves one load.
-
-Systems iterate far more than they look up, and a defense run is mostly agents
-dying, so the dense store wins. Run the benchmark with
-`bazel run -c opt //framework:component_store_benchmark`.
+load, but destroyed entities leave holes. Systems iterate far more than they
+look up, and iteration in a stable-slot store slows in proportion to its
+holes, so the dense store wins (see
+[Dense against stable slots](#dense-against-stable-slots)).
 
 #### Sibling components
 
@@ -317,95 +305,16 @@ archetype requires are the common case, since a drone's `Control` exists for
 as long as its `Kinematics` does. A handle resolves such a sibling once, at
 creation; a lookup by entity finds it every step.
 
-`framework/system_benchmark.cpp` measures that lookup against a handle (a
-pointer resolved at creation) and against "structural" access, where both
-arrays share an order and are walked together. A 72-byte driving component
-reads a 24-byte sibling; times are nanoseconds per entity, uncontended:
-
-| Entities | Sibling order | Lookup | Handle | Structural | No sibling |
-|---:|---|---:|---:|---:|---:|
-| 100,000 | aligned | 1.85 | 1.48 | 1.3–2.4 | 0.84 |
-| 100,000 | shuffled | 3.33 | 2.44 | | 0.84 |
-| 1,000,000 | aligned | 6.1 | 5.6 | 5.1 | 3.8 |
-| 1,000,000 | shuffled | 14–16 | 12–13.6 | | 3.9 |
-
-- **The lookup itself costs about 0.4 ns per entity** over a handle when both
-  stores fit in cache, and 8 to 30% at a million entities.
-- **Order matters more than lookup against handle.** When the sibling store's
-  order diverges from the driving store's, both lookup and handle slow by about
-  2.3 times, because each access lands on a random cache line.
-- **Under contention** (`--contend`, 31 threads streaming 256 MB each),
-  everything at a million entities costs 150 to 660 ns per entity, and lookup
-  against handle stays within about 15%. Cache misses decide the cost.
+A lookup costs little more than a handle. The order of the sibling's store
+matters more: when it diverges from the driving store's, every access lands on
+a random cache line (see [Reaching siblings](#reaching-siblings)).
 
 So the question is how to keep siblings in a shared order under churn, without
 asking users to manage it.
 
-#### Layouts under churn
-
-`framework/churn_benchmark.cpp` replays one schedule of operations against
-six layouts. The population is constant; half the births live 1 to 4 steps
-(like blasts) and the rest an average of 500 (like drones). An entity's
-archetype is the set of siblings it is created with. It may attach and detach
-only siblings its archetype allows, as `Tracked` is attached to a drone
-partway through its life. Each step is timed as structural changes, layout
-maintenance and iteration.
-
-| Layout | What it does |
-|---|---|
-| dense | The store before segments: one array per component, swap-erase, and a lookup per sibling |
-| sorted | Dense, and each store is sorted by entity index at sync points once 1 in 8 of it is out of order |
-| group | An EnTT-style owning group: entities with both components sit at the same positions at the front of both stores, kept there by swaps |
-| hybrid | A group, plus sorting the stores it does not own into the owner's order |
-| generational | A settled region in entity order and a nursery in append order; survivors are merged into the settled region |
-| segmented | One chunked segment per archetype in each store, lined up across the archetype's stores (below) |
-
-The case that matters is two systems competing for one store, as `Integrate`
-(Kinematics, Control) and `ApplyBlasts` (Kinematics, Health) both want
-Kinematics. One sibling is on 80% of entities and the other on 50%.
-Nanoseconds per entity-step, uncontended, including structural changes and
-maintenance:
-
-| Entities, sibling size | dense | sorted | group | hybrid | segmented |
-|---|---:|---:|---:|---:|---:|
-| 100,000, 24 B | 22.3 | 14.8 | 11.6 | 16.1 | **4.2** |
-| 100,000, 256 B | 68.6 | 46.3 | 20.0 | 31.5 | **16.7** |
-| 1,000,000, 24 B | 88.4 | 25.5 | 33.8 | 28.3 | **18.1** |
-| 1,000,000, 256 B | 122.2 | 69.7 | 57.8 | 63.7 | **32.6** |
-
-With a single pair, the best case for a group:
-
-| Entities, sibling size | dense | sorted | group | generational | segmented |
-|---|---:|---:|---:|---:|---:|
-| 100,000, 24 B | 5.3 | 4.5 | 2.1 | 4.7 | **1.9** |
-| 100,000, 256 B | 11.2 | 9.5 | **6.3** | 15.1 | 7.6 |
-| 100,000, 1 KB | 18.2 | 24.5 | **13.3** | 28.0 | 14.3 |
-| 1,000,000, 24 B | 18.3 | 10.3 | **5.8** | 9.0 | 7.4 |
-| 1,000,000, 256 B | 23.1 | 23.7 | **13.4** | 26.7 | 16.4 |
-
-Run-to-run noise is about 10%. An earlier contended run at 100,000 entities
-(before toggles were limited to allowed siblings) kept the same ranking:
-dense 570, sorted 283, group 169, generational 284 ns per entity-step with
-24-byte siblings.
-
-What each layout taught:
-
-- **Sorting** helps small components and hurts large ones: a comparison sort
-  moves every component about log n times, so with 1 KB siblings it costs more
-  than it saves. It also pauses, up to 880 ms in one contended step. A
-  permutation sort would move each component once, but the pauses and the
-  tuning threshold remain. Dropped.
-- **Groups** are the fastest single pair, but a store can belong to only one
-  group, so the system that loses the store is left with lookups in an order
-  the group scrambles: 2 times slower than sorting at a million entities. They
-  also need the user, or a solver, to choose owners.
-- **The hybrid** speeds up the loser, and spends the gain sorting.
-- **The generational layout** doubles memory and loses with large components.
-  Entity lifetimes here do follow the generational hypothesis, but the layout
-  answers "when to compact", which is not the question.
-- **Segments** win whenever systems compete, because no store has an owner.
-  They trail a group only where a group also swallows siblings that were
-  attached later; segments leave those in a sparse store.
+Of six layouts measured under churn, archetype segments win whenever
+systems compete for a store, because no store has an owner (see
+[Layouts under churn](#layouts-under-churn)).
 
 #### Archetype segments
 
@@ -462,22 +371,8 @@ ComponentStore<Health>:     [ drone 0..n      | asset ]
   resimulation repeats it. A checkpoint saves segments as they are, with no
   extra bookkeeping.
 
-Measured with `system_benchmark` after the change (nanoseconds per entity,
-uncontended; "allowed" is a sibling attached after creation, "required" one in
-the archetype's segment):
-
-| Entities | Allowed, aligned | Allowed, shuffled | Required | Handle | Structural |
-|---:|---:|---:|---:|---:|---:|
-| 100,000 | 1.92 | 3.17 | 1.51 | 1.47 | 1.3–2.2 |
-| 1,000,000 | 6.03 | 13.46 | 5.18 | 5.54 | 5.17 |
-
-A required sibling costs what a handle or a structural walk costs. Over 3,000
-steps at 10,000 drones, the defense step takes 0.66 ms with segments, against
-0.738 ms with a lookup per sibling: `Integrate` 0.041 against 0.060,
-`TriggerWarheads` 0.070 against 0.105 and `SteerRedDrones` 0.067 against
-0.078. A segmented walk has more fixed cost than an array, so `ApplyBlasts`
-collects the step's few blasts once in `prepare` (0.026 ms) rather than
-walking them once per victim (0.056 ms).
+A required sibling costs what a handle costs (see
+[Segments against lookups](#segments-against-lookups)).
 
 ### Handles and references
 
@@ -491,27 +386,28 @@ A handle has three duties:
 store:
 
 ```cpp
-const Kinematics* target = world.maybe_component_of<Kinematics>(interceptor.target);  // null if gone
-const Kinematics& target = world.component_of<Kinematics>(interceptor.target);      // contract check if gone
+// In a system, with `target_of` the interceptor's Target:
+const Kinematics* maybe_target = world.maybe_component_of<Kinematics>(target_of->entity);  // null if gone
+const Kinematics& target = world.component_of<Kinematics>(target_of->entity);            // contract check if gone
 ```
 
 `maybe_component_of` is the explicit path for "this may have disappeared".
-`component_of` fails a contract check on a stale entity, so misuse stops
-loudly. `ComponentStore` has the same pair. Neither can read
+`component_of` fails a contract check on a stale entity, or one without the
+component, so misuse stops loudly. `ComponentStore` has the same pair. Neither can read
 freed memory, because store memory lives as long as the world.
 
 Raw pointers or references returned by `maybe_component_of` or
 `component_of` are only valid until the next
 sync point. Systems must not keep them across steps.
 
-Nothing registers handles or patches them. Stores have fixed capacity, so a
-component never moves, and the generation check catches a handle to an entity
-that is gone.
+Nothing registers handles or patches them. Stores never reallocate, so a
+component moves only when an erasure at a sync point fills a gap with it, and
+the generation check catches a handle to an entity that is gone.
 
 Archetype segments (see [Sibling components](#sibling-components)) make a
 structural sibling, such as a drone's `Control`, free to reach on every step
-without a handle: a component the archetype requires sits at the entity's own
-index in the sibling's store.
+without a handle: a component the archetype requires sits at the same slot of
+the archetype's segment in each store.
 
 ### Names, identities and aliases
 
@@ -522,7 +418,7 @@ components, systems, entities and entity-components) is known three ways:
 
 | | For | Example | Cost |
 |---|---|---|---|
-| **Name** `{kind, instance}` | Hot loops, logs, crossing processes | `{Entity, 2}` | Two `uint32_t`, one compare |
+| **Name** `{kind, instance}` | Hot loops, logs, crossing processes | `{ENTITY, 2}` | Two `uint32_t`, one compare |
 | **Identity** | Debugging from a console | `/world/1/entity/2/component/3` | Computed from the Name |
 | **Alias** | Meaning only people bring | `"ego"`, `"Luke Skywalker"` | A multimap, off the hot path |
 
@@ -531,12 +427,12 @@ which one:
 
 | Named | Name | Identity |
 |---|---|---|
-| World | `{World, 1}` | `/world/1` |
-| Archetype | `{Archetype, 0}` | `/world/1/archetype/0` |
-| Component | `{Component, 3}` | `/world/1/component/3` |
-| System | `{System, 4}` | `/world/1/system/4` |
-| Entity | `{Entity, 2}` | `/world/1/entity/2` |
-| Entity-component | `{EntityComponent + 3, 2}` | `/world/1/entity/2/component/3` |
+| World | `{WORLD, 1}` | `/world/1` |
+| Archetype | `{ARCHETYPE, 0}` | `/world/1/archetype/0` |
+| Component | `{COMPONENT, 3}` | `/world/1/component/3` |
+| System | `{SYSTEM, 4}` | `/world/1/system/4` |
+| Entity | `{ENTITY, 2}` | `/world/1/entity/2` |
+| Entity-component | `{ENTITY_COMPONENT + 3, 2}` | `/world/1/entity/2/component/3` |
 
 - **Each component type is its own kind for its entity-components,** so an
   entity-component's Name fits in the same two integers and its Identity
@@ -559,8 +455,10 @@ identity for logs, events and anything leaving the process.
 
 **An Identity** is a REST-like path computed from a Name, so the world stores
 no strings for it. `world.format_identity(name)` formats one and
-`world.find_name_of(Identity{path})` parses one back, returning nothing for anything that does not exist in this
-world. `world.describe(name)` gives a one-line summary for a console:
+`world.find_name_of(Identity{path})` parses one back, returning nothing for
+anything that does not exist in this world. System Names are the exception:
+systems belong to schedulers, which the world does not see, so any system
+instance parses. `world.describe(name)` gives a one-line summary for a console:
 
 ```
 /world/1/entity/0 (red) archetype ball: Kinematics, Control, Thrust, Wind, Drag, Collider, Collision
@@ -584,29 +482,27 @@ callers say which they mean.
   `/world/1/component/3` is also findable as `Kinematics`.
 - Archetypes are aliased by their names, so the ball archetype is findable as
   "ball".
-- Destroying an entity drops its aliases.
+- Destroying an entity drops its aliases when the destruction applies, at the
+  next sync point.
 
-Aliases are an index beside the stores, not store shape, so alias changes take
-effect immediately at `build()` instead of at the next sync point.
+Aliases are an index beside the stores, not store shape, so `alias` and
+`unalias` take effect immediately at `build()` instead of at the next sync
+point.
 
-**A component query** finds every entity with a set of components, optionally
-filtered:
-
-```cpp
-world.query<const Kinematics, const Team>()
-    .where([](const Kinematics&, const Team& team) { return team == Team::Red; })
-    .for_each([&](Entity e, const Kinematics& k, const Team&) { ... });
-```
-
-A query iterates the smallest store in the set and looks up the rest.
+Entities are selected by the query forms of `change()` and `destroy()` (see
+[Builders and commands](#builders-and-commands)): `each<Archetype or
+Component>()`, `within`, `where`, `having` and `lacking`. A query walks one
+archetype's segment or one store and filters what it finds. Reading by query
+outside those builders, such as `world.query<const Kinematics, const Team>()`,
+is planned.
 
 Code never asks for a named thing before it exists, so nothing waits on a
 callback for one to appear. Two rules make that hold:
 
 - **Scenario loading is two-phase.** Create every named entity first, then
   resolve references by name.
-- **At runtime, look names up when they are used.** Code that must react to a
-  new entity subscribes to an `EntityCreated` event.
+- **At runtime, look names up when they are used.** No event announces a new
+  entity; a system finds one when it next walks its store.
 
 ### Builders and commands
 
@@ -746,10 +642,11 @@ commands.
 
 **Domain builders are atomic, through transactions.** `world.transaction()`
 opens one. While it is open, every planned change records how to undo itself:
-entities reserved and their names, aliases, planned attachments, detachments
-and destructions, and their commands. `commit()` keeps them; a transaction that
+entities reserved, aliases, planned attachments, detachments and
+destructions, and their commands. `commit()` keeps them; a transaction that
 ends without committing rolls them back, newest first, so an early return
-undoes the whole utterance and leaves no capacity reserved:
+undoes the whole utterance and leaves no capacity reserved. A rolled-back
+entity's Name number is not given again, so later Names skip it:
 
 ```cpp
 auto transaction = world_->transaction();
@@ -793,7 +690,6 @@ std::expected<std::size_t, Status> changed =
         .each<archetype::RedDrone>()
         .within(asset_kinematics, 4000.0 * meter)
         .attach(Tracked{})
-        .detach<Health>()
         .alias("hostile")
         .build();
 ```
@@ -830,10 +726,10 @@ next system runs, so later systems in the same step see the change.
 
 Builders validate an utterance against the planned state: what the world will
 be once pending commands apply. Each component keeps a plan of which entities
-will gain or lose it and how many entity-components are waiting to be attached,
-and the world tracks which entities will be destroyed. So a second radar trying
-to mark a drone `Tracked` in the same step is refused, although the first mark
-is not applied yet, and applying a batch at `sync()` cannot fail.
+will gain or lose it and how much its store will have grown, and the world
+tracks which entities will be destroyed. So a second attach of `Tracked` to a
+drone in the same step is refused, although the first is not applied yet, and
+applying a batch at `sync()` cannot fail.
 
 Two things happen when `build()` succeeds rather than at sync:
 
@@ -893,25 +789,37 @@ template <typename DrivingComponentType, typename... OtherComponentTypes>
 struct System {
   using DrivingComponent = DrivingComponentType;
   using OtherComponentList = TypeList<OtherComponentTypes...>;
+  using AllowComponentList = TypeList<>;
+  using ExcludeComponentList = TypeList<>;
+  using SequenceAfterSystemList = SystemList<>;
 };
 
 struct GuideInterceptors final   //
     : System<const Interceptor,  //
              const Kinematics,   //
-             Control> {
-  using SequenceAfterSystemList = SystemList<UpdateTracks>;
-  using AllowComponentList = TypeList<Kinematics>;   // other entities, always read-only
+             Control,            //
+             Target> {
   using SystemWorld = ProjectedWorld<GuideInterceptors>;
+  using SequenceAfterSystemList = SystemList<LaunchInterceptors>;
+  using AllowComponentList = TypeList<Kinematics, RedDrone>;  // Other entities, read-only.
 
   auto operator()(SystemWorld& world, Entity self,  //
                   const Interceptor& interceptor,   //
                   const Kinematics* kinematics,     //
                   Control* control,                 //
-                  Step step) const -> void {
-    if (!kinematics || !control) return;
-    const Kinematics* target = world.maybe_component_of<Kinematics>(interceptor.target);
-    if (!target) { ... }
-    control->acceleration = model::compute_proportional_navigation(*kinematics, *target, interceptor);
+                  Target* target_of,                //
+                  Step step) -> void {
+    if (!kinematics || !control || !target_of) {
+      return;
+    }
+    const Kinematics* target =
+        world.maybe_component_of<Kinematics>(target_of->entity);
+    ...
+    control->acceleration = model::limit(
+        model::compute_proportional_navigation(*kinematics, *target,
+                                               interceptor.navigation_gain) +
+            model::hold_speed(*kinematics, interceptor.speed, SPEED_RESPONSE),
+        interceptor.agility);
   }
 };
 ```
@@ -953,8 +861,8 @@ Rules:
 - **Constness is declared in the `System` type, nowhere else.** Components are
   written plainly (`System<Interceptor, Control>`). To read a component without
   writing it, declare it `const` (`System<const Interceptor, Control>`). The
-  framework then takes a `const ComponentStore<T>*` for it, and a const store only hands
-  out `const T&` and `const T*`. The call operator must accept what the
+  framework then reads it through a `const ComponentStore<T>&`, and a const
+  store only hands out `const T&` and `const T*`. The call operator must accept what the
   declaration implies; a mismatch is a compile error.
 - **Other entities are reached through an allow list.** `using AllowComponentList =
   TypeList<...>;` opts the system in to reading those stores by entity.
@@ -969,8 +877,8 @@ Rules:
   component up for an archetype that only allows it, and checks nothing for
   one that cannot have it. A system that excludes nothing pays nothing, and
   one cannot both name and exclude a component. Fidelity levels use it: the
-  aeronautic application's single-pass `Fly` excludes the `AirStateRate` that
-  only Runge-Kutta aircraft have.
+  aeronautic application's single-pass `Fly` excludes the `AirStateRate` and
+  `RigidBody` that only Runge-Kutta and rigid aircraft have.
 - **The call order is `(ProjectedWorld& world, Entity self, driving component,
   other components..., Step step)`.** `ProjectedWorld<S, W>` is the system's
   opt-in access to the world: its allow list, spatial and name queries, and
@@ -1007,7 +915,8 @@ way, each scheduled system is one object that lives as long as its scheduler.
 
 Because the structure is a type, it composes. A system can be generic
 (`template <typename Body> struct Integrate : System<Kinematics, const Control,
-const Body>`), wrapped (`EveryN<10, S>`), or generated (an interop layer could
+const Body>`), wrapped (as `Continuous` wraps the systems it integrates), or
+generated (an interop layer could
 declare `Replicate<T> : System<T, const Replica<T>>` for every component it
 publishes). A later builder built on expression templates could assemble
 `System<...>` types the same way.
@@ -1061,12 +970,12 @@ written the batch, and look up the side being read.
 #### Example: detonation
 
 ```
-TriggerWarheads   driven by Warhead, reads Kinematics*   writes its own warhead state
-   │  on trigger:  world.create<Blast>().under(self).with(Kinematics{...}).with(Blast{...}).build()
+TriggerWarheads   driven by Warhead, reads Kinematics*, Target*
+   │  on trigger:  world.create<archetype::Blast>().under(self).with(Kinematics{...}).with(Blast{...}).build()
    │               world.destroy(self).build()
    ▼  sync point: this step's Blast entities exist
 ApplyBlasts       driven by Health, reads Kinematics*    victims are the batch; each writes only itself
-   │  asks the world for blasts within range, read-only
+   │  prepare collects the step's blasts; each victim checks them, read-only
    │  if destroyed: world.destroy(self).build()
    ▼
 ExpireBlasts      driven by Blast                        destroys blasts older than one step
@@ -1080,9 +989,9 @@ ExpireBlasts      driven by Blast                        destroys blasts older t
 - **Victims write only themselves.** Two blasts hitting one victim, or a victim
   destroyed partway through, cannot produce order-dependent results. Each
   victim sums its own damage.
-- **"Everything within the radius"** is a world query. The world's spatial
-  index is updated once per step after `Motion` and read-only for the rest of
-  the step.
+- **"Everything within the radius"** is read-only. A step has few blasts, so
+  `ApplyBlasts` collects them once in `prepare` and each victim checks the
+  list. A larger set would ask the spatial index (see [Indexes](#indexes)).
 - **Victims that must react** set state on themselves (for example `Damaged`)
   or publish an event if something rare needs to know.
 
@@ -1099,8 +1008,8 @@ ExpireBlasts      driven by Blast                        destroys blasts older t
 #### Guarding against misuse
 
 - **Reads through the allow list are always read-only.** There is no way to
-  declare a writable one, so "loop over blasts and write each victim" cannot be written. The
-  error message points at the inversion pattern.
+  declare a writable one, so "loop over blasts and write each victim" cannot be
+  written.
 - **A system cannot both write `T` and look it up.** Declaring a non-const `T`
   in the `System` type and `T` in its `AllowComponentList` fails to compile. Reading an array
   partway through writing it gives results that depend on iteration order.
@@ -1108,8 +1017,8 @@ ExpireBlasts      driven by Blast                        destroys blasts older t
 - **Structural changes to other entities go through builders.** Their commands
   apply at the next sync point, so nothing is destroyed partway through an
   iteration.
-- **Pointers from `maybe_component_of` are valid only until the next sync point.** Debug
-  builds can wrap them to catch one kept longer.
+- **Pointers from `maybe_component_of` are valid only until the next sync
+  point.** Nothing checks this yet.
 - **The event queue is for rare events.** Per-step traffic belongs in entities
   and components.
 - **The world answers spatial queries,** so nobody writes an O(N²) scan for
@@ -1125,13 +1034,16 @@ A schedule is a type. Its template argument order is the execution order, and
 the compiler holds it fixed. This is what makes a step deterministic and
 replayable.
 
-Running a schedule is a fold expression over its systems. There is no type
-erasure and no virtual call:
+Running a schedule is a fold expression over its systems, with a sync point
+after each. There is no type erasure and no virtual call:
 
 ```cpp
-template <typename... Ss>
-auto run(SystemList<Ss...>, World& world, Step step) -> void {
-  (run_system<Ss>(world, step), ...);   // each call is a direct, inlinable instantiation
+auto step(const Step& step, InOut<WorldType> world) -> void {
+  std::apply(
+      [&](auto&... system) {
+        ((run(step, system, world), world->sync()), ...);
+      },
+      systems_);
 }
 ```
 
@@ -1151,16 +1063,21 @@ framework::Scheduler<World, decltype(schedule)> scheduler{schedule};         // 
 Schedules compose:
 
 ```cpp
-// Toolkit pieces.
-using Motion  = SystemList<Integrate>;
-using Sensing = SystemList<ScanRadars, UpdateTracks, DropStaleTracks>;
-using Blasts  = SystemList<TriggerWarheads, ApplyBlasts, ExpireBlasts>;
+// model/motion.hpp
+using Motion = framework::SystemList<Integrate>;
 
-// Application schedules.
-using HelloSystems   = SystemList<ApplyWind, Motion, DetectCollisions>;
-using DefenseSystems = SystemList<Sensing, ProposeEngagements, ResolveEngagements,
-                               LaunchInterceptors, GuideInterceptors, SteerRedDrones,
-                               Motion, Blasts, CheckOutcome>;
+// application/hello
+using Schedule =
+    framework::SystemList<ApplyForces, model::Motion, DetectCollisions>;
+
+// application/defense
+using Sensing =
+    SystemList<ScanRadars, DetectDrones, UpdateTracks, DropStaleTracks>;
+using Engaging =
+    SystemList<ProposeEngagements, ResolveEngagements, LaunchInterceptors>;
+using Blasts = SystemList<TriggerWarheads, ApplyBlasts, ExpireBlasts>;
+using Schedule = SystemList<Sensing, Engaging, GuideInterceptors,
+                            SteerRedDrones, model::Motion, Blasts>;
 ```
 
 - **Nested schedules flatten** at compile time into one list.
@@ -1168,11 +1085,14 @@ using DefenseSystems = SystemList<Sensing, ProposeEngagements, ResolveEngagement
   declares `using SequenceAfterSystemList = SystemList<X>;` fails the build if it is scheduled
   before `X`. `SequenceAfterSystemList` is about order only: if `X` is not in the schedule, it
   imposes nothing, so a sub-schedule can run alone.
-- **Rate adapters are schedules too.** For example, `EveryN<10, Sensing>` runs
-  a group every tenth step and is still a type the compiler can inline.
-- **The schedule can be printed.** A test or startup flag prints the flattened
-  list with each system's reads, writes and constraints, generated from the
-  type. This recovers the discoverability a type list otherwise costs.
+- **Schedule elements can run themselves.** `Continuous` is one: it steps the
+  systems it holds several times per step (see
+  [Continuous state](#continuous-state)). A system that runs at its own rate
+  gates itself with a `RateGate` (see [Rate gates](#rate-gates)).
+- **The schedule can be printed.** `Scheduler::describe()` lists the flattened
+  schedule with each system's identity, writes, reads, allow list and
+  exclusions, generated from the type, and `hello_test` checks it. This
+  recovers the discoverability a type list otherwise costs.
 - **Sub-schedules can be tested alone** against a small world.
 
 The order is the type list, and the dependencies that justify it are part of
@@ -1194,9 +1114,9 @@ A world is the entity database. It has two halves:
 ```
           write                                           read
 world.create<C>()...build() ─▶ commands ─▶ World ─▶ by name       world.find_name_of(identity)
-world.change(e)...build()   (applied at            by component  System<A, B...>, world.query<...>()
+world.change(e)...build()   (applied at            by component  System<A, B...>, world.store_of<T>()
 world.destroy(e).build()     sync points)          by space      world.within(center, radius, visit), world.nearest(center, radius, accept)
-                                                   by relation   world.parent(e), world.children(e)
+                                                   by relation   world.parent_of(e)
 ```
 
 We use database terms for ECS concepts where they fit:
@@ -1209,7 +1129,7 @@ We use database terms for ECS concepts where they fit:
 | Schema | The world's component list and archetype list, fixed at compile time |
 | `NOT NULL` and nullable columns | An archetype's `Requires` and `Allows`; builders refuse any other component |
 | Partitions | Archetype segments: each store is partitioned by archetype, in the same order in every store, so a row's fields sit at the same slot |
-| Indexes | Each store's entity index, the name index, the spatial index, the transform hierarchy |
+| Indexes | Each store's entity index, the name index, the spatial index |
 | Selection (`WHERE`) | `where`, `within`, `having` and `lacking` in queries and query forms |
 | Projection | `ProjectedWorld`: the stores a system declares, read-only beyond its own row |
 | Left outer join | A system's loop: `System<A, B, C>` runs for every `A`, with `B` and `C` null where absent |
@@ -1248,11 +1168,12 @@ class World;
 
 using World = framework::World<
     Kinematics,
-    TypeList<Control, Health, Warhead, Blast, RedDrone, Tracked, Asset, Radar,
-             Track, Launcher, Interceptor>,
-    TypeList<archetype::Asset, archetype::Radar, archetype::Launcher,
-             archetype::RedDrone, archetype::Interceptor, archetype::Track,
-             archetype::Blast>>;
+    framework::TypeList<Control, Health, Warhead, Blast, Target, RedDrone,
+                        Tracked, Asset, Radar, Track, Estimate, Engagement,
+                        Launcher, WeaponsHold, Interceptor>,
+    framework::TypeList<archetype::Asset, archetype::Radar, archetype::Launcher,
+                        archetype::RedDrone, archetype::Interceptor,
+                        archetype::Track, archetype::Blast>>;
 ```
 
 - **`Spatial` is the world's only configuration concept.** It needs a distance
@@ -1289,9 +1210,10 @@ using World = framework::World<
     converted with `coordinate_length`.
   - `build(lib::Out(world))` fills the caller's world, discarding everything it
     held, and returns `std::expected<void, Status>`. It refuses a given cell
-    size that is not positive (`CELL_SIZE_INVALID`) and holding more than a store's
-    32-bit slots can index (`CAPACITY_TOO_LARGE`), and a refused plan leaves
-    the world as it was.
+    size that is not positive (`CELL_SIZE_INVALID`) and holding more than half
+    of what 32 bits can count, which leaves each store's 32-bit slots room for a
+    partly filled chunk per segment (`CAPACITY_TOO_LARGE`). A refused plan
+    leaves the world as it was.
   - **A world never moves.** Builders, `ProjectedWorld` and domain builders keep a
     pointer to it and its stores never reallocate, so nothing that refers to a
     world can dangle while it lives. Its default constructor makes an empty
@@ -1313,15 +1235,14 @@ using World = framework::World<
 
 #### Indexes
 
-The world owns two trees. Both are implementation details, exposed only as
-queries:
+The world owns a spatial index, an implementation detail exposed only as
+queries. It answers `within()` and `nearest()` over every entity with the
+`Spatial` component. Its structure (uniform grid, BVH, k-d tree) is the
+world's choice, measured and swappable. Users never supply a tree type.
 
-- **The spatial index** answers `within()` and `nearest()` over every entity
-  with the `Spatial` component. Its structure (uniform grid, BVH, k-d tree) is
-  the world's choice, measured and swappable. Users never supply a tree type.
-- **The transform hierarchy** answers `parent()` and `children()`, and composes
-  poses for mounted entities such as a radar on a vehicle. It is built from
-  `pose()` and a parent relation.
+`parent_of(e)` reads an entity's `Parent`. A transform hierarchy, answering
+`children()` and composing poses for mounted entities such as a radar on a
+vehicle from `pose()` and the parent relation, is planned.
 
 The spatial index is a uniform grid, in `framework/spatial_index.hpp`:
 
@@ -1358,82 +1279,16 @@ The grid is also a toolkit class that a system can own over positions that are
 not the world's spatial component. `ProposeEngagements` indexes track
 estimates this way (see [defense](../application/defense/design.md)).
 
-Measured with the defense benchmark over the same 100 steps at 100,000 drones
-(ms per step):
-
-| | Total | ScanRadars | ProposeEngagements |
-|---|---:|---:|---:|
-| Linear scans | 516 | 51 | 462 |
-| Grid, ring search only | 430 | 84 | 342 |
-| Grid, skipping cells beyond the best match | 162 | 85 | 73 |
-
-`ScanRadars` got slower. That benchmark scaled radars with drones inside a
-fixed band, so every radar's 4 km range covered nearly every drone and the grid
-filtered nothing, while visiting in grid order cost random store accesses.
-Compare runs only over the same number of steps (`--steps N`): radars scan once
-a second, so averages over different windows mix different amounts of scanning.
-
-The benchmark now keeps density constant instead. `Scenario::sites` builds
-copies of the whole site (asset, radars, launchers, drones) on a grid 20 km
-apart, and the benchmark uses one site per 1,000 drones, each with 10 radars
-and 50 launchers. One site builds exactly the single-site scenario. Over 500
-steps, after archetype segments:
-
-| Drones | Sites | ms per step | ns per entity-step |
-|---:|---:|---:|---:|
-| 1,000 | 1 | 0.039 | 18.0 |
-| 10,000 | 10 | 0.651 | 32.2 |
-| 100,000 | 100 | 6.885 | 34.3 |
-
-From 10,000 to 100,000 drones the cost per entity is nearly flat; the step
-from 1,000 is the working set leaving the core's caches.
-
-Every radar scans on the same steps, so `UpdateTracks` indexes the step's
-scanning radars in its `prepare`, in a `SpatialIndex` with 4 km cells (about a
-radar's range), and each track asks for the nearest one whose range covers its
-target. That takes 0.018 and 0.218 ms per step at 10,000 and 100,000 drones.
-Each track checking every scanning radar takes 0.011 and 0.824 ms: cheaper at
-10,000, where a query's fixed cost is more than a loop over 100 radars, and
-four times dearer at 100,000. With 1 km cells the query visits dozens of empty
-cells and takes 0.499 ms at 100,000 drones, so cell size matters as much as
-the index.
-
-So the index picks it. A `SpatialIndex` built without a cell size sizes its
+Cell size matters as much as the index, so the index picks it. A
+`SpatialIndex` built without a cell size sizes its
 cells at every rebuild for about one point per cell over the box the points
 span, counting only the axes they spread along, so points on a plane get
 square cells and height is ignored. Choosing costs one pass over the points.
-A launcher wants the nearest track nobody has engaged, which is often near
-its 3 km range, so with 250 m cells `ProposeEngagements`'s track index would
-cross about 540 cells and find about 57 tracks in them each search. With cells
-sized to the tracks it takes 0.268 ms per step at 100,000 drones against 0.635
-with 250 m cells, and 0.021 against 0.054 at 10,000. The radar index's 4 km
-cells are as good as the chosen size. The world's own index sizes
+The world's own index sizes
 itself the same way unless `cells_of` fixes it.
 
-Under contention (`defense_benchmark --contend=N`, N threads each streaming
-over 256 MB), over 200 steps including the first radar scan, ms per step and
-the slowdown against an idle machine:
-
-| Contending threads | 10,000 drones | 100,000 drones |
-|---:|---:|---:|
-| 0 | 1.20 | 9.4 |
-| 4 | 1.82 (1.5×) | 40.8 (4.3×) |
-| 16 | 14.7 (12×) | 141 (15×) |
-| 31 | 30.6 (26×) | 466 (49×) |
-
-- **Light contention separates the sizes.** With 4 threads, 10,000 drones slow
-  1.5 times and 100,000 slow 4.3 times. The smaller working set is probably
-  still mostly in the 32 MiB L3; the larger one is several times bigger and
-  depends on memory bandwidth, which the neighbors take. This is the bar in
-  step 5: at scale the simulation is bandwidth-bound, so the bytes each entity
-  touches per step are what to reduce.
-- **At 16 and 31 threads the benchmark also competes for cores.** The machine
-  has 32 hardware threads, so those runs measure CPU contention as well as
-  memory contention, and overstate a realistic neighbor. 4 to 8 threads is
-  probably closer.
-- **This window runs slower than the 500-step table above,** because it
-  includes the step where every drone gets a track: 9.4 ms idle at 100,000
-  drones here, against 6.3 ms over 500 steps.
+The index's cost at scale, and the defense step's under contention, are in
+[Spatial index](#spatial-index) and [Contention](#contention).
 
 Entities replicated from another process enter the same indexes, so a spatial
 query finds a red drone whether red is simulated locally or remotely.
@@ -1474,9 +1329,12 @@ A run is reproducible from its scenario and seed. That requires:
 The applications are examples of how to use the framework, so they follow
 these practices, and the framework tries to make each one the easy path. They
 come from measuring the defense simulation at 100,000 drones on an idle and a
-contended machine (see [Indexes](#indexes)). At scale the simulation is bound
+contended machine (see [Contention](#contention)). At scale the simulation is bound
 by memory bandwidth, so most of them are about the bytes each entity touches
 per step.
+
+The defense application measures what each practice is worth (see
+[application/defense/design.md](../application/defense/design.md#following-the-frameworks-practices)).
 
 ### Make components thin, and require what is always there
 
@@ -1492,11 +1350,14 @@ bandwidth, because every system that reads one field streams the whole
 component.
 
 ```cpp
-// Thin components an archetype requires: Steer, Integrate and the spatial index
-// each stream only what they read.
+// Thin components an archetype requires: SteerRedDrones, Integrate and the
+// spatial index each stream only what they read.
 struct Kinematics final { Position position; Velocity velocity; };
-struct Orientation final { Quaternion orientation; };   // Only where needed.
-struct Drone final : Archetype<"drone", Requires<Kinematics, Control, Health>> {};
+struct RedDrone final                                                //
+    : Archetype<"red drone",                                         //
+                Requires<Kinematics, Control, Health, Warhead,       //
+                         Target, defense::RedDrone>,                 //
+                Allows<Tracked>> {};                                 //
 ```
 
 ### Allow only what comes and goes
@@ -1515,9 +1376,9 @@ A system writes only the entity it is called for (see
 component so that each entity's work is local: the entity asks an index about
 the few things near it, never "for each X, visit every Y".
 
-- **Build a small view once per step in `prepare`.** `UpdateTracks` indexes
-  the radars that scanned this step, and `ApplyBlasts` collects the step's
-  blasts, so each track or victim reads a short array or asks an index instead
+- **Build a small view once per step in `prepare`.** `DetectDrones` and
+  `UpdateTracks` index the radars that scanned this step, and `ApplyBlasts`
+  collects the step's blasts, so each track or victim reads a short array or asks an index instead
   of walking a store.
 - **Use the world's spatial index for the spatial component, and a system's
   own `SpatialIndex` for other positions,** as `ProposeEngagements` does for
@@ -1536,7 +1397,8 @@ the few things near it, never "for each X, visit every Y".
 
 A system whose work is rate-gated (radar scans) or event-driven (blasts) should
 not touch every entity on the steps in between. A `prepare` stage that returns
-`bool` skips the per-entity loop when it returns false; `resolve` still runs.
+`bool` skips the per-entity loop, and the `resolve` stage with it, when it
+returns false.
 
 ```cpp
 // Steps without a scan have nothing to detect.
@@ -1564,22 +1426,18 @@ auto operator()(SystemWorld& world, Entity self,  //
   }
 }
 
-[[gnu::cold, gnu::noinline]] static auto detonate(...) -> void;
+[[gnu::cold, gnu::noinline]] static auto detonate(
+    SystemWorld& world, Entity self, const Warhead& warhead,
+    const Kinematics& kinematics) -> void;
 ```
 
 A check most entities fail should be cheap: `within_distance` compares squared
 distances, so it takes no square root. `model::limit` does the same for the
 common case, a command already within the limit, and takes a square root only
-to scale one down. `SteerRedDrones` takes 0.59 ms per step at 100,000 drones
-with it, against 0.72 with a square root every time, and `GuideInterceptors`,
-which also limits its command, 0.152 against 0.166 ms.
-
-`TriggerWarheads` shows both. Building the Blast in its call operator keeps
-the operator out of line, where perf shows it as a separate function: 0.548
-ms per step at 100,000 drones. With the builders moved out it takes 0.32 ms,
-and comparing squares instead of calling `distance`, 0.23 ms. Systems whose
+to scale one down. Systems whose
 rare work is small, such as `DropStaleTracks`, are inlined anyway; check perf
-before splitting one.
+before splitting one (see
+[Small per-entity calls](#small-per-entity-calls)).
 
 ### Measure each system, idle and contended
 
@@ -1587,41 +1445,31 @@ Time every system at the population you care about, on an idle machine and
 under `--contend=N`, over the same number of steps, and check the bytes each
 loop reads per entity (`framework::bytes_per_entity_v`).
 
-Measure with both compilers too. Their inliners disagree, and a function that
-is not inlined into a hot loop shows up as its own line in `perf report`. Two
-cases:
+`framework::bytes_per_entity_v<System>` gives the bytes a system's loop can
+read per entity: the owner, the driving component and every other component it
+names. It is an upper bound, since a sibling the entity's archetype cannot have
+costs nothing, and reads of other entities come on top.
 
-- **Contract checks.** A check that expands in place into a
+Measure with both compilers too. Their inliners disagree, and a function that
+is not inlined into a hot loop shows up as its own line in `perf report`:
+
+- **Contract checks fail out of line.** A check that expands in place into a
   `std::source_location`, a `std::format` and a `throw` is a cold branch GCC
   discounts when it decides what to inline and Clang does not, so Clang leaves
-  small checked functions such as `InOut`'s `operator->` out of line, called
-  several times per entity by `Integrate`. `lib`'s `CHECK_*` macros fail in
-  one cold, never-inlined function, `lib::internal::do_contract_failure`, so a
-  check is a compare and a call. At 100,000 drones that gives Clang's
-  `Integrate` 0.24 ms per step against 0.96 with the check in place, and its
-  whole step 3.14 against 3.92 ms; GCC's step is 3.17 against 3.23 ms.
-- **Hot framework helpers.** Clang declined to inline
-  `SpatialIndex::visit_cell`, which a nearest search calls from several places;
-  with `[[gnu::always_inline]]`, `ProposeEngagements` takes 0.62 ms under
-  Clang against 0.77 without, and the same under GCC.
-
-GCC does not inline mp-units' `Position - Position` into `SteerRedDrones` and
-`TriggerWarheads`, which have several call sites, and that costs it about 8%,
-which is accepted. Clang runs the 100,000-drone step in about 3.0 ms and GCC in
-about 3.2 ms. Contention shows which
-systems are bandwidth-bound: at 100,000 drones, four streaming neighbors slowed
-`ScanRadars` 2.6 times but `TriggerWarheads` 12 times.
+  small checked functions such as `InOut`'s `operator->` out of line. `lib`'s
+  `CHECK_*` macros fail in one cold, never-inlined function,
+  `lib::internal::do_contract_failure`, so a check is a compare and a call.
+- **A hot framework helper may need to be forced inline.** Clang declined to
+  inline `SpatialIndex::visit_cell`, which a nearest search calls from several
+  places, so it is marked `[[gnu::always_inline]]`.
 
 **Use `model::max`, `min` and `clamp` on quantities in hot code.**
 `std::max` and its relatives compare through mp-units' `<=>`, and GCC 16
-compiles that to branches and stack spills instead of one `maxsd`. When the
-flight model moved from raw `double`s to quantities, one `std::max` on a speed
-made `Fly` 8% slower, and forcing functions inline did not recover it.
+compiles that to branches and stack spills instead of one `maxsd`.
 `model::max`, `min` and `clamp` (in `model/units.hpp`) take quantities and
-compare their numbers, so the code keeps its units. With them, the typed
-flight model runs as fast as the `double` one did under GCC (7.24 against 7.25
-ms per step at 100,000 aircraft), and within 2% under Clang. `Actuate` and
-`FlyAutopilot`, which already clamped quantities, got 6% and 3% faster.
+compare their numbers, so the code keeps its units.
+
+What each of these is worth is in [Compilers](#compilers).
 
 ### Choose fidelity per archetype
 
@@ -1632,8 +1480,8 @@ segment and no entity branches on how accurate it is:
 | Level | State | Use |
 |---|---|---|
 | Kinematic | `Kinematics` and a commanded acceleration in `Control` | Crowds, distant traffic, defense's drones |
-| Point-mass flight path | Above, plus speed, flight-path angle, heading and bank that follow commands with a lag | Most aircraft and missiles |
-| 6-DOF | Above, plus attitude, body rates and full aerodynamics, often under `Continuous` | The few entities whose handling matters |
+| Point-mass flight path | `AirState`: position, speed, flight-path angle and heading, turned by load factor and throttle that follow commands with a lag, and a rate-limited bank | Most aircraft and missiles |
+| 6-DOF | `AirState` and `RigidBody`: attitude, body rates and full aerodynamics, under `Continuous` | The few entities whose handling matters |
 
 Model fast dynamics away instead of integrating them with small steps. A
 first-order lag advanced by its exact solution, `x += (u - x)(1 - e^(-dt/τ))`,
@@ -1651,66 +1499,6 @@ practices above already give:
 - Packing several components into one struct to keep them together.
 - Giving up units or `double` for speed.
 
-### Defense follows these practices
-
-The defense simulation follows these practices, and measures what they are
-worth against a layout that does not:
-
-- **`Kinematics` is position and velocity, 48 bytes.** Orientation is a
-  separate `Orientation` component, which nothing in defense needs, and the
-  commanded acceleration is in `Control`. With both inside, it is 112 bytes.
-- **`Track` is three components its archetype requires:** `Track` (target and
-  when it was last seen, 16 bytes), `Estimate` (position and velocity, 48) and
-  `Engagement` (launcher and until when, 16). `DropStaleTracks` reads only
-  `Track`, `ResolveEngagements` only `Engagement` and, for proposed tracks,
-  `Estimate`.
-- **Drones detect themselves.** `ScanRadars` only decides which radars scan.
-  `DetectDrones` lets each untracked drone ask an index of the radars that
-  scanned, and create its own track; `UpdateTracks` uses the same index.
-- **Idle steps do nothing.** `DetectDrones`, `UpdateTracks`,
-  `ResolveEngagements` and `ApplyBlasts` skip their loops when no radar scanned,
-  no launcher proposed or nothing exploded.
-
-At 100,000 drones (ms per step), against fat components and radars that create
-tracks:
-
-| | Without them | With them |
-|---|---:|---:|
-| Idle, 500 steps | 6.33 | 2.87 |
-| Idle, 200 steps | 9.49 | 3.01 |
-| 4 contending threads, 200 steps | 42.4 | 5.53 |
-
-The step is 2.2 times faster idle and 7.7 times faster under contention, where
-it slows 1.8 times rather than 4.5. The cost per entity is flat from 1,000 to
-100,000 drones (12.9 to 13.4 ns per entity-step), and the outcomes are the
-same.
-
-Drones creating their own tracks also means each drone has at most one. When
-radars create tracks, ten radars that cover a drone on one scan each create a
-track before marking it `Tracked`; the nine that lose destroy theirs, but a
-destroyed entity's slot is freed only at the next sync. At ten sites the first
-scan then runs out of entity capacity and tracks 5,000 of 10,000 drones.
-
-`framework::bytes_per_entity_v<System>` gives the bytes a system's loop can
-read per entity: the owner, the driving component and every other component it
-names. It is an upper bound, since a sibling the entity's archetype cannot have
-costs nothing, and reads of other entities come on top. `defense_benchmark`
-prints it beside each system's time:
-
-| System | B/entity | System | B/entity |
-|---|---:|---|---:|
-| `SteerRedDrones` | 104 | `TriggerWarheads` | 88 |
-| `Integrate` | 80 | `DropStaleTracks` | 24 |
-| `DetectDrones` | 88 | `ResolveEngagements` | 72 |
-
-A `Target` component that both archetypes require holds a warhead's target,
-so `TriggerWarheads` names `Warhead`, `Kinematics` and `Target`: 88 bytes,
-against 152 when it names `Interceptor` (48 bytes) and `RedDrone` (24) for
-their targets. The time is the same within noise (0.57 to 0.60 ms per step at
-100,000 drones): the runner passes a null `Interceptor` to drones without
-reading it, and most of the time is each drone looking up its target's
-`Kinematics`. The gain is a simpler system and one copy of the target.
-
 ## Extensible edges
 
 Large simulations connect to other input formats and co-simulators, so we
@@ -1725,11 +1513,11 @@ input from an edge, validate it, and emit typed commands.
 |---|---|---|---|
 | Systems and schedules | Per entity-component | Static: `System<...>`, `SystemList<...>` | Hot path; must inline |
 | World configuration (`Spatial`, component list) | Compile time | Static: `World<S, ...>` | Hot path; closed per build |
-| Input formats (scenario files, other schemas) | At load | Runtime: a reader interface feeding builders | New formats without recompiling the framework |
+| Input formats (scenario files, other schemas) | At load | Runtime: a reader interface feeding builders (planned; `format/` has one concrete reader per format today) | New formats without recompiling the framework |
 | Builders | At load or at sync points | Static interface; may type-erase internally | User-facing grammar that emits typed commands |
-| Co-simulator connections (scatter/gather, DIS, HLA) | Once per step | Runtime: a channel interface | Chosen by configuration; cost amortized over the step |
-| Drivers | Once per step | Runtime: chosen from configuration | Outer loop; batch, real-time or lockstep picked at startup |
-| Component serialization | At the edge | Compile-time traits per component, called through the runtime channel | Typed codecs, reachable through the type-erased edge |
+| Co-simulator connections (scatter/gather, DIS, HLA) | Once per step | Runtime: a channel interface (planned) | Chosen by configuration; cost amortized over the step |
+| Drivers | Once per step | Static today: each `main` picks `BatchDriver` or `RealTimeDriver`; choosing from configuration at startup is planned | Outer loop |
+| Component serialization | At the edge | Compile-time traits per component, called through the runtime channel (planned) | Typed codecs, reachable through the type-erased edge |
 
 ## Time and drivers
 
@@ -1739,9 +1527,9 @@ Time is simulation time, never wall time. It is passed explicitly as a `Step`
 to everything that needs it:
 
 ```cpp
-struct Step {
-  TimePoint time;   // start of this step
-  Duration dt;      // length of this step
+struct Step final {
+  TimePoint time;  // Start of this step.
+  Duration dt;     // Length of this step.
 };
 ```
 
@@ -1772,8 +1560,8 @@ requirements, which include `now()`. GCC, Clang and MSVC do not enforce it. If
 that ever matters, `TimePoint` becomes a small type of our own wrapping
 `nanoseconds` since the start of the run, with the same arithmetic rules.
 
-These live in `lib/base/time.hpp` as `lib::SimTime`, `lib::Duration` and
-`lib::TimePoint` (step 2 replaced the old `double`-second `SimClock`).
+These live in `2nd_party/lib/base/time.hpp` (included as `base/time.hpp`) as
+`lib::SimTime`, `lib::Duration` and `lib::TimePoint` (step 2 replaced the old `double`-second `SimClock`).
 
 ### Units
 
@@ -1782,13 +1570,10 @@ Everything else uses [mp-units](https://mpusz.github.io/mp-units/) (2.5.0,
 in the Bazel Central Registry):
 
 ```cpp
-using namespace mp_units;
-using namespace mp_units::si::unit_symbols;
-
-quantity<isq::length[m]> range = 20 * km;
-quantity<isq::speed[m / s]> cruise = 40 * m / s;
-auto travel = range / cruise;                      // a time quantity
-std::chrono::nanoseconds as_chrono = to_chrono_duration(travel);
+Length range = 20'000.0 * meter;
+Speed cruise = 40.0 * meter_per_second;
+Time travel = range / cruise;
+Time dt = seconds(step.dt);   // From std::chrono.
 ```
 
 - **mp-units is heading into the standard.** It is the reference
@@ -1799,8 +1584,8 @@ std::chrono::nanoseconds as_chrono = to_chrono_duration(travel);
 - **Affine positions.** `quantity_point` is to positions what `time_point` is
   to time. Two positions subtract to a displacement, and adding two positions
   does not compile.
-- **`std::chrono` interop.** Durations and time points convert both ways, so
-  `SimTime` plugs straight in.
+- **`std::chrono` interop.** mp-units converts durations both ways. simon
+  needs one way only, `model::seconds()`, from a `Duration` to a `Time`.
 - **Angles** (radians, degrees) help with the geodetic coordinates DIS needs
   later.
 
@@ -1821,7 +1606,8 @@ linear algebra do not mix easily:
 **Spike results (step 1).** The spike is on branch `spike/units-eigen`
 (`spike/units/`).
 
-- **A thin `Vec3` wrapper over Eigen works as a representation.** Every
+- **A thin `Vec3` wrapper over Eigen (now `QuantityVector`) works as a
+  representation.** Every
   operator evaluates back to `Vec3`, so mp-units never sees an Eigen expression
   type. Plain `Eigen::Vector3d` fails to compile for that reason.
 - **Generated code matches raw Eigen** at `-O2`: integration is identical
@@ -1840,18 +1626,18 @@ linear algebra do not mix easily:
   #175831, mp-units #798). Quantities in plain SI units (`quantity<m/s, Vec3>`)
   compile on both compilers.
 
-**Decision: plain SI units, over a `Vector3` wrapper, everywhere.**
-`model/units.hpp` holds the wrapper, the vector algebra (`dot`, `cross`,
-`norm`), a `seconds()` conversion from `std::chrono`, and every quantity type as
-an alias:
+**Decision: plain SI units, over a `QuantityVector` wrapper of Eigen's
+`Vector3`, everywhere.** `model/units.hpp` holds the wrapper, the vector
+algebra (`dot`, `cross`, `norm`), a `seconds()` conversion from `std::chrono`,
+and every quantity type as an alias:
 
 ```cpp
-using Length = quantity<meter, double>;
-using Time = quantity<second, double>;
-using Rate = quantity<one / second, double>;
-using Displacement = quantity<meter, Vector3>;
-using Velocity = quantity<meter / second, Vector3>;
-using Acceleration = quantity<meter / square(second), Vector3>;
+using Length = units::quantity<meter, double>;
+using Time = units::quantity<second, double>;
+using Rate = units::quantity<per_second, double>;
+using Displacement = units::quantity<meter, QuantityVector>;
+using Velocity = units::quantity<meter_per_second, QuantityVector>;
+using Acceleration = units::quantity<meter_per_second_squared, QuantityVector>;
 using Position = Displacement;   // From the world origin.
 ```
 
@@ -1862,8 +1648,10 @@ using Position = Displacement;   // From the world origin.
   `quantity_point`s.
 - Moving to ISQ quantity kinds once Clang is fixed changes the aliases in
   `units.hpp`, not the code that uses them.
-- `framework` stays free of units: the `Spatial` concept only needs distances to be
-  ordered, so `World::within` takes whatever `distance()` returns.
+- `framework` stays free of units: the `Spatial` concept needs distances that
+  are ordered, plain `coordinates()`, and `coordinate_length()` to turn a
+  distance into a plain number, so `World::within` takes whatever `distance()`
+  returns.
 
 ### Lifecycle
 
@@ -1887,8 +1675,9 @@ in the lifecycle is a small enum, `Phase`: `NEW`, `RUNNING`, `STOPPED`,
 
 ### Drivers
 
-A simulation is anything that implements the lifecycle and
-`step(Step) -> Continue | Stop`. A driver owns time and makes the simulation go.
+A simulation is anything that implements the lifecycle's
+`step(const Step&) -> PhaseResult`, returning `Flow::CONTINUE` or
+`Flow::STOP`. A driver owns time and makes the simulation go.
 
 Every driver uses one contract, `advance_to(T)`. The driver is told a target
 time and substeps toward it at no more than the maximum `dt`, clamping the last
@@ -1968,12 +1757,15 @@ element, `Continuous`, in `framework/continuous.hpp` (its own Bazel target).
 A simulation that does not list one pays nothing for it.
 
 ```cpp
-using Dynamics = framework::Continuous<
-    framework::RungeKutta4,
-    TypeList<Kinematics>,                               // The continuous state.
-    SystemList<Gravity, Aerodynamics, EquationsOfMotion>>;  // Its derivatives.
+// application/aeronautic
+using Rigid = framework::Continuous<framework::RungeKutta4,
+                                    TypeList<RigidBody>,             // The continuous state.
+                                    SystemList<RigidAircraftRates>>;  // Its derivatives.
 
-using AircraftSystems = SystemList<Sensors, FlightControl, Dynamics, CheckOutcome>;
+using Schedule =
+    SystemList<MoveAir, FollowRoute, FlyAutopilot, Actuate, Fly, Precise,
+               DriftWithWind, FlySurfaces, RunFlightControls, RunEngines, Rigid,
+               BurnFuel, FollowRigidBody>;
 ```
 
 - **A continuous component names its rate component** and can be advanced
@@ -2061,11 +1853,267 @@ Transport, liveness heartbeats and any controller process live outside the
 framework. Candidate libraries when we get there are Open-DIS for DIS and OpenRTI or
 Portico for HLA.
 
+## Performance
+
+The measurements behind the decisions above, on the development machine (see
+[Stores](#stores)).
+
+### Dense against stable slots
+
+The alternative to the dense store was a stable-slot store,
+where each entity index has a fixed slot, nothing moves, and a lookup is one
+load, but destroyed entities leave holes. `framework/component_store_benchmark.cpp`
+compares the two with a 72-byte component, destroying a random fraction of the
+population (as when drones are shot down). On the development machine, with
+`-c opt`:
+
+| Entities | Churn | Dense iterate | Stable iterate | Dense lookup | Stable lookup |
+|---:|---:|---:|---:|---:|---:|
+| 10,000 | 0% | 0.88 | 1.17 | 1.25 | 1.19 |
+| 10,000 | 75% | 0.72 | 2.73 | 0.95 | 0.94 |
+| 100,000 | 0% | 0.85 | 1.13 | 1.67 | 1.13 |
+| 100,000 | 50% | 0.93 | 4.86 | 1.52 | 1.14 |
+| 100,000 | 75% | 0.84 | 6.16 | 1.50 | 1.16 |
+| 1,000,000 | 75% | 1.06 | 14.78 | 7.34 | 5.99 |
+
+Times are nanoseconds per live entity (iterate) or per random lookup.
+
+- **Iteration** stays near 1 ns per entity in the dense store at every churn
+  level. The stable-slot store slows in proportion to its holes: 7 to 14 times
+  slower at 75% churn from 100,000 entities up.
+- **Lookup** is up to 48% faster in the stable-slot store, which saves one
+  load, and about the same at 10,000 entities.
+
+Systems iterate far more than they look up, and a defense run is mostly agents
+dying, so the dense store wins. Run the benchmark with
+`bazel run -c opt //framework:component_store_benchmark`.
+
+### Reaching siblings
+
+`framework/system_benchmark.cpp` measures a sibling found by lookup against a handle (a
+pointer resolved at creation) and against "structural" access, where both
+arrays share an order and are walked together. A 72-byte driving component
+reads a 24-byte sibling; times are nanoseconds per entity, uncontended:
+
+| Entities | Sibling order | Lookup | Handle | Structural | No sibling |
+|---:|---|---:|---:|---:|---:|
+| 100,000 | aligned | 1.85 | 1.48 | 1.3–2.4 | 0.84 |
+| 100,000 | shuffled | 3.33 | 2.44 | | 0.84 |
+| 1,000,000 | aligned | 6.1 | 5.6 | 5.1 | 3.8 |
+| 1,000,000 | shuffled | 14–16 | 12–13.6 | | 3.9 |
+
+- **The lookup itself costs about 0.4 ns per entity** over a handle when both
+  stores fit in cache, and 8 to 30% at a million entities.
+- **Order matters more than lookup against handle.** When the sibling store's
+  order diverges from the driving store's, both lookup and handle slow by 1.6
+  to 1.8 times at 100,000 entities and 2.2 to 2.5 times at a million, because
+  each access lands on a random cache line.
+- **Under contention** (`--contend`, 31 threads streaming 256 MB each),
+  everything at a million entities costs 150 to 660 ns per entity, and lookup
+  against handle stays within about 15%. Cache misses decide the cost.
+
+### Layouts under churn
+
+`framework/churn_benchmark.cpp` replays one schedule of operations against
+six layouts. The population is constant; half the births live 1 to 4 steps
+(like blasts) and the rest an average of 500 (like drones). An entity's
+archetype is the set of siblings it is created with. It may attach and detach
+only siblings its archetype allows, as `Tracked` is attached to a drone
+partway through its life. Each step is timed as structural changes, layout
+maintenance and iteration.
+
+| Layout | What it does |
+|---|---|
+| dense | The store before segments: one array per component, swap-erase, and a lookup per sibling |
+| sorted | Dense, and each store is sorted by entity index at sync points once 1 in 8 of it is out of order |
+| group | An EnTT-style owning group: entities with both components sit at the same positions at the front of both stores, kept there by swaps |
+| hybrid | A group, plus sorting the stores it does not own into the owner's order |
+| generational | A settled region in entity order and a nursery in append order; survivors are merged into the settled region |
+| segmented | One chunked segment per archetype in each store, lined up across the archetype's stores (below) |
+
+The case that matters is two systems competing for one store's order, as
+`Integrate` walks Kinematics with Control while `ApplyBlasts` walks Health and
+reads each victim's Kinematics. One sibling is on 80% of entities and the other on 50%.
+Nanoseconds per entity-step, uncontended, including structural changes and
+maintenance:
+
+| Entities, sibling size | dense | sorted | group | hybrid | segmented |
+|---|---:|---:|---:|---:|---:|
+| 100,000, 24 B | 22.3 | 14.8 | 11.6 | 16.1 | **4.2** |
+| 100,000, 256 B | 68.6 | 46.3 | 20.0 | 31.5 | **16.7** |
+| 1,000,000, 24 B | 88.4 | 25.5 | 33.8 | 28.3 | **18.1** |
+| 1,000,000, 256 B | 122.2 | 69.7 | 57.8 | 63.7 | **32.6** |
+
+With a single pair, the best case for a group:
+
+| Entities, sibling size | dense | sorted | group | generational | segmented |
+|---|---:|---:|---:|---:|---:|
+| 100,000, 24 B | 5.3 | 4.5 | 2.1 | 4.7 | **1.9** |
+| 100,000, 256 B | 11.2 | 9.5 | **6.3** | 15.1 | 7.6 |
+| 100,000, 1 KB | 18.2 | 24.5 | **13.3** | 28.0 | 14.3 |
+| 1,000,000, 24 B | 18.3 | 10.3 | **5.8** | 9.0 | 7.4 |
+| 1,000,000, 256 B | 23.1 | 23.7 | **13.4** | 26.7 | 16.4 |
+
+Run-to-run noise is about 10%. An earlier contended run at 100,000 entities
+(before toggles were limited to allowed siblings) kept the same ranking:
+dense 570, sorted 283, group 169, generational 284 ns per entity-step with
+24-byte siblings.
+
+What each layout taught:
+
+- **Sorting** helps small components and hurts large ones: a comparison sort
+  moves every component about log n times, so with 1 KB siblings it costs more
+  than it saves. It also pauses, up to 880 ms in one contended step. A
+  permutation sort would move each component once, but the pauses and the
+  tuning threshold remain. Dropped.
+- **Groups** are the fastest single pair, but a store can belong to only one
+  group, so the system that loses the store is left with lookups in an order
+  the group scrambles: 2 times slower than sorting at a million entities. They
+  also need the user, or a solver, to choose owners.
+- **The hybrid** speeds up the loser, and spends the gain sorting.
+- **The generational layout** doubles memory and loses with large components.
+  Entity lifetimes here do follow the generational hypothesis, but the layout
+  answers "when to compact", which is not the question.
+- **Segments** win whenever systems compete, because no store has an owner.
+  They trail a group only where a group also swallows siblings that were
+  attached later; segments leave those in a sparse store.
+
+### Segments against lookups
+
+Measured with `system_benchmark` after the change to archetype segments (nanoseconds per entity,
+uncontended; "allowed" is a sibling attached after creation, "required" one in
+the archetype's segment):
+
+| Entities | Allowed, aligned | Allowed, shuffled | Required | Handle | Structural |
+|---:|---:|---:|---:|---:|---:|
+| 100,000 | 1.92 | 3.17 | 1.51 | 1.47 | 1.3–2.2 |
+| 1,000,000 | 6.03 | 13.46 | 5.18 | 5.54 | 5.17 |
+
+A required sibling costs what a handle or a structural walk costs. Over 3,000
+steps at 10,000 drones, the defense step takes 0.66 ms with segments, against
+0.738 ms with a lookup per sibling: `Integrate` 0.041 against 0.060,
+`TriggerWarheads` 0.070 against 0.105 and `SteerRedDrones` 0.067 against
+0.078. A segmented walk has more fixed cost than an array, so `ApplyBlasts`
+collects the step's few blasts once in `prepare` (0.026 ms) rather than
+walking them once per victim (0.056 ms).
+
+### Spatial index
+
+Measured with the defense benchmark over the same 100 steps at 100,000 drones
+(ms per step):
+
+| | Total | ScanRadars | ProposeEngagements |
+|---|---:|---:|---:|
+| Linear scans | 516 | 51 | 462 |
+| Grid, ring search only | 430 | 84 | 342 |
+| Grid, skipping cells beyond the best match | 162 | 85 | 73 |
+
+`ScanRadars` got slower. That benchmark scaled radars with drones inside a
+fixed band, so every radar's 4 km range covered nearly every drone and the grid
+filtered nothing, while visiting in grid order cost random store accesses.
+Compare runs only over the same number of steps (`--steps N`): radars scan once
+a second, so averages over different windows mix different amounts of scanning.
+
+The benchmark now keeps density constant instead. `Scenario::sites` builds
+copies of the whole site (asset, radars, launchers, drones) on a grid 20 km
+apart, and the benchmark uses one site per 1,000 drones, each with 10 radars
+and 50 launchers. One site builds exactly the single-site scenario. Over 500
+steps, after archetype segments:
+
+| Drones | Sites | ms per step | ns per entity-step |
+|---:|---:|---:|---:|
+| 1,000 | 1 | 0.039 | 18.0 |
+| 10,000 | 10 | 0.651 | 32.2 |
+| 100,000 | 100 | 6.885 | 34.3 |
+
+From 10,000 to 100,000 drones the cost per entity is nearly flat; the step
+from 1,000 is the working set leaving the core's caches.
+
+By default every radar scans on the same steps, so `UpdateTracks` indexes the step's
+scanning radars in its `prepare`, here in a `SpatialIndex` with 4 km cells
+(about a radar's range), and each track asks for the nearest one whose range
+covers its target. That takes 0.018 and 0.218 ms per step at 10,000 and 100,000 drones.
+Each track checking every scanning radar takes 0.011 and 0.824 ms: cheaper at
+10,000, where a query's fixed cost is more than a loop over 100 radars, and
+four times dearer at 100,000. With 1 km cells the query visits dozens of empty
+cells and takes 0.499 ms at 100,000 drones, so cell size matters as much as
+the index.
+
+So the index picks its own cell size (see [Indexes](#indexes)). A launcher
+wants the nearest track nobody has engaged, which is often near its 3 km
+range, so with 250 m cells `ProposeEngagements`'s track index would
+cross about 540 cells and find about 57 tracks in them each search. With cells
+sized to the tracks it takes 0.268 ms per step at 100,000 drones against 0.635
+with 250 m cells, and 0.021 against 0.054 at 10,000. The radar index's 4 km
+cells are as good as the chosen size.
+
+### Contention
+
+Under contention (`defense_benchmark --contend=N`, N threads each streaming
+over 256 MB), over 200 steps including the first radar scan, ms per step and
+the slowdown against an idle machine:
+
+| Contending threads | 10,000 drones | 100,000 drones |
+|---:|---:|---:|
+| 0 | 1.20 | 9.4 |
+| 4 | 1.82 (1.5×) | 40.8 (4.3×) |
+| 16 | 14.7 (12×) | 141 (15×) |
+| 31 | 30.6 (26×) | 466 (49×) |
+
+- **Light contention separates the sizes.** With 4 threads, 10,000 drones slow
+  1.5 times and 100,000 slow 4.3 times. The smaller working set is probably
+  still mostly in the 32 MiB L3; the larger one is several times bigger and
+  depends on memory bandwidth, which the neighbors take. This is the bar in
+  the roadmap's performance step: at scale the simulation is bandwidth-bound,
+  so the bytes each entity touches per step are what to reduce.
+- **At 16 and 31 threads the benchmark also competes for cores.** The machine
+  has 32 hardware threads, so those runs measure CPU contention as well as
+  memory contention, and overstate a realistic neighbor. 4 to 8 threads is
+  probably closer.
+- **This window runs slower than the 500-step table above,** because it
+  includes the step where every drone gets a track: 9.4 ms idle at 100,000
+  drones here, against 6.3 ms over 500 steps.
+
+### Small per-entity calls
+
+`model::limit` takes a square root only to scale a command down.
+`SteerRedDrones` takes 0.59 ms per step at 100,000 drones with it, against 0.72 with a square root every time, and `GuideInterceptors`,
+which also limits its command, 0.152 against 0.166 ms.
+
+`TriggerWarheads` shows both practices. Building the Blast in its call operator keeps
+the operator out of line, where perf shows it as a separate function: 0.548
+ms per step at 100,000 drones. With the builders moved out it takes 0.32 ms,
+and comparing squares instead of calling `distance`, 0.23 ms.
+
+### Compilers
+
+- **Contract checks.** With checks failing out of line, Clang's `Integrate`,
+  which calls `InOut`'s `operator->` several times per entity, takes 0.24 ms
+  per step at 100,000 drones against 0.96 with the check in place, and its
+  whole step 3.14 against 3.92 ms; GCC's step is 3.17 against 3.23 ms.
+- **Hot framework helpers.** With `SpatialIndex::visit_cell` forced inline,
+  `ProposeEngagements` takes 0.62 ms under Clang against 0.77 without, and the
+  same under GCC.
+
+GCC does not inline mp-units' `Position - Position` into `SteerRedDrones` and
+`TriggerWarheads`, which have several call sites, and that costs it about 8%,
+which is accepted. Later measurements put Clang's 100,000-drone step at about
+3.0 ms and GCC's at about 3.2 ms. Contention shows which
+systems are bandwidth-bound: at 100,000 drones, four streaming neighbors slowed
+`ScanRadars` 2.6 times but `TriggerWarheads` 12 times.
+
+When the flight model moved from raw `double`s to quantities, one `std::max`
+on a speed made `Fly` 8% slower, and forcing functions inline did not recover
+it. With `model::max`, `min` and `clamp`, the typed flight model runs as fast
+as the `double` one did under GCC (7.24 against 7.25 ms per step at 100,000
+aircraft), and within 2% under Clang. `Actuate` and `FlyAutopilot`, which
+already bounded quantities through `model`'s helpers, got 6% and 3% faster.
+
 ## Repository layout
 
 ```
 simon/
-  framework/     Entity, ComponentStore, World, Spatial, names, builders, commands, Step, System, schedules
+  framework/     Entity, ComponentStore, World, Spatial, names, builders, commands, Step, System, schedules, and this design
   engine/        Lifecycle, drivers, RateGate, EventQueue
   model/         Reusable physics and maths, as free functions, and the data they work on: frames, the
                  atmosphere and Earth, rigid bodies, aircraft and their engines, roads and lanes, tires,
@@ -2073,15 +2121,15 @@ simon/
   format/        Readers from files into model/ and scenario/ data: OpenDRIVE, OpenSCENARIO, tire
                  property files, converted aircraft
   scenario/      Scenarios and parameter distributions as OpenSCENARIO describes them, and the player that runs their storyboards
-  application/   Each with a README.md of its results and a design.md
+  application/   Each with a README.md of its results, and a design.md where it has more to say
     hello/       Two bouncing balls, the first application
     defense/     Red drones against blue radars, launchers and interceptors
     aeronautic/  Aircraft flying routes, at several fidelity levels
     automotive/  Traffic, vehicle dynamics and scenarios on OpenDRIVE roads
   tools/         Offline converters, such as JSBSim aircraft to simon's data
-  documents/     This document, the framework's design
+  documents/     Images for the READMEs
   2nd_party/lib  Shared core libraries (submodule)
-  3rd_party/     Every outside library, by alias, and vendored data with its license: CARLA's Town01,
+  3rd_party/     Outside libraries, by alias (Catch2 comes through lib), and vendored data with its license: CARLA's Town01,
                  Chrono's tire, esmini's scenarios, JSBSim's aircraft
 ```
 
@@ -2096,8 +2144,8 @@ player keeps a storyboard's states from step to step. `scenario/` depends on
 ## Applications
 
 Each application keeps a `README.md` of what it shows, with the commands
-that check it, and a `design.md` of how it is built and how it compares with
-other simulators of its domain:
+that check it. Those with more to say keep a `design.md` of how they are
+built and how they compare with other simulators of their domain:
 
 | Application | Design |
 |---|---|
@@ -2147,7 +2195,7 @@ application's own steps are in its `design.md`.
      `churn_benchmark` (layouts under churn).
    - Done: archetype segments (see [Stores](#stores)).
    - Done: the defense simulation measured idle and contended (see
-     [Indexes](#indexes)). At 100,000 drones, 4 contending threads slow it
+     [Contention](#contention)). At 100,000 drones, 4 contending threads slow it
      4.3 times.
    - Done: defense follows the practices in
      [Using the framework well](#using-the-framework-well): 2.2 times faster
