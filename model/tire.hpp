@@ -7,8 +7,9 @@
 
 #include "model/units.hpp"
 
-// A tire's forces by Pacejka's Magic Formula 5.2 (Pacejka, Tire and Vehicle
-// Dynamics, chapter 4; see model/REFERENCES.md): steady state, in pure and
+// A tire's forces by Pacejka's Magic Formula 5.2, as PAC2002 (Pacejka, Tyre
+// and Vehicle Dynamics, 2002, chapter 4; Kuiper and van Oosten; see
+// model/REFERENCES.md): steady state, in pure and
 // combined slip. Forces and slips are in ISO tire axes, x forward along the
 // wheel's heading, y to its left and z up.
 //

@@ -15,8 +15,8 @@ namespace simon::model {
 namespace {
 
 // Gauss-Legendre quadrature on [-1, 1] with 8 points, exact for polynomials
-// up to degree 15 (Abramowitz and Stegun, table 25.4; see
-// model/REFERENCES.md).
+// up to degree 15: the roots of the Legendre polynomial of degree 8 and their
+// weights, to double precision (DLMF section 3.5(v); see model/REFERENCES.md).
 constexpr std::array<double, 8> GAUSS_NODES{
     -0.9602898564975363, -0.7966664774136267, -0.5255324099163290,
     -0.1834346424956498, 0.1834346424956498,  0.5255324099163290,

@@ -42,7 +42,7 @@ TEST_CASE("Geodetic") {
 
   SECTION("ShouldMatchIterationGivenHighLatitude") {
     // Bowring's fixed-point iteration, run to convergence, as an independent
-    // reference.
+    // reference (see model/REFERENCES.md).
     QuantityVector xyz =
         convert_geodetic_to_fixed(Geodetic{.latitude = 60.0 * DEGREE * radian,
                                            .longitude = 10.0 * DEGREE * radian,

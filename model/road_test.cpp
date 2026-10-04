@@ -45,7 +45,8 @@ auto meters_of(const Position& position) -> Vector3 {
 TEST_CASE("Road") {
   SECTION("ShouldFollowFresnelIntegralsGivenClothoid") {
     // Heading pi u^2 / 2 over u in [0, 1], so the end is (C(1), S(1)), the
-    // Fresnel integrals (Abramowitz and Stegun, table 7.7).
+    // Fresnel integrals, to double precision (DLMF section 7.2(iii); see
+    // model/REFERENCES.md).
     PlanPoint end = compute_plan_point(
         geometry(1.0, SpiralGeometry{.curvature_start = 0.0,
                                      .curvature_end = std::numbers::pi}),

@@ -149,7 +149,7 @@ auto second_order_gust(const std::array<double, 2>& state) -> double {
 }
 
 // Advances a lag of time constant `tau` by `dt`, its input moving in a
-// straight line from `from` to `to`: the lag's first-order-hold equivalent
+// straight line from `from` to `to`: the lag's triangle-hold equivalent
 // (Franklin, Powell and Workman; see model/REFERENCES.md).
 auto advance_lag(double lagged, double from, double to, double dt, double tau)
     -> double {

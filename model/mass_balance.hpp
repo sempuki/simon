@@ -30,7 +30,9 @@ struct MassBalance final {
 };
 
 // The mass balance of `aircraft` with `contents` in its tanks, one for each,
-// by the parallel axis theorem (Goldstein; see model/REFERENCES.md), as
+// by the inertia tensor's definition, the parallel axis theorem in tensor
+// form for the empty aircraft's own inertia (Goldstein; see
+// model/REFERENCES.md), as
 // JSBSim's FGMassBalance finds it: the empty aircraft, its point masses and
 // each tank's fuel, as a point mass, about the combined center of mass.
 auto compute_mass_balance(const AircraftData& aircraft,
