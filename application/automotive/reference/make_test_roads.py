@@ -23,7 +23,9 @@ coordinates; light.xodr one lane with a traffic light halfway; crossing.xodr a
 one-way major road crossed by a one-way minor road that gives way; and
 crossroads.xodr four arms meeting with nothing to say who goes first;
 midblock.xodr a straight road, 400 m, with a crosswalk halfway and a light
-each way before it; and zebra.xodr the same without the lights.
+each way before it; zebra.xodr the same without the lights; and grid.xodr
+20 by 20 such junctions as signalized.xodr's, 200 m apart, for the scale
+benchmark with signals and pedestrians.
 
   pip install numpy
   python application/automotive/reference/make_test_roads.py
@@ -271,17 +273,17 @@ def arm_lanes():
 
 
 def signal_xml(signal_id, s, t, dynamic, country, kind, subtype, validity,
-               value=None, unit=None, name=''):
+               value=None, unit=None, name='', orientation='+'):
     extra = ''
     if value is not None:
         extra += ' value="%g"' % value
     if unit is not None:
         extra += ' unit="%s"' % unit
     return ('      <signal id="%s" name="%s" s="%.17g" t="%.17g" zOffset="2.5" '
-            'dynamic="%s" orientation="+" country="%s" type="%s" subtype="%s"%s '
+            'dynamic="%s" orientation="%s" country="%s" type="%s" subtype="%s"%s '
             'height="0.8" width="0.3"><validity fromLane="%d" toLane="%d"/></signal>\n'
-            % (signal_id, name, s, t, 'yes' if dynamic else 'no', country, kind,
-               subtype, extra, validity[0], validity[1]))
+            % (signal_id, name, s, t, 'yes' if dynamic else 'no', orientation,
+               country, kind, subtype, extra, validity[0], validity[1]))
 
 
 def crosswalk_xml(object_id, s, t, corners, local, heading=0.0, pitch=0.0,
@@ -303,12 +305,13 @@ def crosswalk_xml(object_id, s, t, corners, local, heading=0.0, pitch=0.0,
                validity[0], validity[1]))
 
 
-def arm(road_id, outward, half, length, junction, signals='', objects=''):
+def arm(road_id, outward, half, length, junction, signals='', objects='',
+        center=(0.0, 0.0)):
     """A road from `half` + `length` out along `outward` in to `half` from
     the junction's center, ending in the junction, and starting in a
     turnaround of its own."""
-    start = ((half + length) * math.cos(outward), (half + length) * math.sin(outward),
-             outward + math.pi)
+    start = (center[0] + (half + length) * math.cos(outward),
+             center[1] + (half + length) * math.sin(outward), outward + math.pi)
     piece = dict(kind='line', s=0.0, x=start[0], y=start[1], hdg=start[2], length=length)
     return ('  <road name="arm %s" id="%s" length="%.17g" junction="-1">\n'
             '    <link><predecessor elementType="junction" elementId="turn %s"/>'
@@ -321,11 +324,11 @@ def arm(road_id, outward, half, length, junction, signals='', objects=''):
                arm_lanes(), objects, signals))
 
 
-def turnaround(arm_id, outward, half, length):
+def turnaround(arm_id, outward, half, length, center=(0.0, 0.0)):
     """A half circle at arm `arm_id`'s far end that turns its outbound lane
     into its inbound one, in a junction of its own, so traffic circulates."""
     far = half + length
-    x, y = far * math.cos(outward), far * math.sin(outward)
+    x, y = center[0] + far * math.cos(outward), center[1] + far * math.sin(outward)
     # Leave the outbound lane's middle heading out, and turn left into the
     # inbound lane's middle.
     left_in = (-math.sin(outward + math.pi), math.cos(outward + math.pi))
@@ -603,6 +606,136 @@ def midblock(light):
     return roads
 
 
+def grid(n=20, block=200.0):
+    """`n` by `n` junctions, `block` m apart between their edges, like
+    signalized.xodr's: roads of one lane each way with sidewalks join them,
+    each approach has a light 8 m before the junction and a crosswalk 4 m
+    wide, and two controllers group each junction's north-south and
+    east-west lights. Each road at the grid's edge runs half a block out and
+    turns around into itself."""
+    half = 10.0
+    pitch = block + 2.0 * half
+    names = {0.0: 'e', math.pi / 2: 'n', math.pi: 'w', -math.pi / 2: 's'}
+    roads, junctions, turns = [], [], []
+    # Each junction's legs: by outward direction, the road, whether the
+    # road's end (rather than its start) is at the junction, and its length.
+    legs = {(i, j): {} for i in range(n) for j in range(n)}
+
+    def road_xml(road_id, start, hdg, length, predecessor, successor, objects,
+                 signals):
+        piece = dict(kind='line', s=0.0, x=start[0], y=start[1], hdg=hdg,
+                     length=length)
+        return ('  <road name="%s" id="%s" length="%.17g" junction="-1">\n'
+                '    <link><predecessor elementType="junction" elementId="%s"/>'
+                '<successor elementType="junction" elementId="%s"/></link>\n'
+                '    <planView>\n%s    </planView>\n'
+                '    <lanes>\n%s    </lanes>\n'
+                '    <objects>\n%s    </objects>\n'
+                '    <signals>\n%s    </signals>\n  </road>\n'
+                % (road_id, road_id, length, predecessor, successor,
+                   geometry_xml(piece), arm_lanes(), objects, signals))
+
+    def approach(road_id, length, at_end):
+        """The light and crosswalk where road `road_id` meets a junction."""
+        s = length - 8.0 if at_end else 8.0
+        side = -1.0 if at_end else 1.0
+        light = signal_xml('L' + road_id + ('e' if at_end else 's'), s,
+                           side * (LANE + SIDEWALK + 0.5), True, 'DE', '1000001',
+                           '-1', (-1, -1) if at_end else (1, 1),
+                           orientation='+' if at_end else '-')
+        middle = length - 4.0 if at_end else 4.0
+        corners = [(middle - 2.0, -LANE, 0.0), (middle + 2.0, -LANE, 0.0),
+                   (middle + 2.0, LANE, 0.0), (middle - 2.0, LANE, 0.0)]
+        walk = crosswalk_xml('W' + road_id + ('e' if at_end else 's'), middle,
+                             0.0, corners, False)
+        return light, walk
+
+    for i in range(n):
+        for j in range(n):
+            cx, cy = i * pitch, j * pitch
+            junction = 'J%d_%d' % (i, j)
+            for di, dj, outward in ((1, 0, 0.0), (0, 1, math.pi / 2)):
+                if i + di < n and j + dj < n:
+                    road_id = '%s%d_%d' % ('h' if di else 'v', i, j)
+                    start = (cx + half * math.cos(outward), cy + half * math.sin(outward))
+                    light_s, walk_s = approach(road_id, block, False)
+                    light_e, walk_e = approach(road_id, block, True)
+                    roads.append(road_xml(road_id, start, outward, block, junction,
+                                          'J%d_%d' % (i + di, j + dj),
+                                          walk_s + walk_e, light_s + light_e))
+                    legs[(i, j)][outward] = (road_id, False)
+                    back = math.pi if di else -math.pi / 2
+                    legs[(i + di, j + dj)][back] = (road_id, True)
+            # Roads half a block out at the grid's edges, turning around.
+            for outward in (0.0, math.pi / 2, math.pi, -math.pi / 2):
+                ni = i + round(math.cos(outward))
+                nj = j + round(math.sin(outward))
+                if 0 <= ni < n and 0 <= nj < n:
+                    continue
+                road_id = 'b%d_%d%s' % (i, j, names[outward])
+                light, walk = approach(road_id, block / 2.0, True)
+                roads.append(arm(road_id, outward, half, block / 2.0, junction,
+                                 light, walk, center=(cx, cy)))
+                road, turn = turnaround(road_id, outward, half, block / 2.0,
+                                        center=(cx, cy))
+                roads.append(road)
+                turns.append(turn)
+                legs[(i, j)][outward] = (road_id, True)
+
+    for (i, j), here in legs.items():
+        cx, cy = i * pitch, j * pitch
+        junction = 'J%d_%d' % (i, j)
+        rows, controllers = '', ''
+        k = 0
+        for a_out, (a, a_end) in sorted(here.items()):
+            for b_out, (b, b_end) in sorted(here.items()):
+                if a == b:
+                    continue
+                road_id = '%s_%s_%s' % (junction, names[a_out], names[b_out])
+                hdg = a_out + math.pi
+                turn = math.remainder(b_out - hdg, 2.0 * math.pi)
+                start = (cx + half * math.cos(a_out), cy + half * math.sin(a_out))
+                if abs(turn) < 1e-9:
+                    piece = dict(kind='line', length=2.0 * half)
+                else:
+                    piece = dict(kind='arc', length=math.pi * half / 2.0,
+                                 curvature=math.copysign(1.0 / half, turn))
+                piece.update(s=0.0, x=start[0], y=start[1], hdg=hdg)
+                into = -1 if a_end else 1
+                out = 1 if b_end else -1
+                lanes = ('      <laneSection s="0">\n'
+                         '        <center><lane id="0" type="none"/></center>\n'
+                         '        <right>%s</right>\n      </laneSection>\n'
+                         % lane_xml(-1, 'driving', [(0, LANE, 0, 0, 0)], into, out))
+                roads.append(
+                    '  <road name="%s" id="%s" length="%.17g" junction="%s">\n'
+                    '    <link>\n'
+                    '      <predecessor elementType="road" elementId="%s" contactPoint="%s"/>\n'
+                    '      <successor elementType="road" elementId="%s" contactPoint="%s"/>\n'
+                    '    </link>\n'
+                    '    <planView>\n%s    </planView>\n'
+                    '    <lanes>\n%s    </lanes>\n  </road>\n'
+                    % (road_id, road_id, piece['length'], junction, a,
+                       'end' if a_end else 'start', b, 'end' if b_end else 'start',
+                       geometry_xml(piece), lanes))
+                rows += ('    <connection id="%d" incomingRoad="%s" connectingRoad="%s" '
+                         'contactPoint="start"><laneLink from="%d" to="-1"/></connection>\n'
+                         % (k, a, road_id, into))
+                k += 1
+        groups = (('ns', (math.pi / 2, -math.pi / 2)), ('ew', (0.0, math.pi)))
+        for sequence, (name, outwards) in enumerate(groups, start=1):
+            lights = ['L%s%s' % (here[o][0], 'e' if here[o][1] else 's')
+                      for o in outwards if o in here]
+            controller_id = '%s_%s' % (junction, name)
+            roads.append(controller_xml(controller_id, name, sequence, lights))
+            rows += '    <controller id="%s" type="0" sequence="%d"/>\n' % (
+                controller_id, sequence)
+        junctions.append('  <junction id="%s" name="junction %s">\n%s  </junction>\n'
+                         % (junction, junction, rows))
+    # Ids without spaces, which SUMO's netconvert needs.
+    return [text.replace('"turn ', '"turn_') for text in roads + junctions + turns]
+
+
 def document(roads):
     return ('<?xml version="1.0" encoding="UTF-8"?>\n<OpenDRIVE>\n'
             '  <header revMajor="1" revMinor="6" name="simon test" version="1"/>\n'
@@ -640,6 +773,8 @@ def main():
         f.write(document(midblock(True)))
     with open(os.path.join(roads, 'zebra.xodr'), 'w') as f:
         f.write(document(midblock(False)))
+    with open(os.path.join(roads, 'grid.xodr'), 'w') as f:
+        f.write(document(grid()))
     print('wrote', roads)
 
 

@@ -1,17 +1,22 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-// Times traffic at growing populations, system by system, on 100 rings of
-// 1 km radius with three lanes each way, 3,770 km of lanes in all:
+// Times traffic at growing populations, system by system:
 //
 //   bazel run -c opt //application/automotive:automotive_benchmark
-//       [-- --steps N] [--contend[=N]] [vehicles...]
+//       [-- --steps N] [--contend[=N]] [--grid] [populations...]
 //
-// Drivers want 30 m/s, and each step is 0.1 s. The world is driven for 60 s
-// first, so that traffic has settled and drivers change lanes as they would.
-// Each system runs in its own single-system scheduler, in schedule order,
-// against one world.
+// By default, vehicles on 100 rings of 1 km radius with three lanes each
+// way, 3,770 km of lanes in all, drivers wanting 30 m/s; a population is a
+// vehicle count. With --grid, vehicles and pedestrians on a 20 by 20 grid of
+// signalized junctions 200 m apart, with sidewalks and crosswalks, drivers
+// wanting 50 km/h; a population is vehicles:pedestrians.
+//
+// Each step is 0.1 s. The world is driven for 60 s first, so that traffic
+// has settled and drivers change lanes as they would. Each system runs in
+// its own single-system scheduler, in schedule order, against one world.
 
 #include <array>
+#include <charconv>
 #include <chrono>
 #include <cstddef>
 #include <optional>
@@ -19,6 +24,7 @@
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "application/automotive/simulation.hpp"
@@ -36,7 +42,52 @@ constexpr Duration DT = 100ms;
 constexpr int DEFAULT_STEPS = 300;  // 30 s simulated.
 constexpr int SETTLING_STEPS = 600;
 
-auto measure(const Network& network, int vehicles, int steps) -> void {
+// Steps `world` through settling and `steps` more, each of `systems` in its
+// own scheduler in turn, and prints each one's share of the measured time,
+// per step and per entity-step of `entities`.
+template <typename... Systems>
+auto time_systems(InOut<World> world, int steps, double entities,
+                  std::array<std::string_view, sizeof...(Systems)> names,
+                  Systems... systems) -> void {
+  std::tuple<framework::Scheduler<World, SystemList<Systems>>...> schedulers{
+      SystemList<Systems>{std::move(systems)}...};
+  std::array<double, sizeof...(Systems)> seconds{};
+  for (int i = 0; i < SETTLING_STEPS + steps; ++i) {
+    framework::Step step{.time = TimePoint{} + i * DT, .dt = DT};
+    std::size_t index = 0;
+    std::apply(
+        [&](auto&... scheduler) {
+          auto timed = [&](auto& one) {
+            auto start = WallClock::now();
+            one.step(step, world);
+            if (i >= SETTLING_STEPS) {
+              seconds[index] +=
+                  std::chrono::duration<double>(WallClock::now() - start)
+                      .count();
+            }
+            ++index;
+          };
+          (timed(scheduler), ...);
+        },
+        schedulers);
+  }
+
+  double total = 0.0;
+  for (double s : seconds) {
+    total += s;
+  }
+  std::println("  total {:10.3f} ms/step {:10.1f} ns/entity-step",
+               1e3 * total / steps, 1e9 * total / (entities * steps));
+  std::array<std::size_t, sizeof...(Systems)> bytes{
+      framework::bytes_per_entity_v<Systems>...};
+  for (std::size_t i = 0; i < names.size(); ++i) {
+    std::println("  {:<22} {:10.3f} ms/step {:6.1f}% {:6} B/entity", names[i],
+                 1e3 * seconds[i] / steps, 100.0 * seconds[i] / total,
+                 bytes[i]);
+  }
+}
+
+auto measure_rings(const Network& network, int vehicles, int steps) -> void {
   Scenario scenario{
       .vehicles = vehicles,
       .starting_speed = 25.0 * model::meter_per_second,
@@ -46,91 +97,105 @@ auto measure(const Network& network, int vehicles, int steps) -> void {
   CHECK_POSTCONDITION(
       build_scenario(scenario, network, InOut(world)).has_value());
   world.sync();
-
-  framework::Scheduler<World, SystemList<Decide>> decide{
-      SystemList{Decide{network}}};
-  framework::Scheduler<World, SystemList<Drive>> drive{
-      SystemList{Drive{network}}};
-  framework::Scheduler<World, SystemList<FollowLane>> follow{
-      SystemList{FollowLane{network}}};
-  std::array<double, 3> seconds{};
-  for (int i = 0; i < SETTLING_STEPS + steps; ++i) {
-    framework::Step step{.time = TimePoint{} + i * DT, .dt = DT};
-    std::size_t index = 0;
-    auto timed = [&](auto& scheduler) {
-      auto start = WallClock::now();
-      scheduler.step(step, InOut(world));
-      if (i >= SETTLING_STEPS) {
-        seconds[index] +=
-            std::chrono::duration<double>(WallClock::now() - start).count();
-      }
-      ++index;
-    };
-    timed(decide);
-    timed(drive);
-    timed(follow);
-  }
+  std::println("\n{} vehicles: {} steps of 0.1 s", vehicles, steps);
+  time_systems(InOut(world), steps, vehicles, {"Decide", "Drive", "FollowLane"},
+               Decide{network}, Drive{network}, FollowLane{network});
 
   double speeds = 0.0;
   world.store_of<LaneState>().for_each([&](Entity, const LaneState& state) {
     speeds += state.speed.numerical_value_in(model::meter_per_second);
   });
+  std::println("  ending at {:.1f} m/s", speeds / vehicles);
+}
 
-  double total = seconds[0] + seconds[1] + seconds[2];
-  double entity_steps = static_cast<double>(vehicles) * steps;
-  std::println("\n{} vehicles: {} steps of 0.1 s, ending at {:.1f} m/s",
-               vehicles, steps, speeds / vehicles);
-  std::println("  total {:10.3f} ms/step {:10.1f} ns/entity-step",
-               1e3 * total / steps, 1e9 * total / entity_steps);
-  std::array<std::string_view, 3> names{"Decide", "Drive", "FollowLane"};
-  std::array<std::size_t, 3> bytes{framework::bytes_per_entity_v<Decide>,
-                                   framework::bytes_per_entity_v<Drive>,
-                                   framework::bytes_per_entity_v<FollowLane>};
-  for (std::size_t i = 0; i < 3; ++i) {
-    std::println("  {:<22} {:10.3f} ms/step {:6.1f}% {:6} B/entity", names[i],
-                 1e3 * seconds[i] / steps, 100.0 * seconds[i] / total,
-                 bytes[i]);
-  }
+auto measure_grid(const Network& network, int vehicles, int pedestrians,
+                  int steps) -> void {
+  Scenario scenario{
+      .vehicles = vehicles,
+      .starting_speed = 10.0 * model::meter_per_second,
+      .following = {.desired_speed = 50.0 / 3.6 * model::meter_per_second},
+      .pedestrians = pedestrians};
+  World world;
+  CHECK_POSTCONDITION(build_world(scenario, network, Out(world)).has_value());
+  CHECK_POSTCONDITION(
+      build_scenario(scenario, network, InOut(world)).has_value());
+  world.sync();
+  std::println("\n{} vehicles and {} pedestrians: {} steps of 0.1 s", vehicles,
+               pedestrians, steps);
+  time_systems(InOut(world), steps, vehicles + pedestrians,
+               {"RunSignals", "Pace", "Decide", "Drive", "FollowLane", "Walk",
+                "PlaceWalker"},
+               RunSignals{}, Pace{network}, Decide{network}, Drive{network},
+               FollowLane{network}, Walk{network}, PlaceWalker{network});
+
+  double speeds = 0.0;
+  world.store_of<LaneState>().for_each([&](Entity, const LaneState& state) {
+    speeds += state.speed.numerical_value_in(model::meter_per_second);
+  });
+  std::uint64_t trips = 0;
+  world.store_of<WalkRoute>().for_each(
+      [&](Entity, const WalkRoute& route) { trips += route.trips; });
+  std::println("  vehicles ending at {:.1f} m/s; pedestrians walked {} trips",
+               vehicles > 0 ? speeds / vehicles : 0.0, trips);
 }
 
 }  // namespace
 }  // namespace simon::automotive
 
-// automotive_benchmark [--steps N] [--contend[=N]] [vehicles...]
+// automotive_benchmark [--steps N] [--contend[=N]] [--grid] [populations...]
 auto main(int argc, char** argv) -> int {
   using simon::framework::benchmark::Contention;
   using simon::framework::benchmark::parse_count;
   int steps = simon::automotive::DEFAULT_STEPS;
   unsigned threads = 0;
-  std::vector<int> populations;
+  bool grid = false;
+  std::vector<std::pair<int, int>> populations;
   for (int i = 1; i < argc; ++i) {
     std::string_view argument{argv[i]};
     std::optional<int> count;
+    std::size_t colon = argument.find(':');
     if (argument == "--steps" && i + 1 < argc &&
         (count = parse_count(argv[i + 1]))) {
       steps = *count;
       ++i;
+    } else if (argument == "--grid") {
+      grid = true;
     } else if (auto asked = Contention::threads_from(argument)) {
       threads = *asked;
+    } else if (colon != std::string_view::npos &&
+               parse_count(std::string{argument.substr(0, colon)}) &&
+               parse_count(std::string{argument.substr(colon + 1)})) {
+      populations.emplace_back(
+          *parse_count(std::string{argument.substr(0, colon)}),
+          *parse_count(std::string{argument.substr(colon + 1)}));
     } else if ((count = parse_count(argument))) {
-      populations.push_back(*count);
+      populations.emplace_back(*count, 0);
     } else {
       std::println(stderr, "unknown argument: {}", argument);
       return 1;
     }
   }
   if (populations.empty()) {
-    populations = {1'000, 10'000, 100'000};
+    populations = grid ? std::vector<std::pair<int, int>>{{1'000, 1'000},
+                                                          {10'000, 10'000},
+                                                          {10'000, 100'000}}
+                       : std::vector<std::pair<int, int>>{
+                             {1'000, 0}, {10'000, 0}, {100'000, 0}};
   }
   auto network = simon::automotive::load_network(
-      "application/automotive/roads/rings.xodr");
+      grid ? "application/automotive/roads/grid.xodr"
+           : "application/automotive/roads/rings.xodr");
   if (!network) {
     std::println(stderr, "{}", network.error().message());
     return 1;
   }
   Contention contention{threads};
   std::println("{}", Contention::describe(threads));
-  for (int vehicles : populations) {
-    simon::automotive::measure(*network, vehicles, steps);
+  for (auto [vehicles, pedestrians] : populations) {
+    if (grid) {
+      simon::automotive::measure_grid(*network, vehicles, pedestrians, steps);
+    } else {
+      simon::automotive::measure_rings(*network, vehicles, steps);
+    }
   }
 }
