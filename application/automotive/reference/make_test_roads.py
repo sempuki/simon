@@ -19,7 +19,7 @@ scale benchmark. signalized.xodr is a four-way junction with a traffic light
 and a crosswalk on each approach and two controllers; priority.xodr a T whose
 minor road gives way, with junction priorities and signs; crosswalks.xodr a
 climbing, leaning curve with a crosswalk in its own frame and one in road
-coordinates.
+coordinates; light.xodr one lane with a traffic light halfway.
 
   pip install numpy
   python application/automotive/reference/make_test_roads.py
@@ -301,18 +301,52 @@ def crosswalk_xml(object_id, s, t, corners, local, heading=0.0, pitch=0.0,
 
 def arm(road_id, outward, half, length, junction, signals='', objects=''):
     """A road from `half` + `length` out along `outward` in to `half` from
-    the junction's center, ending in the junction."""
+    the junction's center, ending in the junction, and starting in a
+    turnaround of its own."""
     start = ((half + length) * math.cos(outward), (half + length) * math.sin(outward),
              outward + math.pi)
     piece = dict(kind='line', s=0.0, x=start[0], y=start[1], hdg=start[2], length=length)
     return ('  <road name="arm %s" id="%s" length="%.17g" junction="-1">\n'
-            '    <link><successor elementType="junction" elementId="%s"/></link>\n'
+            '    <link><predecessor elementType="junction" elementId="turn %s"/>'
+            '<successor elementType="junction" elementId="%s"/></link>\n'
             '    <planView>\n%s    </planView>\n'
             '    <lanes>\n%s    </lanes>\n'
             '    <objects>\n%s    </objects>\n'
             '    <signals>\n%s    </signals>\n  </road>\n'
-            % (road_id, road_id, length, junction, geometry_xml(piece), arm_lanes(),
-               objects, signals))
+            % (road_id, road_id, length, road_id, junction, geometry_xml(piece),
+               arm_lanes(), objects, signals))
+
+
+def turnaround(arm_id, outward, half, length):
+    """A half circle at arm `arm_id`'s far end that turns its outbound lane
+    into its inbound one, in a junction of its own, so traffic circulates."""
+    far = half + length
+    x, y = far * math.cos(outward), far * math.sin(outward)
+    # Leave the outbound lane's middle heading out, and turn left into the
+    # inbound lane's middle.
+    left_in = (-math.sin(outward + math.pi), math.cos(outward + math.pi))
+    start = (x + LANE / 2.0 * left_in[0], y + LANE / 2.0 * left_in[1])
+    piece = dict(kind='arc', s=0.0, x=start[0], y=start[1], hdg=outward,
+                 length=math.pi * LANE / 2.0, curvature=2.0 / LANE)
+    road_id = 'u' + arm_id
+    lanes = ('      <laneSection s="0">\n'
+             '        <center><lane id="0" type="none"/></center>\n'
+             '        <right>%s</right>\n      </laneSection>\n'
+             % lane_xml(-1, 'driving', [(0, LANE, 0, 0, 0)], 1, -1))
+    road = ('  <road name="turn %s" id="%s" length="%.17g" junction="turn %s">\n'
+            '    <link>\n'
+            '      <predecessor elementType="road" elementId="%s" contactPoint="start"/>\n'
+            '      <successor elementType="road" elementId="%s" contactPoint="start"/>\n'
+            '    </link>\n'
+            '    <planView>\n%s    </planView>\n'
+            '    <lanes>\n%s    </lanes>\n  </road>\n'
+            % (arm_id, road_id, piece['length'], arm_id, arm_id, arm_id,
+               geometry_xml(piece), lanes))
+    junction = ('  <junction id="turn %s" name="turn %s">\n'
+                '    <connection id="0" incomingRoad="%s" connectingRoad="%s" '
+                'contactPoint="start"><laneLink from="1" to="-1"/></connection>\n'
+                '  </junction>\n' % (arm_id, arm_id, arm_id, road_id))
+    return road, junction
 
 
 def connecting(road_id, junction, half, a, a_outward, b, b_outward):
@@ -363,6 +397,8 @@ def intersection(arms, half, length, junction, signals, objects):
     through the junction."""
     roads = [arm(name, outward, half, length, junction, signals.get(name, ''),
                  objects.get(name, '')) for name, outward in arms]
+    turns = [turnaround(name, outward, half, length) for name, outward in arms]
+    roads += [road for road, _ in turns]
     connections = []
     for a, a_outward in arms:
         for b, b_outward in arms:
@@ -371,14 +407,15 @@ def intersection(arms, half, length, junction, signals, objects):
                 roads.append(connecting(road_id, junction, half, a, a_outward,
                                         b, b_outward))
                 connections.append((a, road_id))
-    return roads, connections
+    return roads, connections, [junction for _, junction in turns]
 
 
 def signalized():
     """Four arms, 100 m each, one lane each way and sidewalks, meeting in a
     junction 20 m across. Each approach has a traffic light at its stop line,
     8 m before the junction, and a crosswalk 4 m wide between them; two
-    controllers group the north-south and east-west lights."""
+    controllers group the north-south and east-west lights. Each arm's far end
+    turns around into it."""
     half, length = 10.0, 100.0
     arms = [('n', math.pi / 2), ('e', 0.0), ('s', -math.pi / 2), ('w', math.pi)]
     signals = {name: signal_xml('light_' + name, length - 8.0, -(LANE + SIDEWALK + 0.5),
@@ -395,17 +432,18 @@ def signalized():
         'e': crosswalk_xml('crosswalk_e', length - 4.0, 0.0, corners_local, True),
         'w': crosswalk_xml('crosswalk_w', length - 4.0, 0.0, corners_local, True),
     }
-    roads, connections = intersection(arms, half, length, '1', signals, objects)
+    roads, connections, turns = intersection(arms, half, length, '1', signals, objects)
     controllers = [controller_xml('1', 'north-south', 1, ['light_n', 'light_s']),
                    controller_xml('2', 'east-west', 2, ['light_e', 'light_w'])]
     return roads + controllers + [junction_xml('1', connections,
-                                               controllers=[('1', 1), ('2', 2)])]
+                                               controllers=[('1', 1), ('2', 2)])] + turns
 
 
 def priority():
     """A T: a main road east-west and a minor road from the south, which gives
     way to it, 100 m arms meeting in a junction 20 m across. The minor road
-    has a give-way sign, the main road's west arm a 50 km/h limit."""
+    has a give-way sign, the main road's west arm a 50 km/h limit. Each arm's
+    far end turns around into it."""
     half, length = 10.0, 100.0
     arms = [('w', math.pi), ('e', 0.0), ('s', -math.pi / 2)]
     side = -(LANE + SIDEWALK + 0.5)
@@ -415,9 +453,9 @@ def priority():
         'w': signal_xml('limit', 20.0, side, False, 'DE', '274', '55', (-1, -1),
                         value=50, unit='km/h', name='limit 50'),
     }
-    roads, connections = intersection(arms, half, length, '2', signals, {})
+    roads, connections, turns = intersection(arms, half, length, '2', signals, {})
     priorities = [('we', 'se'), ('we', 'sw'), ('we', 'es'), ('ew', 'sw')]
-    return roads + [junction_xml('2', connections, priorities=priorities)]
+    return roads + [junction_xml('2', connections, priorities=priorities)] + turns
 
 
 def crosswalks():
@@ -439,6 +477,24 @@ def crosswalks():
             '    <lanes>\n%s    </lanes>\n'
             '    <objects>\n%s    </objects>\n  </road>\n'
             % (geometry_xml(piece), arm_lanes(), objects))
+
+
+def light():
+    """One lane, 1 km, with a traffic light at 500 m that a controller groups,
+    for checking a queue at a red light against SUMO."""
+    piece = dict(kind='line', s=0.0, x=0.0, y=0.0, hdg=0.0, length=1000.0)
+    lanes = ('      <laneSection s="0">\n'
+             '        <center><lane id="0" type="none"/></center>\n'
+             '        <right>%s</right>\n      </laneSection>\n'
+             % lane_xml(-1, 'driving', [(0, LANE, 0, 0, 0)]))
+    signal = signal_xml('light', 500.0, -(LANE + 0.5), True, 'DE', '1000001', '-1', (-1, -1),
+                        name='light')
+    return ['  <road name="light" id="1" length="1000" junction="-1">\n'
+            '    <planView>\n%s    </planView>\n'
+            '    <lanes>\n%s    </lanes>\n'
+            '    <signals>\n%s    </signals>\n  </road>\n'
+            % (geometry_xml(piece), lanes, signal),
+            controller_xml('1', 'light', 0, ['light'])]
 
 
 def document(roads):
@@ -468,6 +524,8 @@ def main():
         f.write(document(priority()))
     with open(os.path.join(roads, 'crosswalks.xodr'), 'w') as f:
         f.write(document([crosswalks()]))
+    with open(os.path.join(roads, 'light.xodr'), 'w') as f:
+        f.write(document(light()))
     print('wrote', roads)
 
 

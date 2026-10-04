@@ -42,7 +42,7 @@ auto measure(const Network& network, int vehicles, int steps) -> void {
       .starting_speed = 25.0 * model::meter_per_second,
       .following = {.desired_speed = 30.0 * model::meter_per_second}};
   World world;
-  CHECK_POSTCONDITION(build_world(scenario, Out(world)).has_value());
+  CHECK_POSTCONDITION(build_world(scenario, network, Out(world)).has_value());
   CHECK_POSTCONDITION(
       build_scenario(scenario, network, InOut(world)).has_value());
   world.sync();

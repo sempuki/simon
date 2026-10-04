@@ -33,7 +33,7 @@ using model::meter;
 using namespace testing;
 
 // The edges of every file's lane graph together.
-constexpr std::size_t EDGES = 337;
+constexpr std::size_t EDGES = 351;
 
 // Each file's road network, read once.
 auto network_of(std::string_view file) -> const model::RoadNetwork& {

@@ -85,6 +85,8 @@ full where it first appears, and as "above" after.
 |---|---|---|
 | `traffic.hpp` | The Intelligent Driver Model | M. Treiber, A. Hennecke and D. Helbing, "Congested traffic states in empirical observations and microscopic simulations", *Physical Review E* 62(2), 2000, pp. 1805-1824; in the form of M. Treiber and A. Kesting, *Traffic Flow Dynamics*, Springer, 2013, chapter 11 |
 | `traffic.hpp` | MOBIL, the lane-changing model, with a bias toward the right lane | A. Kesting, M. Treiber and D. Helbing, "General lane-changing model MOBIL for car-following models", *Transportation Research Record* 1999, 2007, pp. 86-94; Treiber and Kesting, above, chapter 14 |
+| `traffic_control.cpp` | Stopping for a yellow light, unless braking to the line by the IDM reaches 4 m/s^2 or a stop at 6 m/s^2 is impossible | movsim's `TrafficLightApproaching`, github.com/movsim/movsim at 7fe4162 (GPL-3.0), core/src/main/java/org/movsim/simulator/vehicles/longitudinalmodel/TrafficLightApproaching.java |
+| `traffic_control.cpp` | Braking for a stop: the IDM behind a standing leader with no minimum gap, stopping at once within 1 cm; and stopping 1 m short of a signal's line | SUMO 1.27.1 (EPL-2.0), `MSCFModel_IDM::stopSpeed` in src/microsim/cfmodels/MSCFModel_IDM.cpp, and the vehicle type's `jmStoplineGap`, 1 m by default |
 
 ## Scenarios
 

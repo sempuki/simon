@@ -2,7 +2,7 @@
 <OpenDRIVE>
   <header revMajor="1" revMinor="6" name="simon test" version="1"/>
   <road name="arm w" id="w" length="100" junction="-1">
-    <link><successor elementType="junction" elementId="2"/></link>
+    <link><predecessor elementType="junction" elementId="turn w"/><successor elementType="junction" elementId="2"/></link>
     <planView>
         <geometry s="0" x="-110" y="1.3471114790620885e-14" hdg="6.2831853071795862" length="100">
           <line/>
@@ -22,7 +22,7 @@
     </signals>
   </road>
   <road name="arm e" id="e" length="100" junction="-1">
-    <link><successor elementType="junction" elementId="2"/></link>
+    <link><predecessor elementType="junction" elementId="turn e"/><successor elementType="junction" elementId="2"/></link>
     <planView>
         <geometry s="0" x="110" y="0" hdg="3.1415926535897931" length="100">
           <line/>
@@ -41,7 +41,7 @@
     </signals>
   </road>
   <road name="arm s" id="s" length="100" junction="-1">
-    <link><successor elementType="junction" elementId="2"/></link>
+    <link><predecessor elementType="junction" elementId="turn s"/><successor elementType="junction" elementId="2"/></link>
     <planView>
         <geometry s="0" x="6.7355573953104426e-15" y="-110" hdg="1.5707963267948966" length="100">
           <line/>
@@ -59,6 +59,57 @@
     <signals>
       <signal id="give_way" name="give way" s="97" t="-6" zOffset="2.5" dynamic="no" orientation="+" country="DE" type="205" subtype="-1" height="0.8" width="0.3"><validity fromLane="-1" toLane="-1"/></signal>
     </signals>
+  </road>
+  <road name="turn w" id="uw" length="5.497787143782138" junction="turn w">
+    <link>
+      <predecessor elementType="road" elementId="w" contactPoint="start"/>
+      <successor elementType="road" elementId="w" contactPoint="start"/>
+    </link>
+    <planView>
+        <geometry s="0" x="-110" y="1.7500000000000135" hdg="3.1415926535897931" length="5.497787143782138">
+          <arc curvature="0.5714285714285714"/>
+        </geometry>
+    </planView>
+    <lanes>
+      <laneSection s="0">
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><link><predecessor id="1"/><successor id="-1"/></link><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+    </lanes>
+  </road>
+  <road name="turn e" id="ue" length="5.497787143782138" junction="turn e">
+    <link>
+      <predecessor elementType="road" elementId="e" contactPoint="start"/>
+      <successor elementType="road" elementId="e" contactPoint="start"/>
+    </link>
+    <planView>
+        <geometry s="0" x="110" y="-1.75" hdg="0" length="5.497787143782138">
+          <arc curvature="0.5714285714285714"/>
+        </geometry>
+    </planView>
+    <lanes>
+      <laneSection s="0">
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><link><predecessor id="1"/><successor id="-1"/></link><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+    </lanes>
+  </road>
+  <road name="turn s" id="us" length="5.497787143782138" junction="turn s">
+    <link>
+      <predecessor elementType="road" elementId="s" contactPoint="start"/>
+      <successor elementType="road" elementId="s" contactPoint="start"/>
+    </link>
+    <planView>
+        <geometry s="0" x="-1.7499999999999933" y="-110" hdg="-1.5707963267948966" length="5.497787143782138">
+          <arc curvature="0.5714285714285714"/>
+        </geometry>
+    </planView>
+    <lanes>
+      <laneSection s="0">
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><link><predecessor id="1"/><successor id="-1"/></link><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+    </lanes>
   </road>
   <road name="from w to e" id="we" length="20" junction="2">
     <link>
@@ -173,5 +224,14 @@
     <priority high="we" low="sw"/>
     <priority high="we" low="es"/>
     <priority high="ew" low="sw"/>
+  </junction>
+  <junction id="turn w" name="turn w">
+    <connection id="0" incomingRoad="w" connectingRoad="uw" contactPoint="start"><laneLink from="1" to="-1"/></connection>
+  </junction>
+  <junction id="turn e" name="turn e">
+    <connection id="0" incomingRoad="e" connectingRoad="ue" contactPoint="start"><laneLink from="1" to="-1"/></connection>
+  </junction>
+  <junction id="turn s" name="turn s">
+    <connection id="0" incomingRoad="s" connectingRoad="us" contactPoint="start"><laneLink from="1" to="-1"/></connection>
   </junction>
 </OpenDRIVE>

@@ -16,6 +16,7 @@
 #include "model/road.hpp"
 #include "model/road_placement.hpp"
 #include "model/traffic.hpp"
+#include "model/traffic_control.hpp"
 #include "model/units.hpp"
 #include "scenario/storyboard.hpp"
 #include "scenario/transition.hpp"
@@ -39,11 +40,13 @@ using model::Length;
 using model::Position;
 using model::Speed;
 
-// The roads vehicles drive on and how their lanes link, read once and shared
-// by the systems. It outlives the world.
+// The roads vehicles drive on, how their lanes link, and the signal groups
+// and stop lines on them, read once and shared by the systems. It outlives
+// the world.
 struct Network final {
   model::RoadNetwork roads;
   model::LaneGraph graph;
+  model::TrafficControl control;
 };
 
 // Where a vehicle is in the network and how fast it goes: its lane, the s of
@@ -63,6 +66,23 @@ struct Driver final {
   model::LaneChanger changing;
   Length length = 4.5 * model::meter;
   std::uint64_t seed = 0;  // Picks its way at forks.
+};
+
+// How a driver treats what it must stop for, and what it has resolved to do
+// ahead: the stop line, by its place in the network's stop lines, that it
+// passes whatever the light shows, having decided to go on yellow or been
+// too near to stop on red. Only vehicles on a network with lights have it.
+struct Tactical final {
+  static constexpr std::uint32_t NONE = ~std::uint32_t{0};
+
+  model::LightBraking braking;
+  std::uint32_t committed = NONE;
+};
+
+// A signal group, by its place in the network's groups, and what it shows.
+struct SignalState final {
+  std::uint32_t group = 0;
+  model::Aspect aspect = model::Aspect::RED;
 };
 
 // What a vehicle's driver decided this step: its acceleration, and the lane
@@ -188,6 +208,18 @@ struct Vehicle final                                                         //
     : Archetype<"vehicle",                                                   //
                 Requires<VehiclePose, LaneState, Driver, DriveCommand>> {};  //
 
+// A vehicle on a network with lights, which it stops for.
+struct TacticalVehicle final                      //
+    : Archetype<"tactical vehicle",               //
+                Requires<VehiclePose, LaneState,  //
+                         Driver, DriveCommand,    //
+                         Tactical>> {};           //
+
+// A signal group's controller, running its plan.
+struct SignalController final                                  //
+    : Archetype<"signal controller",                           //
+                Requires<model::SignalPlan, SignalState>> {};  //
+
 struct ScenarioVehicle final                             //
     : Archetype<"scenario vehicle",                      //
                 Requires<VehiclePose, ScenarioActor,     //
@@ -196,10 +228,12 @@ struct ScenarioVehicle final                             //
 
 }  // namespace archetype
 
-using World =
-    framework::World<VehiclePose,
-                     framework::TypeList<LaneState, Driver, DriveCommand>,
-                     framework::TypeList<archetype::Vehicle>>;
+using World = framework::World<
+    VehiclePose,
+    framework::TypeList<LaneState, Driver, DriveCommand, Tactical,
+                        model::SignalPlan, SignalState>,
+    framework::TypeList<archetype::Vehicle, archetype::TacticalVehicle,
+                        archetype::SignalController>>;
 
 // The world an OpenSCENARIO scenario plays in.
 using ScenarioWorld =

@@ -2,10 +2,12 @@
 
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <expected>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "application/automotive/simulation_components.hpp"
 #include "application/automotive/simulation_systems.hpp"
@@ -22,6 +24,10 @@ namespace simon::automotive {
 // least their length, their minimum gap and 5 m apart, and at
 // `starting_speed`. Each driver's desired speed is the scenario's, varied by
 // up to `speed_spread` either way.
+//
+// Each junction's signal groups take turns in their order, each green for
+// `green` and yellow for `yellow`, with every group red for `all_red`
+// between turns; a group no junction lists takes turns alone.
 struct Scenario final {
   std::uint64_t seed = 1;
   std::string roads = "application/automotive/roads/ring.xodr";
@@ -30,19 +36,28 @@ struct Scenario final {
   model::IntelligentDriver following{.desired_speed =
                                          20.0 * model::meter_per_second};
   model::LaneChanger changing;
+  model::LightBraking braking;
   Length length = 4.5 * model::meter;
   double speed_spread = 0.1;
+  Duration green = std::chrono::seconds{30};
+  Duration yellow = std::chrono::seconds{3};
+  Duration all_red = std::chrono::seconds{2};
 };
 
 // Reads the network a scenario drives on and links its lanes.
 auto load_network(const std::string& path)
     -> std::expected<Network, framework::Status>;
 
-// Builds in `world` the world a scenario needs.
-auto build_world(const Scenario& scenario, Out<World> world)
-    -> std::expected<void, framework::Status>;
+// Builds in `world` the world a scenario needs on `network`.
+auto build_world(const Scenario& scenario, const Network& network,
+                 Out<World> world) -> std::expected<void, framework::Status>;
 
-// Creates every vehicle of a scenario on `network`.
+// The fixed-time plan of each of `network`'s signal groups, by group.
+auto plan_signals(const Scenario& scenario, const Network& network)
+    -> std::vector<model::SignalPlan>;
+
+// Creates every vehicle of a scenario on `network`, and a controller for each
+// signal group.
 auto build_scenario(const Scenario& scenario, const Network& network,
                     InOut<World> world)
     -> std::expected<void, framework::Status>;

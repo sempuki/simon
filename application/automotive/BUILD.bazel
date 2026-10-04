@@ -30,6 +30,7 @@ cc_library(
         "//framework:vocabulary",
         "//model:kinematics",
         "//model:lane_graph",
+        "//model:traffic_control",
         "//format:opendrive",
         "//format:openscenario",
         "//scenario:openscenario",
@@ -205,6 +206,24 @@ cc_test(
     deps = [
         "//format:openscenario",
         "//scenario:openscenario",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "signal_test",
+    size = "small",
+    srcs = ["signal_test.cpp"],
+    copts = COPTS,
+    data = [
+        "reference/sumo_signal.csv",
+        "roads/light.xodr",
+        "roads/signalized.xodr",
+    ],
+    deps = [
+        ":automotive_library",
+        ":testing",
+        "//framework:vocabulary",
         "@lib//base:testing",
     ],
 )

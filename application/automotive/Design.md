@@ -71,8 +71,8 @@ esmini's roads with signs (see `application/automotive/reference/README.md`):
 |---|---:|
 | Positions on lines, arcs and spirals, through elevation and superelevation, on and off the surface | 1.0e-13 m |
 | Lane borders | 8e-14 m |
-| The lane at each lane's middle | 5,879 of 5,880 |
-| The lane graph, through both junctions too | All 337 edges |
+| The lane at each lane's middle | 5,900 of 5,901 |
+| The lane graph, through both junctions and their turnarounds too | All 351 edges |
 | Positions on parametric cubics, against an exact arc length | 1.2e-13 m |
 | 20 signals: every field, every lane validity, and where each stands | Exact |
 | The corners of 6 crosswalks' outlines | 1.6e-14 m |
@@ -446,34 +446,31 @@ vehicles enter 1,573 lanes through its junctions in 120 s, at 10.2 of their
 
 ## Tactical layer
 
-Planned, step by step (see the [Roadmap](#roadmap)). IDM decides how hard to
-accelerate behind one leader; the tactical layer decides where a vehicle
-must stop, and pedestrians decide when to cross.
+IDM decides how hard to accelerate behind one leader; the tactical layer
+decides where a vehicle must stop, and pedestrians decide when to cross.
+Traffic lights are built; right of way at junctions and pedestrians come
+next (see the [Roadmap](#roadmap)).
 
-**Everything a vehicle stops for is a stopped leader.** The tactical layer
-never sets an acceleration. It finds the first point ahead where the vehicle
-must stop and hands IDM a standing leader of no length there; IDM's leader is
-the nearer of that and the real one. Treiber and Kesting model a red light
-this way (*Traffic Flow Dynamics*), and SUMO stops its vehicles at junctions
-the same way.
+**Everything a vehicle stops for is a point to stop at.** The tactical layer
+finds the first point ahead where the vehicle must stop, and the vehicle's
+acceleration is the lesser of IDM's behind its leader and its braking to
+stop at that point, as movsim takes the lesser of the two at a light.
 
 The points are **conflict zones**, fixed data built from the network when it
 is read and sorted by s along each lane:
 
 | Zone | Where | Blocks when |
 |---|---|---|
-| Stop line | Where a signal's validity starts on a lane | Its group shows red, or yellow and the vehicle can still stop comfortably |
+| Stop line | Where a traffic light stands, on each driving lane its orientation and validity hold for | Its group shows red and the driver can stop at all, or yellow and it can stop comfortably |
 | Conflict area | Where a junction's connecting lane crosses or merges with a foe | A foe with priority would arrive within the driver's critical gap |
 | Crosswalk | Where a crosswalk's outline crosses the lane | A pedestrian is on it or has committed to it |
 
 - **Zones are model data, not entities.** They never move and are many, so
   they live in a table keyed by lane, as the lane graph does. What changes,
   signal states and who is on a crosswalk, is in entities.
-- **A vehicle commits** once it can no longer stop at a zone with its
-  comfortable deceleration, and then ignores it, so it neither dithers in the
-  dilemma zone nor brakes inside the junction. At yellow it stops if stopping
-  needs less than its comfortable deceleration, as Treiber and Kesting's
-  drivers do.
+- **A vehicle commits** to passing a zone once it will not stop there, and
+  then ignores it until the zone is behind it, so it neither dithers in the
+  dilemma zone nor brakes inside the junction when yellow turns red.
 - **Yielding is gap acceptance.** A driver on a lane that yields asks when the
   first vehicle with priority reaches each conflict area ahead, and the area
   blocks while that is sooner than its critical gap t_c; a driver following
@@ -488,12 +485,58 @@ is read and sorted by s along each lane:
   vehicle then searches its lane's zones once and writes only its own
   command and `Tactical` state.
 
-**Traffic lights** are `SignalController` entities, one per OpenDRIVE
-`<controller>`, holding a fixed-time `SignalProgram` and its `SignalState`,
-advanced by `RunSignals`. OpenDRIVE says which signals a controller groups
-but not their timing, which comes from OpenSCENARIO's
-`TrafficSignalController`, a scenario parameter, or a default plan. Actuated
-signals are a later opt-in.
+### Traffic lights
+
+`model/traffic_control` builds a network's signal groups, one per OpenDRIVE
+`<controller>`, and a stop line on each driving lane a controlled traffic
+light holds for: the lanes its orientation runs on, narrowed by its
+validities. Each group is a `SignalController` entity holding a fixed-time
+`model::SignalPlan`, its phases repeating from an offset, and a
+`SignalState`, which `RunSignals` sets from the plan each step. OpenDRIVE says
+which signals change together but not when, so by default each junction's
+groups take turns in their order, green for 30 s and yellow for 3 s, with 2 s
+of red for all between turns; a scenario can set other times, and
+OpenSCENARIO's signal controllers come in step 6. A light no controller
+lists stops no one. Actuated signals are a later opt-in.
+
+Only a network with lights gives its vehicles a `Tactical` component, the
+braking above and the line a driver has committed to, as a
+`TacticalVehicle`; on any other the vehicles are plain `Vehicle`s, and
+`Decide`'s runner leaves the lights out at compile time, so traffic without
+lights costs what it did: 100,000 vehicles on the rings step in 25.2 ms,
+against 24.9 ms before lights, within the benchmark's run-to-run noise.
+`Decide` reads every group's aspect in its `prepare`, and each driver looks
+along its way, as far as it looks for a leader, for the first stop line it
+must stop at:
+
+- **It stops for yellow as movsim's drivers do** (its
+  `TrafficLightApproaching`): unless its braking to the line would reach
+  4 m/s^2 or it could not stop at 6 m/s^2. Otherwise it commits.
+- **It stops for red if it can stop at all,** at its maximum braking,
+  9 m/s^2. movsim also passes a red light when the IDM would brake harder
+  than that, but with no minimum gap a driver creeping up to the line asks
+  for that much, so only the physical test is kept.
+- **It brakes as SUMO's IDM brakes for a stop:** IDM behind a standing leader
+  at the point, with no minimum gap, so it comes to rest at the point and not
+  short of it, and stops at once within a centimeter of it
+  (`MSCFModel_IDM::stopSpeed`). A minimum gap there would leave it 2 m short,
+  and IDM, braking hard toward a standing leader, ends inside its minimum
+  gap, which here would carry it past the line.
+- **It stops a meter short of the line,** SUMO's default stop-line gap.
+
+`signal_test` checks the lights against SUMO 1.27.1, on one lane with a
+light halfway (`roads/light.xodr`), and at the signalized junction:
+
+| Check | Result |
+|---|---|
+| Ten IDM drivers queue at a red light for 30 s and leave on green, every position and speed every 0.1 s for 50 s, simon and SUMO both at 1 ms | 2.7 cm, 4 mm/s |
+| Where the first stops | 498.990007 m, as SUMO, to 6e-7 m |
+| At yellow, 15 m from the line at 15 m/s | Goes, and on through red |
+| At yellow, 80 m away | Stops 1 m short of the line |
+| 40 vehicles at the junction for 10 min, two groups taking turns | 304 crossings of a stop line, one on red, by a driver that committed on yellow |
+
+After 50 s the queue's leader nears the lane's end, which simon's drivers
+treat as a standing leader 250 m ahead and SUMO's leave the network at.
 
 **Pedestrians** walk a graph of sidewalk lanes, crossings from crosswalk
 outlines, and links where sidewalks meet at junctions, in one dimension as
@@ -616,8 +659,8 @@ who decide when to cross (see [Tactical layer](#tactical-layer)):
 
 1. Done: signals, controllers, junction priorities and crosswalks, read
    from OpenDRIVE and checked against libOpenDRIVE.
-2. Conflict zones, stopped leaders, commitment and fixed-time signals,
-   against movsim, Webster's uniform delay and SUMO.
+2. Done: stop lines, commitment and fixed-time signals, with movsim's
+   yellow rule and SUMO's stop, against SUMO.
 3. Right of way at junctions: priority, give-way and stop, gap acceptance and
    deadlock, against Siegloch's capacity and SUMO.
 4. The walking graph, and pedestrians walking routes on it.

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OpenDRIVE>
+  <header revMajor="1" revMinor="6" name="simon test" version="1"/>
+  <road name="light" id="1" length="1000" junction="-1">
+    <planView>
+        <geometry s="0" x="0" y="0" hdg="0" length="1000">
+          <line/>
+        </geometry>
+    </planView>
+    <lanes>
+      <laneSection s="0">
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+    </lanes>
+    <signals>
+      <signal id="light" name="light" s="500" t="-4" zOffset="2.5" dynamic="yes" orientation="+" country="DE" type="1000001" subtype="-1" height="0.8" width="0.3"><validity fromLane="-1" toLane="-1"/></signal>
+    </signals>
+  </road>
+  <controller id="1" name="light" sequence="0"><control signalId="light" type="0"/></controller>
+</OpenDRIVE>

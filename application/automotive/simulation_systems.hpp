@@ -19,6 +19,7 @@
 #include "model/lane_graph.hpp"
 #include "model/road.hpp"
 #include "model/traffic.hpp"
+#include "model/traffic_control.hpp"
 
 namespace simon::automotive {
 
@@ -253,18 +254,38 @@ class LaneOccupancy final {
 
 //-- Systems -------------------------------------------------------------------
 
+// Each step, each signal group shows what its plan gives for the step's time.
+struct RunSignals final    //
+    : System<SignalState,  //
+             const model::SignalPlan> {
+  using SystemWorld = ProjectedWorld<RunSignals>;
+
+  auto operator()(SystemWorld&, Entity,           //
+                  SignalState& state,             //
+                  const model::SignalPlan* plan,  //
+                  Step step) const -> void {
+    if (plan) {
+      state.aspect = plan->aspect_at(step.time.time_since_epoch());
+    }
+  }
+};
+
 // Each step, each driver finds its leader, in its lane or the lanes its way
 // leads into, and accelerates by the Intelligent Driver Model; once a second
 // it weighs changing to a lane beside its own by MOBIL. A dead end ahead is a
-// leader standing still.
+// leader standing still. At a light it stops for, it brakes to stop its line
+// gap short of the line, and its acceleration is the lesser of the two.
 struct Decide final            //
     : System<DriveCommand,     //
              const LaneState,  //
-             const Driver> {
+             const Driver,     //
+             Tactical> {
   using SystemWorld = ProjectedWorld<Decide>;
-  using AllowComponentList = TypeList<LaneState, Driver>;
+  using AllowComponentList = TypeList<LaneState, Driver, SignalState>;
+  using SequenceAfterSystemList = SystemList<RunSignals>;
 
-  // How far ahead a driver looks for a leader across its lane's end.
+  // How far ahead a driver looks for a leader across its lane's end, and for
+  // a light.
   static constexpr double LOOKAHEAD = 250.0;  // m.
 
   explicit Decide(const Network& network) : network_{&network} {}
@@ -272,22 +293,40 @@ struct Decide final            //
   auto prepare(SystemWorld& world, Step step) -> bool {
     occupancy_.collect(world, *network_);
     changing_ = gate_.fire(step).has_value();
+    lights_ = !network_->control.stop_lines().empty();
+    aspects_.assign(network_->control.groups().size(), model::Aspect::GREEN);
+    world.template store_of<SignalState>().for_each(
+        [&](Entity, const SignalState& signal) {
+          if (signal.group < aspects_.size()) {
+            aspects_[signal.group] = signal.aspect;
+          }
+        });
     return true;
   }
 
   auto operator()(SystemWorld&, Entity self,  //
                   DriveCommand& command,      //
                   const LaneState* state,     //
-                  const Driver* driver) const -> void {
+                  const Driver* driver,       //
+                  Tactical* tactical) const -> void {
     if (!state || !driver) {
       return;
     }
     double along = along_lane(*network_, state->lane, state->s);
+    std::optional<Length> light =
+        lights_ && tactical ? find_light(*state, *driver, along, *tactical)
+                            : std::nullopt;
+    auto obey = [&](AccelerationMagnitude acceleration) {
+      return light ? std::min(acceleration,
+                              model::compute_stop_acceleration(
+                                  driver->following, state->speed, *light))
+                   : acceleration;
+    };
     std::optional<model::Leader> leader =
         find_leader(state->lane, along, state->turns, driver->seed, self);
     auto now = model::compute_idm_acceleration(driver->following, state->speed,
                                                leader);
-    command = DriveCommand{.acceleration = now};
+    command = DriveCommand{.acceleration = obey(now)};
     if (!changing_ || state->speed < 1.0 * model::meter_per_second) {
       return;
     }
@@ -297,15 +336,68 @@ struct Decide final            //
       if (target && worth_changing(*state, *driver, self, along, now, leader,
                                    *target, right)) {
         command.change = target;
-        command.acceleration = model::compute_idm_acceleration(
+        command.acceleration = obey(model::compute_idm_acceleration(
             driver->following, state->speed,
-            find_leader(*target, along, state->turns, driver->seed, self));
+            find_leader(*target, along, state->turns, driver->seed, self)));
         return;
       }
     }
   }
 
  private:
+  // How far ahead the driver stops for the first light, within the lookahead
+  // along the vehicle's way, it stops for: its line gap short of the line. A
+  // driver that will not stop for a light that is not green commits to
+  // passing it, and holds to that until the line is behind it.
+  auto find_light(const LaneState& state, const Driver& driver, double along,
+                  Tactical& tactical) const -> std::optional<Length> {
+    std::span<const model::StopLine> all = network_->control.stop_lines();
+    bool held = false;
+    std::optional<Length> light;
+    double before = -along;  // From the vehicle to the lane's start.
+    LaneKey key = state.lane;
+    std::uint32_t turns = state.turns;
+    while (!light && before < LOOKAHEAD) {
+      for (const model::StopLine& line : network_->control.stop_lines_on(key)) {
+        double distance = before + line.along;
+        if (distance <= 0.0 || distance >= LOOKAHEAD) {
+          continue;
+        }
+        auto index = static_cast<std::uint32_t>(&line - all.data());
+        if (index == tactical.committed) {
+          held = true;
+          continue;
+        }
+        model::Aspect aspect = aspects_[line.group];
+        if (aspect == model::Aspect::GREEN) {
+          continue;
+        }
+        // Where it stops, its line gap short of the line.
+        Length to_stop =
+            std::max(distance * model::meter - tactical.braking.line_gap,
+                     0.0 * model::meter);
+        if (model::stops_at_light(driver.following, tactical.braking, aspect,
+                                  state.speed, to_stop)) {
+          light = to_stop;
+          break;
+        }
+        tactical.committed = index;
+        held = true;
+      }
+      before += lane_length(*network_, key);
+      std::optional<LaneKey> next =
+          choose_next_lane(*network_, key, driver.seed, turns++);
+      if (!next) {
+        break;
+      }
+      key = *next;
+    }
+    if (!held) {
+      tactical.committed = Tactical::NONE;
+    }
+    return light;
+  }
+
   // The leader of a vehicle `along` meters into `lane`: the next vehicle
   // ahead in the lane, else the first in the lanes its way leads into, within
   // the lookahead.
@@ -395,8 +487,10 @@ struct Decide final            //
 
   const Network* network_ = nullptr;
   LaneOccupancy occupancy_;
+  std::vector<model::Aspect> aspects_;  // By signal group.
   engine::RateGate gate_{1s};
   bool changing_ = false;
+  bool lights_ = false;  // Whether the network has any.
 };
 
 // Each step, each vehicle changes lane if its driver decided to, and moves
@@ -498,7 +592,7 @@ struct FollowLane final    //
   const Network* network_ = nullptr;
 };
 
-using Schedule = SystemList<Decide, Drive, FollowLane>;
+using Schedule = SystemList<RunSignals, Decide, Drive, FollowLane>;
 using Scheduler = framework::Scheduler<World, Schedule>;
 
 //-- Scenarios ----------------------------------------------------------------

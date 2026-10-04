@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cstddef>
 #include <map>
+#include <span>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -47,15 +49,46 @@ auto load_network(const std::string& path)
     -> std::expected<Network, framework::Status> {
   RETURN_OR_ASSIGN(model::RoadNetwork roads, format::load_opendrive(path));
   model::LaneGraph graph = model::build_lane_graph(roads);
-  return Network{.roads = std::move(roads), .graph = std::move(graph)};
+  model::TrafficControl control = model::build_traffic_control(roads);
+  return Network{.roads = std::move(roads),
+                 .graph = std::move(graph),
+                 .control = std::move(control)};
 }
 
-auto build_world(const Scenario& scenario, Out<World> world)
-    -> std::expected<void, framework::Status> {
+auto build_world(const Scenario& scenario, const Network& network,
+                 Out<World> world) -> std::expected<void, framework::Status> {
+  std::size_t vehicles = count(scenario.vehicles);
+  bool lights = !network.control.stop_lines().empty();
   return World::set_up()
       .numbered(1)
-      .holding<archetype::Vehicle>(count(scenario.vehicles))
+      .holding<archetype::Vehicle>(lights ? 0 : vehicles)
+      .holding<archetype::TacticalVehicle>(lights ? vehicles : 0)
+      .holding<archetype::SignalController>(network.control.groups().size())
       .build(world);
+}
+
+auto plan_signals(const Scenario& scenario, const Network& network)
+    -> std::vector<model::SignalPlan> {
+  std::span<const model::SignalGroup> groups = network.control.groups();
+  std::vector<model::SignalPlan> plans(groups.size());
+  // Each junction's groups in its order; a group in none, alone.
+  std::map<std::string, std::vector<std::uint32_t>> turns;
+  for (std::uint32_t g = 0; g < groups.size(); ++g) {
+    std::string junction = groups[g].junction.empty()
+                               ? "group " + std::to_string(g)
+                               : groups[g].junction;
+    turns[junction].push_back(g);
+  }
+  for (auto& [junction, members] : turns) {
+    std::ranges::stable_sort(
+        members, {}, [&](std::uint32_t g) { return groups[g].sequence; });
+    std::vector<model::SignalPlan> in_turn = model::plan_in_turn(
+        members.size(), scenario.green, scenario.yellow, scenario.all_red);
+    for (std::size_t k = 0; k < members.size(); ++k) {
+      plans[members[k]] = std::move(in_turn[k]);
+    }
+  }
+  return plans;
 }
 
 auto build_scenario(const Scenario& scenario, const Network& network,
@@ -105,14 +138,34 @@ auto build_scenario(const Scenario& scenario, const Network& network,
                     .s = s_along(network, lane, along),
                     .speed = scenario.starting_speed};
     auto seed = static_cast<std::uint64_t>(random.uniform(0.0, 0x1.0p53));
-    RETURN_IF_UNEXPECTED(world->create<archetype::Vehicle>()
-                             .with(FollowLane::locate_vehicle(network, state))
-                             .with(state)
-                             .with(Driver{.following = following,
-                                          .changing = scenario.changing,
-                                          .length = scenario.length,
-                                          .seed = seed})
-                             .with(DriveCommand{})
+    VehiclePose pose = FollowLane::locate_vehicle(network, state);
+    Driver driver{.following = following,
+                  .changing = scenario.changing,
+                  .length = scenario.length,
+                  .seed = seed};
+    // Only a network with lights gives its vehicles their tactical state.
+    if (network.control.stop_lines().empty()) {
+      RETURN_IF_UNEXPECTED(world->create<archetype::Vehicle>()
+                               .with(pose)
+                               .with(state)
+                               .with(driver)
+                               .with(DriveCommand{})
+                               .build());
+    } else {
+      RETURN_IF_UNEXPECTED(world->create<archetype::TacticalVehicle>()
+                               .with(pose)
+                               .with(state)
+                               .with(driver)
+                               .with(DriveCommand{})
+                               .with(Tactical{.braking = scenario.braking})
+                               .build());
+    }
+  }
+  std::vector<model::SignalPlan> plans = plan_signals(scenario, network);
+  for (std::uint32_t g = 0; g < plans.size(); ++g) {
+    RETURN_IF_UNEXPECTED(world->create<archetype::SignalController>()
+                             .with(std::move(plans[g]))
+                             .with(SignalState{.group = g})
                              .build());
   }
   transaction.commit();
@@ -125,8 +178,9 @@ auto Simulation::configure() -> engine::PhaseResult {
   RETURN_OR_ASSIGN(Network network, load_network(scenario_.roads));
   network_ = std::make_unique<Network>(std::move(network));
   scheduler_ = std::make_unique<Scheduler>(
-      Schedule{Decide{*network_}, Drive{*network_}, FollowLane{*network_}});
-  RETURN_IF_UNEXPECTED(build_world(scenario_, Out(world_)));
+      Schedule{RunSignals{}, Decide{*network_}, Drive{*network_},
+               FollowLane{*network_}});
+  RETURN_IF_UNEXPECTED(build_world(scenario_, *network_, Out(world_)));
   RETURN_IF_UNEXPECTED(build_scenario(scenario_, *network_, InOut(world_)));
   world_.sync();
   return engine::Flow::CONTINUE;

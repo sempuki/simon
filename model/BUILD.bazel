@@ -331,6 +331,20 @@ cc_library(
 )
 
 cc_library(
+    name = "traffic_control",
+    srcs = ["traffic_control.cpp"],
+    hdrs = ["traffic_control.hpp"],
+    copts = COPTS,
+    deps = [
+        ":lane_graph",
+        ":road",
+        ":traffic",
+        ":units",
+        "@lib//base:core",
+    ],
+)
+
+cc_library(
     name = "multibody",
     srcs = ["multibody.cpp"],
     hdrs = ["multibody.hpp"],
@@ -433,5 +447,6 @@ cc_library(
     "lane_graph",
     "random",
     "road",
+    "traffic_control",
     "wind",
 ]]
