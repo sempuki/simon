@@ -62,7 +62,7 @@ full where it first appears, and as "above" after.
 
 | Where | What | Source |
 |---|---|---|
-| `road.hpp` | Roads: the reference line's geometries, elevation, superelevation, lane offset, lane sections and widths, and road coordinates | *ASAM OpenDRIVE*, version 1.8, ASAM e.V., 2023 |
+| `road.hpp` | Roads: the reference line's geometries, elevation, superelevation, lane offset, lane sections and widths, and road coordinates; signals, objects and their outlines in road and local coordinates (heading, pitch and roll, z-y'-x''), signal controllers, and junction priorities and controllers | *ASAM OpenDRIVE*, version 1.8, ASAM e.V., 2023 |
 | `road_placement.cpp` | Moving at t from a reference line of curvature kappa: s changes by the distance over 1 - kappa t | Derived here, from an arc's length at radius 1 / kappa - t |
 | `single_track.hpp` | The kinematic single-track model | M. Althoff and G. Würsching, "CommonRoad: Vehicle Models", version 2020a, Technical University of Munich, 2020, and its code, commonroad-vehicle-models 3.0.2 |
 | `vehicle.hpp` | Vehicles' steering and acceleration limits, and the parameters of CommonRoad's vehicles 1, 2 and 3; their multibody parameters, CommonRoad's table 6, from R. W. Allen et al., *Vehicle Dynamic Stability and Rollover*, DOT HS 807 956, US Department of Transportation, 1992, table E-5 | Althoff and Würsching, above |

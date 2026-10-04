@@ -15,10 +15,13 @@
 // road's reference line (lines, arcs, spirals and parametric cubics), its
 // elevation and superelevation, its lane offset, and its lane sections with
 // their lanes' widths, and how roads, lanes and junctions link. Those are what
-// the roads' geometry and the lanes' connections need. A road's
-// lateral shape, lane heights, road marks, objects and signals are left out.
-// The deprecated poly3 geometry and lanes given by their borders rather than
-// their widths are refused, as libOpenDRIVE refuses them.
+// the roads' geometry and the lanes' connections need. Each road's signals
+// and objects, with their outlines and the lanes they hold for, junctions'
+// priorities and controllers, and the controllers that group signals are read
+// for traffic control. A road's lateral shape, lane heights, road marks,
+// signal references and repeated objects are left out. The deprecated poly3
+// geometry and lanes given by their borders rather than their widths are
+// refused, as libOpenDRIVE refuses them.
 namespace simon::format {
 
 // The reasons a road network could not be read.

@@ -11,14 +11,17 @@ OpenDRIVE library that renders and queries road networks, on the roads in
 | `paramPoly3.xodr` | `make_test_roads.py` | Parametric cubics over arcLength and normalized ranges, one at map coordinates 500 km east and 5,400 km north |
 | `ring.xodr` | `make_test_roads.py` | Two half circles leading into each other, two lanes each way, for traffic |
 | `rings.xodr` | `make_test_roads.py` | 100 rings of 1 km radius, three lanes each way, for the scale benchmark |
+| `signalized.xodr` | `make_test_roads.py` | Four 100 m arms with sidewalks meeting in a junction, each approach with a traffic light at its stop line and a crosswalk, two in road coordinates and two in their own frame; two controllers group the lights |
+| `priority.xodr` | `make_test_roads.py` | A T whose minor road gives way, with the junction's priorities, a give-way sign and a speed limit |
+| `crosswalks.xodr` | `make_test_roads.py` | A curve that climbs and leans, with a crosswalk turned, pitched and rolled in its own frame and one in road coordinates |
 | `3rd_party/chrono/Sedan_Pac02Tire.tir` | Project Chrono's data (BSD-3-Clause, see `3rd_party/chrono/LICENSE`) | The Sedan's tire, a 245/40 R 18, as a TNO property file in the PAC2002 format |
-| `3rd_party/esmini/` | esmini's resources (MPL-2.0, see `3rd_party/esmini/LICENSE`) | Three scenarios, cut-in_simple, cut-in and lane_change_simple, cut-in's parameter distribution, cut-in_parameter_set, their roads, straight_500m, e6mini and curve_r100, and the vehicle catalog |
+| `3rd_party/esmini/` | esmini's resources (MPL-2.0, see `3rd_party/esmini/LICENSE`) | Three scenarios, cut-in_simple, cut-in and lane_change_simple, cut-in's parameter distribution, cut-in_parameter_set, their roads, straight_500m, e6mini and curve_r100, and the vehicle catalog; and two roads with signs from its unit tests, some_signs and lane_offset_intersection |
 | `3rd_party/carla/Town01.xodr` | CARLA's [OpenDRIVE test files](https://github.com/carla-simulator/opendrive-test-files) (MIT, see `3rd_party/carla/LICENSE`) | A town of 98 roads, as RoadRunner writes them |
 
 | Script | Table | Test |
 |---|---|---|
-| `make_test_roads.py` | `../roads/curves.xodr`, `../roads/paramPoly3.xodr`, `../roads/ring.xodr`, `../roads/rings.xodr` | `opendrive_reference_test`, `automotive_test`, `automotive_benchmark` |
-| `libopendrive_reference.cpp` | `libopendrive_positions.csv`, `libopendrive_borders.csv`, `libopendrive_lanes.csv`, `libopendrive_successors.csv` (its routing graph) | `opendrive_reference_test` |
+| `make_test_roads.py` | `../roads/curves.xodr`, `../roads/paramPoly3.xodr`, `../roads/ring.xodr`, `../roads/rings.xodr`, `../roads/signalized.xodr`, `../roads/priority.xodr`, `../roads/crosswalks.xodr` | `opendrive_reference_test`, `automotive_test`, `automotive_benchmark` |
+| `libopendrive_reference.cpp` | `libopendrive_positions.csv`, `libopendrive_borders.csv`, `libopendrive_lanes.csv`, `libopendrive_successors.csv` (its routing graph), `libopendrive_signals.csv`, `libopendrive_objects.csv` (outline corners), `libopendrive_junctions.csv` (priorities and controllers) | `opendrive_reference_test` |
 | `commonroad_kinematic.py` | `commonroad_rates.csv`, `commonroad_paths.csv`: CommonRoad's kinematic single-track model ([commonroad-vehicle-models](https://commonroad.in.tum.de), BSD) | `single_track_test` |
 | `commonroad_dynamic.py` | `commonroad_vehicles.csv`: every parameter of CommonRoad's vehicles; `commonroad_tires.csv`, `commonroad_dynamic_rates.csv`, `commonroad_dynamic_paths.csv`: its tire and its dynamic, drift and multibody models, with four corrections patched in | `single_track_test`, `vehicle_dynamics_test` |
 | `movsim_reference.js` | `movsim_idm.csv`, `movsim_mobil.csv`: IDM and MOBIL as their authors implement them ([traffic-simulation.de](https://github.com/movsim/traffic-simulation-de), GPL-3.0) | `traffic_test` |

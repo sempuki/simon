@@ -19,10 +19,11 @@
 #include "model/road.hpp"
 
 // simon's roads against libOpenDRIVE's, on the roads in
-// application/automotive/roads and CARLA's Town01: positions on and off each
-// road's surface, each lane's outer border, the lane at each lane's middle,
-// and the lane graph, from the tables reference/libopendrive_reference.cpp
-// recorded.
+// application/automotive/roads, CARLA's Town01 and esmini's signed roads:
+// positions on and off each road's surface, each lane's outer border, the lane
+// at each lane's middle, the lane graph, signals, objects' outlines, and
+// junctions' priorities and controllers, from the tables
+// reference/libopendrive_reference.cpp recorded.
 namespace simon::automotive {
 
 namespace {
@@ -30,6 +31,9 @@ namespace {
 using model::meter;
 
 using namespace testing;
+
+// The edges of every file's lane graph together.
+constexpr std::size_t EDGES = 337;
 
 // Each file's road network, read once.
 auto network_of(std::string_view file) -> const model::RoadNetwork& {
@@ -48,6 +52,34 @@ auto road_of(const Row& row) -> const model::Road& {
       network_of(row.at("file")).find_road(row.at("road"));
   REQUIRE(road);
   return *road;
+}
+
+auto signal_of(const Row& row) -> const model::Signal& {
+  const model::Road& road = road_of(row);
+  auto found =
+      std::ranges::find(road.signals, row.at("id"), &model::Signal::id);
+  REQUIRE(found != road.signals.end());
+  return *found;
+}
+
+auto object_of(const Row& row) -> const model::RoadObject& {
+  const model::Road& road = road_of(row);
+  auto found =
+      std::ranges::find(road.objects, row.at("id"), &model::RoadObject::id);
+  REQUIRE(found != road.objects.end());
+  return *found;
+}
+
+auto orientation_word(model::RoadDirection orientation) -> std::string {
+  switch (orientation) {
+    case model::RoadDirection::POSITIVE:
+      return "+";
+    case model::RoadDirection::NEGATIVE:
+      return "-";
+    case model::RoadDirection::BOTH:
+      return "none";
+  }
+  return "";
 }
 
 // The largest difference in each file.
@@ -151,7 +183,126 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
                      to.lane_sections[edge.to.section].s0, edge.to.lane);
       }
     }
-    CHECK(theirs.size() == 285);
+    CHECK(theirs.size() == EDGES);
+    CHECK(ours == theirs);
+  }
+
+  SECTION("ShouldMatchSignals") {
+    // Every field as read, every validity, and where each stands, to
+    // rounding.
+    std::map<std::string, std::set<std::pair<int, int>>, std::less<>> theirs;
+    double farthest = 0.0;
+    for (const Row& row : load_rows("libopendrive_signals.csv")) {
+      const model::Signal& signal = signal_of(row);
+      CAPTURE(row.at("file"), row.at("road"), row.at("id"));
+      CHECK(signal.name == row.at("name"));
+      CHECK(signal.s == number(row, "s"));
+      CHECK(signal.t == number(row, "t"));
+      CHECK(signal.z_offset == number(row, "z_offset"));
+      CHECK(signal.dynamic == (row.at("dynamic") == "1"));
+      CHECK(orientation_word(signal.orientation) == row.at("orientation"));
+      CHECK(signal.country == row.at("country"));
+      CHECK(signal.type == row.at("type"));
+      CHECK(signal.subtype == row.at("subtype"));
+      CHECK(signal.value.value_or(0.0) == number(row, "value"));
+      CHECK(signal.unit == row.at("unit"));
+      std::string key =
+          row.at("file") + "," + row.at("road") + "," + row.at("id");
+      auto& validities = theirs[key];
+      if (!row.at("from_lane").empty()) {
+        validities.emplace(static_cast<int>(number(row, "from_lane")),
+                           static_cast<int>(number(row, "to_lane")));
+      }
+      model::Position position = model::compute_road_position(
+          road_of(row), signal.s * meter, signal.t * meter,
+          signal.z_offset * meter);
+      Vector3 apart =
+          position.numerical_value_in(meter).eigen() -
+          Vector3{number(row, "x"), number(row, "y"), number(row, "z")};
+      farthest = std::max(farthest, apart.norm());
+    }
+    for (const auto& [key, validities] : theirs) {
+      std::vector<std::string> cells = split_cells(key);
+      Row row{{"file", cells[0]}, {"road", cells[1]}, {"id", cells[2]}};
+      std::set<std::pair<int, int>> ours;
+      for (const model::LaneValidity& validity : signal_of(row).validities) {
+        ours.emplace(validity.from, validity.to);
+      }
+      CAPTURE(key);
+      CHECK(ours == validities);
+    }
+    CAPTURE(farthest);
+    CHECK(theirs.size() == 20);
+    CHECK(farthest < 1e-12);
+  }
+
+  SECTION("ShouldMatchObjectOutlines") {
+    // Each corner of each crosswalk, in road coordinates or turned, pitched
+    // and rolled in its own frame, on a road that climbs and leans, to
+    // rounding.
+    std::set<std::string> objects;
+    double farthest = 0.0;
+    for (const Row& row : load_rows("libopendrive_objects.csv")) {
+      const model::RoadObject& object = object_of(row);
+      CAPTURE(row.at("file"), row.at("road"), row.at("id"));
+      objects.insert(row.at("file") + "," + row.at("id"));
+      CHECK(object.type == row.at("type"));
+      CHECK(object.s == number(row, "s"));
+      CHECK(object.t == number(row, "t"));
+      CHECK(object.z_offset == number(row, "z_offset"));
+      CHECK(object.heading == number(row, "heading"));
+      CHECK(object.pitch == number(row, "pitch"));
+      CHECK(object.roll == number(row, "roll"));
+      std::string validities;
+      for (const model::LaneValidity& validity : object.validities) {
+        validities += (validities.empty() ? "" : ";") +
+                      std::to_string(validity.from) + ":" +
+                      std::to_string(validity.to);
+      }
+      CHECK(validities == row.at("validities"));
+      const model::RoadObject::Outline& outline =
+          object.outlines.at(static_cast<std::size_t>(number(row, "outline")));
+      std::vector<model::Position> corners =
+          model::compute_outline(road_of(row), object, outline);
+      Vector3 apart =
+          corners.at(static_cast<std::size_t>(number(row, "corner")))
+              .numerical_value_in(meter)
+              .eigen() -
+          Vector3{number(row, "x"), number(row, "y"), number(row, "z")};
+      farthest = std::max(farthest, apart.norm());
+    }
+    CAPTURE(farthest);
+    CHECK(objects.size() == 6);
+    CHECK(farthest < 1e-12);
+  }
+
+  SECTION("ShouldMatchJunctionPrioritiesAndControllers") {
+    std::set<std::string> theirs;
+    std::set<std::string> files;
+    for (const Row& row : load_rows("libopendrive_successors.csv")) {
+      files.insert(row.at("file"));
+    }
+    for (const Row& row : load_rows("libopendrive_junctions.csv")) {
+      theirs.insert(row.at("file") + "," + row.at("junction") + "," +
+                    row.at("kind") + "," + row.at("first") + "," +
+                    row.at("second") + "," + row.at("third"));
+    }
+    std::set<std::string> ours;
+    for (const std::string& file : files) {
+      for (const model::Junction& junction : network_of(file).junctions) {
+        for (const model::JunctionPriority& priority : junction.priorities) {
+          ours.insert(file + "," + junction.id + ",priority," + priority.high +
+                      "," + priority.low + ",");
+        }
+        for (const model::JunctionController& controller :
+             junction.controllers) {
+          ours.insert(file + "," + junction.id + ",controller," +
+                      controller.id + "," + controller.type + "," +
+                      std::to_string(controller.sequence));
+        }
+      }
+    }
+    CHECK(theirs.size() == 6);
     CHECK(ours == theirs);
   }
 

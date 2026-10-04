@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <limits>
 
+#include "Eigen/Geometry"
 #include "base/core.hpp"
 
 namespace simon::model {
@@ -180,6 +181,32 @@ auto lane_width(const Lane& lane, double ds) -> double {
   return width.cubic.evaluate(ds - width.start);
 }
 
+struct RoadAxes final {
+  Vector3 e_s;
+  Vector3 e_t;
+  Vector3 e_h;
+};
+
+// The surface's axes at s, as OpenDRIVE defines them: e_s along the reference
+// line, rising with the elevation; e_t across it, the horizontal normal
+// turned about e_s by the superelevation; and e_h normal to both. Turning the
+// horizontal normal n by an angle about the unit vector e_s, to which it is
+// perpendicular, gives cos(angle) n + sin(angle) e_s x n (Rodrigues).
+auto compute_road_axes(const Road& road, const PlanPoint& point, double at)
+    -> RoadAxes {
+  Vector3 along{std::cos(point.heading), std::sin(point.heading),
+                road.elevation.slope(at)};
+  Vector3 e_s = along.normalized();
+  Vector3 normal{-e_s.y(), e_s.x(), 0.0};
+  double roll = road.superelevation.evaluate(at);
+  Vector3 e_t =
+      roll == 0.0
+          ? normal.normalized()
+          : (std::cos(roll) * normal + std::sin(roll) * e_s.cross(normal))
+                .normalized();
+  return {.e_s = e_s, .e_t = e_t, .e_h = along.cross(e_t).normalized()};
+}
+
 }  // namespace
 
 auto CubicProfile::evaluate(double s) const -> double {
@@ -219,11 +246,8 @@ auto compute_plan_point(const Road& road, Length s) -> PlanPoint {
   return compute_plan_point(geometry, at - geometry.s0);
 }
 
-// The surface's axes at s, as OpenDRIVE defines them: e_s along the reference
-// line, rising with the elevation; e_t across it, the horizontal normal
-// turned about e_s by the superelevation; and e_h normal to both. Turning the
-// horizontal normal n by an angle about the unit vector e_s, to which it is
-// perpendicular, gives cos(angle) n + sin(angle) e_s x n (Rodrigues).
+// The point t across and h up from the reference line at s, along the
+// surface's axes there.
 auto compute_road_position(const Road& road, Length s, Length t, Length h)
     -> Position {
   return compute_road_position(road, compute_plan_point(road, s), s, t, h);
@@ -232,21 +256,47 @@ auto compute_road_position(const Road& road, Length s, Length t, Length h)
 auto compute_road_position(const Road& road, const PlanPoint& point, Length s,
                            Length t, Length h) -> Position {
   double at = s.numerical_value_in(meter);
-  Vector3 along{std::cos(point.heading), std::sin(point.heading),
-                road.elevation.slope(at)};
-  Vector3 e_s = along.normalized();
-  Vector3 normal{-e_s.y(), e_s.x(), 0.0};
-  double roll = road.superelevation.evaluate(at);
-  Vector3 e_t =
-      roll == 0.0
-          ? normal.normalized()
-          : (std::cos(roll) * normal + std::sin(roll) * e_s.cross(normal))
-                .normalized();
-  Vector3 e_h = along.cross(e_t).normalized();
+  RoadAxes axes = compute_road_axes(road, point, at);
   Vector3 position = Vector3{point.x, point.y, road.elevation.evaluate(at)} +
-                     t.numerical_value_in(meter) * e_t +
-                     h.numerical_value_in(meter) * e_h;
+                     t.numerical_value_in(meter) * axes.e_t +
+                     h.numerical_value_in(meter) * axes.e_h;
   return QuantityVector{position} * meter;
+}
+
+// A local corner turns by the object's heading about e_h, then pitch, then
+// roll, z-y'-x'' as OpenDRIVE orders them, from the road's axes at the
+// object's origin.
+auto compute_outline(const Road& road, const RoadObject& object,
+                     const RoadObject::Outline& outline)
+    -> std::vector<Position> {
+  std::vector<Position> corners;
+  corners.reserve(outline.corners.size());
+  if (outline.frame == RoadObject::Outline::Frame::ROAD) {
+    for (const RoadObject::Corner& corner : outline.corners) {
+      corners.push_back(compute_road_position(road, corner.first * meter,
+                                              corner.second * meter,
+                                              corner.up * meter));
+    }
+    return corners;
+  }
+  PlanPoint point = compute_plan_point(road, object.s * meter);
+  RoadAxes axes = compute_road_axes(road, point, object.s);
+  Eigen::Matrix3d basis;
+  basis << axes.e_s, axes.e_t, axes.e_h;
+  Eigen::Matrix3d turn = (Eigen::AngleAxisd(object.heading, Vector3::UnitZ()) *
+                          Eigen::AngleAxisd(object.pitch, Vector3::UnitY()) *
+                          Eigen::AngleAxisd(object.roll, Vector3::UnitX()))
+                             .toRotationMatrix();
+  Vector3 origin =
+      compute_road_position(road, point, object.s * meter, object.t * meter,
+                            object.z_offset * meter)
+          .numerical_value_in(meter)
+          .eigen();
+  for (const RoadObject::Corner& corner : outline.corners) {
+    Vector3 local{corner.first, corner.second, corner.up};
+    corners.push_back(QuantityVector{origin + basis * (turn * local)} * meter);
+  }
+  return corners;
 }
 
 auto find_lane_section(const Road& road, Length s) -> const LaneSection& {

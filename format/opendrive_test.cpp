@@ -55,11 +55,34 @@ constexpr std::string_view ROAD = R"(<?xml version="1.0"?>
         </right>
       </laneSection>
     </lanes>
+    <objects>
+      <object id="walk" type="crosswalk" s="95" t="0.5" hdg="0.1">
+        <outlines>
+          <outline id="0">
+            <cornerLocal u="-2" v="-3" z="0"/>
+            <cornerLocal u="2" v="-3" z="0"/>
+            <cornerLocal u="2" v="3" z="0" height="0.1"/>
+          </outline>
+        </outlines>
+        <validity fromLane="-1" toLane="1"/>
+      </object>
+    </objects>
+    <signals>
+      <signal id="light" name="east" s="90" t="-5" zOffset="2" dynamic="yes" orientation="+" country="DE" type="1000001" subtype="-1">
+        <validity fromLane="-1" toLane="-1"/>
+      </signal>
+      <signal id="limit" s="10" t="5" dynamic="no" orientation="-" country="DE" type="274" subtype="55" value="50" unit="km/h"/>
+    </signals>
   </road>
+  <controller id="3" name="lights" sequence="1">
+    <control signalId="light" type="0"/>
+  </controller>
   <junction id="9">
     <connection id="0" incomingRoad="7" connectingRoad="8" contactPoint="end">
       <laneLink from="-1" to="1"/>
     </connection>
+    <priority high="8" low="10"/>
+    <controller id="3" type="0" sequence="2"/>
   </junction>
 </OpenDRIVE>
 )";
@@ -103,6 +126,117 @@ TEST_CASE("OpenDrive") {
     CHECK(connection.contact == RoadLink::Contact::END);
     CHECK(connection.lane_links.at(0).from == -1);
     CHECK(connection.lane_links.at(0).to == 1);
+  }
+
+  SECTION("ShouldReadSignalsGivenRoad") {
+    auto network = parse_opendrive(ROAD);
+    REQUIRE(network);
+    const Road& road = *network->find_road("7");
+    REQUIRE(road.signals.size() == 2);
+    const Signal& light = road.signals[0];
+    CHECK(light.id == "light");
+    CHECK(light.name == "east");
+    CHECK(light.s == 90.0);
+    CHECK(light.t == -5.0);
+    CHECK(light.z_offset == 2.0);
+    CHECK(light.dynamic);
+    CHECK(light.orientation == RoadDirection::POSITIVE);
+    CHECK(light.country == "DE");
+    CHECK(light.type == "1000001");
+    CHECK(light.subtype == "-1");
+    CHECK_FALSE(light.value);
+    REQUIRE(light.validities.size() == 1);
+    CHECK(light.validities[0].from == -1);
+    CHECK(light.validities[0].to == -1);
+    const Signal& limit = road.signals[1];
+    CHECK_FALSE(limit.dynamic);
+    CHECK(limit.orientation == RoadDirection::NEGATIVE);
+    CHECK(limit.value == 50.0);
+    CHECK(limit.unit == "km/h");
+    CHECK(limit.validities.empty());  // Every lane in its orientation.
+  }
+
+  SECTION("ShouldReadObjectsGivenRoad") {
+    auto network = parse_opendrive(ROAD);
+    REQUIRE(network);
+    const Road& road = *network->find_road("7");
+    REQUIRE(road.objects.size() == 1);
+    const RoadObject& walk = road.objects[0];
+    CHECK(walk.type == "crosswalk");
+    CHECK(walk.s == 95.0);
+    CHECK(walk.t == 0.5);
+    CHECK(walk.heading == 0.1);
+    CHECK(walk.orientation == RoadDirection::BOTH);
+    REQUIRE(walk.outlines.size() == 1);
+    const RoadObject::Outline& outline = walk.outlines[0];
+    CHECK(outline.frame == RoadObject::Outline::Frame::LOCAL);
+    CHECK(outline.closed);
+    REQUIRE(outline.corners.size() == 3);
+    CHECK(outline.corners[1].first == 2.0);
+    CHECK(outline.corners[1].second == -3.0);
+    CHECK(outline.corners[2].height == 0.1);
+    REQUIRE(walk.validities.size() == 1);
+    CHECK(walk.validities[0].from == -1);
+    CHECK(walk.validities[0].to == 1);
+  }
+
+  SECTION("ShouldReadControllersAndPrioritiesGivenNetwork") {
+    auto network = parse_opendrive(ROAD);
+    REQUIRE(network);
+    REQUIRE(network->controllers.size() == 1);
+    const SignalController& controller = network->controllers[0];
+    CHECK(controller.id == "3");
+    CHECK(controller.name == "lights");
+    CHECK(controller.sequence == 1);
+    REQUIRE(controller.controls.size() == 1);
+    CHECK(controller.controls[0].signal == "light");
+    const Junction& junction = network->junctions[0];
+    REQUIRE(junction.priorities.size() == 1);
+    CHECK(junction.priorities[0].high == "8");
+    CHECK(junction.priorities[0].low == "10");
+    REQUIRE(junction.controllers.size() == 1);
+    CHECK(junction.controllers[0].id == "3");
+    CHECK(junction.controllers[0].sequence == 2);
+  }
+
+  SECTION("ShouldRefuseGivenUnknownOrientation") {
+    auto network = parse_opendrive(
+        edited(R"(orientation="+")", R"(orientation="sideways")"));
+    REQUIRE_FALSE(network);
+    CHECK_THAT(std::string{network.error().message()},
+               ContainsSubstring("sideways"));
+  }
+
+  SECTION("ShouldRefuseGivenUnknownDynamic") {
+    auto network =
+        parse_opendrive(edited(R"(dynamic="yes")", R"(dynamic="maybe")"));
+    REQUIRE_FALSE(network);
+    CHECK_THAT(std::string{network.error().message()},
+               ContainsSubstring("maybe"));
+  }
+
+  SECTION("ShouldRefuseGivenValidityBackward") {
+    auto network = parse_opendrive(
+        edited(R"(fromLane="-1" toLane="1")", R"(fromLane="1" toLane="-1")"));
+    REQUIRE_FALSE(network);
+    CHECK_THAT(std::string{network.error().message()},
+               ContainsSubstring("fromLane after toLane"));
+  }
+
+  SECTION("ShouldRefuseGivenMixedCorners") {
+    auto network =
+        parse_opendrive(edited(R"(<cornerLocal u="2" v="-3" z="0"/>)",
+                               R"(<cornerRoad s="96" t="-3"/>)"));
+    REQUIRE_FALSE(network);
+    CHECK_THAT(std::string{network.error().message()},
+               ContainsSubstring("mixes"));
+  }
+
+  SECTION("ShouldRefuseGivenPriorityWithoutLow") {
+    auto network = parse_opendrive(edited(R"( low="10")", ""));
+    REQUIRE_FALSE(network);
+    CHECK_THAT(std::string{network.error().message()},
+               ContainsSubstring("needs high and low"));
   }
 
   SECTION("ShouldRefuseGivenUnknownContactPoint") {

@@ -25,11 +25,16 @@ inline constexpr std::string_view REFERENCE =
     "application/automotive/reference/";
 inline constexpr std::string_view TIRES = "3rd_party/chrono/";
 inline constexpr std::string_view CARLA = "3rd_party/carla/";
+inline constexpr std::string_view ESMINI_ROADS = "3rd_party/esmini/xodr/";
 
-// The path of a road the tests read: CARLA's Town01 from 3rd_party, the
-// rest from ROADS.
+// The path of a road the tests read: CARLA's Town01 and esmini's signed roads
+// from 3rd_party, the rest from ROADS.
 inline auto find_road_path(std::string_view file) -> std::string {
-  std::string_view directory = file == "Town01.xodr" ? CARLA : ROADS;
+  std::string_view directory =
+      file == "Town01.xodr" ? CARLA
+      : file == "some_signs.xodr" || file == "lane_offset_intersection.xodr"
+          ? ESMINI_ROADS
+          : ROADS;
   return std::string{directory} + std::string{file};
 }
 

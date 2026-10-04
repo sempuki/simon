@@ -15,7 +15,11 @@ one over arcLength, whose arc length over its range is its length, and one
 normalized, at map coordinates, 500 km east and 5,400 km north. ring.xodr is
 two half circles leading into each other, two lanes each way, for traffic.
 rings.xodr is 100 such rings of 1 km radius, three lanes each way, for the
-scale benchmark.
+scale benchmark. signalized.xodr is a four-way junction with a traffic light
+and a crosswalk on each approach and two controllers; priority.xodr a T whose
+minor road gives way, with junction priorities and signs; crosswalks.xodr a
+climbing, leaning curve with a crosswalk in its own frame and one in road
+coordinates.
 
   pip install numpy
   python application/automotive/reference/make_test_roads.py
@@ -246,6 +250,197 @@ def rings():
     return roads
 
 
+LANE = 3.5      # Driving lane width.
+SIDEWALK = 2.0  # Sidewalk width.
+
+
+def arm_lanes():
+    """One driving lane each way with a sidewalk beyond it."""
+    return ('      <laneSection s="0">\n'
+            '        <left>%s%s</left>\n'
+            '        <center><lane id="0" type="none"/></center>\n'
+            '        <right>%s%s</right>\n      </laneSection>\n'
+            % (lane_xml(1, 'driving', [(0, LANE, 0, 0, 0)]),
+               lane_xml(2, 'sidewalk', [(0, SIDEWALK, 0, 0, 0)]),
+               lane_xml(-1, 'driving', [(0, LANE, 0, 0, 0)]),
+               lane_xml(-2, 'sidewalk', [(0, SIDEWALK, 0, 0, 0)])))
+
+
+def signal_xml(signal_id, s, t, dynamic, country, kind, subtype, validity,
+               value=None, unit=None, name=''):
+    extra = ''
+    if value is not None:
+        extra += ' value="%g"' % value
+    if unit is not None:
+        extra += ' unit="%s"' % unit
+    return ('      <signal id="%s" name="%s" s="%.17g" t="%.17g" zOffset="2.5" '
+            'dynamic="%s" orientation="+" country="%s" type="%s" subtype="%s"%s '
+            'height="0.8" width="0.3"><validity fromLane="%d" toLane="%d"/></signal>\n'
+            % (signal_id, name, s, t, 'yes' if dynamic else 'no', country, kind,
+               subtype, extra, validity[0], validity[1]))
+
+
+def crosswalk_xml(object_id, s, t, corners, local, heading=0.0, pitch=0.0,
+                  roll=0.0, z_offset=0.0, validity=(-1, 1)):
+    """A crosswalk whose outline is `corners`, (s, t, dz) on the road or
+    (u, v, z) in its own frame."""
+    if local:
+        rows = ''.join('<cornerLocal u="%.17g" v="%.17g" z="%.17g" height="0"/>' % c
+                       for c in corners)
+    else:
+        rows = ''.join('<cornerRoad s="%.17g" t="%.17g" dz="%.17g" height="0"/>' % c
+                       for c in corners)
+    return ('      <object id="%s" name="crosswalk %s" type="crosswalk" s="%.17g" '
+            't="%.17g" zOffset="%.17g" hdg="%.17g" pitch="%.17g" roll="%.17g" '
+            'orientation="none" length="4" width="7">'
+            '<outlines><outline id="0" closed="true">%s</outline></outlines>'
+            '<validity fromLane="%d" toLane="%d"/></object>\n'
+            % (object_id, object_id, s, t, z_offset, heading, pitch, roll, rows,
+               validity[0], validity[1]))
+
+
+def arm(road_id, outward, half, length, junction, signals='', objects=''):
+    """A road from `half` + `length` out along `outward` in to `half` from
+    the junction's center, ending in the junction."""
+    start = ((half + length) * math.cos(outward), (half + length) * math.sin(outward),
+             outward + math.pi)
+    piece = dict(kind='line', s=0.0, x=start[0], y=start[1], hdg=start[2], length=length)
+    return ('  <road name="arm %s" id="%s" length="%.17g" junction="-1">\n'
+            '    <link><successor elementType="junction" elementId="%s"/></link>\n'
+            '    <planView>\n%s    </planView>\n'
+            '    <lanes>\n%s    </lanes>\n'
+            '    <objects>\n%s    </objects>\n'
+            '    <signals>\n%s    </signals>\n  </road>\n'
+            % (road_id, road_id, length, junction, geometry_xml(piece), arm_lanes(),
+               objects, signals))
+
+
+def connecting(road_id, junction, half, a, a_outward, b, b_outward):
+    """A road in the junction from arm `a`'s end to arm `b`'s end: straight
+    across, or a quarter circle of radius `half` turning left or right."""
+    hdg = a_outward + math.pi
+    turn = math.remainder(b_outward - hdg, 2.0 * math.pi)
+    start = (half * math.cos(a_outward), half * math.sin(a_outward))
+    if abs(turn) < 1e-9:
+        piece = dict(kind='line', length=2.0 * half)
+    else:
+        piece = dict(kind='arc', length=math.pi * half / 2.0,
+                     curvature=math.copysign(1.0 / half, turn))
+    piece.update(s=0.0, x=start[0], y=start[1], hdg=hdg)
+    lanes = ('      <laneSection s="0">\n'
+             '        <center><lane id="0" type="none"/></center>\n'
+             '        <right>%s</right>\n      </laneSection>\n'
+             % lane_xml(-1, 'driving', [(0, LANE, 0, 0, 0)], -1, 1))
+    return ('  <road name="from %s to %s" id="%s" length="%.17g" junction="%s">\n'
+            '    <link>\n'
+            '      <predecessor elementType="road" elementId="%s" contactPoint="end"/>\n'
+            '      <successor elementType="road" elementId="%s" contactPoint="end"/>\n'
+            '    </link>\n'
+            '    <planView>\n%s    </planView>\n'
+            '    <lanes>\n%s    </lanes>\n  </road>\n'
+            % (a, b, road_id, piece['length'], junction, a, b, geometry_xml(piece), lanes))
+
+
+def junction_xml(junction, connections, priorities=(), controllers=()):
+    rows = ''.join('    <connection id="%d" incomingRoad="%s" connectingRoad="%s" '
+                   'contactPoint="start"><laneLink from="-1" to="-1"/></connection>\n'
+                   % (i, a, c) for i, (a, c) in enumerate(connections))
+    rows += ''.join('    <priority high="%s" low="%s"/>\n' % p for p in priorities)
+    rows += ''.join('    <controller id="%s" type="0" sequence="%d"/>\n' % c
+                    for c in controllers)
+    return '  <junction id="%s" name="junction %s">\n%s  </junction>\n' % (
+        junction, junction, rows)
+
+
+def controller_xml(controller_id, name, sequence, signal_ids):
+    rows = ''.join('<control signalId="%s" type="0"/>' % s for s in signal_ids)
+    return ('  <controller id="%s" name="%s" sequence="%d">%s</controller>\n'
+            % (controller_id, name, sequence, rows))
+
+
+def intersection(arms, half, length, junction, signals, objects):
+    """Arms named by their outward directions, each joined to every other
+    through the junction."""
+    roads = [arm(name, outward, half, length, junction, signals.get(name, ''),
+                 objects.get(name, '')) for name, outward in arms]
+    connections = []
+    for a, a_outward in arms:
+        for b, b_outward in arms:
+            if a != b:
+                road_id = '%s%s' % (a, b)
+                roads.append(connecting(road_id, junction, half, a, a_outward,
+                                        b, b_outward))
+                connections.append((a, road_id))
+    return roads, connections
+
+
+def signalized():
+    """Four arms, 100 m each, one lane each way and sidewalks, meeting in a
+    junction 20 m across. Each approach has a traffic light at its stop line,
+    8 m before the junction, and a crosswalk 4 m wide between them; two
+    controllers group the north-south and east-west lights."""
+    half, length = 10.0, 100.0
+    arms = [('n', math.pi / 2), ('e', 0.0), ('s', -math.pi / 2), ('w', math.pi)]
+    signals = {name: signal_xml('light_' + name, length - 8.0, -(LANE + SIDEWALK + 0.5),
+                                True, 'DE', '1000001', '-1', (-1, -1),
+                                name='light ' + name)
+               for name, _ in arms}
+    corners_road = [(length - 6.0, -LANE, 0.0), (length - 2.0, -LANE, 0.0),
+                    (length - 2.0, LANE, 0.0), (length - 6.0, LANE, 0.0)]
+    corners_local = [(-2.0, -LANE, 0.0), (2.0, -LANE, 0.0),
+                     (2.0, LANE, 0.0), (-2.0, LANE, 0.0)]
+    objects = {
+        'n': crosswalk_xml('crosswalk_n', length - 4.0, 0.0, corners_road, False),
+        's': crosswalk_xml('crosswalk_s', length - 4.0, 0.0, corners_road, False),
+        'e': crosswalk_xml('crosswalk_e', length - 4.0, 0.0, corners_local, True),
+        'w': crosswalk_xml('crosswalk_w', length - 4.0, 0.0, corners_local, True),
+    }
+    roads, connections = intersection(arms, half, length, '1', signals, objects)
+    controllers = [controller_xml('1', 'north-south', 1, ['light_n', 'light_s']),
+                   controller_xml('2', 'east-west', 2, ['light_e', 'light_w'])]
+    return roads + controllers + [junction_xml('1', connections,
+                                               controllers=[('1', 1), ('2', 2)])]
+
+
+def priority():
+    """A T: a main road east-west and a minor road from the south, which gives
+    way to it, 100 m arms meeting in a junction 20 m across. The minor road
+    has a give-way sign, the main road's west arm a 50 km/h limit."""
+    half, length = 10.0, 100.0
+    arms = [('w', math.pi), ('e', 0.0), ('s', -math.pi / 2)]
+    side = -(LANE + SIDEWALK + 0.5)
+    signals = {
+        's': signal_xml('give_way', length - 3.0, side, False, 'DE', '205', '-1', (-1, -1),
+                        name='give way'),
+        'w': signal_xml('limit', 20.0, side, False, 'DE', '274', '55', (-1, -1),
+                        value=50, unit='km/h', name='limit 50'),
+    }
+    roads, connections = intersection(arms, half, length, '2', signals, {})
+    priorities = [('we', 'se'), ('we', 'sw'), ('we', 'es'), ('ew', 'sw')]
+    return roads + [junction_xml('2', connections, priorities=priorities)]
+
+
+def crosswalks():
+    """A curving road that climbs and leans, with sidewalks, and two
+    crosswalks: one in its own frame, turned, pitched, rolled and raised, and
+    one in road coordinates a little above the road."""
+    piece = dict(kind='arc', s=0.0, x=0.0, y=0.0, hdg=0.3, length=100.0, curvature=0.01)
+    objects = (crosswalk_xml('turned', 40.0, 0.5,
+                             [(-2.0, -4.0, 0.0), (2.0, -4.0, 0.0), (2.0, 4.0, 0.1),
+                              (-2.0, 4.0, 0.1)], True, heading=0.2, pitch=0.01,
+                             roll=0.02, z_offset=0.05)
+               + crosswalk_xml('raised', 72.0, 0.0,
+                               [(70.0, -LANE, 0.02), (74.0, -LANE, 0.02),
+                                (74.0, LANE, 0.02), (70.0, LANE, 0.02)], False))
+    return ('  <road name="crosswalks" id="1" length="100" junction="-1">\n'
+            '    <planView>\n%s    </planView>\n'
+            '    <elevationProfile><elevation s="0" a="1" b="0.02" c="0" d="0"/></elevationProfile>\n'
+            '    <lateralProfile><superelevation s="0" a="0.03" b="0" c="0" d="0"/></lateralProfile>\n'
+            '    <lanes>\n%s    </lanes>\n'
+            '    <objects>\n%s    </objects>\n  </road>\n'
+            % (geometry_xml(piece), arm_lanes(), objects))
+
+
 def document(roads):
     return ('<?xml version="1.0" encoding="UTF-8"?>\n<OpenDRIVE>\n'
             '  <header revMajor="1" revMinor="6" name="simon test" version="1"/>\n'
@@ -267,6 +462,12 @@ def main():
                       (0.0, 0.0, 0.004, -3e-5), False),
             poly_road('3', (512000.25, 5400000.75, 2.6), (0.0, 80.0, -6.0, 1.5), (0.0, 0.0, 9.0, -4.0), True),
         ]))
+    with open(os.path.join(roads, 'signalized.xodr'), 'w') as f:
+        f.write(document(signalized()))
+    with open(os.path.join(roads, 'priority.xodr'), 'w') as f:
+        f.write(document(priority()))
+    with open(os.path.join(roads, 'crosswalks.xodr'), 'w') as f:
+        f.write(document([crosswalks()]))
     print('wrote', roads)
 
 

@@ -218,7 +218,10 @@ cc_test(
         "roads/*.xodr",
         "reference/exact_positions.csv",
         "reference/libopendrive_*.csv",
-    ]) + ["//3rd_party:carla"],
+    ]) + [
+        "//3rd_party:carla",
+        "//3rd_party:esmini",
+    ],
     deps = [
         ":testing",
         "//framework:vocabulary",

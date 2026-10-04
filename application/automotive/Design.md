@@ -48,19 +48,35 @@ libOpenDRIVE does.
 - **Road coordinates are found by projection.** Each piece is sampled every 2
   m and every tenth of a radian, and the nearest sample refined by Newton's
   method on the tangent's component of the offset.
+- **Traffic control is read with the roads.** Each road's signals keep their
+  place, whether they change, the direction of travel and lanes they hold for,
+  and their country's catalog entry, such as Germany's 1000001 for a traffic
+  light and 206 for a stop sign. Objects keep their outlines, and
+  `compute_outline` places their corners: a corner in road coordinates on the
+  road, and one in the object's own frame turned by its heading, pitch and
+  roll from the road's axes at the object. Junctions keep their priorities
+  between connecting roads and their controllers, and the network keeps the
+  controllers that group signals; OpenDRIVE says which signals change
+  together, not when.
 
-`opendrive_reference_test` checks simon against libOpenDRIVE on three
-networks: test roads with every geometry, elevation, superelevation and
-changing lanes, one of them at map coordinates, and CARLA's Town01, 98 roads
-as RoadRunner writes them (see `application/automotive/reference/README.md`):
+`opendrive_reference_test` checks simon against libOpenDRIVE on test roads
+with every geometry, elevation, superelevation and changing lanes, one of
+them at map coordinates; a signalized four-way junction with a light and a
+crosswalk on each approach; a T whose minor road gives way; a climbing,
+leaning curve with crosswalks in road coordinates and in their own turned
+frame; CARLA's Town01, 98 roads as RoadRunner writes them; and two of
+esmini's roads with signs (see `application/automotive/reference/README.md`):
 
 | Check | Agreement |
 |---|---:|
-| Positions on lines, arcs and spirals, through elevation and superelevation, on and off the surface | 8e-14 m |
+| Positions on lines, arcs and spirals, through elevation and superelevation, on and off the surface | 1.0e-13 m |
 | Lane borders | 8e-14 m |
-| The lane at each lane's middle | 4,329 of 4,330 |
-| The lane graph, on Town01, the test roads and a ring | All 285 edges |
+| The lane at each lane's middle | 5,879 of 5,880 |
+| The lane graph, through both junctions too | All 337 edges |
 | Positions on parametric cubics, against an exact arc length | 1.2e-13 m |
+| 20 signals: every field, every lane validity, and where each stands | Exact |
+| The corners of 6 crosswalks' outlines | 1.6e-14 m |
+| Junction priorities and controllers | All 6 |
 
 libOpenDRIVE finds a parametric cubic's arc length through a table of chords
 made to 1 cm, and is 5.4 mm from the exact arc length; simon is at rounding.
@@ -428,6 +444,74 @@ right lane than the left; the same seed repeats exactly. In Town01, 60
 vehicles enter 1,573 lanes through its junctions in 120 s, at 10.2 of their
 11 m/s.
 
+## Tactical layer
+
+Planned, step by step (see the [Roadmap](#roadmap)). IDM decides how hard to
+accelerate behind one leader; the tactical layer decides where a vehicle
+must stop, and pedestrians decide when to cross.
+
+**Everything a vehicle stops for is a stopped leader.** The tactical layer
+never sets an acceleration. It finds the first point ahead where the vehicle
+must stop and hands IDM a standing leader of no length there; IDM's leader is
+the nearer of that and the real one. Treiber and Kesting model a red light
+this way (*Traffic Flow Dynamics*), and SUMO stops its vehicles at junctions
+the same way.
+
+The points are **conflict zones**, fixed data built from the network when it
+is read and sorted by s along each lane:
+
+| Zone | Where | Blocks when |
+|---|---|---|
+| Stop line | Where a signal's validity starts on a lane | Its group shows red, or yellow and the vehicle can still stop comfortably |
+| Conflict area | Where a junction's connecting lane crosses or merges with a foe | A foe with priority would arrive within the driver's critical gap |
+| Crosswalk | Where a crosswalk's outline crosses the lane | A pedestrian is on it or has committed to it |
+
+- **Zones are model data, not entities.** They never move and are many, so
+  they live in a table keyed by lane, as the lane graph does. What changes,
+  signal states and who is on a crosswalk, is in entities.
+- **A vehicle commits** once it can no longer stop at a zone with its
+  comfortable deceleration, and then ignores it, so it neither dithers in the
+  dilemma zone nor brakes inside the junction. At yellow it stops if stopping
+  needs less than its comfortable deceleration, as Treiber and Kesting's
+  drivers do.
+- **Yielding is gap acceptance.** A driver on a lane that yields asks when the
+  first vehicle with priority reaches each conflict area ahead, and the area
+  blocks while that is sooner than its critical gap t_c; a driver following
+  another through the same gap needs only the follow-up time t_f, as the
+  Highway Capacity Manual's two-way stop control defines them. Each driver
+  draws its own. Against random priority traffic the minor stream's capacity
+  is then Siegloch's, c = (3600 / t_f) exp(-q_p (t_c - t_f / 2) / 3600).
+- **Deadlocks resolve by arrival.** At an all-way stop the first to arrive
+  goes first, ties going to the lower Name, so runs repeat.
+- **`Decide` stays one system.** Its `prepare` adds signal states, crosswalk
+  occupancy and each conflict area's priority arrivals to its index; each
+  vehicle then searches its lane's zones once and writes only its own
+  command and `Tactical` state.
+
+**Traffic lights** are `SignalController` entities, one per OpenDRIVE
+`<controller>`, holding a fixed-time `SignalProgram` and its `SignalState`,
+advanced by `RunSignals`. OpenDRIVE says which signals a controller groups
+but not their timing, which comes from OpenSCENARIO's
+`TrafficSignalController`, a scenario parameter, or a default plan. Actuated
+signals are a later opt-in.
+
+**Pedestrians** walk a graph of sidewalk lanes, crossings from crosswalk
+outlines, and links where sidewalks meet at junctions, in one dimension as
+vehicles drive lanes, so they cost what traffic does; a social force model
+(Helbing and Molnar, 1995) is a later opt-in for crowds.
+
+| Layer | Decision | Model |
+|---|---|---|
+| Strategic | Where to go | A destination and the shortest path on the walking graph, from the seed |
+| Tactical | Whether to cross now | At a signal, walk or don't walk, with each person's compliance; elsewhere, gap acceptance against the next vehicle, the critical gap the crossing's length over the walking speed plus a start-up time, as in the Highway Capacity Manual |
+| Operational | How to move | Each person's desired speed, slowing behind the person ahead on the same edge |
+
+A pedestrian who commits to a crossing occupies it in the next index, and
+vehicles see a stopped leader there. Whether vehicles yield at an
+unsignalized crosswalk, and which side traffic drives on, are parameters of
+the network, by default right-hand traffic that yields. Vehicles and
+pedestrians share one spatial component, `RoadPose`.
+
 ## Viewer
 
 `bazel run -c opt //application/automotive:viewer -- <file>` watches traffic
@@ -526,3 +610,19 @@ claim checked against an open reference:
    parameter distributions played in batches on threads, against esmini and
    nuPlan.
 8. A viewer for traffic and for scenarios.
+
+**Tactical layer (in progress).** Where vehicles must stop, and pedestrians
+who decide when to cross (see [Tactical layer](#tactical-layer)):
+
+1. Done: signals, controllers, junction priorities and crosswalks, read
+   from OpenDRIVE and checked against libOpenDRIVE.
+2. Conflict zones, stopped leaders, commitment and fixed-time signals,
+   against movsim, Webster's uniform delay and SUMO.
+3. Right of way at junctions: priority, give-way and stop, gap acceptance and
+   deadlock, against Siegloch's capacity and SUMO.
+4. The walking graph, and pedestrians walking routes on it.
+5. Crossing decisions and vehicles yielding, against the Highway Capacity
+   Manual's pedestrian delay and SUMO.
+6. OpenSCENARIO's signal controllers and pedestrians, against esmini.
+7. The scale benchmark with signals and pedestrians, against SUMO, and the
+   viewer.

@@ -1,0 +1,7 @@
+file,junction,kind,first,second,third
+signalized.xodr,1,controller,1,0,1
+signalized.xodr,1,controller,2,0,2
+priority.xodr,2,priority,ew,sw,
+priority.xodr,2,priority,we,es,
+priority.xodr,2,priority,we,se,
+priority.xodr,2,priority,we,sw,
