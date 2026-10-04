@@ -19,6 +19,7 @@
 #include "model/traffic.hpp"
 #include "model/traffic_control.hpp"
 #include "model/units.hpp"
+#include "model/walking_graph.hpp"
 #include "scenario/storyboard.hpp"
 #include "scenario/transition.hpp"
 
@@ -49,6 +50,8 @@ struct Network final {
   model::LaneGraph graph;
   model::TrafficControl control;
   model::RightOfWay rights;
+  model::WalkingGraph walking;
+  std::vector<std::uint32_t> walking_components;  // Each node's.
 };
 
 // Where a vehicle is in the network and how fast it goes: its lane, the s of
@@ -108,25 +111,26 @@ struct DriveCommand final {
   std::optional<LaneKey> change;
 };
 
-// A vehicle in the world: its front bumper's position, and its heading,
+// Where a road user is in the world, the world's spatial component: a
+// vehicle's front bumper or a pedestrian's middle, and its heading,
 // counterclockwise from east.
-struct VehiclePose final {
+struct RoadPose final {
   Position position = model::meters(0.0, 0.0, 0.0);
   Angle heading = 0.0 * model::radian;
 };
 
 //-- As a spatial component ---------------------------------------------------
 
-inline auto distance(const VehiclePose& a, const VehiclePose& b) -> Length {
+inline auto distance(const RoadPose& a, const RoadPose& b) -> Length {
   return norm(a.position - b.position);
 }
-inline auto coordinates(const VehiclePose& pose) -> framework::Coordinates {
+inline auto coordinates(const RoadPose& pose) -> framework::Coordinates {
   return model::coordinates(pose.position);
 }
-inline auto coordinate_length(const VehiclePose&, Length length) -> double {
+inline auto coordinate_length(const RoadPose&, Length length) -> double {
   return length.numerical_value_in(model::meter);
 }
-inline auto pose(const VehiclePose& vehicle) -> model::Pose {
+inline auto pose(const RoadPose& vehicle) -> model::Pose {
   return model::Pose{.position = vehicle.position,
                      .orientation = Quaternion{AngleAxis{
                          model::radians(vehicle.heading), Vector3::UnitZ()}}};
@@ -215,22 +219,56 @@ struct ScenarioMotion final {
   std::vector<std::uint32_t> finished;
 };
 
+//-- Pedestrians ---------------------------------------------------------------
+
+// A pedestrian's route on the walking graph, and how many it has walked.
+struct WalkRoute final {
+  std::vector<model::Leg> legs;
+  std::uint32_t trips = 0;
+};
+
+// Where a pedestrian is on its route: the leg it walks, how far along it,
+// and its speed.
+struct WalkState final {
+  std::uint32_t leg = 0;
+  Length along = 0.0 * model::meter;
+  Speed speed = 0.0 * model::meter_per_second;
+};
+
+// A pedestrian's walking speed, as it would walk alone, and its seed, which
+// picks where it goes.
+struct Walker final {
+  Speed desired_speed = 1.34 * model::meter_per_second;
+  std::uint64_t seed = 0;
+};
+
+// How fast a pedestrian walks this step.
+struct WalkCommand final {
+  Speed speed = 0.0 * model::meter_per_second;
+};
+
 namespace archetype {
 
 using framework::Archetype;
 using framework::Requires;
 
-struct Vehicle final                                                         //
-    : Archetype<"vehicle",                                                   //
-                Requires<VehiclePose, LaneState, Driver, DriveCommand>> {};  //
+struct Vehicle final                                                      //
+    : Archetype<"vehicle",                                                //
+                Requires<RoadPose, LaneState, Driver, DriveCommand>> {};  //
 
 // A vehicle on a network with lights or junctions, which it stops for and
 // gives way at.
 struct TacticalVehicle final                      //
     : Archetype<"tactical vehicle",               //
-                Requires<VehiclePose, LaneState,  //
+                Requires<RoadPose, LaneState,     //
                          Driver, DriveCommand,    //
                          Tactical, Stopped>> {};  //
+
+// A pedestrian on the walking graph.
+struct Pedestrian final                                //
+    : Archetype<"pedestrian",                          //
+                Requires<RoadPose, WalkState, Walker,  //
+                         WalkRoute, WalkCommand>> {};  //
 
 // A signal group's controller, running its plan.
 struct SignalController final                                  //
@@ -239,22 +277,23 @@ struct SignalController final                                  //
 
 struct ScenarioVehicle final                             //
     : Archetype<"scenario vehicle",                      //
-                Requires<VehiclePose, ScenarioActor,     //
+                Requires<RoadPose, ScenarioActor,        //
                          ScenarioOrders, ScenarioSpeed,  //
                          ScenarioMotion>> {};            //
 
 }  // namespace archetype
 
 using World = framework::World<
-    VehiclePose,
+    RoadPose,
     framework::TypeList<LaneState, Driver, DriveCommand, Tactical, Stopped,
-                        model::SignalPlan, SignalState>,
+                        model::SignalPlan, SignalState, WalkState, Walker,
+                        WalkRoute, WalkCommand>,
     framework::TypeList<archetype::Vehicle, archetype::TacticalVehicle,
-                        archetype::SignalController>>;
+                        archetype::Pedestrian, archetype::SignalController>>;
 
 // The world an OpenSCENARIO scenario plays in.
 using ScenarioWorld =
-    framework::World<VehiclePose,
+    framework::World<RoadPose,
                      framework::TypeList<ScenarioActor, ScenarioOrders,
                                          ScenarioSpeed, ScenarioMotion>,
                      framework::TypeList<archetype::ScenarioVehicle>>;

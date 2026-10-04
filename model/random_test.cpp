@@ -2,6 +2,8 @@
 
 #include "model/random.hpp"
 
+#include <cmath>
+
 #include "base/testing.hpp"
 
 namespace simon::model {
@@ -29,6 +31,23 @@ TEST_CASE("Random") {
       CHECK(value >= -2.0);
       CHECK(value < 3.0);
     }
+  }
+
+  SECTION("ShouldHaveMeanAndDeviationGivenNormal") {
+    Random random{3};
+    constexpr int SAMPLES = 100000;
+    double sum = 0.0;
+    double squares = 0.0;
+    for (int i = 0; i < SAMPLES; ++i) {
+      double value = random.normal(1.34, 0.26);
+      sum += value;
+      squares += value * value;
+    }
+    double mean = sum / SAMPLES;
+    double deviation = std::sqrt(squares / SAMPLES - mean * mean);
+    // Within four standard errors.
+    CHECK(std::abs(mean - 1.34) < 4.0 * 0.26 / std::sqrt(SAMPLES));
+    CHECK(std::abs(deviation - 0.26) < 0.003);
   }
 }
 

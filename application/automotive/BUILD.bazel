@@ -31,6 +31,7 @@ cc_library(
         "//model:kinematics",
         "//model:lane_graph",
         "//model:right_of_way",
+        "//model:walking_graph",
         "//model:traffic_control",
         "//format:opendrive",
         "//format:openscenario",
@@ -222,6 +223,20 @@ cc_test(
         ":testing",
         "//framework:vocabulary",
         "//model:collision",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "walking_test",
+    size = "small",
+    srcs = ["walking_test.cpp"],
+    copts = COPTS,
+    data = glob(["roads/*.xodr"]) + ["//3rd_party:carla"],
+    deps = [
+        ":automotive_library",
+        ":testing",
+        "//framework:vocabulary",
         "@lib//base:testing",
     ],
 )

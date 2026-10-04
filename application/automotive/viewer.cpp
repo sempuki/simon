@@ -410,7 +410,7 @@ class TrafficViewer final {
   }
 
   // A vehicle's box: its pose is its front bumper.
-  auto convert_to_box(const VehiclePose& pose, const Driver& driver) const
+  auto convert_to_box(const RoadPose& pose, const Driver& driver) const
       -> model::OrientedBox {
     Vector3 front = model::eigen(pose.position);
     double heading = model::radians(pose.heading);
@@ -492,8 +492,8 @@ class TrafficViewer final {
     const World& world = session_->simulation().world();
     std::optional<model::Point2> follow;
     if (running && followed_ && keep_in_view_) {
-      if (const VehiclePose* pose =
-              world.store_of<VehiclePose>().maybe_component_of(*followed_)) {
+      if (const RoadPose* pose =
+              world.store_of<RoadPose>().maybe_component_of(*followed_)) {
         Vector3 at = model::eigen(pose->position);
         follow = model::Point2{.x = at.x(), .y = at.y()};
       }
@@ -504,8 +504,8 @@ class TrafficViewer final {
     if (running) {
       std::optional<model::Point2> clicked = map_.clicked();
       double nearest = std::numeric_limits<double>::infinity();
-      world.store_of<VehiclePose>().for_each(
-          [&](Entity entity, const VehiclePose& pose) {
+      world.store_of<RoadPose>().for_each(
+          [&](Entity entity, const RoadPose& pose) {
             const Driver* driver =
                 world.store_of<Driver>().maybe_component_of(entity);
             const LaneState* state =

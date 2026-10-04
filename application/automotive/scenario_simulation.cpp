@@ -37,7 +37,7 @@ auto ScenarioSimulation::configure() -> engine::PhaseResult {
   auto transaction = world_.transaction();
   for (std::size_t i = 0; i < count; ++i) {
     RETURN_IF_UNEXPECTED(world_.create<archetype::ScenarioVehicle>()
-                             .with(VehiclePose{})
+                             .with(RoadPose{})
                              .with(ScenarioActor{.entity = i})
                              .with(ScenarioOrders{})
                              .with(ScenarioSpeed{})

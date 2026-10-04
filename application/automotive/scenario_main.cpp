@@ -30,14 +30,14 @@ auto main(int argc, char** argv) -> int {
     return 1;
   }
   const ScenarioWorld& world = simulation.world();
-  world.store_of<ScenarioActor>().for_each([&](Entity owner,
-                                               const ScenarioActor& actor) {
-    const VehiclePose& pose = world.store_of<VehiclePose>().component_of(owner);
-    const ScenarioSpeed& speed =
-        world.store_of<ScenarioSpeed>().component_of(owner);
-    Vector3 at = model::eigen(pose.position);
-    std::println("{}: ({:.3f}, {:.3f}) heading {:.4f} rad, {:.3f} m/s",
-                 simulation.scenario().entities[actor.entity].name, at.x(),
-                 at.y(), model::radians(pose.heading), speed.speed);
-  });
+  world.store_of<ScenarioActor>().for_each(
+      [&](Entity owner, const ScenarioActor& actor) {
+        const RoadPose& pose = world.store_of<RoadPose>().component_of(owner);
+        const ScenarioSpeed& speed =
+            world.store_of<ScenarioSpeed>().component_of(owner);
+        Vector3 at = model::eigen(pose.position);
+        std::println("{}: ({:.3f}, {:.3f}) heading {:.4f} rad, {:.3f} m/s",
+                     simulation.scenario().entities[actor.entity].name, at.x(),
+                     at.y(), model::radians(pose.heading), speed.speed);
+      });
 }

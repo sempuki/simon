@@ -31,8 +31,7 @@ using model::meter_per_second;
 
 constexpr double WIDTH = 1.8;  // m, a car's.
 
-auto box_of(const VehiclePose& pose, const Driver& driver)
-    -> model::OrientedBox {
+auto box_of(const RoadPose& pose, const Driver& driver) -> model::OrientedBox {
   Vector3 front = pose.position.numerical_value_in(meter).eigen();
   double heading = pose.heading.numerical_value_in(model::radian);
   double length = driver.length.numerical_value_in(meter);
@@ -47,12 +46,11 @@ auto box_of(const VehiclePose& pose, const Driver& driver)
 auto find_overlaps(const World& world) -> std::set<std::pair<Entity, Entity>> {
   std::vector<std::pair<Entity, model::OrientedBox>> boxes;
   const auto& drivers = world.store_of<Driver>();
-  world.store_of<VehiclePose>().for_each(
-      [&](Entity owner, const VehiclePose& pose) {
-        if (const Driver* driver = drivers.maybe_component_of(owner)) {
-          boxes.emplace_back(owner, box_of(pose, *driver));
-        }
-      });
+  world.store_of<RoadPose>().for_each([&](Entity owner, const RoadPose& pose) {
+    if (const Driver* driver = drivers.maybe_component_of(owner)) {
+      boxes.emplace_back(owner, box_of(pose, *driver));
+    }
+  });
   std::set<std::pair<Entity, Entity>> overlaps;
   for (std::size_t i = 0; i < boxes.size(); ++i) {
     for (std::size_t j = i + 1; j < boxes.size(); ++j) {
@@ -140,8 +138,7 @@ TEST_CASE("RightOfWay") {
     LaneKey minor_cross{.road = road_index(network, "sn"), .lane = -1};
     std::uint32_t out_e = road_index(network, "out_e");
     std::uint32_t out_n = road_index(network, "out_n");
-    Scheduler scheduler{Schedule{RunSignals{}, Decide{network}, Drive{network},
-                                 FollowLane{network}}};
+    Scheduler scheduler{make_schedule(network)};
     std::mt19937_64 random{7};
     double flow = 400.0 / 3600.0;  // Major vehicles a second.
     std::exponential_distribution<double> headway{flow};
@@ -308,8 +305,7 @@ TEST_CASE("RightOfWay") {
                  .build());
       }
       world.sync();
-      Scheduler scheduler{Schedule{RunSignals{}, Decide{network},
-                                   Drive{network}, FollowLane{network}}};
+      Scheduler scheduler{make_schedule(network)};
       // Each driver gets through once it leaves the junction it entered.
       std::map<Entity, int> through;  // 0 before, 1 in it, 2 through.
       for (long k = 0; k < 600; ++k) {

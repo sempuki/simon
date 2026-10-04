@@ -410,7 +410,7 @@ Components (`application/automotive/simulation_components.hpp`):
 
 | Component | Holds |
 |---|---|
-| `VehiclePose` | The world's spatial component: the front bumper's position and the heading |
+| `RoadPose` | The world's spatial component: the front bumper's position and the heading |
 | `LaneState` | The lane, s, speed and lanes entered |
 | `Driver` | The IDM and MOBIL drivers, the vehicle's length, and the seed that picks its way at forks |
 | `DriveCommand` | The step's acceleration, and a lane to change to |
@@ -450,8 +450,9 @@ vehicles enter 1,573 lanes through its junctions in 120 s, at 10.2 of their
 
 IDM decides how hard to accelerate behind one leader; the tactical layer
 decides where a vehicle must stop, and pedestrians decide when to cross.
-Traffic lights and right of way at junctions are built; pedestrians come
-next (see the [Roadmap](#roadmap)).
+Traffic lights, right of way at junctions and pedestrians walking are
+built; pedestrians deciding when to cross come next (see the
+[Roadmap](#roadmap)).
 
 **Everything a vehicle stops for is a point to stop at.** The tactical layer
 finds the first point ahead where the vehicle must stop, and the vehicle's
@@ -607,10 +608,53 @@ Town01's remaining overlaps are at merges inside its junctions, where
 RoadRunner's lanes converge over many meters and two drivers creeping in a
 queue meet before either leads the other.
 
-**Pedestrians** walk a graph of sidewalk lanes, crossings from crosswalk
+### Pedestrians
+
+Pedestrians walk a graph of sidewalk lanes, crossings from crosswalk
 outlines, and links where sidewalks meet at junctions, in one dimension as
 vehicles drive lanes, so they cost what traffic does; a social force model
 (Helbing and Molnar, 1995) is a later opt-in for crowds.
+
+`model/walking_graph` builds the graph: each sidewalk lane's middle, split
+where a crosswalk meets it; a crossing along each crosswalk between the
+sidewalks nearest the road on either side; and a corner link between
+sidewalk ends of different roads within 25 m of each other whose straight
+line crosses no driving lane, as at a junction whose own roads have no
+sidewalks. Ends within half a meter are one node, so sidewalks of linked
+roads run on. Routes are shortest paths, by Dijkstra's algorithm.
+
+A `Pedestrian` has a `RoadPose`, the spatial component it shares with
+vehicles, a `WalkRoute`, its legs on the graph, a `WalkState`, its leg and
+place on it, a `Walker`, its speed alone and its seed, and a `WalkCommand`.
+As `Decide` and `Drive` split driving, `Pace` sets each pedestrian's speed,
+reading where the others are, and `Walk` moves it; `PlaceWalker` puts it in
+the world.
+
+- **Each walks at its own speed,** drawn from Weidmann's free walking
+  speeds, normal about 1.34 m/s with a spread of 0.26 m/s, clipped to 0.5 to
+  2.5 m/s.
+- **It keeps half a meter behind the one ahead** on its edge, or on its next
+  leg's within 5 m, closing the rest in a second at most, so behind a slower
+  walker it settles half a meter and a second's walk back. Pedestrians walking
+  the other way pass.
+- **It walks from place to place:** at the end of its route it sets out for a
+  node its seed picks among those it can reach. Pedestrians start at random
+  along the sidewalks, by length, at least a meter apart.
+
+For now pedestrians cross on crosswalks without looking and vehicles do not
+yet stop for them; that is step 5. `walking_test` checks:
+
+| Check | Result |
+|---|---|
+| The signalized junction's graph | 16 sidewalk pieces, 4 crossings, 4 corners, one piece |
+| The T's, with no crosswalks | Three pieces, cut off from each other by its roads |
+| Town01's, with no crosswalks | 52 sidewalks, 36 corners, eight pieces, one a block |
+| Every route, against Floyd and Warshall's shortest distances, at the junction and on Town01 | 552 and 984 routes, to 1.1e-13 m |
+| A walker at 1.6 m/s behind one at 0.8 m/s | Settles 1.30 m behind at 0.80 m/s |
+| 2,000 pedestrians' speeds | 1.32 m/s, spread 0.27 m/s |
+| 60 pedestrians for 10 min at the junction | 455 trips, every one walking, none closing within half a meter of one ahead |
+
+Planned for step 5, the decisions in full:
 
 | Layer | Decision | Model |
 |---|---|---|
@@ -621,8 +665,7 @@ vehicles drive lanes, so they cost what traffic does; a social force model
 A pedestrian who commits to a crossing occupies it in the next index, and
 vehicles see a stopped leader there. Whether vehicles yield at an
 unsignalized crosswalk, and which side traffic drives on, are parameters of
-the network, by default right-hand traffic that yields. Vehicles and
-pedestrians share one spatial component, `RoadPose`.
+the network, by default right-hand traffic that yields.
 
 ## Viewer
 
@@ -733,7 +776,7 @@ who decide when to cross (see [Tactical layer](#tactical-layer)):
 3. Done: right of way at junctions: priority, lights, signs, turns and the
    right; gap acceptance against Harders' rule; first to stop goes first;
    junctions kept clear; merging and parting lanes.
-4. The walking graph, and pedestrians walking routes on it.
+4. Done: the walking graph, and pedestrians walking routes on it.
 5. Crossing decisions and vehicles yielding, against the Highway Capacity
    Manual's pedestrian delay and SUMO.
 6. OpenSCENARIO's signal controllers and pedestrians, against esmini.

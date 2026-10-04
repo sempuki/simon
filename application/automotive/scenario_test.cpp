@@ -72,8 +72,7 @@ auto play(std::string_view scenario, std::size_t steps) -> Run {
     const ScenarioWorld& world = simulation.world();
     world.store_of<ScenarioActor>().for_each(
         [&](Entity owner, const ScenarioActor& actor) {
-          const VehiclePose& pose =
-              world.store_of<VehiclePose>().component_of(owner);
+          const RoadPose& pose = world.store_of<RoadPose>().component_of(owner);
           const ScenarioSpeed& speed =
               world.store_of<ScenarioSpeed>().component_of(owner);
           Vector3 at = model::eigen(pose.position);

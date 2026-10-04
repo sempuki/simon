@@ -17,9 +17,11 @@
 #include "framework/system.hpp"
 #include "framework/vocabulary.hpp"
 #include "model/lane_graph.hpp"
+#include "model/random.hpp"
 #include "model/road.hpp"
 #include "model/traffic.hpp"
 #include "model/traffic_control.hpp"
+#include "model/walking_graph.hpp"
 
 namespace simon::automotive {
 
@@ -921,8 +923,8 @@ struct Drive final                //
 // After Drive, each vehicle's place in the world follows its lane state: the
 // middle of its lane at its s, heading along the road, or against it on the
 // left.
-struct FollowLane final    //
-    : System<VehiclePose,  //
+struct FollowLane final  //
+    : System<RoadPose,   //
              const LaneState> {
   using SystemWorld = ProjectedWorld<FollowLane>;
   using SequenceAfterSystemList = SystemList<Drive>;
@@ -930,7 +932,7 @@ struct FollowLane final    //
   explicit FollowLane(const Network& network) : network_{&network} {}
 
   auto operator()(SystemWorld&, Entity,  //
-                  VehiclePose& pose,     //
+                  RoadPose& pose,        //
                   const LaneState* state) const -> void {
     if (!state) {
       return;
@@ -940,7 +942,7 @@ struct FollowLane final    //
 
   // The pose of a vehicle in `state`.
   static auto locate_vehicle(const Network& network, const LaneState& state)
-      -> VehiclePose {
+      -> RoadPose {
     const model::Road& road = network.roads.roads[state.lane.road];
     Length middle =
         model::compute_lane_middle(network.roads, state.lane, state.s);
@@ -949,7 +951,7 @@ struct FollowLane final    //
     if (!model::runs_with_s(state.lane)) {
       heading += std::numbers::pi;
     }
-    return VehiclePose{
+    return RoadPose{
         .position = model::compute_road_position(road, point, state.s, middle),
         .heading = heading * model::radian};
   }
@@ -958,7 +960,245 @@ struct FollowLane final    //
   const Network* network_ = nullptr;
 };
 
-using Schedule = SystemList<RunSignals, Decide, Drive, FollowLane>;
+//-- Pedestrians ---------------------------------------------------------------
+
+// The node a pedestrian on `legs` reaches at their end.
+inline auto find_route_end(const Network& network,
+                           std::span<const model::Leg> legs) -> std::uint32_t {
+  const model::WalkEdge& edge = network.walking.edges()[legs.back().edge];
+  return legs.back().forward ? edge.to : edge.from;
+}
+
+// A route from `node` to a node `seed` and `trip` pick at random among those
+// `node` can reach; none if it can reach none.
+inline auto plan_walk(const Network& network, std::uint32_t node,
+                      std::uint64_t seed, std::uint32_t trip)
+    -> std::vector<model::Leg> {
+  // SplitMix64 of the seed and the trip (see model/REFERENCES.md).
+  std::uint64_t z = seed + (std::uint64_t{trip} + 1) * 0x9e3779b97f4a7c15ULL;
+  z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+  z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+  z ^= z >> 31;
+  model::Random random{z};
+  std::span<const std::uint32_t> component = network.walking_components;
+  for (int attempt = 0; attempt < 100; ++attempt) {
+    auto goal = static_cast<std::uint32_t>(
+        random.uniform(0.0, static_cast<double>(component.size())));
+    if (goal != node && component[goal] == component[node]) {
+      return network.walking.find_route(node, goal);
+    }
+  }
+  return {};
+}
+
+// Where pedestrians walk, each step: every pedestrian by edge and direction,
+// in order along it, for finding who walks ahead of whom.
+class WalkOccupancy final {
+ public:
+  struct Walking final {
+    std::uint32_t edge = 0;
+    bool forward = true;
+    double along = 0.0;  // m along the edge, as walked.
+    double speed = 0.0;  // m/s.
+    Entity entity;
+  };
+
+  template <typename ProjectedWorldType>
+  auto collect(ProjectedWorldType& world) -> void {
+    walking_.clear();
+    const auto& routes = world.template store_of<WalkRoute>();
+    world.template store_of<WalkState>().for_each(
+        [&](Entity owner, const WalkState& state) {
+          const WalkRoute* route = routes.maybe_component_of(owner);
+          if (!route || state.leg >= route->legs.size()) {
+            return;
+          }
+          const model::Leg& leg = route->legs[state.leg];
+          walking_.push_back(Walking{
+              .edge = leg.edge,
+              .forward = leg.forward,
+              .along = state.along.numerical_value_in(model::meter),
+              .speed = state.speed.numerical_value_in(model::meter_per_second),
+              .entity = owner});
+        });
+    std::ranges::sort(walking_, [](const Walking& a, const Walking& b) {
+      return std::tie(a.edge, a.forward, a.along, a.entity) <
+             std::tie(b.edge, b.forward, b.along, b.entity);
+    });
+  }
+
+  // The first pedestrian walking `leg` ahead of `along`, but `self`.
+  auto find_ahead(const model::Leg& leg, double along, Entity self) const
+      -> const Walking* {
+    auto first = std::ranges::lower_bound(
+        walking_, std::tuple{leg.edge, leg.forward, along}, {},
+        [](const Walking& w) {
+          return std::tuple{w.edge, w.forward, w.along};
+        });
+    for (auto it = first; it != walking_.end() && it->edge == leg.edge &&
+                          it->forward == leg.forward;
+         ++it) {
+      if (it->entity != self && (it->along > along || it->entity > self)) {
+        return &*it;
+      }
+    }
+    return nullptr;
+  }
+
+ private:
+  std::vector<Walking> walking_;  // By edge, direction, then along.
+};
+
+// Each step, each pedestrian walks at its own speed, slowing behind the one
+// ahead on its edge, or on its next leg's: so as never to come nearer than
+// half a meter, it walks the gap beyond that in a second at most.
+struct Pace final              //
+    : System<WalkCommand,      //
+             const WalkState,  //
+             const Walker,     //
+             const WalkRoute> {
+  using SystemWorld = ProjectedWorld<Pace>;
+  using AllowComponentList = TypeList<WalkState, WalkRoute>;
+
+  static constexpr double SPACE = 0.5;      // m kept to the one ahead.
+  static constexpr double HEADWAY = 1.0;    // s to close the rest.
+  static constexpr double LOOKAHEAD = 5.0;  // m into the next leg.
+
+  explicit Pace(const Network& network) : network_{&network} {}
+
+  auto prepare(SystemWorld& world) -> bool {
+    occupancy_.collect(world);
+    return true;
+  }
+
+  auto operator()(SystemWorld&, Entity self,  //
+                  WalkCommand& command,       //
+                  const WalkState* state,     //
+                  const Walker* walker,       //
+                  const WalkRoute* route) const -> void {
+    if (!state || !walker || !route || state->leg >= route->legs.size()) {
+      return;
+    }
+    double along = state->along.numerical_value_in(model::meter);
+    const model::Leg& leg = route->legs[state->leg];
+    std::optional<double> gap;
+    if (const WalkOccupancy::Walking* ahead =
+            occupancy_.find_ahead(leg, along, self)) {
+      gap = ahead->along - along;
+    } else if (state->leg + 1 < route->legs.size()) {
+      double left = network_->walking.edges()[leg.edge].length() - along;
+      if (left < LOOKAHEAD) {
+        if (const WalkOccupancy::Walking* next = occupancy_.find_ahead(
+                route->legs[state->leg + 1], -1.0, self)) {
+          gap = left + next->along;
+        }
+      }
+    }
+    double desired =
+        walker->desired_speed.numerical_value_in(model::meter_per_second);
+    double speed =
+        gap ? std::clamp((*gap - SPACE) / HEADWAY, 0.0, desired) : desired;
+    command.speed = speed * model::meter_per_second;
+  }
+
+ private:
+  const Network* network_ = nullptr;
+  WalkOccupancy occupancy_;
+};
+
+// Each step, each pedestrian walks its route at the speed it set, leg after
+// leg; at the route's end it sets out for a new place.
+struct Walk final                //
+    : System<WalkState,          //
+             const WalkCommand,  //
+             const Walker,       //
+             WalkRoute> {
+  using SystemWorld = ProjectedWorld<Walk>;
+  using SequenceAfterSystemList = SystemList<Pace>;
+
+  explicit Walk(const Network& network) : network_{&network} {}
+
+  auto operator()(SystemWorld&, Entity,        //
+                  WalkState& state,            //
+                  const WalkCommand* command,  //
+                  const Walker* walker,        //
+                  WalkRoute* route,            //
+                  Step step) const -> void {
+    if (!command || !walker || !route || route->legs.empty()) {
+      return;
+    }
+    double dt = std::chrono::duration<double>(step.dt).count();
+    state.speed = command->speed;
+    double along =
+        state.along.numerical_value_in(model::meter) +
+        command->speed.numerical_value_in(model::meter_per_second) * dt;
+    std::span<const model::WalkEdge> edges = network_->walking.edges();
+    while (along >= edges[route->legs[state.leg].edge].length()) {
+      along -= edges[route->legs[state.leg].edge].length();
+      if (++state.leg < route->legs.size()) {
+        continue;
+      }
+      // There: on to somewhere new, from where it stands.
+      std::uint32_t node = find_route_end(*network_, route->legs);
+      std::vector<model::Leg> next =
+          plan_walk(*network_, node, walker->seed, ++route->trips);
+      state.leg = 0;
+      if (next.empty()) {
+        state.leg = static_cast<std::uint32_t>(route->legs.size() - 1);
+        along = edges[route->legs[state.leg].edge].length();
+        break;
+      }
+      route->legs = std::move(next);
+    }
+    state.along = along * model::meter;
+  }
+
+ private:
+  const Network* network_ = nullptr;
+};
+
+// After Walk, each pedestrian's place in the world follows its place on its
+// route, facing the way it walks.
+struct PlaceWalker final       //
+    : System<RoadPose,         //
+             const WalkState,  //
+             const WalkRoute> {
+  using SystemWorld = ProjectedWorld<PlaceWalker>;
+  using SequenceAfterSystemList = SystemList<Walk>;
+
+  explicit PlaceWalker(const Network& network) : network_{&network} {}
+
+  auto operator()(SystemWorld&, Entity,    //
+                  RoadPose& pose,          //
+                  const WalkState* state,  //
+                  const WalkRoute* route) const -> void {
+    if (!state || !route || state->leg >= route->legs.size()) {
+      return;
+    }
+    pose = locate_walker(*network_, *route, *state);
+  }
+
+  static auto locate_walker(const Network& network, const WalkRoute& route,
+                            const WalkState& state) -> RoadPose {
+    auto [point, heading] = network.walking.locate(
+        route.legs[state.leg], state.along.numerical_value_in(model::meter));
+    return RoadPose{.position = model::meters(point.x, point.y, point.z),
+                    .heading = heading * model::radian};
+  }
+
+ private:
+  const Network* network_ = nullptr;
+};
+
+using Schedule =
+    SystemList<RunSignals, Decide, Drive, FollowLane, Pace, Walk, PlaceWalker>;
+
+// The schedule's systems on `network`.
+inline auto make_schedule(const Network& network) -> Schedule {
+  return Schedule{RunSignals{},        Decide{network}, Drive{network},
+                  FollowLane{network}, Pace{network},   Walk{network},
+                  PlaceWalker{network}};
+}
 using Scheduler = framework::Scheduler<World, Schedule>;
 
 //-- Scenarios ----------------------------------------------------------------
@@ -1111,8 +1351,8 @@ struct MoveOnRoad final       //
 
 // After MoveOnRoad, each vehicle's place in the world: its reference point,
 // the middle of its rear axle, at its road placement.
-struct PlaceOnRoad final   //
-    : System<VehiclePose,  //
+struct PlaceOnRoad final  //
+    : System<RoadPose,    //
              const ScenarioMotion> {
   using SystemWorld = ScenarioProjectedWorld<PlaceOnRoad>;
   using SequenceAfterSystemList = SystemList<MoveOnRoad>;
@@ -1120,15 +1360,15 @@ struct PlaceOnRoad final   //
   explicit PlaceOnRoad(ScenarioContext& context) : context_{&context} {}
 
   auto operator()(SystemWorld&, Entity,  //
-                  VehiclePose& pose,     //
+                  RoadPose& pose,        //
                   const ScenarioMotion* motion) const -> void {
     if (motion == nullptr) {
       return;
     }
     model::PlacementPose at =
         model::compute_placement_pose(*context_->roads, motion->placement);
-    pose = VehiclePose{.position = model::meters(at.x, at.y, at.z),
-                       .heading = at.heading * model::radian};
+    pose = RoadPose{.position = model::meters(at.x, at.y, at.z),
+                    .heading = at.heading * model::radian};
   }
 
  private:

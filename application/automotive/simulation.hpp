@@ -29,6 +29,10 @@ namespace simon::automotive {
 // `green` and yellow for `yellow`, with every group red for `all_red`
 // between turns; a group no junction lists takes turns alone. Where a
 // driver gives way, it takes a gap of at least `critical_gap`.
+//
+// Pedestrians start at random along the sidewalks, by length, at least a
+// meter apart, each walking at its own speed, and walk from place to place
+// on the walking graph.
 struct Scenario final {
   std::uint64_t seed = 1;
   std::string roads = "application/automotive/roads/ring.xodr";
@@ -40,6 +44,10 @@ struct Scenario final {
   model::LightBraking braking;
   model::Time critical_gap = 6.0 * model::second;
   Length length = 4.5 * model::meter;
+  int pedestrians = 0;
+  // Free walking speeds, normal, clipped to 0.5 to 2.5 m/s: Weidmann's.
+  Speed walking_speed = 1.34 * model::meter_per_second;
+  Speed walking_spread = 0.26 * model::meter_per_second;
   double speed_spread = 0.1;
   Duration green = std::chrono::seconds{30};
   Duration yellow = std::chrono::seconds{3};

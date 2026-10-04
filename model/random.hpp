@@ -2,7 +2,9 @@
 
 #pragma once
 
+#include <cmath>
 #include <cstdint>
+#include <numbers>
 #include <random>
 
 namespace simon::model {
@@ -22,6 +24,15 @@ class Random final {
   // Uniform in [low, high).
   auto uniform(double low, double high) -> double {
     return low + (high - low) * unit();
+  }
+
+  // Normal with `mean` and `deviation`, by Box and Muller's transform of two
+  // uniform numbers (see model/REFERENCES.md).
+  auto normal(double mean, double deviation) -> double {
+    double u = 1.0 - unit();  // In (0, 1], so its logarithm is finite.
+    double v = unit();
+    return mean + deviation * std::sqrt(-2.0 * std::log(u)) *
+                      std::cos(2.0 * std::numbers::pi * v);
   }
 
  private:

@@ -50,16 +50,16 @@ auto sample_entities(const ScenarioSimulation& simulation)
     -> std::vector<RunSample> {
   const ScenarioWorld& world = simulation.world();
   std::vector<RunSample> samples(simulation.scenario().entities.size());
-  world.store_of<ScenarioActor>().for_each([&](Entity owner,
-                                               const ScenarioActor& actor) {
-    const VehiclePose& pose = world.store_of<VehiclePose>().component_of(owner);
-    Vector3 at = model::eigen(pose.position);
-    samples[actor.entity] = {
-        .x = at.x(),
-        .y = at.y(),
-        .heading = model::radians(pose.heading),
-        .speed = world.store_of<ScenarioSpeed>().component_of(owner).speed};
-  });
+  world.store_of<ScenarioActor>().for_each(
+      [&](Entity owner, const ScenarioActor& actor) {
+        const RoadPose& pose = world.store_of<RoadPose>().component_of(owner);
+        Vector3 at = model::eigen(pose.position);
+        samples[actor.entity] = {
+            .x = at.x(),
+            .y = at.y(),
+            .heading = model::radians(pose.heading),
+            .speed = world.store_of<ScenarioSpeed>().component_of(owner).speed};
+      });
   return samples;
 }
 

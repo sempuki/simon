@@ -22,7 +22,7 @@ full where it first appears, and as "above" after.
 | `wind.cpp` | Sampling a filter driven by white noise exactly over a step | C. F. Van Loan, "Computing integrals involving the matrix exponential", *IEEE Transactions on Automatic Control* 23(3), 1978, pp. 395-404 |
 | `wind.cpp` | A lag whose input moves in a straight line over a step | The triangle-hold equivalent, G. F. Franklin, J. D. Powell and M. L. Workman, *Digital Control of Dynamic Systems*, 3rd edition, Addison-Wesley, 1998, section 6.3.2 |
 | `wind.cpp`, `application/automotive/simulation_systems.hpp` | SplitMix64 | G. L. Steele Jr., D. Lea and C. H. Flood, "Fast splittable pseudorandom number generators", OOPSLA 2014, pp. 453-472; its constants as in S. Vigna's [splitmix64.c](https://prng.di.unimi.it/splitmix64.c) |
-| `wind.cpp` | Normal numbers from uniform ones | G. E. P. Box and M. E. Muller, "A note on the generation of random normal deviates", *Annals of Mathematical Statistics* 29(2), 1958, pp. 610-611 |
+| `wind.cpp`, `random.hpp` | Normal numbers from uniform ones | G. E. P. Box and M. E. Muller, "A note on the generation of random normal deviates", *Annals of Mathematical Statistics* 29(2), 1958, pp. 610-611 |
 
 ## Aircraft
 
@@ -90,6 +90,9 @@ full where it first appears, and as "above" after.
 | `right_of_way.cpp` | Who gives way: the junction's `<priority>`, give-way and stop signs (catalog 205 and 206), a left turn to oncoming traffic, and otherwise to the right | *ASAM OpenDRIVE*, version 1.8, above; Germany's *Straßenverkehrs-Ordnung*, §8 (priority to the right) and §9 (turning left gives way to oncoming traffic) |
 | `right_of_way.cpp` | Gap acceptance: a minor driver enters a gap if the next vehicle with priority is at least the critical gap away when it reaches the junction | W. Harders, *Die Leistungsfähigkeit nicht signalgeregelter städtischer Verkehrsknoten*, Straßenbau und Straßenverkehrstechnik 76, 1968; Transportation Research Board, *Highway Capacity Manual*, 7th edition, 2022, chapter 20, two-way stop control |
 | `right_of_way.cpp` | Merging lanes meet where their middles come within a car's width, and a vehicle on a merging lane leads the other's driver | SUMO 1.27.1 (EPL-2.0), `MSLink` in src/microsim/MSLink.cpp: a lane with the same target has its conflict where the two diverge, and `getLeaderInfo` returns vehicles on foe lanes as leaders |
+| `walking_graph.cpp` | The walking graph from sidewalk lanes and crosswalk objects | *ASAM OpenDRIVE*, version 1.8, above |
+| `walking_graph.cpp` | Shortest routes | E. W. Dijkstra, "A note on two problems in connexion with graphs", *Numerische Mathematik* 1, 1959, pp. 269-271 |
+| `application/automotive/simulation.hpp` | Free walking speeds: normal, mean 1.34 m/s, standard deviation 0.26 m/s | U. Weidmann, *Transporttechnik der Fussgänger*, Schriftenreihe des IVT 90, ETH Zürich, 1993 |
 
 ## Scenarios
 

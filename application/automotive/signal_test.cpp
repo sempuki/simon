@@ -82,9 +82,7 @@ TEST_CASE("SignalAgainstSumo") {
     // light turns green a step sooner on that clock.
     constexpr auto STEP = 1ms;
     Queue queue{-STEP};
-    Scheduler scheduler{Schedule{RunSignals{}, Decide{queue.network},
-                                 Drive{queue.network},
-                                 FollowLane{queue.network}}};
+    Scheduler scheduler{make_schedule(queue.network)};
     std::map<std::pair<long, int>, std::pair<double, double>> sumo;
     for (const Row& row : load_rows("sumo_signal.csv")) {
       sumo[{std::lround(number(row, "time") * 1000.0),
@@ -157,8 +155,7 @@ TEST_CASE("SignalAgainstSumo") {
               .with(SignalState{})
               .build());
       world.sync();
-      Scheduler scheduler{Schedule{RunSignals{}, Decide{network},
-                                   Drive{network}, FollowLane{network}}};
+      Scheduler scheduler{make_schedule(network)};
       for (long k = 0; k < 300; ++k) {
         scheduler.step(Step{.time = TimePoint{} + k * 100ms, .dt = 100ms},
                        InOut(world));

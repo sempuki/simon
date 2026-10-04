@@ -76,10 +76,14 @@ auto load_network(const std::string& path)
   model::LaneGraph graph = model::build_lane_graph(roads);
   model::TrafficControl control = model::build_traffic_control(roads);
   model::RightOfWay rights = model::build_right_of_way(roads, graph, control);
+  model::WalkingGraph walking = model::build_walking_graph(roads);
+  std::vector<std::uint32_t> components = walking.find_components();
   return Network{.roads = std::move(roads),
                  .graph = std::move(graph),
                  .control = std::move(control),
-                 .rights = std::move(rights)};
+                 .rights = std::move(rights),
+                 .walking = std::move(walking),
+                 .walking_components = std::move(components)};
 }
 
 auto is_tactical(const Network& network) -> bool {
@@ -95,6 +99,7 @@ auto build_world(const Scenario& scenario, const Network& network,
       .numbered(1)
       .holding<archetype::Vehicle>(tactical ? 0 : vehicles)
       .holding<archetype::TacticalVehicle>(tactical ? vehicles : 0)
+      .holding<archetype::Pedestrian>(count(scenario.pedestrians))
       .holding<archetype::SignalController>(network.control.groups().size())
       .build(world);
 }
@@ -170,7 +175,7 @@ auto build_scenario(const Scenario& scenario, const Network& network,
                     .s = s_along(network, lane, along),
                     .speed = scenario.starting_speed};
     auto seed = static_cast<std::uint64_t>(random.uniform(0.0, 0x1.0p53));
-    VehiclePose pose = FollowLane::locate_vehicle(network, state);
+    RoadPose pose = FollowLane::locate_vehicle(network, state);
     Driver driver{.following = following,
                   .changing = scenario.changing,
                   .length = scenario.length,
@@ -197,6 +202,61 @@ auto build_scenario(const Scenario& scenario, const Network& network,
               .build());
     }
   }
+  // Pedestrians, at random along the sidewalks, by length, each setting out
+  // for a place its seed picks.
+  std::vector<std::uint32_t> sidewalks;
+  double walkable = 0.0;
+  for (std::uint32_t e = 0; e < network.walking.edges().size(); ++e) {
+    if (network.walking.edges()[e].kind == model::WalkEdge::Kind::SIDEWALK) {
+      sidewalks.push_back(e);
+      walkable += network.walking.edges()[e].length();
+    }
+  }
+  std::map<std::uint32_t, std::vector<double>> walking;  // Edge, along.
+  for (std::size_t i = 0; i < count(scenario.pedestrians); ++i) {
+    CHECK_PRECONDITION(walkable > 0.0);
+    double at = 0.0;
+    std::uint32_t edge = sidewalks.back();
+    for (int attempt = 0;; ++attempt) {
+      CHECK_PRECONDITION(attempt < 10000);
+      at = random.uniform(0.0, walkable);
+      for (std::uint32_t e : sidewalks) {
+        double length = network.walking.edges()[e].length();
+        if (at < length) {
+          edge = e;
+          break;
+        }
+        at -= length;
+      }
+      if (std::ranges::none_of(walking[edge], [&](double other) {
+            return std::abs(other - at) < 1.0;
+          })) {
+        break;
+      }
+    }
+    walking[edge].push_back(at);
+    auto seed = static_cast<std::uint64_t>(random.uniform(0.0, 0x1.0p53));
+    WalkRoute route{.legs = {model::Leg{.edge = edge, .forward = true}}};
+    std::vector<model::Leg> onward =
+        plan_walk(network, network.walking.edges()[edge].to, seed, 0);
+    route.legs.insert(route.legs.end(), onward.begin(), onward.end());
+    WalkState state{.along = at * model::meter};
+    double speed = std::clamp(
+        random.normal(
+            scenario.walking_speed.numerical_value_in(model::meter_per_second),
+            scenario.walking_spread.numerical_value_in(
+                model::meter_per_second)),
+        0.5, 2.5);
+    RETURN_IF_UNEXPECTED(
+        world->create<archetype::Pedestrian>()
+            .with(PlaceWalker::locate_walker(network, route, state))
+            .with(state)
+            .with(Walker{.desired_speed = speed * model::meter_per_second,
+                         .seed = seed})
+            .with(std::move(route))
+            .with(WalkCommand{})
+            .build());
+  }
   std::vector<model::SignalPlan> plans = plan_signals(scenario, network);
   for (std::uint32_t g = 0; g < plans.size(); ++g) {
     RETURN_IF_UNEXPECTED(world->create<archetype::SignalController>()
@@ -213,9 +273,7 @@ Simulation::Simulation(Scenario scenario) : scenario_{std::move(scenario)} {}
 auto Simulation::configure() -> engine::PhaseResult {
   RETURN_OR_ASSIGN(Network network, load_network(scenario_.roads));
   network_ = std::make_unique<Network>(std::move(network));
-  scheduler_ = std::make_unique<Scheduler>(
-      Schedule{RunSignals{}, Decide{*network_}, Drive{*network_},
-               FollowLane{*network_}});
+  scheduler_ = std::make_unique<Scheduler>(make_schedule(*network_));
   RETURN_IF_UNEXPECTED(build_world(scenario_, *network_, Out(world_)));
   RETURN_IF_UNEXPECTED(build_scenario(scenario_, *network_, InOut(world_)));
   world_.sync();
