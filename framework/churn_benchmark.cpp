@@ -234,7 +234,7 @@ auto generate_schedule(const Workload& workload) -> Schedule {
 // One dense array with swap-erase, plus what the sorted and hybrid layouts
 // need: a count of appends and erases that break entity order, and an
 // in-place sort. The framework's own store uses archetype segments; see
-// framework/design.md.
+// framework/Design.md.
 template <typename ComponentType>
 class DenseStore final {
  public:

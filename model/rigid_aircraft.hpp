@@ -16,7 +16,7 @@
 // An aircraft as a rigid body (see rigid_body.hpp), flown by its control
 // surfaces through aerodynamics read from data (see aircraft_data.hpp). It is
 // the highest fidelity level (see "Choose fidelity per archetype" in
-// framework/design.md), for the few aircraft whose handling matters. Its
+// framework/Design.md), for the few aircraft whose handling matters. Its
 // frames, mass balance, engines and sensing have headers of their own, which
 // this one includes.
 namespace simon::model {

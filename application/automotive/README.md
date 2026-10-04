@@ -3,7 +3,7 @@
 The automotive application shows that simon's framework can carry a
 closed-loop driving simulation, at the level of objects, comparable to the
 best open source. Each claim is checked against an open reference, and the
-details are in [design.md](design.md).
+details are in [Design.md](Design.md).
 Its roads come first: read from ASAM OpenDRIVE, their positions, lane
 borders and lanes match [libOpenDRIVE](https://github.com/pageldev/libOpenDRIVE)
 to 8e-14 m on test roads of every geometry and on CARLA's Town01. On

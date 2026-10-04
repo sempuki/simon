@@ -104,7 +104,7 @@ struct Ring final {
 // Builds one defended site: an asset at its origin, the radars and launchers
 // that defend it on rings around it, and the red drones that attack it, flying
 // at the asset. A domain builder (see "Domain builders" in
-// framework/design.md): one utterance becomes an entity utterance for each
+// framework/Design.md): one utterance becomes an entity utterance for each
 // thing on the site. Start with create_site.
 class [[nodiscard]] SiteBuilder final {
  public:

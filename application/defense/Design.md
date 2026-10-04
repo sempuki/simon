@@ -158,7 +158,7 @@ only and changes nothing in the simulation.
 ## Following the framework's practices
 
 defense follows the practices in
-[Using the framework well](../../framework/design.md#using-the-framework-well),
+[Using the framework well](../../framework/Design.md#using-the-framework-well),
 and measures what they are worth against a layout that does not:
 
 - **`Kinematics` is position and velocity, 48 bytes.** Orientation is a

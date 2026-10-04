@@ -554,7 +554,7 @@ aircraft in wind flies as it does in still air, carried by the wind.
 
 **Flight dynamics (in progress).** Run flight control algorithms of the
 class JSBSim runs, at scale, with fidelity as an opt-in (see
-[Choose fidelity per archetype](../../framework/design.md#choose-fidelity-per-archetype)).
+[Choose fidelity per archetype](../../framework/Design.md#choose-fidelity-per-archetype)).
 
 - Done: control blocks in `model/`: exact first-order lags, rate limits,
   PI control, and lookup tables with linear interpolation.

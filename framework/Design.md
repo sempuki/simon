@@ -6,7 +6,7 @@ applications that drive its development.
 This document records the framework's architecture, the decisions behind
 it, and its roadmap. Update it when a decision changes. Each application's
 design, and its comparisons with other simulators, are in that
-application's own `design.md` (see [Applications](#applications)).
+application's own `Design.md` (see [Applications](#applications)).
 
 ## Goals
 
@@ -1277,7 +1277,7 @@ last sync. Queries are not const on the world, because they may rebuild.
 
 The grid is also a toolkit class that a system can own over positions that are
 not the world's spatial component. `ProposeEngagements` indexes track
-estimates this way (see [defense](../application/defense/design.md)).
+estimates this way (see [defense](../application/defense/Design.md)).
 
 Cell size matters as much as the index, so the index picks it. A
 `SpatialIndex` built without a cell size sizes its
@@ -1334,7 +1334,7 @@ by memory bandwidth, so most of them are about the bytes each entity touches
 per step.
 
 The defense application measures what each practice is worth (see
-[application/defense/design.md](../application/defense/design.md#following-the-frameworks-practices)).
+[application/defense/Design.md](../application/defense/Design.md#following-the-frameworks-practices)).
 
 ### Make components thin, and require what is always there
 
@@ -2121,7 +2121,7 @@ simon/
   format/        Readers from files into model/ and scenario/ data: OpenDRIVE, OpenSCENARIO, tire
                  property files, converted aircraft
   scenario/      Scenarios and parameter distributions as OpenSCENARIO describes them, and the player that runs their storyboards
-  application/   Each with a README.md of its results, and a design.md where it has more to say
+  application/   Each with a README.md of its results, and a Design.md where it has more to say
     hello/       Two bouncing balls, the first application
     defense/     Red drones against blue radars, launchers and interceptors
     aeronautic/  Aircraft flying routes, at several fidelity levels
@@ -2144,15 +2144,15 @@ player keeps a storyboard's states from step to step. `scenario/` depends on
 ## Applications
 
 Each application keeps a `README.md` of what it shows, with the commands
-that check it. Those with more to say keep a `design.md` of how they are
+that check it. Those with more to say keep a `Design.md` of how they are
 built and how they compare with other simulators of their domain:
 
 | Application | Design |
 |---|---|
 | hello | [application/hello](../application/hello/README.md) |
-| defense | [application/defense/design.md](../application/defense/design.md) |
-| aeronautic | [application/aeronautic/design.md](../application/aeronautic/design.md) |
-| automotive | [application/automotive/design.md](../application/automotive/design.md) |
+| defense | [application/defense/Design.md](../application/defense/Design.md) |
+| aeronautic | [application/aeronautic/Design.md](../application/aeronautic/Design.md) |
+| automotive | [application/automotive/Design.md](../application/automotive/Design.md) |
 
 ## Libraries
 
@@ -2173,7 +2173,7 @@ Clang 22 does not. We will revisit it when both compilers do.
 ## Roadmap
 
 Each step ends with a working application and passing tests. Each
-application's own steps are in its `design.md`.
+application's own steps are in its `Design.md`.
 
 1. **Framework (done).** `Entity`, `ComponentStore`, `World`, systems, schedules, builders and
    commands, with tests. Benchmark the dense store against the stable-slot

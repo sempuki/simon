@@ -7,8 +7,8 @@ layer for two very different aircraft, a 737 airliner and an F-16 fighter,
 and one thread flies a hundred thousand aircraft at mixed fidelity.
 Each claim below names the command that checks it. Timings are GCC builds on
 one core of an AMD Ryzen 9 5900XT. The details are in
-[design.md](design.md), and the framework it is built on is described in
-[framework/design.md](../../framework/design.md).
+[Design.md](Design.md), and the framework it is built on is described in
+[framework/Design.md](../../framework/Design.md).
 
 ## The physics matches JSBSim
 
