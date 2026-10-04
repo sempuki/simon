@@ -19,7 +19,9 @@ scale benchmark. signalized.xodr is a four-way junction with a traffic light
 and a crosswalk on each approach and two controllers; priority.xodr a T whose
 minor road gives way, with junction priorities and signs; crosswalks.xodr a
 climbing, leaning curve with a crosswalk in its own frame and one in road
-coordinates; light.xodr one lane with a traffic light halfway.
+coordinates; light.xodr one lane with a traffic light halfway; crossing.xodr a
+one-way major road crossed by a one-way minor road that gives way; and
+crossroads.xodr four arms meeting with nothing to say who goes first.
 
   pip install numpy
   python application/automotive/reference/make_test_roads.py
@@ -497,6 +499,81 @@ def light():
             controller_xml('1', 'light', 0, ['light'])]
 
 
+def one_way(road_id, start, heading, length, predecessor=None, successor=None,
+            signals=''):
+    """A road of one driving lane, with s, linked to junctions at its ends."""
+    piece = dict(kind='line', s=0.0, x=start[0], y=start[1], hdg=heading, length=length)
+    links = ''
+    if predecessor is not None:
+        links += '<predecessor elementType="junction" elementId="%s"/>' % predecessor
+    if successor is not None:
+        links += '<successor elementType="junction" elementId="%s"/>' % successor
+    lanes = ('      <laneSection s="0">\n'
+             '        <center><lane id="0" type="none"/></center>\n'
+             '        <right>%s</right>\n      </laneSection>\n'
+             % lane_xml(-1, 'driving', [(0, LANE, 0, 0, 0)]))
+    return ('  <road name="%s" id="%s" length="%.17g" junction="-1">\n'
+            '    <link>%s</link>\n'
+            '    <planView>\n%s    </planView>\n'
+            '    <lanes>\n%s    </lanes>\n'
+            '    <signals>\n%s    </signals>\n  </road>\n'
+            % (road_id, road_id, length, links, geometry_xml(piece), lanes, signals))
+
+
+def through(road_id, junction, start, heading, length, a, b):
+    """A straight connecting road of one lane, from road `a`'s end to road
+    `b`'s start."""
+    piece = dict(kind='line', s=0.0, x=start[0], y=start[1], hdg=heading, length=length)
+    lanes = ('      <laneSection s="0">\n'
+             '        <center><lane id="0" type="none"/></center>\n'
+             '        <right>%s</right>\n      </laneSection>\n'
+             % lane_xml(-1, 'driving', [(0, LANE, 0, 0, 0)], -1, -1))
+    return ('  <road name="%s" id="%s" length="%.17g" junction="%s">\n'
+            '    <link>\n'
+            '      <predecessor elementType="road" elementId="%s" contactPoint="end"/>\n'
+            '      <successor elementType="road" elementId="%s" contactPoint="start"/>\n'
+            '    </link>\n'
+            '    <planView>\n%s    </planView>\n'
+            '    <lanes>\n%s    </lanes>\n  </road>\n'
+            % (road_id, road_id, length, junction, a, b, geometry_xml(piece), lanes))
+
+
+def crossing():
+    """A one-way major road west to east, crossed by a one-way minor road
+    south to north that gives way: a give-way sign and the junction's
+    priority. Each road runs 300 m to and from a junction 20 m across."""
+    half, length = 10.0, 300.0
+    give_way = signal_xml('give_way', length - 3.0, -(LANE + 0.5), False, 'DE', '205', '-1',
+                          (-1, -1), name='give way')
+    roads = [
+        one_way('in_w', (-half - length, 0.0), 0.0, length, successor='9'),
+        one_way('out_e', (half, 0.0), 0.0, length, predecessor='9'),
+        one_way('in_s', (0.0, -half - length), math.pi / 2, length, successor='9',
+                signals=give_way),
+        one_way('out_n', (0.0, half), math.pi / 2, length, predecessor='9'),
+        through('we', '9', (-half, 0.0), 0.0, 2.0 * half, 'in_w', 'out_e'),
+        through('sn', '9', (0.0, -half), math.pi / 2, 2.0 * half, 'in_s', 'out_n'),
+    ]
+    junction = ('  <junction id="9" name="crossing">\n'
+                '    <connection id="0" incomingRoad="in_w" connectingRoad="we" '
+                'contactPoint="start"><laneLink from="-1" to="-1"/></connection>\n'
+                '    <connection id="1" incomingRoad="in_s" connectingRoad="sn" '
+                'contactPoint="start"><laneLink from="-1" to="-1"/></connection>\n'
+                '    <priority high="we" low="sn"/>\n'
+                '  </junction>\n')
+    return roads + [junction]
+
+
+def crossroads():
+    """signalized.xodr's four arms and junction with nothing to say who goes
+    first: no lights, priorities or signs, so traffic gives way to the
+    right."""
+    half, length = 10.0, 100.0
+    arms = [('n', math.pi / 2), ('e', 0.0), ('s', -math.pi / 2), ('w', math.pi)]
+    roads, connections, turns = intersection(arms, half, length, '1', {}, {})
+    return roads + [junction_xml('1', connections)] + turns
+
+
 def document(roads):
     return ('<?xml version="1.0" encoding="UTF-8"?>\n<OpenDRIVE>\n'
             '  <header revMajor="1" revMinor="6" name="simon test" version="1"/>\n'
@@ -526,6 +603,10 @@ def main():
         f.write(document([crosswalks()]))
     with open(os.path.join(roads, 'light.xodr'), 'w') as f:
         f.write(document(light()))
+    with open(os.path.join(roads, 'crossing.xodr'), 'w') as f:
+        f.write(document(crossing()))
+    with open(os.path.join(roads, 'crossroads.xodr'), 'w') as f:
+        f.write(document(crossroads()))
     print('wrote', roads)
 
 

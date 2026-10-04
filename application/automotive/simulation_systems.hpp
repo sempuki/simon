@@ -121,25 +121,44 @@ class LaneOccupancy final {
     Entity entity;
   };
 
-  template <typename ProjectedWorldType>
+  // Since when a vehicle has stood still, and whether it has committed to
+  // the junction ahead or the one it is in: kept beside the occupants, so
+  // the sorted index carries no more than it did without junctions.
+  struct Stop final {
+    TimePoint since = TimePoint::max();  // Never, if moving.
+    bool committed = false;
+  };
+
+  // Every vehicle, and its stop if `STOPPED`.
+  template <bool STOPPED = false, typename ProjectedWorldType>
   auto collect(ProjectedWorldType& world, const Network& network) -> void {
     occupants_.clear();
     const auto& drivers = world.template store_of<Driver>();
-    world.template store_of<LaneState>().for_each(
-        [&](Entity owner, const LaneState& state) {
-          const Driver* driver = drivers.maybe_component_of(owner);
-          if (!driver) {
-            return;
+    world.template store_of<LaneState>().for_each([&](Entity owner,
+                                                      const LaneState& state) {
+      const Driver* driver = drivers.maybe_component_of(owner);
+      if (!driver) {
+        return;
+      }
+      occupants_.push_back(Occupant{
+          .lane = state.lane,
+          .along = along_lane(network, state.lane, state.s),
+          .speed = state.speed.numerical_value_in(model::meter_per_second),
+          .length = driver->length.numerical_value_in(model::meter),
+          .turns = state.turns,
+          .driver = driver,
+          .entity = owner});
+      if constexpr (STOPPED) {
+        if (const Stopped* since =
+                world.template store_of<Stopped>().maybe_component_of(owner)) {
+          if (owner.index >= stops_.size()) {
+            stops_.resize(owner.index + 1);
           }
-          occupants_.push_back(Occupant{
-              .lane = state.lane,
-              .along = along_lane(network, state.lane, state.s),
-              .speed = state.speed.numerical_value_in(model::meter_per_second),
-              .length = driver->length.numerical_value_in(model::meter),
-              .turns = state.turns,
-              .driver = driver,
-              .entity = owner});
-        });
+          stops_[owner.index] =
+              Stop{.since = since->since, .committed = since->committed};
+        }
+      }
+    });
     std::ranges::sort(occupants_, [](const Occupant& a, const Occupant& b) {
       return std::tie(a.lane, a.along, a.entity) <
              std::tie(b.lane, b.along, b.entity);
@@ -162,14 +181,13 @@ class LaneOccupancy final {
   // The first vehicle in `lane` ahead of `along`, but `self`.
   auto find_ahead(const LaneKey& lane, double along, Entity self) const
       -> const Occupant* {
-    // In its own lane, the vehicles ahead of `self` follow it.
+    // In its own lane, the vehicles ahead of `self` follow it, those level
+    // with it ahead by entity, as sorted.
     if (std::uint32_t at = place_of(self, lane); at != NOWHERE) {
-      for (++at; at < occupants_.size() && occupants_[at].lane == lane; ++at) {
-        if (occupants_[at].along > along) {
-          return &occupants_[at];
-        }
-      }
-      return nullptr;
+      ++at;
+      return at < occupants_.size() && occupants_[at].lane == lane
+                 ? &occupants_[at]
+                 : nullptr;
     }
     auto [first, last] = in_lane(lane);
     for (auto it = std::upper_bound(first, last, along, by_along); it != last;
@@ -208,6 +226,24 @@ class LaneOccupancy final {
   auto find_first(const LaneKey& lane) const -> const Occupant* {
     auto [first, last] = in_lane(lane);
     return first == last ? nullptr : &*first;
+  }
+
+  // `occupant`'s stop, if they were collected.
+  auto stop_of(const Occupant& occupant) const -> Stop {
+    return occupant.entity.index < stops_.size() ? stops_[occupant.entity.index]
+                                                 : Stop{};
+  }
+
+  // The vehicles in `lane`, in order along it.
+  auto occupants_of(const LaneKey& lane) const -> std::span<const Occupant> {
+    auto [first, last] = in_lane(lane);
+    return {first, last};
+  }
+
+  // `self`, if it is in `lane`.
+  auto find(Entity self, const LaneKey& lane) const -> const Occupant* {
+    std::uint32_t at = place_of(self, lane);
+    return at == NOWHERE ? nullptr : &occupants_[at];
   }
 
  private:
@@ -250,6 +286,7 @@ class LaneOccupancy final {
   std::vector<Occupant> occupants_;    // By lane, then along it.
   std::vector<Span> lanes_;            // Each occupied lane, in order.
   std::vector<std::uint32_t> places_;  // Each entity's place, by its index.
+  std::vector<Stop> stops_;            // Each entity's stop, by its index.
 };
 
 //-- Systems -------------------------------------------------------------------
@@ -273,27 +310,33 @@ struct RunSignals final    //
 // Each step, each driver finds its leader, in its lane or the lanes its way
 // leads into, and accelerates by the Intelligent Driver Model; once a second
 // it weighs changing to a lane beside its own by MOBIL. A dead end ahead is a
-// leader standing still. At a light it stops for, it brakes to stop its line
-// gap short of the line, and its acceleration is the lesser of the two.
+// leader standing still. At a light it stops for, or a junction where it
+// gives way and finds no gap, it brakes to stop its line gap short of the
+// line or the junction, and its acceleration is the lesser of the two.
 struct Decide final            //
     : System<DriveCommand,     //
              const LaneState,  //
              const Driver,     //
              Tactical> {
   using SystemWorld = ProjectedWorld<Decide>;
-  using AllowComponentList = TypeList<LaneState, Driver, SignalState>;
+  using AllowComponentList = TypeList<LaneState, Driver, SignalState, Stopped>;
   using SequenceAfterSystemList = SystemList<RunSignals>;
 
   // How far ahead a driver looks for a leader across its lane's end, and for
-  // a light.
+  // a light or a junction.
   static constexpr double LOOKAHEAD = 250.0;  // m.
 
   explicit Decide(const Network& network) : network_{&network} {}
 
   auto prepare(SystemWorld& world, Step step) -> bool {
-    occupancy_.collect(world, *network_);
-    changing_ = gate_.fire(step).has_value();
     lights_ = !network_->control.stop_lines().empty();
+    yields_ = !network_->rights.conflicts().empty();
+    if (yields_) {
+      occupancy_.collect<true>(world, *network_);
+    } else {
+      occupancy_.collect(world, *network_);
+    }
+    changing_ = gate_.fire(step).has_value();
     aspects_.assign(network_->control.groups().size(), model::Aspect::GREEN);
     world.template store_of<SignalState>().for_each(
         [&](Entity, const SignalState& signal) {
@@ -316,6 +359,12 @@ struct Decide final            //
     std::optional<Length> light =
         lights_ && tactical ? find_light(*state, *driver, along, *tactical)
                             : std::nullopt;
+    if (std::optional<Length> wait =
+            yields_ && tactical
+                ? find_wait(*state, *driver, along, self, *tactical)
+                : std::nullopt) {
+      light = light ? std::min(*light, *wait) : *wait;
+    }
     auto obey = [&](AccelerationMagnitude acceleration) {
       return light ? std::min(acceleration,
                               model::compute_stop_acceleration(
@@ -345,12 +394,196 @@ struct Decide final            //
   }
 
  private:
+  // How far ahead the driver waits at the next junction on its way, within
+  // the lookahead, its line gap short of the junction; none if it may go.
+  // It goes when there is room for it past the junction, so it never stops
+  // in it, and every vehicle with priority would reach each conflict on its
+  // connecting lane at least its critical gap after it reaches the junction;
+  // once it would have to brake to wait it holds to that, as it does when it
+  // is too near to stop. Of two drivers waiting at the junction for each
+  // other, the one that stopped first goes.
+  [[gnu::noinline]] auto find_wait(const LaneState& state, const Driver& driver,
+                                   double along, Entity self,
+                                   Tactical& tactical) const
+      -> std::optional<Length> {
+    const model::RightOfWay& rights = network_->rights;
+    double before = -along;  // From the vehicle to the lane's start.
+    LaneKey key = state.lane;
+    std::uint32_t turns = state.turns;
+    while (network_->roads.roads[key.road].junction == "-1") {
+      before += lane_length(*network_, key);
+      std::optional<LaneKey> next =
+          choose_next_lane(*network_, key, driver.seed, turns++);
+      if (!next || before >= LOOKAHEAD) {
+        tactical.entering.reset();
+        return std::nullopt;
+      }
+      key = *next;
+    }
+    if (before <= 0.0 || tactical.entering == key) {
+      tactical.entering = key;  // In the junction, or decided.
+      return std::nullopt;
+    }
+    tactical.entering.reset();
+    // Kept clear: room past the junction for the whole vehicle.
+    bool room = true;
+    if (std::optional<LaneKey> exit =
+            choose_next_lane(*network_, key, driver.seed, turns)) {
+      if (const LaneOccupancy::Occupant* last = occupancy_.find_first(*exit)) {
+        room = last->along - last->length >=
+               (driver.length + driver.following.minimum_gap)
+                   .numerical_value_in(model::meter);
+      }
+    }
+    double v = state.speed.numerical_value_in(model::meter_per_second);
+    double to_wait = std::max(
+        before - tactical.braking.line_gap.numerical_value_in(model::meter),
+        0.0);
+    // s, at the soonest, to where it waits.
+    double arriving =
+        model::compute_soonest_arrival(to_wait * model::meter, state.speed,
+                                       driver.following.acceleration,
+                                       driver.following.desired_speed)
+            .numerical_value_in(model::second);
+    const LaneOccupancy::Occupant* me = occupancy_.find(self, state.lane);
+    LaneOccupancy::Stop my_stop =
+        me ? occupancy_.stop_of(*me) : LaneOccupancy::Stop{};
+    bool waiting = me && my_stop.since != TimePoint::max() && to_wait < 0.5;
+    double gap = tactical.critical_gap.numerical_value_in(model::second);
+    bool clear = room;
+    // Nor does it enter while one that gives way to it is in the junction
+    // and has not cleared where their ways meet, or waits to enter it,
+    // having stopped first, as that one then goes.
+    for (std::uint32_t index : rights.conflicts_against(key)) {
+      const model::Conflict& conflict = rights.conflicts()[index];
+      for (const LaneOccupancy::Occupant& other :
+           occupancy_.occupants_of(conflict.lane)) {
+        clear = clear && !(other.along - other.length < conflict.along);
+      }
+      if (!waiting || conflict.why == model::Yielding::LIGHTS) {
+        continue;
+      }
+      for (const LaneKey& before_lane :
+           network_->graph.predecessors_of(conflict.lane)) {
+        std::span<const LaneOccupancy::Occupant> in =
+            occupancy_.occupants_of(before_lane);
+        if (in.empty()) {
+          continue;
+        }
+        const LaneOccupancy::Occupant& other = in.back();
+        LaneOccupancy::Stop other_stop = occupancy_.stop_of(other);
+        bool first = std::tie(other_stop.since, other.entity) <
+                     std::tie(my_stop.since, me->entity);
+        bool waits =
+            other_stop.since != TimePoint::max() && !other_stop.committed &&
+            other.along >=
+                lane_length(*network_, before_lane) -
+                    tactical.braking.line_gap.numerical_value_in(model::meter) -
+                    0.5;
+        bool heading =
+            choose_next_lane(*network_, before_lane, other.driver->seed,
+                             other.turns) == conflict.lane;
+        clear = clear && !(first && waits && heading);
+      }
+    }
+    for (const model::Conflict& conflict : rights.conflicts_on(key)) {
+      if (conflict.why == model::Yielding::LIGHTS) {
+        continue;  // Kept apart by lights: only who is in the junction.
+      }
+      auto index =
+          static_cast<std::uint32_t>(&conflict - rights.conflicts().data());
+      std::span<const model::Approach> approaches = rights.approaches_of(index);
+      for (const model::Approach& approach : approaches) {
+        if (const LaneOccupancy::Occupant* foe =
+                find_foe(approaches, approach, self)) {
+          TimePoint foe_since = occupancy_.stop_of(*foe).since;
+          if (waiting && waits_at_entry(approach, *foe, tactical) &&
+              std::tie(my_stop.since, me->entity) <
+                  std::tie(foe_since, foe->entity)) {
+            continue;  // It stopped first.
+          }
+          double time = model::compute_soonest_arrival(
+                            (approach.to_conflict - foe->along) * model::meter,
+                            foe->speed * model::meter_per_second,
+                            foe->driver->following.acceleration,
+                            foe->driver->following.desired_speed)
+                            .numerical_value_in(model::second);
+          clear = clear && time - arriving >= gap;
+        }
+      }
+    }
+    double comfortable = driver.following.deceleration.numerical_value_in(
+        model::meter_per_second_squared);
+    double maximum = tactical.braking.maximum.numerical_value_in(
+        model::meter_per_second_squared);
+    if (clear) {
+      if (to_wait <= v * v / (2.0 * comfortable) + 1.0) {
+        tactical.entering = key;
+      }
+      return std::nullopt;
+    }
+    if (to_wait > 0.0 && v * v / (2.0 * maximum) >= to_wait) {
+      tactical.entering = key;  // Too near to stop.
+      return std::nullopt;
+    }
+    return to_wait * model::meter;
+  }
+
+  // The nearest vehicle in `approach`'s lane, but `self`, whose way leads to
+  // the conflict and that has not passed it, unless one going elsewhere
+  // stands still before it.
+  auto find_foe(std::span<const model::Approach> approaches,
+                const model::Approach& approach, Entity self) const
+      -> const LaneOccupancy::Occupant* {
+    std::span<const LaneOccupancy::Occupant> in =
+        occupancy_.occupants_of(approach.lane);
+    for (auto it = in.rbegin(); it != in.rend(); ++it) {
+      // Past the conflict only once its tail is.
+      if (it->entity == self || it->along - it->length > approach.to_conflict) {
+        continue;
+      }
+      LaneKey key = approach.lane;
+      std::uint32_t turns = it->turns;
+      std::uint32_t toward = approach.toward;
+      bool heading = true;
+      while (heading && toward != model::Approach::NONE) {
+        std::optional<LaneKey> next =
+            choose_next_lane(*network_, key, it->driver->seed, turns++);
+        heading = next == approaches[toward].lane;
+        key = approaches[toward].lane;
+        toward = approaches[toward].toward;
+      }
+      if (heading) {
+        return &*it;
+      }
+      if (occupancy_.stop_of(*it).since != TimePoint::max()) {
+        return nullptr;  // Those behind wait for it.
+      }
+    }
+    return nullptr;
+  }
+
+  // Whether `foe` stands waiting at its own way into the junction, at the end
+  // of the lane leading into the conflict's foe lane.
+  auto waits_at_entry(const model::Approach& approach,
+                      const LaneOccupancy::Occupant& foe,
+                      const Tactical& tactical) const -> bool {
+    double line_gap =
+        tactical.braking.line_gap.numerical_value_in(model::meter);
+    LaneOccupancy::Stop stop = occupancy_.stop_of(foe);
+    return approach.toward == 0 && stop.since != TimePoint::max() &&
+           !stop.committed &&
+           foe.along >= lane_length(*network_, approach.lane) - line_gap - 0.5;
+  }
+
   // How far ahead the driver stops for the first light, within the lookahead
   // along the vehicle's way, it stops for: its line gap short of the line. A
   // driver that will not stop for a light that is not green commits to
   // passing it, and holds to that until the line is behind it.
-  auto find_light(const LaneState& state, const Driver& driver, double along,
-                  Tactical& tactical) const -> std::optional<Length> {
+  [[gnu::noinline]] auto find_light(const LaneState& state,
+                                    const Driver& driver, double along,
+                                    Tactical& tactical) const
+      -> std::optional<Length> {
     std::span<const model::StopLine> all = network_->control.stop_lines();
     bool held = false;
     std::optional<Length> light;
@@ -404,6 +637,9 @@ struct Decide final            //
   auto find_leader(const LaneKey& lane, double along, std::uint32_t turns,
                    std::uint64_t seed, Entity self) const
       -> std::optional<model::Leader> {
+    if (yields_) {
+      return find_leader_near_junctions(lane, along, turns, seed, self);
+    }
     if (const LaneOccupancy::Occupant* ahead =
             occupancy_.find_ahead(lane, along, self)) {
       return gap_to(*ahead, ahead->along - along);
@@ -424,6 +660,123 @@ struct Decide final            //
       distance += lane_length(*network_, key);
     }
     return std::nullopt;
+  }
+
+  // find_leader where lanes merge and part in junctions: the vehicles on
+  // lanes merging into or parting from the driver's way lead it too.
+  [[gnu::noinline]] auto find_leader_near_junctions(
+      const LaneKey& lane, double along, std::uint32_t turns,
+      std::uint64_t seed, Entity self) const -> std::optional<model::Leader> {
+    auto nearer = [](std::optional<model::Leader> a,
+                     std::optional<model::Leader> b) {
+      return !a || (b && b->gap < a->gap) ? b : a;
+    };
+    // Where lanes part, those leaving the same lane share it at first.
+    std::optional<model::Leader> parting;
+    if (yields_) {
+      for (const LaneKey& before : network_->graph.predecessors_of(lane)) {
+        for (const LaneKey& sibling : network_->graph.successors_of(before)) {
+          if (sibling != lane) {
+            parting = nearer(parting, find_parting(sibling, -along, self));
+          }
+        }
+      }
+    }
+    if (const LaneOccupancy::Occupant* ahead =
+            occupancy_.find_ahead(lane, along, self)) {
+      return nearer(parting, gap_to(*ahead, ahead->along - along));
+    }
+    double distance = lane_length(*network_, lane) - along;
+    LaneKey key = lane;
+    while (distance < LOOKAHEAD) {
+      std::optional<LaneKey> next =
+          choose_next_lane(*network_, key, seed, turns++);
+      if (!next) {
+        return nearer(parting,
+                      model::Leader{.gap = distance * model::meter,
+                                    .speed = 0.0 * model::meter_per_second});
+      }
+      LaneKey from = key;
+      key = *next;
+      if (yields_) {
+        parting = nearer(parting, find_merging(from, key, distance, self));
+        for (const LaneKey& sibling : network_->graph.successors_of(from)) {
+          if (sibling != key) {
+            parting = nearer(parting, find_parting(sibling, distance, self));
+          }
+        }
+      }
+      if (const LaneOccupancy::Occupant* first = occupancy_.find_first(key)) {
+        return nearer(parting, gap_to(*first, distance + first->along));
+      }
+      if (parting) {
+        return parting;
+      }
+      distance += lane_length(*network_, key);
+    }
+    return parting;
+  }
+
+  // The last vehicle on `lane`, which parts from the driver's way, still
+  // where the two share the road: a leader `distance` plus its place along
+  // `lane` ahead of the driver, if that is ahead.
+  auto find_parting(const LaneKey& lane, double distance, Entity self) const
+      -> std::optional<model::Leader> {
+    std::optional<double> parts = network_->rights.find_parting(lane);
+    if (!parts) {
+      return std::nullopt;
+    }
+    for (const LaneOccupancy::Occupant& other : occupancy_.occupants_of(lane)) {
+      if (other.entity != self && distance + other.along > 0.0 &&
+          other.along - other.length < *parts) {
+        return gap_to(other, distance + other.along);
+      }
+    }
+    return std::nullopt;
+  }
+
+  // Of the vehicles about to merge into `into` from lanes other than `from`,
+  // the nearest to where their ways meet that is nearer it than the driver,
+  // `distance` from `into`: a leader as if in the driver's lane, as SUMO
+  // treats a vehicle on a merging lane. Each is measured to where its lane
+  // first comes within a car's width of another; ties go to the lower
+  // entity.
+  auto find_merging(const LaneKey& from, const LaneKey& into, double distance,
+                    Entity self) const -> std::optional<model::Leader> {
+    std::span<const LaneKey> feeding = network_->graph.predecessors_of(into);
+    if (feeding.size() < 2) {
+      return std::nullopt;
+    }
+    auto before_end = [&](const LaneKey& lane) {
+      double length = lane_length(*network_, lane);
+      return length - network_->rights.find_merge(lane).value_or(length);
+    };
+    double mine = distance - before_end(from);  // To where ways meet.
+    std::optional<model::Leader> nearest;
+    for (const LaneKey& lane : feeding) {
+      if (lane == from) {
+        continue;
+      }
+      std::span<const LaneOccupancy::Occupant> in =
+          occupancy_.occupants_of(lane);
+      double meets = lane_length(*network_, lane) - before_end(lane);
+      for (auto it = in.rbegin(); it != in.rend(); ++it) {
+        double theirs = meets - it->along;
+        if (std::tie(theirs, it->entity) >= std::tie(mine, self)) {
+          break;  // It and those behind it follow the driver.
+        }
+        if (choose_next_lane(*network_, lane, it->driver->seed, it->turns) !=
+            into) {
+          continue;
+        }
+        model::Leader leader = gap_to(*it, mine - theirs);
+        if (!nearest || leader.gap < nearest->gap) {
+          nearest = leader;
+        }
+        break;
+      }
+    }
+    return nearest;
   }
 
   // A leader `apart` meters ahead, front bumper to front bumper.
@@ -491,6 +844,7 @@ struct Decide final            //
   engine::RateGate gate_{1s};
   bool changing_ = false;
   bool lights_ = false;  // Whether the network has any.
+  bool yields_ = false;  // Whether its junctions have any conflicts.
 };
 
 // Each step, each vehicle changes lane if its driver decided to, and moves
@@ -500,7 +854,9 @@ struct Decide final            //
 struct Drive final                //
     : System<LaneState,           //
              const DriveCommand,  //
-             const Driver> {
+             const Driver,        //
+             const Tactical,      //
+             Stopped> {
   using SystemWorld = ProjectedWorld<Drive>;
   using SequenceAfterSystemList = SystemList<Decide>;
 
@@ -510,6 +866,8 @@ struct Drive final                //
                   LaneState& state,             //
                   const DriveCommand* command,  //
                   const Driver* driver,         //
+                  const Tactical* tactical,     //
+                  Stopped* stopped,             //
                   Step step) const -> void {
     if (!command || !driver) {
       return;
@@ -546,6 +904,14 @@ struct Drive final                //
     }
     state.s = s_along(*network_, state.lane, along);
     state.speed = v * model::meter_per_second;
+    if (stopped) {
+      stopped->committed = tactical && tactical->entering;
+      if (v > 0.0) {
+        stopped->since = TimePoint::max();
+      } else if (stopped->since == TimePoint::max()) {
+        stopped->since = step.time + step.dt;
+      }
+    }
   }
 
  private:

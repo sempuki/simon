@@ -113,6 +113,17 @@ auto LaneGraph::successors_of(const LaneKey& lane) const
   return std::span{to_}.subspan(first_[i], first_[i + 1] - first_[i]);
 }
 
+auto LaneGraph::predecessors_of(const LaneKey& lane) const
+    -> std::span<const LaneKey> {
+  auto found = std::ranges::lower_bound(into_, lane);
+  if (found == into_.end() || *found != lane) {
+    return {};
+  }
+  auto i = static_cast<std::size_t>(found - into_.begin());
+  return std::span{before_}.subspan(first_from_[i],
+                                    first_from_[i + 1] - first_from_[i]);
+}
+
 auto LaneGraph::edges() const -> std::vector<Edge> {
   std::vector<Edge> all;
   for (std::size_t i = 0; i < from_.size(); ++i) {
@@ -216,6 +227,18 @@ auto build_lane_graph(const RoadNetwork& network) -> LaneGraph {
     graph.to_.push_back(to);
   }
   graph.first_.push_back(static_cast<std::uint32_t>(graph.to_.size()));
+  std::ranges::sort(edges, {}, [](const std::pair<LaneKey, LaneKey>& edge) {
+    return std::pair{edge.second, edge.first};
+  });
+  for (const auto& [from, to] : edges) {
+    if (graph.into_.empty() || graph.into_.back() != to) {
+      graph.into_.push_back(to);
+      graph.first_from_.push_back(
+          static_cast<std::uint32_t>(graph.before_.size()));
+    }
+    graph.before_.push_back(from);
+  }
+  graph.first_from_.push_back(static_cast<std::uint32_t>(graph.before_.size()));
   return graph;
 }
 

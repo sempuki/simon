@@ -50,6 +50,11 @@ TEST_CASE("LaneGraph") {
     CHECK(lanes(graph.successors_of({.road = 0, .lane = 1})) ==
           std::vector<LaneKey>{{.road = 1, .lane = 1}});
     CHECK(graph.edges().size() == 4);
+    // And back the other way.
+    CHECK(lanes(graph.predecessors_of({.road = 1, .lane = -1})) ==
+          std::vector<LaneKey>{{.road = 0, .lane = -1}});
+    CHECK(lanes(graph.predecessors_of({.road = 1, .lane = 1})) ==
+          std::vector<LaneKey>{{.road = 0, .lane = 1}});
   }
 
   SECTION("ShouldEnterConnectingRoadGivenJunction") {
@@ -69,6 +74,9 @@ TEST_CASE("LaneGraph") {
     // A link to a lane the road lacks adds nothing.
     CHECK(graph.edges().size() == 1);
     CHECK(graph.successors_of({.road = 1, .lane = -1}).empty());
+    CHECK(lanes(graph.predecessors_of({.road = 1, .lane = -1})) ==
+          std::vector<LaneKey>{{.road = 0, .lane = -1}});
+    CHECK(graph.predecessors_of({.road = 0, .lane = -1}).empty());
   }
 }
 

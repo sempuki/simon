@@ -64,17 +64,19 @@ with every geometry, elevation, superelevation and changing lanes, one of
 them at map coordinates; a signalized four-way junction with a light and a
 crosswalk on each approach; a T whose minor road gives way; a climbing,
 leaning curve with crosswalks in road coordinates and in their own turned
-frame; CARLA's Town01, 98 roads as RoadRunner writes them; and two of
-esmini's roads with signs (see `application/automotive/reference/README.md`):
+frame; one lane with a light; a one-way crossing whose minor road gives way;
+a crossroads with no rule but the right's; CARLA's Town01, 98 roads as
+RoadRunner writes them; and two of esmini's roads with signs (see
+`application/automotive/reference/README.md`):
 
 | Check | Agreement |
 |---|---:|
 | Positions on lines, arcs and spirals, through elevation and superelevation, on and off the surface | 1.0e-13 m |
 | Lane borders | 8e-14 m |
-| The lane at each lane's middle | 5,900 of 5,901 |
-| The lane graph, through both junctions and their turnarounds too | All 351 edges |
+| The lane at each lane's middle | 6,291 of 6,292 |
+| The lane graph, through every junction and turnaround too | All 387 edges |
 | Positions on parametric cubics, against an exact arc length | 1.2e-13 m |
-| 20 signals: every field, every lane validity, and where each stands | Exact |
+| 22 signals: every field, every lane validity, and where each stands | Exact |
 | The corners of 6 crosswalks' outlines | 1.6e-14 m |
 | Junction priorities and controllers | All 6 |
 
@@ -448,7 +450,7 @@ vehicles enter 1,573 lanes through its junctions in 120 s, at 10.2 of their
 
 IDM decides how hard to accelerate behind one leader; the tactical layer
 decides where a vehicle must stop, and pedestrians decide when to cross.
-Traffic lights are built; right of way at junctions and pedestrians come
+Traffic lights and right of way at junctions are built; pedestrians come
 next (see the [Roadmap](#roadmap)).
 
 **Everything a vehicle stops for is a point to stop at.** The tactical layer
@@ -471,19 +473,10 @@ is read and sorted by s along each lane:
 - **A vehicle commits** to passing a zone once it will not stop there, and
   then ignores it until the zone is behind it, so it neither dithers in the
   dilemma zone nor brakes inside the junction when yellow turns red.
-- **Yielding is gap acceptance.** A driver on a lane that yields asks when the
-  first vehicle with priority reaches each conflict area ahead, and the area
-  blocks while that is sooner than its critical gap t_c; a driver following
-  another through the same gap needs only the follow-up time t_f, as the
-  Highway Capacity Manual's two-way stop control defines them. Each driver
-  draws its own. Against random priority traffic the minor stream's capacity
-  is then Siegloch's, c = (3600 / t_f) exp(-q_p (t_c - t_f / 2) / 3600).
-- **Deadlocks resolve by arrival.** At an all-way stop the first to arrive
-  goes first, ties going to the lower Name, so runs repeat.
-- **`Decide` stays one system.** Its `prepare` adds signal states, crosswalk
-  occupancy and each conflict area's priority arrivals to its index; each
-  vehicle then searches its lane's zones once and writes only its own
-  command and `Tactical` state.
+- **Yielding is gap acceptance** (see [Right of way](#right-of-way)).
+- **`Decide` stays one system.** Its `prepare` adds signal states and when
+  each vehicle stopped to its index; each vehicle then searches its way's
+  zones once and writes only its own command and `Tactical` state.
 
 ### Traffic lights
 
@@ -499,12 +492,13 @@ of red for all between turns; a scenario can set other times, and
 OpenSCENARIO's signal controllers come in step 6. A light no controller
 lists stops no one. Actuated signals are a later opt-in.
 
-Only a network with lights gives its vehicles a `Tactical` component, the
-braking above and the line a driver has committed to, as a
-`TacticalVehicle`; on any other the vehicles are plain `Vehicle`s, and
-`Decide`'s runner leaves the lights out at compile time, so traffic without
-lights costs what it did: 100,000 vehicles on the rings step in 25.2 ms,
-against 24.9 ms before lights, within the benchmark's run-to-run noise.
+Only a network with lights or conflicts in its junctions gives its vehicles
+a `Tactical` component, the braking above, a critical gap and what a driver
+has committed to, and a `Stopped` component, as `TacticalVehicle`s; on any
+other the vehicles are plain `Vehicle`s, and `Decide`'s runner leaves the
+tactical layer out at compile time. Traffic without lights or junctions
+costs within 3% of what it did: 100,000 vehicles on the rings step in
+25.4 ms, against 24.8 to 25.0 ms before, where run-to-run noise is about 2%.
 `Decide` reads every group's aspect in its `prepare`, and each driver looks
 along its way, as far as it looks for a leader, for the first stop line it
 must stop at:
@@ -533,10 +527,85 @@ light halfway (`roads/light.xodr`), and at the signalized junction:
 | Where the first stops | 498.990007 m, as SUMO, to 6e-7 m |
 | At yellow, 15 m from the line at 15 m/s | Goes, and on through red |
 | At yellow, 80 m away | Stops 1 m short of the line |
-| 40 vehicles at the junction for 10 min, two groups taking turns | 304 crossings of a stop line, one on red, by a driver that committed on yellow |
+| 40 vehicles at the junction for 10 min, two groups taking turns | 190 crossings of a stop line, none on red uncommitted |
 
 After 50 s the queue's leader nears the lane's end, which simon's drivers
 treat as a standing leader 250 m ahead and SUMO's leave the network at.
+
+### Right of way
+
+`model/right_of_way` finds, in each junction, where two connecting lanes
+from different approaches cross, their middles sampled every 0.25 m, or
+merge into one lane, where their middles first come within 2 m, a car's
+width, of each other; and where lanes leaving one approach part, a car's
+width apart. Who gives way at a conflict is decided in this order:
+
+| Rule | Gives way |
+|---|---|
+| The junction's `<priority>` | The connecting road it names `low` |
+| Lights of different groups | Neither: the lights keep them apart, and each waits only for the other still in the junction |
+| Give-way and stop signs, Germany's 205 and 206 | The approach with the sign, if the other has none |
+| A left turn against oncoming traffic | The left turn |
+| Otherwise | The one with the other on its right |
+
+Each conflict keeps the lanes that lead to its foe lane within 200 m, for
+finding the vehicles that will reach it. Before every junction on its way a
+`TacticalVehicle` decides whether to enter:
+
+- **It keeps the junction clear:** it enters only with room past the
+  junction for itself and its minimum gap, so it never stops in it.
+- **It takes a gap of at least its critical gap,** 6 s by default: every
+  vehicle with priority must reach the conflict at least that long after it
+  reaches the junction, each by its soonest arrival, speeding up to its
+  desired speed. A vehicle with priority counts until its tail has passed
+  the conflict, and not while one going elsewhere stands still before it.
+- **It commits** once it would have to brake to wait, or is too near to
+  stop, and holds to that through the junction.
+- **A vehicle with priority waits too** while one that gives way to it is in
+  the junction short of their conflict.
+- **The first to stop goes first.** Of drivers waiting at the junction for
+  each other, and not committed, the one that stopped first goes, the lower
+  entity on a tie, so a crossroads with no rule but the right's never
+  deadlocks. `Drive` records when each vehicle stopped, in `Stopped`.
+- **Merging and parting lanes lead each other,** as SUMO treats a vehicle on
+  a merging lane: a vehicle nearer where two merging lanes meet leads the
+  other's driver, and one on a lane parting from the driver's way leads it
+  until their lanes are a car's width apart.
+
+`right_of_way_test` checks the rules on the test networks, gap acceptance
+against Harders' rule, and traffic against itself. Harders (1968), whose
+capacity is the Highway Capacity Manual's for two-way stop control, has a
+minor driver enter a gap between vehicles with priority if, when it reaches
+the junction, the next is at least the critical gap away. On the one-way
+crossing (`roads/crossing.xodr`), 400 vehicles an hour with priority,
+arriving at random, against a minor queue that never empties, for an hour:
+
+| Check | Result |
+|---|---|
+| Gaps between vehicles with priority | 413 |
+| Minor drivers entering, against Harders' rule on each gap, with the queue's own discharge | 495, against 529 |
+| Gaps in which exactly as many enter as the rule says | 379, 92% |
+
+The queue discharges as IDM drivers start from standstill: the first in it
+enters 0.2 s after the gap opens, the next 5.4 s after, and the rest 2.1 to
+3.9 s apart. Harders' closed form takes one follow-up time for all of them,
+so it overstates what the queue can do; each gap is checked against the
+queue as it discharges. Drivers miss some gaps near the critical gap
+because a vehicle with priority slows for one already in the junction, and
+the gap a driver judged shrinks.
+
+| Check | Result |
+|---|---|
+| Who gives way at the T (`roads/priority.xodr`) | Each of its six conflicts, by priority, sign and turn |
+| Four drivers, one on each arm of the crossroads with no rule but the right's, each way its seed picks, 100 times | Every one through; boxes overlapping for 4 vehicle-steps in all |
+| Pairs of vehicles that start to overlap in 10 min, crossroads, 40 vehicles | 0, against 763 with no right of way |
+| The same, the T, 25 vehicles | 2, against 399 |
+| The same, the signalized junction, 40 vehicles | 0, against 102 |
+| The same, CARLA's Town01, 60 vehicles | 66, against 228 |
+
+Town01's remaining overlaps are at merges inside its junctions, where
+RoadRunner's lanes converge over many meters and two drivers creeping in a
+queue meet before either leads the other.
 
 **Pedestrians** walk a graph of sidewalk lanes, crossings from crosswalk
 outlines, and links where sidewalks meet at junctions, in one dimension as
@@ -661,8 +730,9 @@ who decide when to cross (see [Tactical layer](#tactical-layer)):
    from OpenDRIVE and checked against libOpenDRIVE.
 2. Done: stop lines, commitment and fixed-time signals, with movsim's
    yellow rule and SUMO's stop, against SUMO.
-3. Right of way at junctions: priority, give-way and stop, gap acceptance and
-   deadlock, against Siegloch's capacity and SUMO.
+3. Done: right of way at junctions: priority, lights, signs, turns and the
+   right; gap acceptance against Harders' rule; first to stop goes first;
+   junctions kept clear; merging and parting lanes.
 4. The walking graph, and pedestrians walking routes on it.
 5. Crossing decisions and vehicles yielding, against the Highway Capacity
    Manual's pedestrian delay and SUMO.

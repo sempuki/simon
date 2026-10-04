@@ -13,6 +13,7 @@
 #include "framework/world.hpp"
 #include "model/kinematics.hpp"
 #include "model/lane_graph.hpp"
+#include "model/right_of_way.hpp"
 #include "model/road.hpp"
 #include "model/road_placement.hpp"
 #include "model/traffic.hpp"
@@ -47,6 +48,7 @@ struct Network final {
   model::RoadNetwork roads;
   model::LaneGraph graph;
   model::TrafficControl control;
+  model::RightOfWay rights;
 };
 
 // Where a vehicle is in the network and how fast it goes: its lane, the s of
@@ -71,12 +73,26 @@ struct Driver final {
 // How a driver treats what it must stop for, and what it has resolved to do
 // ahead: the stop line, by its place in the network's stop lines, that it
 // passes whatever the light shows, having decided to go on yellow or been
-// too near to stop on red. Only vehicles on a network with lights have it.
+// too near to stop on red; and the junction's connecting lane it has decided
+// to enter, having found a gap or been too near to stop. It gives way where
+// the first vehicle with priority would reach the conflict within
+// `critical_gap` of its reaching the junction. Only vehicles on a network
+// with lights or junctions have it.
 struct Tactical final {
   static constexpr std::uint32_t NONE = ~std::uint32_t{0};
 
   model::LightBraking braking;
+  model::Time critical_gap = 6.0 * model::second;
+  std::optional<LaneKey> entering;
   std::uint32_t committed = NONE;
+};
+
+// Since when a vehicle has stood still, or never if it is moving, and
+// whether its driver has committed to the junction ahead or the one it is
+// in, for deciding who goes first among drivers that wait for each other.
+struct Stopped final {
+  TimePoint since = TimePoint::max();
+  bool committed = false;
 };
 
 // A signal group, by its place in the network's groups, and what it shows.
@@ -208,12 +224,13 @@ struct Vehicle final                                                         //
     : Archetype<"vehicle",                                                   //
                 Requires<VehiclePose, LaneState, Driver, DriveCommand>> {};  //
 
-// A vehicle on a network with lights, which it stops for.
+// A vehicle on a network with lights or junctions, which it stops for and
+// gives way at.
 struct TacticalVehicle final                      //
     : Archetype<"tactical vehicle",               //
                 Requires<VehiclePose, LaneState,  //
                          Driver, DriveCommand,    //
-                         Tactical>> {};           //
+                         Tactical, Stopped>> {};  //
 
 // A signal group's controller, running its plan.
 struct SignalController final                                  //
@@ -230,7 +247,7 @@ struct ScenarioVehicle final                             //
 
 using World = framework::World<
     VehiclePose,
-    framework::TypeList<LaneState, Driver, DriveCommand, Tactical,
+    framework::TypeList<LaneState, Driver, DriveCommand, Tactical, Stopped,
                         model::SignalPlan, SignalState>,
     framework::TypeList<archetype::Vehicle, archetype::TacticalVehicle,
                         archetype::SignalController>>;

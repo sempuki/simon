@@ -22,19 +22,44 @@ auto count(int value) -> std::size_t {
 }
 
 // Every driving lane of `network`, and its length.
-auto driving_lanes(const Network& network)
-    -> std::vector<std::pair<LaneKey, double>> {
-  std::vector<std::pair<LaneKey, double>> lanes;
+// Where on a driving lane vehicles may start: from `from` to `to` along it.
+struct Room final {
+  LaneKey lane;
+  double from = 0.0;
+  double to = 0.0;
+};
+
+// Every driving lane of `network` outside its junctions, and where on it
+// vehicles may start: all of it, but `margin` from an end at a junction, so
+// none starts in a junction or beside one about to leave it.
+auto driving_lanes(const Network& network, double margin) -> std::vector<Room> {
+  std::vector<Room> lanes;
   for (std::uint32_t r = 0; r < network.roads.roads.size(); ++r) {
     const model::Road& road = network.roads.roads[r];
+    if (road.junction != "-1") {
+      continue;
+    }
+    bool before = road.predecessor.kind == model::RoadLink::Kind::JUNCTION;
+    bool after = road.successor.kind == model::RoadLink::Kind::JUNCTION;
     for (std::uint32_t k = 0; k < road.lane_sections.size(); ++k) {
       const model::LaneSection& section = road.lane_sections[k];
+      // Whether this section's start, in s, is at the junction before the
+      // road, and its end at the one after it.
+      bool start = before && k == 0;
+      bool end = after && k + 1 == road.lane_sections.size();
       for (const std::vector<model::Lane>* side :
            {&section.left, &section.right}) {
         for (const model::Lane& lane : *side) {
           LaneKey key{.road = r, .section = k, .lane = lane.id};
-          if (lane.type == "driving") {
-            lanes.emplace_back(key, lane_length(network, key));
+          if (lane.type != "driving") {
+            continue;
+          }
+          bool with_s = model::runs_with_s(key);
+          double length = lane_length(network, key);
+          double from = (with_s ? start : end) ? margin : 0.0;
+          double to = length - ((with_s ? end : start) ? margin : 0.0);
+          if (to > from) {
+            lanes.push_back(Room{.lane = key, .from = from, .to = to});
           }
         }
       }
@@ -50,19 +75,26 @@ auto load_network(const std::string& path)
   RETURN_OR_ASSIGN(model::RoadNetwork roads, format::load_opendrive(path));
   model::LaneGraph graph = model::build_lane_graph(roads);
   model::TrafficControl control = model::build_traffic_control(roads);
+  model::RightOfWay rights = model::build_right_of_way(roads, graph, control);
   return Network{.roads = std::move(roads),
                  .graph = std::move(graph),
-                 .control = std::move(control)};
+                 .control = std::move(control),
+                 .rights = std::move(rights)};
+}
+
+auto is_tactical(const Network& network) -> bool {
+  return !network.control.stop_lines().empty() ||
+         !network.rights.conflicts().empty();
 }
 
 auto build_world(const Scenario& scenario, const Network& network,
                  Out<World> world) -> std::expected<void, framework::Status> {
   std::size_t vehicles = count(scenario.vehicles);
-  bool lights = !network.control.stop_lines().empty();
+  bool tactical = is_tactical(network);
   return World::set_up()
       .numbered(1)
-      .holding<archetype::Vehicle>(lights ? 0 : vehicles)
-      .holding<archetype::TacticalVehicle>(lights ? vehicles : 0)
+      .holding<archetype::Vehicle>(tactical ? 0 : vehicles)
+      .holding<archetype::TacticalVehicle>(tactical ? vehicles : 0)
       .holding<archetype::SignalController>(network.control.groups().size())
       .build(world);
 }
@@ -94,15 +126,15 @@ auto plan_signals(const Scenario& scenario, const Network& network)
 auto build_scenario(const Scenario& scenario, const Network& network,
                     InOut<World> world)
     -> std::expected<void, framework::Status> {
-  std::vector<std::pair<LaneKey, double>> lanes = driving_lanes(network);
-  double total = 0.0;
-  for (const auto& [lane, length] : lanes) {
-    total += length;
-  }
-  CHECK_PRECONDITION(total > 0.0);
   double spacing = (scenario.length + scenario.following.minimum_gap)
                        .numerical_value_in(model::meter) +
                    5.0;
+  std::vector<Room> lanes = driving_lanes(network, spacing);
+  double total = 0.0;
+  for (const Room& room : lanes) {
+    total += room.to - room.from;
+  }
+  CHECK_PRECONDITION(total > 0.0);
 
   model::Random random{scenario.seed};
   std::map<LaneKey, std::vector<double>> taken;
@@ -114,13 +146,13 @@ auto build_scenario(const Scenario& scenario, const Network& network,
     for (int attempt = 0;; ++attempt) {
       CHECK_PRECONDITION(attempt < 10000);
       double at = random.uniform(0.0, total);
-      for (const auto& [key, length] : lanes) {
-        if (at < length) {
-          lane = key;
-          along = at;
+      for (const Room& room : lanes) {
+        if (at < room.to - room.from) {
+          lane = room.lane;
+          along = room.from + at;
           break;
         }
-        at -= length;
+        at -= room.to - room.from;
       }
       const std::vector<double>& others = taken[lane];
       if (std::ranges::none_of(others, [&](double other) {
@@ -143,8 +175,9 @@ auto build_scenario(const Scenario& scenario, const Network& network,
                   .changing = scenario.changing,
                   .length = scenario.length,
                   .seed = seed};
-    // Only a network with lights gives its vehicles their tactical state.
-    if (network.control.stop_lines().empty()) {
+    // Only a network with lights or junctions gives its vehicles their
+    // tactical state.
+    if (!is_tactical(network)) {
       RETURN_IF_UNEXPECTED(world->create<archetype::Vehicle>()
                                .with(pose)
                                .with(state)
@@ -152,13 +185,16 @@ auto build_scenario(const Scenario& scenario, const Network& network,
                                .with(DriveCommand{})
                                .build());
     } else {
-      RETURN_IF_UNEXPECTED(world->create<archetype::TacticalVehicle>()
-                               .with(pose)
-                               .with(state)
-                               .with(driver)
-                               .with(DriveCommand{})
-                               .with(Tactical{.braking = scenario.braking})
-                               .build());
+      RETURN_IF_UNEXPECTED(
+          world->create<archetype::TacticalVehicle>()
+              .with(pose)
+              .with(state)
+              .with(driver)
+              .with(DriveCommand{})
+              .with(Tactical{.braking = scenario.braking,
+                             .critical_gap = scenario.critical_gap})
+              .with(Stopped{})
+              .build());
     }
   }
   std::vector<model::SignalPlan> plans = plan_signals(scenario, network);

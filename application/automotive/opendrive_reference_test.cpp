@@ -33,7 +33,7 @@ using model::meter;
 using namespace testing;
 
 // The edges of every file's lane graph together.
-constexpr std::size_t EDGES = 351;
+constexpr std::size_t EDGES = 387;
 
 // Each file's road network, read once.
 auto network_of(std::string_view file) -> const model::RoadNetwork& {
@@ -232,7 +232,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
       CHECK(ours == validities);
     }
     CAPTURE(farthest);
-    CHECK(theirs.size() == 20);
+    CHECK(theirs.size() == 22);
     CHECK(farthest < 1e-12);
   }
 
@@ -302,7 +302,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
         }
       }
     }
-    CHECK(theirs.size() == 6);
+    CHECK(theirs.size() == 7);
     CHECK(ours == theirs);
   }
 

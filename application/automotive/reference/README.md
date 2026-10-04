@@ -14,6 +14,8 @@ OpenDRIVE library that renders and queries road networks, on the roads in
 | `signalized.xodr` | `make_test_roads.py` | Four 100 m arms with sidewalks meeting in a junction, each approach with a traffic light at its stop line and a crosswalk, two in road coordinates and two in their own frame; two controllers group the lights; each arm's far end turns around into it |
 | `priority.xodr` | `make_test_roads.py` | A T whose minor road gives way, with the junction's priorities, a give-way sign and a speed limit; each arm's far end turns around into it |
 | `light.xodr` | `make_test_roads.py` | One lane, 1 km, with a traffic light halfway |
+| `crossing.xodr` | `make_test_roads.py` | A one-way major road crossed by a one-way minor road that gives way, by a sign and the junction's priority |
+| `crossroads.xodr` | `make_test_roads.py` | `signalized.xodr`'s arms and junction with no lights, priorities or signs |
 | `crosswalks.xodr` | `make_test_roads.py` | A curve that climbs and leans, with a crosswalk turned, pitched and rolled in its own frame and one in road coordinates |
 | `3rd_party/chrono/Sedan_Pac02Tire.tir` | Project Chrono's data (BSD-3-Clause, see `3rd_party/chrono/LICENSE`) | The Sedan's tire, a 245/40 R 18, as a TNO property file in the PAC2002 format |
 | `3rd_party/esmini/` | esmini's resources (MPL-2.0, see `3rd_party/esmini/LICENSE`) | Three scenarios, cut-in_simple, cut-in and lane_change_simple, cut-in's parameter distribution, cut-in_parameter_set, their roads, straight_500m, e6mini and curve_r100, and the vehicle catalog; and two roads with signs from its unit tests, some_signs and lane_offset_intersection |
@@ -21,7 +23,7 @@ OpenDRIVE library that renders and queries road networks, on the roads in
 
 | Script | Table | Test |
 |---|---|---|
-| `make_test_roads.py` | `../roads/curves.xodr`, `../roads/paramPoly3.xodr`, `../roads/ring.xodr`, `../roads/rings.xodr`, `../roads/signalized.xodr`, `../roads/priority.xodr`, `../roads/crosswalks.xodr`, `../roads/light.xodr` | `opendrive_reference_test`, `automotive_test`, `automotive_benchmark`, `signal_test` |
+| `make_test_roads.py` | `../roads/curves.xodr`, `../roads/paramPoly3.xodr`, `../roads/ring.xodr`, `../roads/rings.xodr`, `../roads/signalized.xodr`, `../roads/priority.xodr`, `../roads/crosswalks.xodr`, `../roads/light.xodr`, `../roads/crossing.xodr`, `../roads/crossroads.xodr` | `opendrive_reference_test`, `automotive_test`, `automotive_benchmark`, `signal_test`, `right_of_way_test` |
 | `libopendrive_reference.cpp` | `libopendrive_positions.csv`, `libopendrive_borders.csv`, `libopendrive_lanes.csv`, `libopendrive_successors.csv` (its routing graph), `libopendrive_signals.csv`, `libopendrive_objects.csv` (outline corners), `libopendrive_junctions.csv` (priorities and controllers) | `opendrive_reference_test` |
 | `commonroad_kinematic.py` | `commonroad_rates.csv`, `commonroad_paths.csv`: CommonRoad's kinematic single-track model ([commonroad-vehicle-models](https://commonroad.in.tum.de), BSD) | `single_track_test` |
 | `commonroad_dynamic.py` | `commonroad_vehicles.csv`: every parameter of CommonRoad's vehicles; `commonroad_tires.csv`, `commonroad_dynamic_rates.csv`, `commonroad_dynamic_paths.csv`: its tire and its dynamic, drift and multibody models, with four corrections patched in | `single_track_test`, `vehicle_dynamics_test` |

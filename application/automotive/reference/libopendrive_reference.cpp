@@ -85,6 +85,9 @@ int main(int argc, char** argv) {
       {"signalized.xodr", 5.0},
       {"priority.xodr", 5.0},
       {"crosswalks.xodr", 5.0},
+      {"light.xodr", 25.0},
+      {"crossing.xodr", 10.0},
+      {"crossroads.xodr", 10.0},
       {"Town01.xodr", 5.0, Directory::CARLA},
       {"some_signs.xodr", 25.0, Directory::ESMINI},
       {"lane_offset_intersection.xodr", 10.0, Directory::ESMINI}};

@@ -34,6 +34,10 @@ class LaneGraph final {
   // is not in the graph.
   auto successors_of(const LaneKey& lane) const -> std::span<const LaneKey>;
 
+  // The lanes traffic moves into `lane` from, in order; more than one where
+  // lanes merge.
+  auto predecessors_of(const LaneKey& lane) const -> std::span<const LaneKey>;
+
   // Every edge of the graph, from a lane to a successor, in order.
   struct Edge final {
     LaneKey from;
@@ -47,6 +51,10 @@ class LaneGraph final {
   std::vector<LaneKey> from_;         // Each lane with successors, in order.
   std::vector<std::uint32_t> first_;  // Its successors' start; one more.
   std::vector<LaneKey> to_;
+  // The same, the other way.
+  std::vector<LaneKey> into_;  // Each lane with predecessors, in order.
+  std::vector<std::uint32_t> first_from_;
+  std::vector<LaneKey> before_;
 };
 
 // Where `key`'s lane section ends in s: at the next section's start, or at

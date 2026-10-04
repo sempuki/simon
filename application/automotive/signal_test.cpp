@@ -53,6 +53,7 @@ struct Queue final {
                                                       20.0 * meter_per_second}})
                        .with(DriveCommand{})
                        .with(Tactical{})
+                       .with(Stopped{})
                        .build();
       REQUIRE(built);
       vehicles.push_back(*built);
@@ -146,6 +147,7 @@ TEST_CASE("SignalAgainstSumo") {
                    .following = {.desired_speed = 15.0 * meter_per_second}})
                .with(DriveCommand{})
                .with(Tactical{})
+               .with(Stopped{})
                .build();
       REQUIRE(
           world.create<archetype::SignalController>()

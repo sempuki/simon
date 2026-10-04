@@ -30,6 +30,7 @@ cc_library(
         "//framework:vocabulary",
         "//model:kinematics",
         "//model:lane_graph",
+        "//model:right_of_way",
         "//model:traffic_control",
         "//format:opendrive",
         "//format:openscenario",
@@ -206,6 +207,21 @@ cc_test(
     deps = [
         "//format:openscenario",
         "//scenario:openscenario",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "right_of_way_test",
+    size = "medium",
+    srcs = ["right_of_way_test.cpp"],
+    copts = COPTS,
+    data = glob(["roads/*.xodr"]) + ["//3rd_party:carla"],
+    deps = [
+        ":automotive_library",
+        ":testing",
+        "//framework:vocabulary",
+        "//model:collision",
         "@lib//base:testing",
     ],
 )

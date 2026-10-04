@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OpenDRIVE>
+  <header revMajor="1" revMinor="6" name="simon test" version="1"/>
+  <road name="in_w" id="in_w" length="300" junction="-1">
+    <link><successor elementType="junction" elementId="9"/></link>
+    <planView>
+        <geometry s="0" x="-310" y="0" hdg="0" length="300">
+          <line/>
+        </geometry>
+    </planView>
+    <lanes>
+      <laneSection s="0">
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+    </lanes>
+    <signals>
+    </signals>
+  </road>
+  <road name="out_e" id="out_e" length="300" junction="-1">
+    <link><predecessor elementType="junction" elementId="9"/></link>
+    <planView>
+        <geometry s="0" x="10" y="0" hdg="0" length="300">
+          <line/>
+        </geometry>
+    </planView>
+    <lanes>
+      <laneSection s="0">
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+    </lanes>
+    <signals>
+    </signals>
+  </road>
+  <road name="in_s" id="in_s" length="300" junction="-1">
+    <link><successor elementType="junction" elementId="9"/></link>
+    <planView>
+        <geometry s="0" x="0" y="-310" hdg="1.5707963267948966" length="300">
+          <line/>
+        </geometry>
+    </planView>
+    <lanes>
+      <laneSection s="0">
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+    </lanes>
+    <signals>
+      <signal id="give_way" name="give way" s="297" t="-4" zOffset="2.5" dynamic="no" orientation="+" country="DE" type="205" subtype="-1" height="0.8" width="0.3"><validity fromLane="-1" toLane="-1"/></signal>
+    </signals>
+  </road>
+  <road name="out_n" id="out_n" length="300" junction="-1">
+    <link><predecessor elementType="junction" elementId="9"/></link>
+    <planView>
+        <geometry s="0" x="0" y="10" hdg="1.5707963267948966" length="300">
+          <line/>
+        </geometry>
+    </planView>
+    <lanes>
+      <laneSection s="0">
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+    </lanes>
+    <signals>
+    </signals>
+  </road>
+  <road name="we" id="we" length="20" junction="9">
+    <link>
+      <predecessor elementType="road" elementId="in_w" contactPoint="end"/>
+      <successor elementType="road" elementId="out_e" contactPoint="start"/>
+    </link>
+    <planView>
+        <geometry s="0" x="-10" y="0" hdg="0" length="20">
+          <line/>
+        </geometry>
+    </planView>
+    <lanes>
+      <laneSection s="0">
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><link><predecessor id="-1"/><successor id="-1"/></link><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+    </lanes>
+  </road>
+  <road name="sn" id="sn" length="20" junction="9">
+    <link>
+      <predecessor elementType="road" elementId="in_s" contactPoint="end"/>
+      <successor elementType="road" elementId="out_n" contactPoint="start"/>
+    </link>
+    <planView>
+        <geometry s="0" x="0" y="-10" hdg="1.5707963267948966" length="20">
+          <line/>
+        </geometry>
+    </planView>
+    <lanes>
+      <laneSection s="0">
+        <center><lane id="0" type="none"/></center>
+        <right><lane id="-1" type="driving"><link><predecessor id="-1"/><successor id="-1"/></link><width sOffset="0" a="3.5" b="0" c="0" d="0"/></lane></right>
+      </laneSection>
+    </lanes>
+  </road>
+  <junction id="9" name="crossing">
+    <connection id="0" incomingRoad="in_w" connectingRoad="we" contactPoint="start"><laneLink from="-1" to="-1"/></connection>
+    <connection id="1" incomingRoad="in_s" connectingRoad="sn" contactPoint="start"><laneLink from="-1" to="-1"/></connection>
+    <priority high="we" low="sn"/>
+  </junction>
+</OpenDRIVE>
