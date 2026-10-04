@@ -4,8 +4,11 @@
 
 #include <cstddef>
 #include <optional>
+#include <span>
+#include <vector>
 
 #include "base/core.hpp"
+#include "model/lane_graph.hpp"
 #include "model/road.hpp"
 
 // A vehicle placed on a road by lane rather than by lane graph, as a scenario
@@ -59,15 +62,27 @@ enum class RoadMove : std::uint8_t { ALONG, END_OF_ROAD };
 // Moves the placement `ds` along its road in the direction it heads, onto
 // the road a link joins past either end, its lane continued by the lane's
 // link and its heading and offset turned if the next road runs the other
-// way. Without a road link to follow, a junction among them, it stops at the
-// end.
+// way. Into a junction it takes the connecting road `route` takes next, its
+// lane by the connection's lane link; without a link to follow it stops at
+// the end.
 auto move_along_road(const RoadNetwork& network, InOut<RoadPlacement> placement,
-                     double ds) -> RoadMove;
+                     double ds, std::span<const std::size_t> route = {})
+    -> RoadMove;
+
+// The roads, by index and in order, of the shortest way by lane length on
+// `graph` from each of `waypoints` to the next, as traffic keeps right; as
+// far as it gets if a waypoint cannot be reached.
+auto find_route(const RoadNetwork& network, const LaneGraph& graph,
+                std::span<const RoadPlacement> waypoints)
+    -> std::vector<std::size_t>;
 
 // The placement nearest the world's (`x`, `y`): the road whose lane holds
-// it, nearest by t, and its lane, offset and s, heading `heading`. None off
-// every road's lanes.
+// it, nearest by t, and its lane, offset and s, heading `heading`; road
+// `staying` if one of its lanes holds it, as an entity keeps to its road.
+// None off every road's lanes.
 auto find_placement(const RoadNetwork& network, double x, double y,
-                    double heading) -> std::optional<RoadPlacement>;
+                    double heading,
+                    std::optional<std::size_t> staying = std::nullopt)
+    -> std::optional<RoadPlacement>;
 
 }  // namespace simon::model

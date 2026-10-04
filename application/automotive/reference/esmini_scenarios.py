@@ -30,7 +30,8 @@ import subprocess
 import sys
 import tempfile
 
-SCENARIOS = ['cut-in_simple.xosc', 'cut-in.xosc', 'lane_change_simple.xosc']
+SCENARIOS = ['cut-in_simple.xosc', 'cut-in.xosc', 'lane_change_simple.xosc',
+             'traffic_lights.xosc']
 DISTRIBUTION = 'cut-in_parameter_set.xosc'
 PERMUTATIONS = 12
 STEP = 0.05

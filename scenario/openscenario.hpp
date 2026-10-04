@@ -12,15 +12,16 @@
 #include <vector>
 
 // A scenario as ASAM OpenSCENARIO 1.x describes it (see model/REFERENCES.md):
-// the entities, their vehicles, and the storyboard that drives them, its
-// stories, acts, maneuver groups, maneuvers and events, and the triggers that
-// start and stop them. format/openscenario reads it from files.
+// the entities, vehicles and pedestrians, the traffic signal controllers, and
+// the storyboard that drives them, its stories, acts, maneuver groups,
+// maneuvers and events, and the triggers that start and stop them.
+// format/openscenario reads it from files.
 //
 // The subset is what object-level driving needs: positions on lanes,
-// roads and in the world; speed, lane change, lane offset, teleport and
-// parameter actions; and the conditions on time, speed, distance, headway,
-// position, the end of the road, leaving the road, parameters and the
-// storyboard's own states.
+// roads and in the world; speed, lane change, lane offset, teleport, route,
+// trajectory, parameter and traffic signal actions; and the conditions on
+// time, speed, distance, headway, position, the end of the road, leaving the
+// road, parameters, traffic signals and the storyboard's own states.
 namespace simon::scenario {
 
 //-- Positions ----------------------------------------------------------------
@@ -144,6 +145,40 @@ struct TeleportAction final {
   Position position;
 };
 
+// A point of a route, and how the way to it is chosen: "shortest", the only
+// strategy simon has, or another, taken as shortest.
+struct Waypoint final {
+  Position position;
+  std::string strategy;
+};
+
+// A route through the road network, which picks the way an entity takes at
+// each junction.
+struct Route final {
+  std::string name;
+  std::vector<Waypoint> waypoints;
+};
+
+struct AssignRouteAction final {
+  Route route;
+};
+
+// A polyline's vertex, and the time it is given for, unused without timing.
+struct Vertex final {
+  Position position;
+  double time = 0.0;
+};
+
+// An open polyline to follow at the entity's speed, starting
+// `initial_distance_offset` along it: its timing ignored (a time reference of
+// none), the entity held to the line (a following mode of position), and its
+// vertices without orientations.
+struct FollowTrajectoryAction final {
+  std::string name;
+  std::vector<Vertex> vertices;
+  double initial_distance_offset = 0.0;
+};
+
 // A global action setting a parameter, or adding to it or multiplying it.
 struct ParameterAction final {
   enum class Kind : std::uint8_t { SET, ADD, MULTIPLY };
@@ -153,12 +188,29 @@ struct ParameterAction final {
   std::string value;
 };
 
-using PrivateAction = std::variant<SpeedAction, LaneChangeAction,
-                                   LaneOffsetAction, TeleportAction>;
+// A global action setting a traffic signal's state, its lamps' modes as
+// text, such as "on;off;off".
+struct TrafficSignalStateAction final {
+  std::string signal;
+  std::string state;
+};
+
+// A global action putting a traffic signal controller into a phase.
+struct TrafficSignalControllerAction final {
+  std::string controller;
+  std::string phase;
+};
+
+using PrivateAction =
+    std::variant<SpeedAction, LaneChangeAction, LaneOffsetAction,
+                 TeleportAction, AssignRouteAction, FollowTrajectoryAction>;
+
+using GlobalAction = std::variant<ParameterAction, TrafficSignalStateAction,
+                                  TrafficSignalControllerAction>;
 
 struct Action final {
   std::string name;
-  std::variant<PrivateAction, ParameterAction> action;
+  std::variant<PrivateAction, GlobalAction> action;
 };
 
 //-- Conditions ---------------------------------------------------------------
@@ -210,6 +262,18 @@ struct StoryboardElementStateCondition final {
   StoryboardElementState state = StoryboardElementState::COMPLETE;
 };
 
+// A traffic signal's state, as text, being `state`.
+struct TrafficSignalCondition final {
+  std::string signal;
+  std::string state;
+};
+
+// A traffic signal controller being in phase `phase`.
+struct TrafficSignalControllerCondition final {
+  std::string controller;
+  std::string phase;
+};
+
 struct SpeedCondition final {
   double value = 0.0;
   Rule rule = Rule::GREATER_THAN;
@@ -254,6 +318,14 @@ struct ReachPositionCondition final {
   double tolerance = 0.0;
 };
 
+// The distance to a position, either way, between reference points.
+struct DistanceCondition final {
+  Position position;
+  double value = 0.0;
+  RelativeDistance distance;
+  Rule rule = Rule::GREATER_THAN;
+};
+
 // At the end of a road, or off it, for at least `duration` seconds.
 struct EndOfRoadCondition final {
   double duration = 0.0;
@@ -266,7 +338,7 @@ struct OffroadCondition final {
 using EntityConditionKind =
     std::variant<SpeedCondition, AccelerationCondition, TimeHeadwayCondition,
                  RelativeDistanceCondition, ReachPositionCondition,
-                 EndOfRoadCondition, OffroadCondition>;
+                 DistanceCondition, EndOfRoadCondition, OffroadCondition>;
 
 // A condition on entities: on any or all of the triggering entities.
 struct EntityCondition final {
@@ -275,8 +347,10 @@ struct EntityCondition final {
   EntityConditionKind condition;
 };
 
-using ValueCondition = std::variant<SimulationTimeCondition, ParameterCondition,
-                                    StoryboardElementStateCondition>;
+using ValueCondition =
+    std::variant<SimulationTimeCondition, ParameterCondition,
+                 StoryboardElementStateCondition, TrafficSignalCondition,
+                 TrafficSignalControllerCondition>;
 
 // A condition and when it counts: on its rising edge, its falling edge,
 // either, or whenever it holds, after a delay.
@@ -340,7 +414,7 @@ struct InitActions final {
 
 struct Storyboard final {
   std::vector<InitActions> init;
-  std::vector<ParameterAction> global_init;
+  std::vector<GlobalAction> global_init;
   std::vector<Story> stories;
   std::optional<Trigger> stop;
 };
@@ -360,9 +434,38 @@ struct Vehicle final {
   double wheelbase = 0.0;  // From the axles.
 };
 
+// An entity: a vehicle, or a pedestrian, whose box is its vehicle's and
+// whose speed and changes of speed have no limit, as esmini has them.
 struct Entity final {
+  enum class Kind : std::uint8_t { VEHICLE, PEDESTRIAN };
+
   std::string name;
   Vehicle vehicle;
+  Kind kind = Kind::VEHICLE;
+};
+
+//-- Traffic signals ----------------------------------------------------------
+
+// A signal's state in a phase, as text.
+struct TrafficSignalState final {
+  std::string signal;
+  std::string state;
+};
+
+struct TrafficSignalPhase final {
+  std::string name;
+  double duration = 0.0;  // s.
+  std::vector<TrafficSignalState> states;
+};
+
+// A controller running its phases in turn, over and over, its first phase
+// starting `delay` seconds after its reference's, if it has one, and else
+// at the start.
+struct TrafficSignalController final {
+  std::string name;
+  double delay = 0.0;
+  std::string reference;  // None if empty.
+  std::vector<TrafficSignalPhase> phases;
 };
 
 // A parameter's value, as text, as parameters are written.
@@ -377,6 +480,7 @@ struct Scenario final {
   auto find_entity(std::string_view name) const -> const Entity*;
 
   std::string road_network;  // The OpenDRIVE file, as a path.
+  std::vector<TrafficSignalController> signal_controllers;
   std::vector<Parameter> parameters;
   std::vector<Entity> entities;
   Storyboard storyboard;

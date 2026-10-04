@@ -1452,13 +1452,13 @@ struct RunStoryboard final    //
           if (speed == nullptr || motion == nullptr || actor.entity >= count) {
             return;
           }
-          context.states[actor.entity] =
-              scenario::EntityState{.placement = motion->placement,
-                                    .pose = model::compute_placement_pose(
-                                        *context.roads, motion->placement),
-                                    .speed = speed->speed,
-                                    .acceleration = speed->acceleration,
-                                    .end_of_road = motion->end_of_road};
+          context.states[actor.entity] = scenario::EntityState{
+              .placement = motion->placement,
+              .pose = motion->pose.value_or(model::compute_placement_pose(
+                  *context.roads, motion->placement)),
+              .speed = speed->speed,
+              .acceleration = speed->acceleration,
+              .end_of_road = motion->end_of_road};
           finished.insert(finished.end(), speed->finished.begin(),
                           speed->finished.end());
           finished.insert(finished.end(), motion->finished.begin(),
@@ -1541,11 +1541,13 @@ struct ControlSpeed final    //
   ScenarioContext* context_ = nullptr;
 };
 
-// Each step, a vehicle's place on the road: teleported, moved by its lateral
-// action, a lane change or lane offset, as esmini moves it, or else carried
-// along its lane at its speed. A lateral action keeps the vehicle's path as
-// long as its speed allows, its lateral motion taken from it, and turns its
-// heading to its path.
+// Each step, an entity's place on the road: teleported, moved by its lateral
+// action, a lane change or lane offset, or along its trajectory, as esmini
+// moves it, or else carried along its lane at its speed, into a junction by
+// its route. A lateral action keeps the entity's path as long as its speed
+// allows, its lateral motion taken from it, and turns its heading to its
+// path. A trajectory holds the entity to its polyline, and at its end the
+// entity goes on along its heading for the rest of the step.
 struct MoveOnRoad final       //
     : System<ScenarioMotion,  //
              const ScenarioActor, const ScenarioOrders, const ScenarioSpeed> {
@@ -1565,8 +1567,9 @@ struct MoveOnRoad final       //
   ScenarioContext* context_ = nullptr;
 };
 
-// After MoveOnRoad, each vehicle's place in the world: its reference point,
-// the middle of its rear axle, at its road placement.
+// After MoveOnRoad, each entity's place in the world: its reference point,
+// the middle of a vehicle's rear axle, where its trajectory put it or at its
+// road placement.
 struct PlaceOnRoad final  //
     : System<RoadPose,    //
              const ScenarioMotion> {
@@ -1581,8 +1584,8 @@ struct PlaceOnRoad final  //
     if (motion == nullptr) {
       return;
     }
-    model::PlacementPose at =
-        model::compute_placement_pose(*context_->roads, motion->placement);
+    model::PlacementPose at = motion->pose.value_or(
+        model::compute_placement_pose(*context_->roads, motion->placement));
     pose = RoadPose{.position = model::meters(at.x, at.y, at.z),
                     .heading = at.heading * model::radian};
   }

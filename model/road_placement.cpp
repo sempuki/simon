@@ -2,8 +2,12 @@
 
 #include "model/road_placement.hpp"
 
+#include <algorithm>
 #include <cmath>
+#include <functional>
+#include <map>
 #include <numbers>
+#include <queue>
 
 namespace simon::model {
 
@@ -64,7 +68,8 @@ auto convert_distance_to_ds(const RoadNetwork& network,
 }
 
 auto move_along_road(const RoadNetwork& network, InOut<RoadPlacement> placement,
-                     double ds) -> RoadMove {
+                     double ds, std::span<const std::size_t> route)
+    -> RoadMove {
   double remaining = runs_forward(*placement) ? ds : -ds;
   for (int links = 0; links < 8; ++links) {
     const Road& road = network.roads[placement->road];
@@ -74,7 +79,7 @@ auto move_along_road(const RoadNetwork& network, InOut<RoadPlacement> placement,
       return RoadMove::ALONG;
     }
     bool past_end = s > road.length;
-    const RoadLink& link = past_end ? road.successor : road.predecessor;
+    RoadLink link = past_end ? road.successor : road.predecessor;
     const Road* next = link.kind == RoadLink::Kind::ROAD
                            ? network.find_road(link.id)
                            : nullptr;
@@ -87,6 +92,31 @@ auto move_along_road(const RoadNetwork& network, InOut<RoadPlacement> placement,
                                   ? (past_end ? side[index - 1].successor
                                               : side[index - 1].predecessor)
                                   : std::nullopt;
+    if (link.kind == RoadLink::Kind::JUNCTION) {
+      // The connecting road the route takes next, and the lane it links.
+      lane.reset();
+      auto here = std::ranges::find(route, placement->road);
+      const Junction* junction = network.find_junction(link.id);
+      if (junction != nullptr && here != route.end() &&
+          here + 1 != route.end()) {
+        const std::string& through = network.roads[*(here + 1)].id;
+        for (const JunctionConnection& connection : junction->connections) {
+          if (connection.incoming_road != road.id ||
+              connection.connecting_road != through) {
+            continue;
+          }
+          auto linked =
+              std::ranges::find(connection.lane_links, placement->lane,
+                                &JunctionConnection::LaneLink::from);
+          if (linked != connection.lane_links.end()) {
+            next = network.find_road(through);
+            lane = linked->to;
+            link.contact = connection.contact;
+            break;
+          }
+        }
+      }
+    }
     if (next == nullptr) {
       placement->s = past_end ? road.length : 0.0;
       return RoadMove::END_OF_ROAD;
@@ -111,33 +141,106 @@ auto move_along_road(const RoadNetwork& network, InOut<RoadPlacement> placement,
   return RoadMove::END_OF_ROAD;
 }
 
+auto find_route(const RoadNetwork& network, const LaneGraph& graph,
+                std::span<const RoadPlacement> waypoints)
+    -> std::vector<std::size_t> {
+  auto key_of = [&](const RoadPlacement& placement) {
+    const std::vector<LaneSection>& sections =
+        network.roads[placement.road].lane_sections;
+    std::uint32_t section = 0;
+    while (section + 1 < sections.size() &&
+           sections[section + 1].s0 <= placement.s) {
+      ++section;
+    }
+    return LaneKey{.road = static_cast<std::uint32_t>(placement.road),
+                   .section = section,
+                   .lane = placement.lane};
+  };
+  std::vector<std::size_t> roads;
+  auto append = [&](std::size_t road) {
+    if (roads.empty() || roads.back() != road) {
+      roads.push_back(road);
+    }
+  };
+  if (waypoints.empty()) {
+    return roads;
+  }
+  append(waypoints.front().road);
+  for (std::size_t w = 1; w < waypoints.size(); ++w) {
+    LaneKey from = key_of(waypoints[w - 1]);
+    LaneKey to = key_of(waypoints[w]);
+    // Dijkstra's algorithm, each lane costing its section's length.
+    using Entry = std::pair<double, LaneKey>;
+    std::priority_queue<Entry, std::vector<Entry>, std::greater<>> open;
+    std::map<LaneKey, double> best{{from, 0.0}};
+    std::map<LaneKey, LaneKey> came;
+    open.emplace(0.0, from);
+    while (!open.empty()) {
+      auto [cost, at] = open.top();
+      open.pop();
+      if (at == to || cost > best[at]) {
+        continue;
+      }
+      const Road& road = network.roads[at.road];
+      double length =
+          find_section_end(network, at) - road.lane_sections[at.section].s0;
+      for (const LaneKey& next : graph.successors_of(at)) {
+        auto known = best.find(next);
+        if (known == best.end() || cost + length < known->second) {
+          best[next] = cost + length;
+          came[next] = at;
+          open.emplace(cost + length, next);
+        }
+      }
+    }
+    if (!best.contains(to)) {
+      break;
+    }
+    std::vector<LaneKey> path{to};
+    while (path.back() != from) {
+      path.push_back(came.at(path.back()));
+    }
+    for (auto it = path.rbegin(); it != path.rend(); ++it) {
+      append(it->road);
+    }
+  }
+  return roads;
+}
+
 auto find_placement(const RoadNetwork& network, double x, double y,
-                    double heading) -> std::optional<RoadPlacement> {
-  std::optional<RoadPlacement> nearest;
-  double nearest_apart = 0.0;
-  for (std::size_t i = 0; i < network.roads.size(); ++i) {
+                    double heading, std::optional<std::size_t> staying)
+    -> std::optional<RoadPlacement> {
+  // Road `i`'s lane holding (x, y), if one does.
+  auto place_on = [&](std::size_t i) -> std::optional<RoadPlacement> {
     const Road& road = network.roads[i];
     RoadCoordinates at = find_road_coordinates(road, x * meter, y * meter);
     double s = at.s.numerical_value_in(meter);
     double t = at.t.numerical_value_in(meter);
     if (s < 0.0 || s > road.length) {
-      continue;
+      return std::nullopt;
     }
     std::optional<int> lane = find_lane(road, at.s, at.t);
     if (!lane || *lane == 0) {
-      continue;
+      return std::nullopt;
     }
-    double center = compute_lane_center(road, s, *lane);
     PlanPoint point = compute_plan_point(road, at.s);
-    RoadPlacement placement{.road = i,
-                            .lane = *lane,
-                            .s = s,
-                            .offset = t - center,
-                            .heading = wrap(heading - point.heading)};
-    double apart = std::abs(t - center);
-    if (!nearest || apart < nearest_apart) {
+    return RoadPlacement{.road = i,
+                         .lane = *lane,
+                         .s = s,
+                         .offset = t - compute_lane_center(road, s, *lane),
+                         .heading = wrap(heading - point.heading)};
+  };
+  if (staying && *staying < network.roads.size()) {
+    if (std::optional<RoadPlacement> kept = place_on(*staying)) {
+      return kept;
+    }
+  }
+  std::optional<RoadPlacement> nearest;
+  for (std::size_t i = 0; i < network.roads.size(); ++i) {
+    std::optional<RoadPlacement> placement = place_on(i);
+    if (placement &&
+        (!nearest || std::abs(placement->offset) < std::abs(nearest->offset))) {
       nearest = placement;
-      nearest_apart = apart;
     }
   }
   return nearest;

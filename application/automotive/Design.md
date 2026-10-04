@@ -243,23 +243,39 @@ not; that difference, up to 0.04 deg/g, is not yet explained.
 
 `format/openscenario` reads ASAM OpenSCENARIO 1.x scenarios with pugixml:
 parameters, substituted as $name and evaluated as ${...} expressions;
-vehicles from catalogs; positions on lanes and roads, relative to entities
-and in the world; speed, lane change, lane offset, teleport and parameter
-actions; and conditions on time, speed, acceleration, headway, distance,
-position, the end of the road, parameters and the storyboard's own states.
-Anything else that changes what happens, a controller, a route or a
-trajectory among them, is refused. A vehicle towing a
-trailer is refused too, since esmini makes the trailer an entity of its own.
+vehicles and pedestrians, inline or from catalogs; the road network's
+traffic signal controllers; positions on lanes and roads, relative to
+entities and in the world; speed, lane change, lane offset, teleport,
+route, trajectory, parameter and traffic signal actions; and conditions on
+time, speed, acceleration, headway, distance to an entity or a position,
+position, the end of the road, parameters, traffic signals, controllers'
+phases and the storyboard's own states. A trajectory must be an open
+polyline followed without timing and held to its line, its vertices
+without headings of their own. Anything else that
+changes what happens, an entity's controller or a trajectory steered
+toward among them, is refused. A vehicle towing a trailer is refused too,
+since esmini makes the trailer an entity of its own.
 
 `scenario/storyboard` runs the storyboard: its elements' states and
 transitions, events by priority and execution count, and triggers, each
-condition on its edge and after its delay. `model/road_placement` places a
+condition on its edge and after its delay. It also holds each traffic
+signal's state, as text such as "on;off;off": set by signal actions, and by
+the controllers, each running its phases in turn from a delay after its
+reference's first phase and setting its signals' states as a phase begins.
+A controller action moves a controller's cycle so that the phase starts
+then; a signal action holds until the next phase changes that signal. `model/road_placement` places a
 vehicle by road, lane, s and offset, either way along any lane, and moves it
 along its path at its t, s changing by the distance over 1 - kappa t. In the
 ECS, `RunStoryboard` evaluates the storyboard and gives each vehicle its
 orders, `ControlSpeed` runs speed actions, `MoveOnRoad` runs lateral actions
-and teleports or carries a vehicle along its lane, and `PlaceOnRoad` puts it
-in the world (`application/automotive/scenario_simulation.hpp`).
+and teleports or carries an entity along its lane or its trajectory, and
+`PlaceOnRoad` puts it in the world
+(`application/automotive/scenario_simulation.hpp`). A pedestrian is an
+entity like a vehicle, with its own box and no limit on its speed or its
+changes of speed, as esmini has it. A route is the shortest way by lane
+length between its waypoints on the lane graph, and picks the connecting
+road an entity takes into a junction; without one, an entity stops at the
+junction.
 
 Where the standard leaves the details open, simon follows esmini, the open
 OpenSCENARIO player:
@@ -280,6 +296,17 @@ OpenSCENARIO player:
   a value before it; a trigger that fires starts its conditions over.
 - **A teleport or a parameter set ends after the step's triggers,** and a
   vehicle the storyboard teleports stays where it was put for the step.
+- **A trajectory is a polyline held to.** The entity follows it at its
+  speed, heading along each segment, the heading blended across a corner
+  within 2 m of it or half the segment; at the end it goes on along its
+  heading for the rest of the step, then along its road at its offset and
+  relative heading. On it, its road position is the nearest lane, its own
+  road while one of its lanes holds it.
+- **A relative heading on a lane turns from the lane's travel,** so on a
+  left lane in right-hand traffic it is half a turn from the road's.
+- **A traffic signal action sets the state as it starts and stops on its
+  next step,** as a parameter set does; a signal condition compares the
+  state's text.
 - **A condition measures distance in the triggering entity's own
   coordinates by default:** along its heading, across it, or straight,
   signed by whether the other is ahead; or along or across its road. 1.0's
@@ -290,7 +317,7 @@ simon evaluates every condition of a group each step, where esmini stops at
 the first false one but for those with delays, which keeps every edge's
 history current.
 
-`scenario_test` plays three of esmini's scenarios and checks every entity
+`scenario_test` plays four of esmini's scenarios and checks every entity
 at every step against esmini 3.8.2 at 0.05 s
 (`application/automotive/reference/esmini_scenarios.py`):
 
@@ -299,13 +326,21 @@ at every step against esmini 3.8.2 at 0.05 s
 | A cut-in on a straight road: a headway trigger, a sinusoidal lane change and braking | 322 | 6.8e-7 m | 4.9e-7 rad | 4.6e-14 m/s |
 | A cut-in on a curved highway, at a speed relative to the ego's | 440 | 1.2 mm | 8.3e-7 rad | 8.3e-14 m/s |
 | Lane changes across a curve, into the oncoming lane, over and over: reaching positions, the end of the road, teleports, two acts, repeated events | 3,669 | 7.0e-7 m | 1.3e-6 rad | 0.0033 m/s |
+| A car stopping for a light turned yellow by its distance to it, then red, then green; two pedestrians crossing on polylines when their lights turn; the car's route through a junction | 601 | 2.5e-6 m | 5.0e-7 rad | 5.0e-7 m/s |
 
-esmini logs to six decimals, which bounds the agreement on straight roads.
+esmini logs to six decimals, which bounds the agreement on straight roads
+and the traffic lights' speeds.
 On e6mini's curves the 1.2 mm is the two road models' geometry. The lane
 changes' speed differs in two steps, where esmini reports a vehicle
 teleported away from the end of its road at a standstill for a step; its
 next step and every position agree. Each storyboard stops on the same step
 as esmini's.
+
+esmini 3.8.2 reads OpenSCENARIO's traffic signal controllers but does not
+run them, so `storyboard_test` checks simon's against the standard: two
+controllers, one 5 s behind the other, through 70 s, a controller action
+and a signal action among them, every phase and state as the standard
+has it, and a condition on the phase firing as the phase first begins.
 
 ## Metrics and batch runs
 
@@ -452,8 +487,9 @@ vehicles enter 1,573 lanes through its junctions in 120 s, at 10.2 of their
 IDM decides how hard to accelerate behind one leader; the tactical layer
 decides where a vehicle must stop, and pedestrians decide when to cross.
 Traffic lights, right of way at junctions, pedestrians walking and
-crossing, and vehicles yielding to them are built; OpenSCENARIO's
-controllers and pedestrians come next (see the [Roadmap](#roadmap)).
+crossing, vehicles yielding to them, and OpenSCENARIO's signals and
+pedestrians are built; the scale benchmark and the viewer come next (see
+the [Roadmap](#roadmap)).
 
 **Everything a vehicle stops for is a point to stop at.** The tactical layer
 finds the first point ahead where the vehicle must stop, and the vehicle's
@@ -812,6 +848,8 @@ who decide when to cross (see [Tactical layer](#tactical-layer)):
 4. Done: the walking graph, and pedestrians walking routes on it.
 5. Done: crossing decisions, groups and vehicles yielding, against the
    Highway Capacity Manual's pedestrian delays.
-6. OpenSCENARIO's signal controllers and pedestrians, against esmini.
+6. Done: OpenSCENARIO's pedestrians, routes, trajectories, traffic signal
+   actions and conditions, against esmini; its signal controllers, which
+   esmini does not run, against the standard.
 7. The scale benchmark with signals and pedestrians, against SUMO, and the
    viewer.

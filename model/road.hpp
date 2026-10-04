@@ -280,6 +280,9 @@ struct RoadNetwork final {
   // The road with `id`, if there is one.
   auto find_road(std::string_view id) const -> const Road*;
 
+  // The junction with `id`, if there is one.
+  auto find_junction(std::string_view id) const -> const Junction*;
+
   std::vector<Road> roads;
   std::vector<Junction> junctions;
   std::vector<SignalController> controllers;

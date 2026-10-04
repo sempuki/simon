@@ -131,8 +131,9 @@ auto compare(const Run& ours, const Run& theirs) -> Apart {
 TEST_CASE("ScenariosAgainstEsmini") {
   // Every step of every entity, until the storyboard stops: positions to
   // esmini's log's six decimals but on e6mini's curves, 1.2 mm; speeds to
-  // rounding but for the lane change's two steps where esmini reports a
-  // vehicle teleported off the end of its road at a standstill for a step.
+  // rounding, or to the six decimals where the log's speed feeds back, but
+  // for the lane change's two steps where esmini reports a vehicle
+  // teleported off the end of its road at a standstill for a step.
   struct Bounds final {
     std::string_view scenario;
     double position = 0.0;
@@ -140,7 +141,8 @@ TEST_CASE("ScenariosAgainstEsmini") {
   };
   for (Bounds bounds : {Bounds{"cut-in_simple.xosc", 1e-6, 1e-12},
                         Bounds{"cut-in.xosc", 0.002, 1e-12},
-                        Bounds{"lane_change_simple.xosc", 1e-6, 0.004}}) {
+                        Bounds{"lane_change_simple.xosc", 1e-6, 0.004},
+                        Bounds{"traffic_lights.xosc", 3e-6, 1e-6}}) {
     CAPTURE(bounds.scenario);
     Run theirs = load_esmini(bounds.scenario);
     Run ours = play(bounds.scenario, theirs.size() - 1);

@@ -60,10 +60,18 @@ auto domain_of(const PrivateAction* actor) -> Domain {
     return Domain::LONGITUDINAL;
   }
   if (std::holds_alternative<LaneChangeAction>(*actor) ||
-      std::holds_alternative<LaneOffsetAction>(*actor)) {
+      std::holds_alternative<LaneOffsetAction>(*actor) ||
+      std::holds_alternative<FollowTrajectoryAction>(*actor)) {
     return Domain::LATERAL;
   }
   return Domain::NONE;
+}
+
+// Whether a private action is done as it starts: a teleport, or a route
+// assigned.
+auto is_instant(const PrivateAction& action) -> bool {
+  return std::holds_alternative<TeleportAction>(action) ||
+         std::holds_alternative<AssignRouteAction>(action);
 }
 
 }  // namespace
@@ -89,6 +97,26 @@ StoryboardPlayer::StoryboardPlayer(const Scenario& scenario,
   }
   for (const Story& story : scenario.storyboard.stories) {
     build(story);
+  }
+  // Each controller's cycle starts its delay after its reference's, the
+  // references followed as far as they go.
+  for (const TrafficSignalController& controller :
+       scenario.signal_controllers) {
+    ControllerState state{.controller = &controller};
+    const TrafficSignalController* at = &controller;
+    for (std::size_t depth = 0;
+         at != nullptr && depth <= scenario.signal_controllers.size();
+         ++depth) {
+      state.offset += at->delay;
+      auto reference =
+          std::ranges::find(scenario.signal_controllers, at->reference,
+                            &TrafficSignalController::name);
+      at = at->reference.empty() ||
+                   reference == scenario.signal_controllers.end()
+               ? nullptr
+               : &*reference;
+    }
+    controllers_.push_back(state);
   }
 }
 
@@ -170,6 +198,24 @@ auto StoryboardPlayer::find_parameter(std::string_view name) const
   return found == parameters_.end() ? nullptr : &found->value;
 }
 
+auto StoryboardPlayer::find_signal_state(std::string_view signal) const
+    -> const std::string* {
+  auto found = std::ranges::find(signals_, signal, &TrafficSignalState::signal);
+  return found == signals_.end() ? nullptr : &found->state;
+}
+
+auto StoryboardPlayer::find_phase(std::string_view controller) const
+    -> const std::string* {
+  auto found =
+      std::ranges::find_if(controllers_, [&](const ControllerState& c) {
+        return c.controller->name == controller;
+      });
+  if (found == controllers_.end() || found->phase == ControllerState::NONE) {
+    return nullptr;
+  }
+  return &found->controller->phases[found->phase].name;
+}
+
 auto StoryboardPlayer::running() const -> bool {
   return elements_[ROOT].state != State::COMPLETE;
 }
@@ -191,12 +237,9 @@ auto StoryboardPlayer::record(std::size_t index,
 
 auto StoryboardPlayer::start(double time) -> StoryboardOrders {
   orders_ = {};
-  for (const ParameterAction& action : scenario_->storyboard.global_init) {
-    auto found =
-        std::ranges::find(parameters_, action.parameter, &Parameter::name);
-    if (found != parameters_.end()) {
-      found->value = action.value;
-    }
+  run_controllers(time);
+  for (const GlobalAction& action : scenario_->storyboard.global_init) {
+    apply(action, time);
   }
   for (std::size_t index = 0; index < elements_.size(); ++index) {
     Element& element = elements_[index];
@@ -206,7 +249,7 @@ auto StoryboardPlayer::start(double time) -> StoryboardOrders {
           ActionOrder{.entity = element.entity,
                       .handle = static_cast<std::uint32_t>(index),
                       .action = element.private_action});
-      if (std::holds_alternative<TeleportAction>(*element.private_action)) {
+      if (is_instant(*element.private_action)) {
         instant_.push_back(index);
       }
     }
@@ -246,24 +289,11 @@ auto StoryboardPlayer::start_element(std::size_t index, double time) -> void {
           ActionOrder{.entity = element.entity,
                       .handle = static_cast<std::uint32_t>(index),
                       .action = actor});
-      if (std::holds_alternative<TeleportAction>(*actor)) {
+      if (is_instant(*actor)) {
         instant_.push_back(index);
       }
     } else {
-      const auto& set = std::get<ParameterAction>(element.action->action);
-      auto found =
-          std::ranges::find(parameters_, set.parameter, &Parameter::name);
-      if (found != parameters_.end()) {
-        auto now = parse_number(found->value);
-        auto by = parse_number(set.value);
-        if (set.kind == ParameterAction::Kind::SET || !now || !by) {
-          found->value = set.value;
-        } else {
-          double value =
-              set.kind == ParameterAction::Kind::ADD ? *now + *by : *now * *by;
-          found->value = std::to_string(value);
-        }
-      }
+      apply(std::get<GlobalAction>(element.action->action), time);
       instant_.push_back(index);
     }
     return;
@@ -411,11 +441,105 @@ auto StoryboardPlayer::propagate(std::size_t index, double time) -> void {
   }
 }
 
+//-- Global actions and traffic signals ---------------------------------------
+
+auto StoryboardPlayer::apply(const GlobalAction& action, double time) -> void {
+  if (const auto* set = std::get_if<ParameterAction>(&action)) {
+    auto found =
+        std::ranges::find(parameters_, set->parameter, &Parameter::name);
+    if (found == parameters_.end()) {
+      return;
+    }
+    auto now = parse_number(found->value);
+    auto by = parse_number(set->value);
+    if (set->kind == ParameterAction::Kind::SET || !now || !by) {
+      found->value = set->value;
+    } else {
+      double value =
+          set->kind == ParameterAction::Kind::ADD ? *now + *by : *now * *by;
+      found->value = std::to_string(value);
+    }
+  } else if (const auto* signal =
+                 std::get_if<TrafficSignalStateAction>(&action)) {
+    set_signal(signal->signal, signal->state);
+  } else {
+    // The controller's cycle moves so that the phase starts now.
+    const auto& jump = std::get<TrafficSignalControllerAction>(action);
+    for (ControllerState& state : controllers_) {
+      const std::vector<TrafficSignalPhase>& phases = state.controller->phases;
+      auto phase =
+          std::ranges::find(phases, jump.phase, &TrafficSignalPhase::name);
+      if (state.controller->name != jump.controller || phase == phases.end()) {
+        continue;
+      }
+      double before = 0.0;
+      for (auto it = phases.begin(); it != phase; ++it) {
+        before += it->duration;
+      }
+      state.offset = time - before;
+      state.phase = ControllerState::NONE;
+    }
+    run_controllers(time);
+  }
+}
+
+auto StoryboardPlayer::set_signal(const std::string& signal,
+                                  const std::string& state) -> void {
+  auto found = std::ranges::find(signals_, signal, &TrafficSignalState::signal);
+  if (found == signals_.end()) {
+    signals_.push_back(TrafficSignalState{.signal = signal, .state = state});
+  } else {
+    found->state = state;
+  }
+}
+
+// The phase a controller is in at `time`: where `time` falls in its cycle,
+// counted from its offset either way.
+auto StoryboardPlayer::find_phase_index(const ControllerState& state,
+                                        double time) const -> std::size_t {
+  const std::vector<TrafficSignalPhase>& phases = state.controller->phases;
+  double cycle = 0.0;
+  for (const TrafficSignalPhase& phase : phases) {
+    cycle += phase.duration;
+  }
+  if (cycle <= 0.0) {
+    return 0;
+  }
+  double into = std::fmod(time - state.offset, cycle);
+  if (into < 0.0) {
+    into += cycle;
+  }
+  for (std::size_t i = 0; i < phases.size(); ++i) {
+    if (into < phases[i].duration - SMALL) {
+      return i;
+    }
+    into -= phases[i].duration;
+  }
+  return phases.size() - 1;
+}
+
+// Each controller entering a phase sets that phase's signal states, which
+// hold until a signal action or another phase changes them.
+auto StoryboardPlayer::run_controllers(double time) -> void {
+  for (ControllerState& state : controllers_) {
+    std::size_t phase = find_phase_index(state, time);
+    if (phase == state.phase) {
+      continue;
+    }
+    state.phase = phase;
+    for (const TrafficSignalState& signal :
+         state.controller->phases[phase].states) {
+      set_signal(signal.signal, signal.state);
+    }
+  }
+}
+
 auto StoryboardPlayer::step(double time, std::span<const EntityState> entities,
                             std::span<const std::uint32_t> finished)
     -> StoryboardOrders {
   orders_ = {};
   entities_ = entities;
+  run_controllers(time);
   for (std::uint32_t handle : finished) {
     if (handle < elements_.size() &&
         elements_[handle].state == State::RUNNING) {
@@ -431,7 +555,8 @@ auto StoryboardPlayer::step(double time, std::span<const EntityState> entities,
   return std::move(orders_);
 }
 
-// A teleport ends and a parameter set stops, as esmini's do when they run.
+// A teleport or a route ends, and a parameter set or traffic signal action
+// stops, as esmini's do when they run.
 auto StoryboardPlayer::finish_instant(double time) -> void {
   std::vector<std::size_t> instant = std::move(instant_);
   instant_.clear();
@@ -577,6 +702,14 @@ auto StoryboardPlayer::check(const ValueCondition& condition, double time)
              : c.rule == Rule::NOT_EQUAL_TO ? !equal
                                             : false;
     }
+    auto operator()(const TrafficSignalCondition& c) const -> bool {
+      const std::string* state = player->find_signal_state(c.signal);
+      return state != nullptr && *state == c.state;
+    }
+    auto operator()(const TrafficSignalControllerCondition& c) const -> bool {
+      const std::string* phase = player->find_phase(c.controller);
+      return phase != nullptr && *phase == c.phase;
+    }
     auto operator()(const StoryboardElementStateCondition& c) const -> bool {
       const auto& elements = player->elements_;
       auto found = std::ranges::find_if(elements, [&](const Element& e) {
@@ -652,6 +785,9 @@ auto StoryboardPlayer::check(const EntityCondition& condition, double time)
             PlacementPose at = compute_placement_pose(*network_, target);
             return std::hypot(at.x - entity.pose.x, at.y - entity.pose.y) <
                    kind.tolerance;
+          } else if constexpr (std::is_same_v<Kind, DistanceCondition>) {
+            return compare(compute_distance_to(index, kind), kind.value,
+                           kind.rule);
           } else if constexpr (std::is_same_v<Kind, EndOfRoadCondition>) {
             return entity.end_of_road >= kind.duration - SMALL;
           } else {
@@ -663,6 +799,43 @@ auto StoryboardPlayer::check(const EntityCondition& condition, double time)
     all = all && holds;
   }
   return condition.all ? all && !condition.triggering.empty() : any;
+}
+
+// esmini's Object::Distance to a position, either way: straight; along or
+// across the entity's heading; or along or across its road, infinite on
+// another road.
+auto StoryboardPlayer::compute_distance_to(
+    std::size_t from, const DistanceCondition& condition) const -> double {
+  const EntityState& a = entities_[from];
+  RoadPlacement target = locate(condition.position, entities_);
+  PlacementPose b = compute_placement_pose(*network_, target);
+  double dx = b.x - a.pose.x;
+  double dy = b.y - a.pose.y;
+  bool along_road = condition.distance.along_road;
+  switch (condition.distance.kind) {
+    case RelativeDistance::Kind::LONGITUDINAL:
+      if (along_road) {
+        return a.placement.road == target.road
+                   ? std::abs(target.s - a.placement.s)
+                   : std::numeric_limits<double>::infinity();
+      }
+      return std::abs(std::cos(a.pose.heading) * dx +
+                      std::sin(a.pose.heading) * dy);
+    case RelativeDistance::Kind::LATERAL: {
+      if (along_road) {
+        if (a.placement.road != target.road) {
+          return std::numeric_limits<double>::infinity();
+        }
+        const Road& road = network_->roads[target.road];
+        return std::abs(compute_placement_t(road, target) -
+                        compute_placement_t(road, a.placement));
+      }
+      return std::abs(-std::sin(a.pose.heading) * dx +
+                      std::cos(a.pose.heading) * dy);
+    }
+    default:
+      return std::hypot(dx, dy);
+  }
 }
 
 // esmini's Object::Distance: straight, signed by whether `to` is ahead along
@@ -766,14 +939,17 @@ auto StoryboardPlayer::locate(const Position& position,
                ? std::size_t{0}
                : static_cast<std::size_t>(road - network.roads.data());
   };
-  // Along the lane's travel by default, else as the orientation says.
+  // Along the lane's travel by default, else as the orientation says: a
+  // relative heading turns from the lane's travel, as esmini has it in
+  // right-hand traffic.
   auto heading_of = [&](const RoadPlacement& placement,
                         const std::optional<Orientation>& orientation) {
+    double travel = placement.lane > 0 ? std::numbers::pi : 0.0;
     if (!orientation) {
-      return placement.lane > 0 ? std::numbers::pi : 0.0;
+      return travel;
     }
     if (orientation->relative) {
-      return orientation->h;
+      return std::remainder(travel + orientation->h, 2.0 * std::numbers::pi);
     }
     double road =
         compute_plan_point(network.roads[placement.road], placement.s * meter)

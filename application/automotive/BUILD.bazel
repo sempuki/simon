@@ -41,6 +41,7 @@ cc_library(
         "//model:driving_metrics",
         "//model:random",
         "//model:road",
+        "//model:polyline",
         "//model:road_placement",
         "//scenario:storyboard",
         "//model:traffic",
@@ -307,6 +308,19 @@ cc_test(
         ":road_drawing",
         ":testing",
         "//format:opendrive",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "storyboard_test",
+    size = "small",
+    srcs = ["storyboard_test.cpp"],
+    copts = COPTS,
+    deps = [
+        "//format:openscenario",
+        "//model:road",
+        "//scenario:storyboard",
         "@lib//base:testing",
     ],
 )

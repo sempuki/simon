@@ -32,6 +32,7 @@ using namespace scenario;
 namespace {
 
 using Failure = std::unexpected<lib::Status>;
+using lib::InOut;
 using lib::Out;
 
 auto read_file(const std::string& path)
@@ -242,6 +243,9 @@ class Parser final {
     }
     RETURN_OR_ASSIGN(std::string road, text_of(logic, "filepath"));
     scenario.road_network = resolve(road);
+    RETURN_OR_ASSIGN(scenario.signal_controllers,
+                     read_signal_controllers(
+                         root.child("RoadNetwork").child("TrafficSignals")));
 
     for (pugi::xml_node object : root.child("Entities").children()) {
       RETURN_OR_ASSIGN(Entity entity, read_entity(object));
@@ -412,6 +416,57 @@ class Parser final {
     return {};
   }
 
+  //-- Traffic signals --------------------------------------------------------
+
+  auto read_signal_controllers(pugi::xml_node signals)
+      -> std::expected<std::vector<TrafficSignalController>, lib::Status> {
+    std::vector<TrafficSignalController> controllers;
+    for (pugi::xml_node node : signals.children()) {
+      if (std::string_view{node.name()} != "TrafficSignalController") {
+        return refuse(node);
+      }
+      TrafficSignalController controller;
+      RETURN_OR_ASSIGN(controller.name, text_of(node, "name"));
+      RETURN_OR_ASSIGN(controller.delay, number_or(node, "delay", 0.0));
+      if (node.attribute("reference")) {
+        RETURN_OR_ASSIGN(controller.reference, text_of(node, "reference"));
+      }
+      for (pugi::xml_node phase : node.children()) {
+        if (std::string_view{phase.name()} != "Phase") {
+          return refuse(phase);
+        }
+        TrafficSignalPhase read;
+        RETURN_OR_ASSIGN(read.name, text_of(phase, "name"));
+        RETURN_OR_ASSIGN(read.duration, number_of(phase, "duration"));
+        for (pugi::xml_node state : phase.children()) {
+          if (std::string_view{state.name()} != "TrafficSignalState") {
+            return refuse(state);
+          }
+          TrafficSignalState signal;
+          RETURN_OR_ASSIGN(signal.signal, text_of(state, "trafficSignalId"));
+          RETURN_OR_ASSIGN(signal.state, text_of(state, "state"));
+          read.states.push_back(std::move(signal));
+        }
+        controller.phases.push_back(std::move(read));
+      }
+      if (controller.phases.empty()) {
+        return fail("<TrafficSignalController> " + controller.name +
+                    " has no phases");
+      }
+      controllers.push_back(std::move(controller));
+    }
+    for (const TrafficSignalController& controller : controllers) {
+      if (!controller.reference.empty() &&
+          std::ranges::find(controllers, controller.reference,
+                            &TrafficSignalController::name) ==
+              controllers.end()) {
+        return fail("<TrafficSignalController> " + controller.name +
+                    " refers to no controller " + controller.reference);
+      }
+    }
+    return controllers;
+  }
+
   //-- Entities ---------------------------------------------------------------
 
   auto read_entity(pugi::xml_node object)
@@ -424,6 +479,9 @@ class Parser final {
       std::string_view kind = child.name();
       if (kind == "Vehicle") {
         RETURN_OR_ASSIGN(entity.vehicle, read_vehicle(child));
+      } else if (kind == "Pedestrian") {
+        RETURN_OR_ASSIGN(entity.vehicle, read_pedestrian(child));
+        entity.kind = Entity::Kind::PEDESTRIAN;
       } else if (kind == "CatalogReference") {
         RETURN_OR_ASSIGN(std::string catalog, text_of(child, "catalogName"));
         RETURN_OR_ASSIGN(std::string name, text_of(child, "entryName"));
@@ -431,7 +489,8 @@ class Parser final {
         if (!vehicle) {
           return fail("no catalog entry " + catalog + "/" + name);
         }
-        if (std::string_view{vehicle.name()} != "Vehicle") {
+        std::string_view entry = vehicle.name();
+        if (entry != "Vehicle" && entry != "Pedestrian") {
           return refuse(vehicle);
         }
         // The entry's own parameters, overridden by the reference's.
@@ -450,12 +509,16 @@ class Parser final {
           }
         }
         scope_.insert(scope_.end(), local.begin(), local.end());
-        auto read = read_vehicle(vehicle);
+        auto read = entry == "Vehicle" ? read_vehicle(vehicle)
+                                       : read_pedestrian(vehicle);
         scope_ = std::move(outer);
         if (!read) {
           return std::unexpected(read.error());
         }
         entity.vehicle = std::move(*read);
+        if (entry == "Pedestrian") {
+          entity.kind = Entity::Kind::PEDESTRIAN;
+        }
       } else if (kind == "ObjectController") {
         return refuse(child);
       } else {
@@ -465,20 +528,41 @@ class Parser final {
     return entity;
   }
 
+  auto read_box(pugi::xml_node box, InOut<Vehicle> vehicle) const
+      -> std::expected<void, lib::Status> {
+    RETURN_OR_ASSIGN(vehicle->center[0], number_of(box.child("Center"), "x"));
+    RETURN_OR_ASSIGN(vehicle->center[1], number_of(box.child("Center"), "y"));
+    RETURN_OR_ASSIGN(vehicle->center[2], number_of(box.child("Center"), "z"));
+    RETURN_OR_ASSIGN(vehicle->dimensions[0],
+                     number_of(box.child("Dimensions"), "length"));
+    RETURN_OR_ASSIGN(vehicle->dimensions[1],
+                     number_of(box.child("Dimensions"), "width"));
+    RETURN_OR_ASSIGN(vehicle->dimensions[2],
+                     number_of(box.child("Dimensions"), "height"));
+    return {};
+  }
+
+  // A pedestrian, as a vehicle with its box and esmini's limits for it:
+  // 1e10 on speed and on each change of speed, none in effect.
+  auto read_pedestrian(pugi::xml_node node)
+      -> std::expected<Vehicle, lib::Status> {
+    constexpr double UNLIMITED = 1e10;
+    Vehicle pedestrian{
+        .name = node.attribute("name").as_string(),
+        .category = node.attribute("pedestrianCategory").as_string(),
+        .max_speed = UNLIMITED,
+        .max_acceleration = UNLIMITED,
+        .max_deceleration = UNLIMITED};
+    RETURN_IF_UNEXPECTED(
+        read_box(node.child("BoundingBox"), InOut(pedestrian)));
+    return pedestrian;
+  }
+
   auto read_vehicle(pugi::xml_node node)
       -> std::expected<Vehicle, lib::Status> {
     Vehicle vehicle{.name = node.attribute("name").as_string(),
                     .category = node.attribute("vehicleCategory").as_string()};
-    pugi::xml_node box = node.child("BoundingBox");
-    RETURN_OR_ASSIGN(vehicle.center[0], number_of(box.child("Center"), "x"));
-    RETURN_OR_ASSIGN(vehicle.center[1], number_of(box.child("Center"), "y"));
-    RETURN_OR_ASSIGN(vehicle.center[2], number_of(box.child("Center"), "z"));
-    RETURN_OR_ASSIGN(vehicle.dimensions[0],
-                     number_of(box.child("Dimensions"), "length"));
-    RETURN_OR_ASSIGN(vehicle.dimensions[1],
-                     number_of(box.child("Dimensions"), "width"));
-    RETURN_OR_ASSIGN(vehicle.dimensions[2],
-                     number_of(box.child("Dimensions"), "height"));
+    RETURN_IF_UNEXPECTED(read_box(node.child("BoundingBox"), InOut(vehicle)));
     pugi::xml_node performance = node.child("Performance");
     RETURN_OR_ASSIGN(vehicle.max_speed, number_of(performance, "maxSpeed"));
     RETURN_OR_ASSIGN(vehicle.max_acceleration,
@@ -695,15 +779,123 @@ class Parser final {
                        read_position(kind.child("Position")));
       return TeleportAction{.position = position};
     }
+    if (name == "RoutingAction") {
+      pugi::xml_node routing = kind.first_child();
+      std::string_view routing_name = routing.name();
+      if (routing_name == "AssignRouteAction") {
+        return read_assign_route(routing);
+      }
+      if (routing_name == "FollowTrajectoryAction") {
+        return read_follow_trajectory(routing);
+      }
+      return routing ? refuse(routing) : refuse(kind);
+    }
     return refuse(kind);
   }
 
-  auto read_parameter_action(pugi::xml_node global)
-      -> std::expected<ParameterAction, lib::Status> {
-    pugi::xml_node node = global.child("ParameterAction");
-    if (!node) {
+  auto read_assign_route(pugi::xml_node node)
+      -> std::expected<PrivateAction, lib::Status> {
+    pugi::xml_node route = node.child("Route");
+    if (!route) {
+      return refuse(node.first_child());
+    }
+    AssignRouteAction action;
+    action.route.name = route.attribute("name").as_string();
+    RETURN_OR_ASSIGN(bool closed, flag_of(route, "closed", false));
+    if (closed) {
+      return Failure{lib::raise(ScenarioError::UNSUPPORTED, "<Route> closed")};
+    }
+    for (pugi::xml_node waypoint : route.children("Waypoint")) {
+      Waypoint read;
+      RETURN_OR_ASSIGN(read.strategy, text_of(waypoint, "routeStrategy"));
+      RETURN_OR_ASSIGN(read.position,
+                       read_position(waypoint.child("Position")));
+      action.route.waypoints.push_back(std::move(read));
+    }
+    if (action.route.waypoints.size() < 2) {
+      return fail("<Route> " + action.route.name +
+                  " needs two waypoints or more");
+    }
+    return action;
+  }
+
+  // A polyline followed without timing, held to the line: the only kind
+  // simon follows.
+  auto read_follow_trajectory(pugi::xml_node node)
+      -> std::expected<PrivateAction, lib::Status> {
+    pugi::xml_node trajectory = node.child("Trajectory");
+    if (!trajectory) {
+      return refuse(node.first_child());
+    }
+    FollowTrajectoryAction action{.name =
+                                      trajectory.attribute("name").as_string()};
+    RETURN_OR_ASSIGN(action.initial_distance_offset,
+                     number_or(node, "initialDistanceOffset", 0.0));
+    RETURN_OR_ASSIGN(bool closed, flag_of(trajectory, "closed", false));
+    if (closed) {
+      return Failure{
+          lib::raise(ScenarioError::UNSUPPORTED, "<Trajectory> closed")};
+    }
+    pugi::xml_node shape = trajectory.child("Shape").first_child();
+    if (std::string_view{shape.name()} != "Polyline") {
+      return refuse(shape);
+    }
+    for (pugi::xml_node vertex : shape.children("Vertex")) {
+      // esmini turns the entity to a vertex's own heading, which simon does
+      // not.
+      if (vertex.child("Position").first_child().child("Orientation")) {
+        return Failure{lib::raise(ScenarioError::UNSUPPORTED,
+                                  "<Vertex> with an orientation")};
+      }
+      Vertex read;
+      RETURN_OR_ASSIGN(read.time, number_or(vertex, "time", 0.0));
+      RETURN_OR_ASSIGN(read.position, read_position(vertex.child("Position")));
+      action.vertices.push_back(std::move(read));
+    }
+    if (action.vertices.size() < 2) {
+      return fail("<Trajectory> " + action.name + " needs two vertices");
+    }
+    pugi::xml_node timing = node.child("TimeReference").first_child();
+    if (std::string_view{timing.name()} != "None") {
+      return refuse(timing);
+    }
+    pugi::xml_node following = node.child("TrajectoryFollowingMode");
+    RETURN_OR_ASSIGN(std::string mode, text_of(following, "followingMode"));
+    if (mode != "position") {
+      return Failure{lib::raise(ScenarioError::UNSUPPORTED,
+                                "<TrajectoryFollowingMode> " + mode)};
+    }
+    return action;
+  }
+
+  auto read_global_action(pugi::xml_node global)
+      -> std::expected<GlobalAction, lib::Status> {
+    if (global.child("ParameterAction")) {
+      return read_parameter_action(global.child("ParameterAction"));
+    }
+    pugi::xml_node signal =
+        global.child("InfrastructureAction").child("TrafficSignalAction");
+    if (!signal) {
       return refuse(global.first_child());
     }
+    if (pugi::xml_node state = signal.child("TrafficSignalStateAction")) {
+      TrafficSignalStateAction action;
+      RETURN_OR_ASSIGN(action.signal, text_of(state, "name"));
+      RETURN_OR_ASSIGN(action.state, text_of(state, "state"));
+      return action;
+    }
+    if (pugi::xml_node phase = signal.child("TrafficSignalControllerAction")) {
+      TrafficSignalControllerAction action;
+      RETURN_OR_ASSIGN(action.controller,
+                       text_of(phase, "trafficSignalControllerRef"));
+      RETURN_OR_ASSIGN(action.phase, text_of(phase, "phase"));
+      return action;
+    }
+    return refuse(signal.first_child());
+  }
+
+  auto read_parameter_action(pugi::xml_node node)
+      -> std::expected<ParameterAction, lib::Status> {
     ParameterAction action;
     RETURN_OR_ASSIGN(action.parameter, text_of(node, "parameterRef"));
     pugi::xml_node change = node.first_child();
@@ -825,6 +1017,19 @@ class Parser final {
       RETURN_OR_ASSIGN(reach.position, read_position(node.child("Position")));
       return reach;
     }
+    if (kind == "DistanceCondition") {
+      DistanceCondition distance;
+      RETURN_OR_ASSIGN(distance.value, number_of(node, "value"));
+      RETURN_OR_ASSIGN(distance.distance, read_relative_distance(node));
+      if (distance.distance.freespace) {
+        return Failure{lib::raise(ScenarioError::UNSUPPORTED,
+                                  "<DistanceCondition> freespace")};
+      }
+      RETURN_OR_ASSIGN(distance.rule, read_rule(node));
+      RETURN_OR_ASSIGN(distance.position,
+                       read_position(node.child("Position")));
+      return distance;
+    }
     if (kind == "EndOfRoadCondition") {
       EndOfRoadCondition end;
       RETURN_OR_ASSIGN(end.duration, number_of(node, "duration"));
@@ -890,6 +1095,19 @@ class Parser final {
       }
       state.state = found_state->second;
       return state;
+    }
+    if (kind == "TrafficSignalCondition") {
+      TrafficSignalCondition signal;
+      RETURN_OR_ASSIGN(signal.signal, text_of(node, "name"));
+      RETURN_OR_ASSIGN(signal.state, text_of(node, "state"));
+      return signal;
+    }
+    if (kind == "TrafficSignalControllerCondition") {
+      TrafficSignalControllerCondition phase;
+      RETURN_OR_ASSIGN(phase.controller,
+                       text_of(node, "trafficSignalControllerRef"));
+      RETURN_OR_ASSIGN(phase.phase, text_of(node, "phase"));
+      return phase;
     }
     return refuse(node);
   }
@@ -963,7 +1181,7 @@ class Parser final {
         }
         storyboard.init.push_back(std::move(init));
       } else if (kind == "GlobalAction") {
-        RETURN_OR_ASSIGN(ParameterAction read, read_parameter_action(actions));
+        RETURN_OR_ASSIGN(GlobalAction read, read_global_action(actions));
         storyboard.global_init.push_back(std::move(read));
       } else {
         return refuse(actions);
@@ -1040,8 +1258,7 @@ class Parser final {
                            read_private_action(private_action));
           parsed.action = std::move(value);
         } else if (pugi::xml_node global = action.child("GlobalAction")) {
-          RETURN_OR_ASSIGN(ParameterAction value,
-                           read_parameter_action(global));
+          RETURN_OR_ASSIGN(GlobalAction value, read_global_action(global));
           parsed.action = std::move(value);
         } else {
           return refuse(action.first_child());

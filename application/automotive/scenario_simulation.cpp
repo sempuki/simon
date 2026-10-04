@@ -20,9 +20,11 @@ auto ScenarioSimulation::configure() -> engine::PhaseResult {
   RETURN_OR_ASSIGN(model::RoadNetwork roads,
                    format::load_opendrive(scenario_->road_network));
   roads_ = std::make_unique<model::RoadNetwork>(std::move(roads));
+  lanes_ = std::make_unique<model::LaneGraph>(model::build_lane_graph(*roads_));
   player_ = std::make_unique<scenario::StoryboardPlayer>(*scenario_, *roads_);
   context_ = std::make_unique<ScenarioContext>(
       ScenarioContext{.roads = roads_.get(),
+                      .lanes = lanes_.get(),
                       .scenario = scenario_.get(),
                       .player = player_.get()});
   scheduler_ = std::make_unique<ScenarioScheduler>(
@@ -32,11 +34,11 @@ auto ScenarioSimulation::configure() -> engine::PhaseResult {
   std::size_t count = scenario_->entities.size();
   RETURN_IF_UNEXPECTED(ScenarioWorld::set_up()
                            .numbered(1)
-                           .holding<archetype::ScenarioVehicle>(count)
+                           .holding<archetype::ScenarioEntity>(count)
                            .build(Out(world_)));
   auto transaction = world_.transaction();
   for (std::size_t i = 0; i < count; ++i) {
-    RETURN_IF_UNEXPECTED(world_.create<archetype::ScenarioVehicle>()
+    RETURN_IF_UNEXPECTED(world_.create<archetype::ScenarioEntity>()
                              .with(RoadPose{})
                              .with(ScenarioActor{.entity = i})
                              .with(ScenarioOrders{})

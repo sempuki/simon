@@ -422,11 +422,19 @@ cc_library(
 )
 
 cc_library(
+    name = "polyline",
+    srcs = ["polyline.cpp"],
+    hdrs = ["polyline.hpp"],
+    copts = COPTS,
+)
+
+cc_library(
     name = "road_placement",
     srcs = ["road_placement.cpp"],
     hdrs = ["road_placement.hpp"],
     copts = COPTS,
     deps = [
+        ":lane_graph",
         ":road",
         ":units",
         "@lib//base:core",

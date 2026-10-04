@@ -17,6 +17,12 @@ Model and change lanes by MOBIL, matching their authors' implementation, and
 a platoon follows SUMO's to its converged solution: 1 cm, where SUMO at its
 usual step is 1 m off.
 
+Vehicles stop at traffic lights, give way at junctions and yield at
+crosswalks, and pedestrians walk the sidewalks and decide when to cross:
+stops at lights match SUMO's, gaps are accepted by Harders' rule, and
+pedestrians wait as long as the Highway Capacity Manual's rules have them
+wait, at lights and in traffic.
+
 Beyond the kinematic model, the dynamic and drift single-track models, the
 Magic Formula tire and the 29-state multibody model match CommonRoad's to
 rounding, with four of CommonRoad's slips corrected from their sources; one
@@ -29,9 +35,10 @@ understeer gradient within 0.01 deg/g at 80 km/h, its suspension measured
 from Chrono's as a kinematics and compliance rig would.
 
 It plays ASAM OpenSCENARIO scenarios, their storyboards, triggers and
-actions running in the ECS: esmini's cut-ins and lane changes play out as
-they do in esmini, every vehicle at every step within its log's six decimals
-on straight roads and 1.2 mm on a curved highway. Runs are measured by
+actions running in the ECS: esmini's cut-ins, lane changes, and a car and
+two pedestrians at a junction's traffic lights play out as they do in
+esmini, every entity at every step within its log's six decimals on
+straight roads and 1.2 mm on a curved highway. Runs are measured by
 nuPlan's comfort and time to collision, matching nuPlan's own code, on
 vehicle boxes that match GEOS. A parameter distribution's permutations run
 in batches on threads, each as it runs in esmini and measured as nuPlan

@@ -17,8 +17,8 @@
 namespace simon::automotive {
 
 // Plays an OpenSCENARIO scenario: reads it and its road network when
-// configured, creates a vehicle for each of its entities, and steps its
-// storyboard and vehicles until its stop trigger fires. `assignments` give
+// configured, creates an entity in the world for each of its own, and steps
+// its storyboard and entities until its stop trigger fires. `assignments` give
 // its parameters other values, as a permutation of a parameter distribution
 // does.
 class ScenarioSimulation final {
@@ -49,6 +49,7 @@ class ScenarioSimulation final {
   // Shared by the systems; none moves once configured.
   std::unique_ptr<scenario::Scenario> scenario_;
   std::unique_ptr<model::RoadNetwork> roads_;
+  std::unique_ptr<model::LaneGraph> lanes_;
   std::unique_ptr<scenario::StoryboardPlayer> player_;
   std::unique_ptr<ScenarioContext> context_;
   ScenarioWorld world_;

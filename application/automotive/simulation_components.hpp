@@ -13,6 +13,7 @@
 #include "framework/world.hpp"
 #include "model/kinematics.hpp"
 #include "model/lane_graph.hpp"
+#include "model/polyline.hpp"
 #include "model/right_of_way.hpp"
 #include "model/road.hpp"
 #include "model/road_placement.hpp"
@@ -148,15 +149,17 @@ inline auto pose(const RoadPose& vehicle) -> model::Pose {
 // world.
 struct ScenarioContext final {
   const model::RoadNetwork* roads = nullptr;
+  const model::LaneGraph* lanes = nullptr;
   const scenario::Scenario* scenario = nullptr;
   scenario::StoryboardPlayer* player = nullptr;
   std::vector<scenario::EntityState> states;  // By entity.
   bool started = false;
 };
 
-// A vehicle an OpenSCENARIO scenario drives: its entity's index in the
-// scenario. The storyboard drives it, by its actions on speed and on the
-// lateral position, and between them it holds its speed and keeps its lane.
+// A vehicle or pedestrian an OpenSCENARIO scenario drives: its entity's
+// index in the scenario. The storyboard drives it, by its actions on speed,
+// on the lateral position and on its route or trajectory, and between them
+// it holds its speed and keeps its lane.
 struct ScenarioActor final {
   std::size_t entity = 0;
 };
@@ -213,13 +216,27 @@ struct LateralChange final {
   scenario::Transition transition;
 };
 
-// A vehicle on the road: where it is, the lateral action moving it, how long
-// it has been at the end of its road, and the lateral actions it finished
-// this step.
+// A trajectory being followed: its polyline, how far along it the entity
+// is, and whether the entity faces back along it, as it does if it was
+// moving backward when it started.
+struct TrajectoryRun final {
+  std::uint32_t handle = 0;
+  model::Polyline polyline;
+  double along = 0.0;  // m.
+  bool backward = false;
+};
+
+// An entity on the road: where it is, the lateral action or trajectory
+// moving it, the roads its route runs through, how long it has been at the
+// end of its road, and the lateral actions it finished this step.
 struct ScenarioMotion final {
   model::RoadPlacement placement;
   std::optional<LateralChange> change;
-  double end_of_road = -1.0;  // s, -1 if not there.
+  std::optional<TrajectoryRun> trajectory;
+  // Where a trajectory put it this step, which its placement only nears.
+  std::optional<model::PlacementPose> pose;
+  std::vector<std::size_t> route;  // By index.
+  double end_of_road = -1.0;       // s, -1 if not there.
   std::vector<std::uint32_t> finished;
 };
 
@@ -290,8 +307,8 @@ struct SignalController final                                  //
     : Archetype<"signal controller",                           //
                 Requires<model::SignalPlan, SignalState>> {};  //
 
-struct ScenarioVehicle final                             //
-    : Archetype<"scenario vehicle",                      //
+struct ScenarioEntity final                              //
+    : Archetype<"scenario entity",                       //
                 Requires<RoadPose, ScenarioActor,        //
                          ScenarioOrders, ScenarioSpeed,  //
                          ScenarioMotion>> {};            //
@@ -311,6 +328,6 @@ using ScenarioWorld =
     framework::World<RoadPose,
                      framework::TypeList<ScenarioActor, ScenarioOrders,
                                          ScenarioSpeed, ScenarioMotion>,
-                     framework::TypeList<archetype::ScenarioVehicle>>;
+                     framework::TypeList<archetype::ScenarioEntity>>;
 
 }  // namespace simon::automotive

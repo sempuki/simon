@@ -240,6 +240,11 @@ auto RoadNetwork::find_road(std::string_view id) const -> const Road* {
   return found == roads.end() ? nullptr : &*found;
 }
 
+auto RoadNetwork::find_junction(std::string_view id) const -> const Junction* {
+  auto found = std::ranges::find(junctions, id, &Junction::id);
+  return found == junctions.end() ? nullptr : &*found;
+}
+
 auto compute_plan_point(const Road& road, Length s) -> PlanPoint {
   double at = s.numerical_value_in(meter);
   const PlanGeometry& geometry = find_geometry(road.plan, at);
