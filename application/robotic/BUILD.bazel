@@ -140,6 +140,7 @@ VIEWER_DEPS = [
     "//application:viewing",
     "//engine:driver",
     "//framework:vocabulary",
+    "//model:articulated_arithmetic",
     "//3rd_party:imgui",
     "//3rd_party:implot",
     "@lib//base:core",

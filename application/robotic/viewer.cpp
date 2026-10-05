@@ -27,6 +27,7 @@
 #include "engine/driver.hpp"
 #include "framework/vocabulary.hpp"
 #include "imgui/imgui.h"
+#include "model/articulated_arithmetic.hpp"
 
 namespace simon::robotic {
 namespace {
@@ -37,24 +38,13 @@ using framework::Entity;
 using model::Array3;
 using model::GeomFrame;
 using model::GeomType;
+using model::articulated::add;
+using model::articulated::column;
+using model::articulated::dot;
+using model::articulated::scale;
+using model::articulated::subtract;
 
 constexpr std::string_view HUMANOID = "3rd_party/mujoco/humanoid.xml";
-
-auto add(const Array3& a, const Array3& b) -> Array3 {
-  return {a[0] + b[0], a[1] + b[1], a[2] + b[2]};
-}
-auto subtract(const Array3& a, const Array3& b) -> Array3 {
-  return {a[0] - b[0], a[1] - b[1], a[2] - b[2]};
-}
-auto scale(const Array3& v, double s) -> Array3 {
-  return {v[0] * s, v[1] * s, v[2] * s};
-}
-auto dot(const Array3& a, const Array3& b) -> double {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
-auto column(const model::Matrix3& m, int c) -> Array3 {
-  return {m[c], m[c + 3], m[c + 6]};
-}
 
 // A perspective camera turning about a target, z up.
 struct Camera final {

@@ -32,7 +32,7 @@ struct Line final {
   std::vector<std::string_view> words;
 };
 
-auto split(std::string_view text) -> std::vector<Line> {
+auto split_lines(std::string_view text) -> std::vector<Line> {
   std::vector<Line> lines;
   std::size_t number = 0;
   while (!text.empty()) {
@@ -1061,7 +1061,7 @@ class Parser final {
 
 auto parse_aircraft(std::string_view text)
     -> std::expected<AircraftData, lib::Status> {
-  return Parser{split(text)}.parse();
+  return Parser{split_lines(text)}.parse();
 }
 
 auto load_aircraft(const std::string& path)

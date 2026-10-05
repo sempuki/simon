@@ -59,16 +59,6 @@ inline auto operator*(double weight, const AirStateRate& rate) -> AirStateRate {
           .turn = weight * rate.turn};
 }
 
-// `angle` wrapped into [-pi, pi]. An angle already inside costs a compare; a
-// heading leaves the range only on the step it crosses south.
-inline auto wrap(Angle angle) -> Angle {
-  double value = radians(angle);
-  if (value > std::numbers::pi || value < -std::numbers::pi) [[unlikely]] {
-    value = std::remainder(value, 2.0 * std::numbers::pi);
-  }
-  return value * radian;
-}
-
 // Moves `state` along `rate` for `dt`, keeping the heading in [-pi, pi].
 inline auto advance(const AirState& state, const AirStateRate& rate,
                     framework::Duration dt) -> AirState {

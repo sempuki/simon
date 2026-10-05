@@ -36,9 +36,9 @@ using ProjectedWorld = framework::ProjectedWorld<SystemType, World>;
 //-- Lanes --------------------------------------------------------------------
 
 // The lane's length, from its section's start to its end.
-inline auto lane_length(const Network& network, const LaneKey& lane) -> double {
-  return model::find_section_end(network.roads, lane) -
-         network.roads.roads[lane.road].lane_sections[lane.section].s0;
+inline auto find_lane_length(const Network& network, const LaneKey& lane)
+    -> double {
+  return model::find_lane_length(network.roads, lane);
 }
 
 // How far along its lane, in the direction of travel, `s` is.
@@ -52,14 +52,9 @@ inline auto along_lane(const Network& network, const LaneKey& lane, Length s)
 }
 
 // The s of `along` meters along `lane`, in the direction of travel.
-inline auto s_along(const Network& network, const LaneKey& lane, double along)
-    -> Length {
-  double s =
-      model::runs_with_s(lane)
-          ? network.roads.roads[lane.road].lane_sections[lane.section].s0 +
-                along
-          : model::find_section_end(network.roads, lane) - along;
-  return s * model::meter;
+inline auto find_s_along(const Network& network, const LaneKey& lane,
+                         double along) -> Length {
+  return model::find_s_along(network.roads, lane, along) * model::meter;
 }
 
 // The driving lane a vehicle enters from `lane`, its `turns`th: at a fork,
@@ -421,7 +416,7 @@ struct Decide final            //
     LaneKey key = state.lane;
     std::uint32_t turns = state.turns;
     while (network_->roads.roads[key.road].junction == "-1") {
-      before += lane_length(*network_, key);
+      before += find_lane_length(*network_, key);
       std::optional<LaneKey> next =
           choose_next_lane(*network_, key, driver.seed, turns++);
       if (!next || before >= LOOKAHEAD) {
@@ -487,7 +482,7 @@ struct Decide final            //
         bool waits =
             other_stop.since != TimePoint::max() && !other_stop.committed &&
             other.along >=
-                lane_length(*network_, before_lane) -
+                find_lane_length(*network_, before_lane) -
                     tactical.braking.line_gap.numerical_value_in(model::meter) -
                     0.5;
         bool heading =
@@ -583,7 +578,8 @@ struct Decide final            //
     LaneOccupancy::Stop stop = occupancy_.stop_of(foe);
     return approach.toward == 0 && stop.since != TimePoint::max() &&
            !stop.committed &&
-           foe.along >= lane_length(*network_, approach.lane) - line_gap - 0.5;
+           foe.along >=
+               find_lane_length(*network_, approach.lane) - line_gap - 0.5;
   }
 
   // How far ahead the driver stops for the first crosswalk on its way,
@@ -624,7 +620,7 @@ struct Decide final            //
         }
         return to_stop * model::meter;
       }
-      before += lane_length(*network_, key);
+      before += find_lane_length(*network_, key);
       std::optional<LaneKey> next =
           choose_next_lane(*network_, key, driver.seed, turns++);
       if (!next) {
@@ -676,7 +672,7 @@ struct Decide final            //
         tactical.committed = index;
         held = true;
       }
-      before += lane_length(*network_, key);
+      before += find_lane_length(*network_, key);
       std::optional<LaneKey> next =
           choose_next_lane(*network_, key, driver.seed, turns++);
       if (!next) {
@@ -703,7 +699,7 @@ struct Decide final            //
             occupancy_.find_ahead(lane, along, self)) {
       return gap_to(*ahead, ahead->along - along);
     }
-    double distance = lane_length(*network_, lane) - along;
+    double distance = find_lane_length(*network_, lane) - along;
     LaneKey key = lane;
     while (distance < LOOKAHEAD) {
       std::optional<LaneKey> next =
@@ -716,7 +712,7 @@ struct Decide final            //
       if (const LaneOccupancy::Occupant* first = occupancy_.find_first(key)) {
         return gap_to(*first, distance + first->along);
       }
-      distance += lane_length(*network_, key);
+      distance += find_lane_length(*network_, key);
     }
     return std::nullopt;
   }
@@ -745,7 +741,7 @@ struct Decide final            //
             occupancy_.find_ahead(lane, along, self)) {
       return nearer(parting, gap_to(*ahead, ahead->along - along));
     }
-    double distance = lane_length(*network_, lane) - along;
+    double distance = find_lane_length(*network_, lane) - along;
     LaneKey key = lane;
     while (distance < LOOKAHEAD) {
       std::optional<LaneKey> next =
@@ -771,7 +767,7 @@ struct Decide final            //
       if (parting) {
         return parting;
       }
-      distance += lane_length(*network_, key);
+      distance += find_lane_length(*network_, key);
     }
     return parting;
   }
@@ -807,7 +803,7 @@ struct Decide final            //
       return std::nullopt;
     }
     auto before_end = [&](const LaneKey& lane) {
-      double length = lane_length(*network_, lane);
+      double length = find_lane_length(*network_, lane);
       return length - network_->rights.find_merge(lane).value_or(length);
     };
     double mine = distance - before_end(from);  // To where ways meet.
@@ -818,7 +814,7 @@ struct Decide final            //
       }
       std::span<const LaneOccupancy::Occupant> in =
           occupancy_.occupants_of(lane);
-      double meets = lane_length(*network_, lane) - before_end(lane);
+      double meets = find_lane_length(*network_, lane) - before_end(lane);
       for (auto it = in.rbegin(); it != in.rend(); ++it) {
         double theirs = meets - it->along;
         if (std::tie(theirs, it->entity) >= std::tie(mine, self)) {
@@ -952,7 +948,7 @@ struct Drive final                //
       v += a * dt;
     }
     double along = along_lane(*network_, state.lane, state.s) + travel;
-    double length = lane_length(*network_, state.lane);
+    double length = find_lane_length(*network_, state.lane);
     while (along > length) {
       std::optional<LaneKey> next =
           choose_next_lane(*network_, state.lane, driver->seed, state.turns);
@@ -964,9 +960,9 @@ struct Drive final                //
       along -= length;
       ++state.turns;
       state.lane = *next;
-      length = lane_length(*network_, state.lane);
+      length = find_lane_length(*network_, state.lane);
     }
-    state.s = s_along(*network_, state.lane, along);
+    state.s = find_s_along(*network_, state.lane, along);
     state.speed = v * model::meter_per_second;
     if (stopped) {
       stopped->committed = tactical && tactical->entering;
@@ -1155,7 +1151,8 @@ struct Pace final              //
           if (model::find_lane(network.roads, before).type == "driving" &&
               std::none_of(upstream_.begin() + first_.back(), upstream_.end(),
                            [&](const auto& u) { return u.first == before; })) {
-            upstream_.emplace_back(before, to + lane_length(network, before));
+            upstream_.emplace_back(before,
+                                   to + find_lane_length(network, before));
           }
         }
       }

@@ -4,7 +4,7 @@
 // (reference/mujoco_benchmark.py):
 //
 //   python application/robotic/reference/make_scenes.py DIR
-//   bazel run -c opt //application/robotic:robotic_benchmark -- \
+//   bazel run -c opt //application/robotic:robotic_benchmark --
 //       DIR/bodies_10000.xml [steps]
 //
 // Steps the scene once to settle the first contacts, then times `steps`

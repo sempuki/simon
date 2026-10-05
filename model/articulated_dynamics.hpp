@@ -12,6 +12,7 @@
 
 #include "framework/vocabulary.hpp"
 #include "model/articulated.hpp"
+#include "model/articulated_arithmetic.hpp"
 
 // The smooth dynamics of one kinematic tree, as MuJoCo computes a model's
 // (see model/REFERENCES.md): forward kinematics; each body's inertia and each
@@ -24,7 +25,6 @@
 // rotation then translation; matrices row by row.
 namespace simon::model {
 
-using Matrix3 = std::array<double, 9>;
 using Spatial = std::array<double, 6>;
 using Inertia10 = std::array<double, 10>;  // xx yy zz xy xz yz, m c, m.
 
@@ -85,100 +85,7 @@ struct TreeDynamics final {
 
 namespace articulated {
 
-constexpr double MINVAL = 1e-15;  // MuJoCo's mjMINVAL.
 constexpr std::uint32_t NONE = ~std::uint32_t{0};
-
-// MuJoCo's engine arithmetic, engine_util_spatial.c and engine_util_blas.c
-// (Apache-2.0), in its order of operations.
-
-inline auto normalize4(Quaternion4& q) -> double {
-  double norm =
-      std::sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
-  if (norm < MINVAL) {
-    q = {1.0, 0.0, 0.0, 0.0};
-  } else if (std::abs(norm - 1) > MINVAL) {
-    double inverse = 1 / norm;
-    for (double& x : q) {
-      x *= inverse;
-    }
-  }
-  return norm;
-}
-
-inline auto normalize3(Array3& v) -> double {
-  double norm = std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-  if (norm < MINVAL) {
-    v = {1.0, 0.0, 0.0};
-  } else {
-    double inverse = 1 / norm;
-    for (double& x : v) {
-      x *= inverse;
-    }
-  }
-  return norm;
-}
-
-inline auto multiply(const Quaternion4& a, const Quaternion4& b)
-    -> Quaternion4 {
-  return {a[0] * b[0] - a[1] * b[1] - a[2] * b[2] - a[3] * b[3],
-          a[0] * b[1] + a[1] * b[0] + a[2] * b[3] - a[3] * b[2],
-          a[0] * b[2] - a[1] * b[3] + a[2] * b[0] + a[3] * b[1],
-          a[0] * b[3] + a[1] * b[2] - a[2] * b[1] + a[3] * b[0]};
-}
-
-inline auto rotate(const Array3& v, const Quaternion4& q) -> Array3 {
-  if (v[0] == 0 && v[1] == 0 && v[2] == 0) {
-    return {0.0, 0.0, 0.0};
-  }
-  if (q[0] == 1 && q[1] == 0 && q[2] == 0 && q[3] == 0) {
-    return v;
-  }
-  Array3 t{q[0] * v[0] + q[2] * v[2] - q[3] * v[1],
-           q[0] * v[1] + q[3] * v[0] - q[1] * v[2],
-           q[0] * v[2] + q[1] * v[1] - q[2] * v[0]};
-  return {v[0] + 2 * (q[2] * t[2] - q[3] * t[1]),
-          v[1] + 2 * (q[3] * t[0] - q[1] * t[2]),
-          v[2] + 2 * (q[1] * t[1] - q[2] * t[0])};
-}
-
-inline auto convert_axis_angle(const Array3& axis, double angle)
-    -> Quaternion4 {
-  if (angle == 0) {
-    return {1.0, 0.0, 0.0, 0.0};
-  }
-  double s = std::sin(angle * 0.5);
-  return {std::cos(angle * 0.5), axis[0] * s, axis[1] * s, axis[2] * s};
-}
-
-inline auto convert_to_matrix(const Quaternion4& q) -> Matrix3 {
-  if (q[0] == 1 && q[1] == 0 && q[2] == 0 && q[3] == 0) {
-    return {1, 0, 0, 0, 1, 0, 0, 0, 1};
-  }
-  double q00 = q[0] * q[0];
-  double q01 = q[0] * q[1];
-  double q02 = q[0] * q[2];
-  double q03 = q[0] * q[3];
-  double q11 = q[1] * q[1];
-  double q12 = q[1] * q[2];
-  double q13 = q[1] * q[3];
-  double q22 = q[2] * q[2];
-  double q23 = q[2] * q[3];
-  double q33 = q[3] * q[3];
-  return {q00 + q11 - q22 - q33, 2 * (q12 - q03),       2 * (q13 + q02),
-          2 * (q12 + q03),       q00 - q11 + q22 - q33, 2 * (q23 - q01),
-          2 * (q13 - q02),       2 * (q23 + q01),       q00 - q11 - q22 + q33};
-}
-
-inline auto multiply(const Matrix3& m, const Array3& v) -> Array3 {
-  return {m[0] * v[0] + m[1] * v[1] + m[2] * v[2],
-          m[3] * v[0] + m[4] * v[1] + m[5] * v[2],
-          m[6] * v[0] + m[7] * v[1] + m[8] * v[2]};
-}
-
-inline auto cross(const Array3& a, const Array3& b) -> Array3 {
-  return {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
-          a[0] * b[1] - a[1] * b[0]};
-}
 
 inline auto dot6(const Spatial& a, const Spatial& b) -> double {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3] + a[4] * b[4] +
@@ -277,9 +184,9 @@ inline auto combine(std::span<const Spatial> dofs, std::span<const double> w)
 inline auto integrate_quaternion(Quaternion4 q, const Array3& vel, double scale)
     -> Quaternion4 {
   Array3 axis = vel;
-  double angle = scale * normalize3(axis);
+  double angle = scale * normalize3(InOut(axis));
   Quaternion4 turn = convert_axis_angle(axis, angle);
-  normalize4(q);
+  normalize4(InOut(q));
   return multiply(q, turn);
 }
 
@@ -698,7 +605,7 @@ class TreeKernel final {
         xpos = {state.qpos[q], state.qpos[q + 1], state.qpos[q + 2]};
         xquat = {state.qpos[q + 3], state.qpos[q + 4], state.qpos[q + 5],
                  state.qpos[q + 6]};
-        normalize4(xquat);
+        normalize4(InOut(xquat));
         out->xanchor[j] = xpos;
         out->xaxis[j] = joint.axis;
       } else {
@@ -732,7 +639,7 @@ class TreeKernel final {
             if (joint.type == JointType::BALL) {
               local = {state.qpos[q], state.qpos[q + 1], state.qpos[q + 2],
                        state.qpos[q + 3]};
-              normalize4(local);
+              normalize4(InOut(local));
             } else {
               local = convert_axis_angle(joint.axis,
                                          state.qpos[q] - m.qpos0[joint.qpos]);
@@ -747,7 +654,7 @@ class TreeKernel final {
           out->xaxis[j] = xaxis;
         }
       }
-      normalize4(xquat);
+      normalize4(InOut(xquat));
       out->xquat[b] = xquat;
       out->xpos[b] = xpos;
       out->xmat[b] = convert_to_matrix(xquat);
@@ -997,13 +904,13 @@ class TreeKernel final {
           }
           Quaternion4 quat{state.qpos[q + skip], state.qpos[q + skip + 1],
                            state.qpos[q + skip + 2], state.qpos[q + skip + 3]};
-          normalize4(quat);
+          normalize4(InOut(quat));
           Quaternion4 spring{
               m.qpos_spring[qs + skip], -m.qpos_spring[qs + skip + 1],
               -m.qpos_spring[qs + skip + 2], -m.qpos_spring[qs + skip + 3]};
           Quaternion4 dq = multiply(spring, quat);
           Array3 axis{dq[1], dq[2], dq[3]};
-          double sin_half = normalize3(axis);
+          double sin_half = normalize3(InOut(axis));
           double speed = 2 * std::atan2(sin_half, dq[0]);
           if (speed > std::numbers::pi) {
             speed -= 2 * std::numbers::pi;

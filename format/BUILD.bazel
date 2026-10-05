@@ -39,6 +39,7 @@ cc_library(
     copts = COPTS,
     deps = [
         "//model:articulated",
+        "//model:articulated_arithmetic",
         "@lib//base:core",
         "@lib//base:status",
         "//3rd_party:pugixml",

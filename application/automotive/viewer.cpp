@@ -455,7 +455,7 @@ class TrafficViewer final {
     for (const model::StopLine& line : network.control.stop_lines()) {
       const model::Road& road = network.roads.roads[line.lane.road];
       const model::LaneSection& section = road.lane_sections[line.lane.section];
-      Length s = s_along(network, line.lane, line.along);
+      Length s = find_s_along(network, line.lane, line.along);
       int inner = line.lane.lane > 0 ? line.lane.lane - 1 : line.lane.lane + 1;
       auto at = [&](int id) {
         Vector3 p = model::eigen(model::compute_road_position(

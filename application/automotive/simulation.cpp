@@ -55,7 +55,7 @@ auto driving_lanes(const Network& network, double margin) -> std::vector<Room> {
             continue;
           }
           bool with_s = model::runs_with_s(key);
-          double length = lane_length(network, key);
+          double length = find_lane_length(network, key);
           double from = (with_s ? start : end) ? margin : 0.0;
           double to = length - ((with_s ? end : start) ? margin : 0.0);
           if (to > from) {
@@ -185,7 +185,7 @@ auto build_scenario(const Scenario& scenario, const Network& network,
     following.desired_speed *=
         1.0 + random.uniform(-scenario.speed_spread, scenario.speed_spread);
     LaneState state{.lane = lane,
-                    .s = s_along(network, lane, along),
+                    .s = find_s_along(network, lane, along),
                     .speed = scenario.starting_speed};
     auto seed = static_cast<std::uint64_t>(random.uniform(0.0, 0x1.0p53));
     RoadPose pose = FollowLane::locate_vehicle(network, state);

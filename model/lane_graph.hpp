@@ -149,6 +149,13 @@ class LaneGraph final {
 // the road's end.
 auto find_section_end(const RoadNetwork& network, const LaneKey& key) -> double;
 
+// The length of `key`'s lane, from its section's start to its end.
+auto find_lane_length(const RoadNetwork& network, const LaneKey& key) -> double;
+
+// The s of `along` meters along `key`'s lane, in the direction of travel.
+auto find_s_along(const RoadNetwork& network, const LaneKey& key, double along)
+    -> double;
+
 // The lane `key` names.
 auto find_lane(const RoadNetwork& network, const LaneKey& key) -> const Lane&;
 

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <numbers>
 
 #include "Eigen/Dense"
 #include "framework/vocabulary.hpp"
@@ -229,6 +230,26 @@ inline auto sin(Angle angle) -> double { return std::sin(radians(angle)); }
 inline auto cos(Angle angle) -> double { return std::cos(radians(angle)); }
 inline auto arcsin(double ratio) -> Angle { return std::asin(ratio) * radian; }
 inline auto arctan(double ratio) -> Angle { return std::atan(ratio) * radian; }
+
+// -1, 0 or 1 as `x` is negative, zero or positive.
+inline auto sign(double x) -> double {
+  return x > 0.0 ? 1.0 : x < 0.0 ? -1.0 : 0.0;
+}
+
+// `angle` in radians wrapped into [-pi, pi].
+inline auto wrap(double angle) -> double {
+  return std::remainder(angle, 2.0 * std::numbers::pi);
+}
+
+// `angle` wrapped into [-pi, pi]. An angle already inside costs a compare; a
+// heading leaves the range only on the step it crosses south.
+inline auto wrap(Angle angle) -> Angle {
+  double value = radians(angle);
+  if (value > std::numbers::pi || value < -std::numbers::pi) [[unlikely]] {
+    value = std::remainder(value, 2.0 * std::numbers::pi);
+  }
+  return value * radian;
+}
 
 // A std::chrono duration as seconds.
 template <typename RepresentationType, typename PeriodType>

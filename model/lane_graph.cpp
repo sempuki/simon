@@ -86,6 +86,19 @@ auto find_section_end(const RoadNetwork& network, const LaneKey& key)
              : road.length;
 }
 
+auto find_lane_length(const RoadNetwork& network, const LaneKey& key)
+    -> double {
+  return find_section_end(network, key) -
+         network.roads[key.road].lane_sections[key.section].s0;
+}
+
+auto find_s_along(const RoadNetwork& network, const LaneKey& key, double along)
+    -> double {
+  return runs_with_s(key)
+             ? network.roads[key.road].lane_sections[key.section].s0 + along
+             : find_section_end(network, key) - along;
+}
+
 auto find_lane(const RoadNetwork& network, const LaneKey& key) -> const Lane& {
   const LaneSection& section =
       network.roads[key.road].lane_sections[key.section];

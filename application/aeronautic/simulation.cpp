@@ -23,14 +23,14 @@ auto count(int value) -> std::size_t {
 
 // The aircraft that fly the single-pass model, those that opt in to
 // Runge-Kutta 4, and those that fly as rigid bodies, airliners and fighters.
-struct Split final {
+struct Fleet final {
   std::size_t simple = 0;
   std::size_t precise = 0;
   std::size_t airliners = 0;
   std::size_t fighters = 0;
 };
 
-auto split(const Scenario& scenario) -> Split {
+auto split_fleet(const Scenario& scenario) -> Fleet {
   std::size_t all = count(scenario.aircraft);
   std::size_t airliners = std::min(count(scenario.rigid), all);
   std::size_t fighters = std::min(count(scenario.fighters), all - airliners);
@@ -168,7 +168,7 @@ auto create_rigid_aircraft(const model::AircraftData& data,
 
 auto build_world(const Scenario& scenario, Out<World> world)
     -> std::expected<void, framework::Status> {
-  auto [simple, precise, airliners, fighters] = split(scenario);
+  auto [simple, precise, airliners, fighters] = split_fleet(scenario);
   bool still = model::is_still(scenario.wind);
   return World::set_up()
       .numbered(1)
@@ -182,7 +182,7 @@ auto build_world(const Scenario& scenario, Out<World> world)
 auto build_scenario(const Scenario& scenario, const RigidTypes& types,
                     InOut<World> world)
     -> std::expected<void, framework::Status> {
-  auto [simple, precise, airliners, fighters] = split(scenario);
+  auto [simple, precise, airliners, fighters] = split_fleet(scenario);
   CHECK_PRECONDITION(airliners == 0 || types.airliner);
   CHECK_PRECONDITION(fighters == 0 || types.fighter);
   model::Earth earth = model::Earth::flat();

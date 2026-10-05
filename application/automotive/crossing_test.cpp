@@ -235,7 +235,7 @@ TEST_CASE("Crossing") {
     constexpr double SPEED = 50.0 / 3.6;  // m/s.
     auto add_vehicle = [&](const LaneKey& lane) {
       LaneState state{.lane = lane,
-                      .s = s_along(network, lane, 0.0),
+                      .s = find_s_along(network, lane, 0.0),
                       .speed = SPEED * meter_per_second};
       REQUIRE(world.create<archetype::TacticalVehicle>()
                   .with(FollowLane::locate_vehicle(network, state))
@@ -359,7 +359,8 @@ TEST_CASE("Crossing") {
     auto add_vehicle = [&](int lane) {
       LaneState state{
           .lane = {.road = 0, .section = 0, .lane = lane},
-          .s = s_along(network, {.road = 0, .section = 0, .lane = lane}, 0.0),
+          .s = find_s_along(network, {.road = 0, .section = 0, .lane = lane},
+                            0.0),
           .speed = SPEED * meter_per_second};
       REQUIRE(world.create<archetype::TacticalVehicle>()
                   .with(FollowLane::locate_vehicle(network, state))

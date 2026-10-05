@@ -2,6 +2,7 @@
 
 #include "model/articulated_collision.hpp"
 
+#include "model/articulated_arithmetic.hpp"
 #include "model/articulated_convex.hpp"
 
 #include <algorithm>
@@ -11,54 +12,21 @@ namespace simon::model {
 
 namespace {
 
+using articulated::add;
+using articulated::add_scaled;
+using articulated::add_to_scaled;
+using articulated::column;
 using articulated::convert_to_matrix;
 using articulated::cross;
+using articulated::dot;
 using articulated::MINVAL;
 using articulated::multiply;
+using articulated::multiply_transposed;
 using articulated::normalize3;
+using articulated::scale;
+using articulated::subtract;
 
 constexpr double MAXVAL = 1e10;  // mjMAXVAL.
-
-// MuJoCo's three-vector arithmetic (engine_inline.h, engine_util_blas.c), in
-// its order of operations.
-
-auto dot(const Array3& a, const Array3& b) -> double {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
-
-auto add(const Array3& a, const Array3& b) -> Array3 {
-  return {a[0] + b[0], a[1] + b[1], a[2] + b[2]};
-}
-
-auto subtract(const Array3& a, const Array3& b) -> Array3 {
-  return {a[0] - b[0], a[1] - b[1], a[2] - b[2]};
-}
-
-auto scale(const Array3& v, double s) -> Array3 {
-  return {v[0] * s, v[1] * s, v[2] * s};
-}
-
-// a + s b (mji_addScl3).
-auto add_scaled(const Array3& a, const Array3& b, double s) -> Array3 {
-  return {a[0] + s * b[0], a[1] + s * b[1], a[2] + s * b[2]};
-}
-
-// v += w s (mji_addToScl3).
-auto add_to_scaled(InOut<Array3> v, const Array3& w, double s) -> void {
-  (*v)[0] += w[0] * s;
-  (*v)[1] += w[1] * s;
-  (*v)[2] += w[2] * s;
-}
-
-auto multiply_transposed(const Matrix3& m, const Array3& v) -> Array3 {
-  return {m[0] * v[0] + m[3] * v[1] + m[6] * v[2],
-          m[1] * v[0] + m[4] * v[1] + m[7] * v[2],
-          m[2] * v[0] + m[5] * v[1] + m[8] * v[2]};
-}
-
-auto column(const Matrix3& m, int c) -> Array3 {
-  return {m[c], m[c + 3], m[c + 6]};
-}
 
 auto clip(double x, double low, double high) -> double {
   return x < low ? low : (x > high ? high : x);
@@ -98,10 +66,10 @@ auto collide_spheres(Out1 con, double margin, const Array3& pos1,
   }
   con[0].dist = std::sqrt(cdist_sqr) - radius1 - radius2;
   con[0].normal = subtract(pos2, pos1);
-  double len = normalize3(con[0].normal);
+  double len = normalize3(InOut(con[0].normal));
   if (len < MINVAL) {
     con[0].normal = cross(column(mat1, 2), column(mat2, 2));
-    normalize3(con[0].normal);
+    normalize3(InOut(con[0].normal));
   }
   con[0].pos = scale(con[0].normal, radius1 + con[0].dist / 2);
   con[0].pos = add(con[0].pos, pos1);
@@ -174,7 +142,7 @@ auto collide_plane_cylinder(Out1 con, double margin, const GeomFrame& f1,
   double prjvec1 = -prjvec * 0.5;
   if (dist0 + prjaxis + prjvec1 <= margin) {
     Array3 vec1 = cross(vec, axis);
-    normalize3(vec1);
+    normalize3(InOut(vec1));
     vec1 = scale(vec1, size2[0] * std::sqrt(3.0) / 2);
     Array3 a = add(add(f2.pos, vec1), axis);
     add_to_scaled(InOut(a), vec, -0.5);
@@ -354,7 +322,7 @@ auto collide_sphere_box(Out1 con, double margin, const Array3& pos1,
   }
   Array3 deepest = center;
   tmp = subtract(clamped, center);
-  double dist = normalize3(tmp);
+  double dist = normalize3(InOut(tmp));
   if (dist - radius1 > margin) {
     return 0;
   }
@@ -808,7 +776,7 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
     axis[i] = 0;
     axis[i1] = -rot[3 * i2 + j];
     axis[i2] = rot[3 * i1 + j];
-    normalize3(axis);
+    normalize3(InOut(axis));
     return axis;
   };
 
@@ -1016,7 +984,7 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
 // A contact's frame from its normal and tangent (mju_makeFrame).
 auto make_frame(const Array3& normal, const Array3& tangent) -> Matrix3 {
   Array3 x = normal;
-  normalize3(x);
+  normalize3(InOut(x));
   Array3 y = tangent;
   if (dot(y, y) < 0.25) {
     y = {};
@@ -1028,7 +996,7 @@ auto make_frame(const Array3& normal, const Array3& tangent) -> Matrix3 {
   }
   Array3 tmp = scale(x, dot(x, y));
   y = subtract(y, tmp);
-  normalize3(y);
+  normalize3(InOut(y));
   Array3 z = cross(x, y);
   return {x[0], x[1], x[2], y[0], y[1], y[2], z[0], z[1], z[2]};
 }

@@ -19,18 +19,6 @@ namespace {
 constexpr double SAMPLE = 0.25;    // m between a lane's sampled middles.
 constexpr double CLEARANCE = 2.0;  // m: two cars' bodies touch nearer.
 
-auto lane_length(const RoadNetwork& network, const LaneKey& lane) -> double {
-  return find_section_end(network, lane) -
-         network.roads[lane.road].lane_sections[lane.section].s0;
-}
-
-auto s_along(const RoadNetwork& network, const LaneKey& lane, double along)
-    -> double {
-  return runs_with_s(lane)
-             ? network.roads[lane.road].lane_sections[lane.section].s0 + along
-             : find_section_end(network, lane) - along;
-}
-
 struct Point final {
   double x = 0.0;
   double y = 0.0;
@@ -53,10 +41,10 @@ auto movement_of(const RoadNetwork& network, const LaneGraph& graph,
   Movement movement{.lane = lane, .incoming = incoming};
   std::span<const LaneKey> next = graph.successors_of(lane);
   movement.exits.assign(next.begin(), next.end());
-  movement.length = lane_length(network, lane);
+  movement.length = find_lane_length(network, lane);
   const Road& road = network.roads[lane.road];
   auto point_at = [&](double along) {
-    Length s = s_along(network, lane, along) * meter;
+    Length s = find_s_along(network, lane, along) * meter;
     Length t = compute_lane_middle(network, lane, s);
     Vector3 p =
         compute_road_position(road, s, t).numerical_value_in(meter).eigen();
@@ -68,7 +56,8 @@ auto movement_of(const RoadNetwork& network, const LaneGraph& graph,
   movement.middle.push_back(point_at(movement.length));
   auto heading = [&](double along) {
     double h =
-        compute_plan_point(road, s_along(network, lane, along) * meter).heading;
+        compute_plan_point(road, find_s_along(network, lane, along) * meter)
+            .heading;
     return runs_with_s(lane) ? h : h + std::numbers::pi;
   };
   movement.heading_in = heading(0.0);
@@ -141,10 +130,6 @@ auto find_crossing(const Movement& a, const Movement& b)
   return std::nullopt;
 }
 
-auto wrap(double angle) -> double {
-  return std::remainder(angle, 2.0 * std::numbers::pi);
-}
-
 enum class Turn : std::uint8_t { LEFT, STRAIGHT, RIGHT };
 
 auto turn_of(const Movement& movement) -> Turn {
@@ -189,8 +174,8 @@ auto group_of(const TrafficControl& control, const LaneKey& lane)
 
 // Whether `a` gives way to `b`, and why.
 auto who_yields(const RoadNetwork& network, const Junction& junction,
-                const TrafficControl& control, const Movement& a,
-                const Movement& b) -> std::pair<bool, Yielding> {
+                const Movement& a, const Movement& b)
+    -> std::pair<bool, Yielding> {
   const std::string& road_a = network.roads[a.lane.road].id;
   const std::string& road_b = network.roads[b.lane.road].id;
   for (const JunctionPriority& priority : junction.priorities) {
@@ -324,7 +309,7 @@ auto build_right_of_way(const RoadNetwork& network, const LaneGraph& graph,
           }
           continue;
         }
-        auto [a_yields, why] = who_yields(network, junction, control, a, b);
+        auto [a_yields, why] = who_yields(network, junction, a, b);
         const Movement& yielder = a_yields ? a : b;
         const Movement& foe = a_yields ? b : a;
         right.conflicts_.push_back(
@@ -396,7 +381,7 @@ auto build_right_of_way(const RoadNetwork& network, const LaneGraph& graph,
         }
         right.approaches_.push_back(Approach{
             .lane = before,
-            .to_conflict = lane_length(network, before) + here.to_conflict,
+            .to_conflict = find_lane_length(network, before) + here.to_conflict,
             .toward = k - root});
       }
     }

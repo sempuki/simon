@@ -137,7 +137,10 @@ cc_library(
         "//application:__subpackages__",
         "//framework:__pkg__",
     ],
-    deps = ["@lib//base:core"],
+    deps = [
+        ":framework",
+        "@lib//base:core",
+    ],
 )
 
 cc_test(

@@ -123,7 +123,6 @@ TEST_CASE("RightOfWay") {
     LaneKey major_in{.road = road_index(network, "in_w"), .lane = -1};
     LaneKey minor_in{.road = road_index(network, "in_s"), .lane = -1};
     LaneKey major_cross{.road = road_index(network, "we"), .lane = -1};
-    LaneKey minor_cross{.road = road_index(network, "sn"), .lane = -1};
     std::uint32_t out_e = road_index(network, "out_e");
     std::uint32_t out_n = road_index(network, "out_n");
     Scheduler scheduler{make_schedule(network)};

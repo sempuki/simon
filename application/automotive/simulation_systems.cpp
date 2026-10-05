@@ -13,13 +13,13 @@ namespace {
 
 namespace osc = scenario;
 
+using model::sign;
+
 constexpr double SMALL = 1e-10;
 
 auto seconds_of(const Step& step) -> double {
   return std::chrono::duration<double>(step.dt).count();
 }
-
-auto sign(double x) -> double { return x > 0.0 ? 1.0 : x < 0.0 ? -1.0 : 0.0; }
 
 auto stopped(const ScenarioOrders* orders, std::uint32_t handle) -> bool {
   return orders != nullptr &&

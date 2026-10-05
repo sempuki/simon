@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "base/core.hpp"
+#include "model/articulated_arithmetic.hpp"
 #include "pugixml.hpp"
 
 template <>
@@ -46,6 +47,7 @@ using model::Quaternion4;
 using model::SameFrame;
 using model::SoftConstraint;
 using model::Tendon;
+using model::articulated::cross;
 
 using Failure = std::unexpected<lib::Status>;
 using lib::InOut;
@@ -126,11 +128,6 @@ auto transpose(const std::array<double, 9>& m) -> std::array<double, 9> {
   return {m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]};
 }
 
-auto cross(const Array3& b, const Array3& c) -> Array3 {
-  return {b[1] * c[2] - b[2] * c[1], b[2] * c[0] - b[0] * c[2],
-          b[0] * c[1] - b[1] * c[0]};
-}
-
 // The minimal rotation from z to `v` (mjuu_z2quat).
 auto rotate_z_to(const Array3& v) -> Quaternion4 {
   Array3 axis = cross({0.0, 0.0, 1.0}, v);
@@ -191,7 +188,7 @@ auto turn_inertia(const Array3& local, const Quaternion4& q)
 }
 
 // The parallel axis term of `mass` at `d` (mjuu_offcenter).
-auto shift_inertia(double mass, const Array3& d) -> std::array<double, 6> {
+auto offset_inertia(double mass, const Array3& d) -> std::array<double, 6> {
   return {mass * (d[1] * d[1] + d[2] * d[2]),
           mass * (d[0] * d[0] + d[2] * d[2]),
           mass * (d[0] * d[0] + d[1] * d[1]),
@@ -1548,7 +1545,7 @@ class Reader final {
                    geom.pos[2] - body.inertial_pos[2]};
           std::array<double, 6> own =
               turn_inertia(compute_inertia(geom, mass), geom.quat);
-          std::array<double, 6> shift = shift_inertia(mass, d);
+          std::array<double, 6> shift = offset_inertia(mass, d);
           for (std::size_t j = 0; j < 6; ++j) {
             tensor[j] = tensor[j] + own[j] + shift[j];
           }

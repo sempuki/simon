@@ -429,11 +429,22 @@ cc_library(
 )
 
 cc_library(
+    name = "articulated_arithmetic",
+    hdrs = ["articulated_arithmetic.hpp"],
+    copts = COPTS,
+    deps = [
+        ":articulated",
+        "//framework:vocabulary",
+    ],
+)
+
+cc_library(
     name = "articulated_dynamics",
     hdrs = ["articulated_dynamics.hpp"],
     copts = COPTS,
     deps = [
         ":articulated",
+        ":articulated_arithmetic",
         "//framework:vocabulary",
     ],
 )
@@ -462,6 +473,7 @@ cc_library(
     copts = COPTS,
     deps = [
         ":articulated",
+        ":articulated_arithmetic",
         ":articulated_dynamics",
         "//framework:vocabulary",
     ],

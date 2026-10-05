@@ -42,40 +42,6 @@ using WallClock = std::chrono::steady_clock;
 constexpr Duration DT = 20ms;
 constexpr int DEFAULT_STEPS = 500;  // 10 s simulated.
 
-template <typename... SystemTypes>
-auto schedulers_of(framework::TypeList<SystemTypes...>) {
-  return std::tuple<framework::Scheduler<World, SystemList<SystemTypes>>...>{};
-}
-
-template <typename... SystemTypes>
-auto names_of(framework::TypeList<SystemTypes...>)
-    -> std::array<std::string, sizeof...(SystemTypes)> {
-  auto unqualified = [](const std::string& name) {
-    std::size_t colons = name.rfind("::");
-    return colons == std::string::npos ? name : name.substr(colons + 2);
-  };
-  // A Continuous element by the state it integrates, the rest by name.
-  auto short_name = [&](const std::string& name) {
-    std::size_t open = name.find('<');
-    std::string head =
-        unqualified(open == std::string::npos ? name : name.substr(0, open));
-    std::size_t states = name.find("TypeList<");
-    if (head == "Continuous" && states != std::string::npos) {
-      std::size_t from = states + std::string_view{"TypeList<"}.size();
-      std::size_t to = name.find_first_of(",>", from);
-      return head + "(" + unqualified(name.substr(from, to - from)) + ")";
-    }
-    return head;
-  };
-  return {short_name(lib::to_type_string<SystemTypes>())...};
-}
-
-template <typename... SystemTypes>
-auto bytes_of(framework::TypeList<SystemTypes...>)
-    -> std::array<std::size_t, sizeof...(SystemTypes)> {
-  return {framework::bytes_per_entity_v<SystemTypes>...};
-}
-
 // The models the aircraft fly: all single pass, all Runge-Kutta 4, or mixed,
 // with 1% on Runge-Kutta 4 and 0.1% rigid.
 enum class Fidelity { SINGLE_PASS, RUNGE_KUTTA, MIXED };
@@ -101,7 +67,7 @@ auto measure(int aircraft, Fidelity fidelity, int steps,
   CHECK_POSTCONDITION(built.has_value());
   world.sync();
 
-  auto schedulers = schedulers_of(List{});
+  auto schedulers = framework::benchmark::create_schedulers<World>(List{});
   std::array<double, SYSTEM_COUNT> seconds{};
   for (int i = 0; i < steps; ++i) {
     framework::Step step{.time = TimePoint{} + i * DT, .dt = DT};
@@ -133,8 +99,8 @@ auto measure(int aircraft, Fidelity fidelity, int steps,
                steps);
   std::println("  total {:10.3f} ms/step {:10.1f} ns/entity-step",
                1e3 * total / std::max(steps, 1), 1e9 * total / entity_steps);
-  auto names = names_of(List{});
-  auto bytes = bytes_of(List{});
+  auto names = framework::benchmark::collect_system_names(List{});
+  auto bytes = framework::benchmark::collect_bytes_per_entity(List{});
   for (std::size_t i = 0; i < SYSTEM_COUNT; ++i) {
     std::println("  {:<22} {:10.3f} ms/step {:6.1f}% {:6} B/entity", names[i],
                  1e3 * seconds[i] / std::max(steps, 1),
@@ -171,8 +137,7 @@ auto main(int argc, char** argv) -> int {
   if (populations.empty()) {
     populations = {1'000, 10'000, 100'000};
   }
-  auto rigid = simon::format::load_aircraft(
-      "3rd_party/jsbsim/737.aircraft");
+  auto rigid = simon::format::load_aircraft("3rd_party/jsbsim/737.aircraft");
   if (!rigid) {
     std::println(stderr, "{}", rigid.error().message());
     return 1;

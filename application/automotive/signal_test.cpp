@@ -209,7 +209,7 @@ TEST_CASE("SignalAgainstSumo") {
             double from = along_lane(network, was.lane, was.s);
             double to = state.lane == was.lane
                             ? along_lane(network, state.lane, state.s)
-                            : lane_length(network, was.lane);
+                            : find_lane_length(network, was.lane);
             for (const model::StopLine& line :
                  network.control.stop_lines_on(was.lane)) {
               if (from < line.along && line.along <= to) {

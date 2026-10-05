@@ -4,7 +4,7 @@
 // headless, at 0.05 s steps, on several threads, and prints a table of each
 // run's parameter values and its ego's measures by nuPlan's metrics:
 //
-//   bazel run -c opt //application/automotive:scenario_batch -- \
+//   bazel run -c opt //application/automotive:scenario_batch --
 //       <distribution.xosc> [threads]
 
 #include <chrono>

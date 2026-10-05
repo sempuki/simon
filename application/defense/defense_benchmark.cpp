@@ -65,29 +65,6 @@ auto make_scenario(int drones) -> Scenario {
                   .sites = sites};
 }
 
-template <typename... SystemTypes>
-auto schedulers_of(framework::TypeList<SystemTypes...>) {
-  return std::tuple<framework::Scheduler<World, SystemList<SystemTypes>>...>{};
-}
-
-template <typename... SystemTypes>
-auto names_of(framework::TypeList<SystemTypes...>)
-    -> std::array<std::string, sizeof...(SystemTypes)> {
-  auto short_name = [](std::string name) {
-    std::size_t colons = name.rfind("::");
-    return colons == std::string::npos ? name : name.substr(colons + 2);
-  };
-  return {short_name(lib::to_type_string<SystemTypes>())...};
-}
-
-// Counts the bytes each system's per-entity loop can read for each entity; see
-// framework::bytes_per_entity_v.
-template <typename... SystemTypes>
-auto bytes_of(framework::TypeList<SystemTypes...>)
-    -> std::array<std::size_t, sizeof...(SystemTypes)> {
-  return {framework::bytes_per_entity_v<SystemTypes>...};
-}
-
 auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
     -> void {
   using List = Scheduler::FlattenedSystemList;
@@ -103,7 +80,7 @@ auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
       build_scenario(scenario, InOut(world));
   CHECK_POSTCONDITION(built_asset.has_value());
   Entity asset = *built_asset;
-  auto schedulers = schedulers_of(List{});
+  auto schedulers = framework::benchmark::create_schedulers<World>(List{});
   std::array<double, SYSTEM_COUNT> seconds{};
   std::size_t entity_steps = 0;
   double slowest = 0.0;  // The slowest step, in seconds.
@@ -149,8 +126,8 @@ auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
       "ms",
       1e3 * total / std::max(steps, 1),
       1e9 * total / std::max<double>(entity_steps, 1), 1e3 * slowest);
-  auto names = names_of(List{});
-  auto bytes = bytes_of(List{});
+  auto names = framework::benchmark::collect_system_names(List{});
+  auto bytes = framework::benchmark::collect_bytes_per_entity(List{});
   for (std::size_t i = 0; i < SYSTEM_COUNT; ++i) {
     std::println("  {:<20} {:10.3f} ms/step {:6.1f}% {:6} B/entity", names[i],
                  1e3 * seconds[i] / std::max(steps, 1),

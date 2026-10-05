@@ -16,8 +16,6 @@ auto compute_magic_angle(double b, double c, double e, double x) -> double {
   return c * std::atan(bx - e * (bx - std::atan(bx)));
 }
 
-auto sign(double x) -> double { return x > 0.0 ? 1.0 : x < 0.0 ? -1.0 : 0.0; }
-
 }  // namespace
 
 // Pacejka's Magic Formula 5.2 for pure and combined slip (Pacejka, chapter

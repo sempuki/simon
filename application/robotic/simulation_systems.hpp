@@ -373,7 +373,6 @@ auto Solve::gather(SystemWorld& world) -> void {
   world.template store_of<TreeDynamics<Capacity>>().for_each(
       [&](Entity owner, const TreeDynamics<Capacity>& dynamics) {
         std::uint32_t t = mechanisms.component_of(owner).tree;
-        const model::Tree& tree = mechanics_->trees()[t];
         const TreeState<Capacity>& state = states.component_of(owner);
         data_[t] = TreeData{.mass = dynamics.mass.data(),
                             .stride = V,

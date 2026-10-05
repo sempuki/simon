@@ -9,16 +9,13 @@
 #include <numbers>
 #include <queue>
 
+#include "model/units.hpp"
+
 namespace simon::model {
 
 namespace {
 
 constexpr double TINY = 1e-12;
-
-// The angle in (-pi, pi].
-auto wrap(double angle) -> double {
-  return std::remainder(angle, 2.0 * std::numbers::pi);
-}
 
 }  // namespace
 
