@@ -2388,6 +2388,246 @@ free_body.xml,geom,2,margin,0.0
 free_body.xml,geom,2,gap,0.0
 free_body.xml,geom,2,priority,0.0
 free_body.xml,geom,2,sameframe,0.0
+limits.xml,option,0,timestep,0.002
+limits.xml,option,0,gravity,0.0 0.0 -9.81
+limits.xml,option,0,integrator,0.0
+limits.xml,option,0,cone,0.0
+limits.xml,option,0,solver,2.0
+limits.xml,option,0,iterations,100.0
+limits.xml,option,0,tolerance,1e-08
+limits.xml,qpos0,0,values,0.0 1.0 0.0 0.0 0.0 0.0 0.0
+limits.xml,qpos_spring,0,values,0.0 1.0 0.0 0.0 0.0 0.0 0.0
+limits.xml,body,0,parentid,0.0
+limits.xml,body,0,rootid,0.0
+limits.xml,body,0,pos,0.0 0.0 0.0
+limits.xml,body,0,quat,1.0 0.0 0.0 0.0
+limits.xml,body,0,ipos,0.0 0.0 0.0
+limits.xml,body,0,iquat,1.0 0.0 0.0 0.0
+limits.xml,body,0,mass,0.0
+limits.xml,body,0,inertia,0.0 0.0 0.0
+limits.xml,body,0,jntadr,-1.0
+limits.xml,body,0,jntnum,0.0
+limits.xml,body,0,dofadr,-1.0
+limits.xml,body,0,dofnum,0.0
+limits.xml,body,0,geomadr,-1.0
+limits.xml,body,0,geomnum,0.0
+limits.xml,body,0,sameframe,1.0
+limits.xml,body,1,parentid,0.0
+limits.xml,body,1,rootid,1.0
+limits.xml,body,1,pos,0.0 0.0 2.0
+limits.xml,body,1,quat,1.0 0.0 0.0 0.0
+limits.xml,body,1,ipos,0.2 0.0 0.0
+limits.xml,body,1,iquat,0.7071067811865476 0.0 -0.7071067811865475 0.0
+limits.xml,body,1,mass,1.2440706908215582
+limits.xml,body,1,inertia,0.020407660214013155 0.020407660214013155 0.0005496530506720703
+limits.xml,body,1,jntadr,0.0
+limits.xml,body,1,jntnum,1.0
+limits.xml,body,1,dofadr,0.0
+limits.xml,body,1,dofnum,1.0
+limits.xml,body,1,geomadr,0.0
+limits.xml,body,1,geomnum,1.0
+limits.xml,body,1,sameframe,0.0
+limits.xml,body,2,parentid,0.0
+limits.xml,body,2,rootid,2.0
+limits.xml,body,2,pos,1.0 0.0 2.0
+limits.xml,body,2,quat,1.0 0.0 0.0 0.0
+limits.xml,body,2,ipos,0.15 0.0 -0.1
+limits.xml,body,2,iquat,0.8816745987679437 0.0 -0.4718579255320243 0.0
+limits.xml,body,2,mass,1.1325429414517407
+limits.xml,body,2,inertia,0.015448498293648784 0.015448498293648784 0.0004994655634556523
+limits.xml,body,2,jntadr,1.0
+limits.xml,body,2,jntnum,1.0
+limits.xml,body,2,dofadr,1.0
+limits.xml,body,2,dofnum,3.0
+limits.xml,body,2,geomadr,1.0
+limits.xml,body,2,geomnum,1.0
+limits.xml,body,2,sameframe,0.0
+limits.xml,body,3,parentid,0.0
+limits.xml,body,3,rootid,3.0
+limits.xml,body,3,pos,2.0 0.0 2.0
+limits.xml,body,3,quat,1.0 0.0 0.0 0.0
+limits.xml,body,3,ipos,0.0 0.0 0.0
+limits.xml,body,3,iquat,1.0 0.0 0.0 0.0
+limits.xml,body,3,mass,1.0000000000000002
+limits.xml,body,3,inertia,0.0016666666666666672 0.0016666666666666672 0.0016666666666666672
+limits.xml,body,3,jntadr,2.0
+limits.xml,body,3,jntnum,1.0
+limits.xml,body,3,dofadr,4.0
+limits.xml,body,3,dofnum,1.0
+limits.xml,body,3,geomadr,2.0
+limits.xml,body,3,geomnum,1.0
+limits.xml,body,3,sameframe,1.0
+limits.xml,body,4,parentid,0.0
+limits.xml,body,4,rootid,4.0
+limits.xml,body,4,pos,3.0 0.0 2.0
+limits.xml,body,4,quat,1.0 0.0 0.0 0.0
+limits.xml,body,4,ipos,0.0 0.15 0.0
+limits.xml,body,4,iquat,0.7071067811865476 0.7071067811865475 0.0 -0.0
+limits.xml,body,4,mass,0.9613273519984767
+limits.xml,body,4,inertia,0.009519685474834328 0.009519685474834328 0.00042241854820168357
+limits.xml,body,4,jntadr,3.0
+limits.xml,body,4,jntnum,1.0
+limits.xml,body,4,dofadr,5.0
+limits.xml,body,4,dofnum,1.0
+limits.xml,body,4,geomadr,3.0
+limits.xml,body,4,geomnum,1.0
+limits.xml,body,4,sameframe,0.0
+limits.xml,jnt,0,type,3.0
+limits.xml,jnt,0,bodyid,1.0
+limits.xml,jnt,0,pos,0.0 0.0 0.0
+limits.xml,jnt,0,axis,0.0 1.0 0.0
+limits.xml,jnt,0,limited,1.0
+limits.xml,jnt,0,range,-0.5235987755982988 0.5235987755982988
+limits.xml,jnt,0,stiffness,0.0
+limits.xml,jnt,0,qposadr,0.0
+limits.xml,jnt,0,dofadr,0.0
+limits.xml,jnt,0,solref,0.01 0.8
+limits.xml,jnt,0,solimp,0.8 0.95 0.002 0.5 2.0
+limits.xml,jnt,0,margin,0.0
+limits.xml,jnt,1,type,1.0
+limits.xml,jnt,1,bodyid,2.0
+limits.xml,jnt,1,pos,0.0 0.0 0.0
+limits.xml,jnt,1,axis,0.0 0.0 1.0
+limits.xml,jnt,1,limited,1.0
+limits.xml,jnt,1,range,0.0 0.7853981633974483
+limits.xml,jnt,1,stiffness,0.0
+limits.xml,jnt,1,qposadr,1.0
+limits.xml,jnt,1,dofadr,1.0
+limits.xml,jnt,1,solref,0.02 1.0
+limits.xml,jnt,1,solimp,0.9 0.95 0.001 0.5 2.0
+limits.xml,jnt,1,margin,0.0
+limits.xml,jnt,2,type,2.0
+limits.xml,jnt,2,bodyid,3.0
+limits.xml,jnt,2,pos,0.0 0.0 0.0
+limits.xml,jnt,2,axis,0.8944271909999159 0.0 0.4472135954999579
+limits.xml,jnt,2,limited,1.0
+limits.xml,jnt,2,range,-0.2 0.1
+limits.xml,jnt,2,stiffness,0.0
+limits.xml,jnt,2,qposadr,5.0
+limits.xml,jnt,2,dofadr,4.0
+limits.xml,jnt,2,solref,0.02 1.0
+limits.xml,jnt,2,solimp,0.9 0.95 0.001 0.5 2.0
+limits.xml,jnt,2,margin,0.02
+limits.xml,jnt,3,type,3.0
+limits.xml,jnt,3,bodyid,4.0
+limits.xml,jnt,3,pos,0.0 0.0 0.0
+limits.xml,jnt,3,axis,1.0 0.0 0.0
+limits.xml,jnt,3,limited,0.0
+limits.xml,jnt,3,range,0.0 0.0
+limits.xml,jnt,3,stiffness,0.0
+limits.xml,jnt,3,qposadr,6.0
+limits.xml,jnt,3,dofadr,5.0
+limits.xml,jnt,3,solref,0.02 1.0
+limits.xml,jnt,3,solimp,0.9 0.95 0.001 0.5 2.0
+limits.xml,jnt,3,margin,0.0
+limits.xml,dof,0,bodyid,1.0
+limits.xml,dof,0,jntid,0.0
+limits.xml,dof,0,parentid,-1.0
+limits.xml,dof,0,armature,0.0
+limits.xml,dof,0,damping,0.0
+limits.xml,dof,0,frictionloss,0.0
+limits.xml,dof,0,solref,0.02 1.0
+limits.xml,dof,0,solimp,0.9 0.95 0.001 0.5 2.0
+limits.xml,dof,1,bodyid,2.0
+limits.xml,dof,1,jntid,1.0
+limits.xml,dof,1,parentid,-1.0
+limits.xml,dof,1,armature,0.0
+limits.xml,dof,1,damping,0.0
+limits.xml,dof,1,frictionloss,0.0
+limits.xml,dof,1,solref,0.02 1.0
+limits.xml,dof,1,solimp,0.9 0.95 0.001 0.5 2.0
+limits.xml,dof,2,bodyid,2.0
+limits.xml,dof,2,jntid,1.0
+limits.xml,dof,2,parentid,1.0
+limits.xml,dof,2,armature,0.0
+limits.xml,dof,2,damping,0.0
+limits.xml,dof,2,frictionloss,0.0
+limits.xml,dof,2,solref,0.02 1.0
+limits.xml,dof,2,solimp,0.9 0.95 0.001 0.5 2.0
+limits.xml,dof,3,bodyid,2.0
+limits.xml,dof,3,jntid,1.0
+limits.xml,dof,3,parentid,2.0
+limits.xml,dof,3,armature,0.0
+limits.xml,dof,3,damping,0.0
+limits.xml,dof,3,frictionloss,0.0
+limits.xml,dof,3,solref,0.02 1.0
+limits.xml,dof,3,solimp,0.9 0.95 0.001 0.5 2.0
+limits.xml,dof,4,bodyid,3.0
+limits.xml,dof,4,jntid,2.0
+limits.xml,dof,4,parentid,-1.0
+limits.xml,dof,4,armature,0.0
+limits.xml,dof,4,damping,0.0
+limits.xml,dof,4,frictionloss,0.5
+limits.xml,dof,4,solref,0.02 1.0
+limits.xml,dof,4,solimp,0.9 0.95 0.001 0.5 2.0
+limits.xml,dof,5,bodyid,4.0
+limits.xml,dof,5,jntid,3.0
+limits.xml,dof,5,parentid,-1.0
+limits.xml,dof,5,armature,0.0
+limits.xml,dof,5,damping,0.0
+limits.xml,dof,5,frictionloss,0.05
+limits.xml,dof,5,solref,0.03 1.0
+limits.xml,dof,5,solimp,0.9 0.95 0.001 0.5 2.0
+limits.xml,geom,0,type,3.0
+limits.xml,geom,0,bodyid,1.0
+limits.xml,geom,0,size,0.03 0.2 0.0
+limits.xml,geom,0,pos,0.2 0.0 0.0
+limits.xml,geom,0,quat,0.7071067811865476 0.0 -0.7071067811865475 0.0
+limits.xml,geom,0,friction,1.0 0.005 0.0001
+limits.xml,geom,0,condim,3.0
+limits.xml,geom,0,contype,1.0
+limits.xml,geom,0,conaffinity,1.0
+limits.xml,geom,0,solref,0.02 1.0
+limits.xml,geom,0,solimp,0.9 0.95 0.001 0.5 2.0
+limits.xml,geom,0,margin,0.0
+limits.xml,geom,0,gap,0.0
+limits.xml,geom,0,priority,0.0
+limits.xml,geom,0,sameframe,2.0
+limits.xml,geom,1,type,3.0
+limits.xml,geom,1,bodyid,2.0
+limits.xml,geom,1,size,0.03 0.18027756377319948 0.0
+limits.xml,geom,1,pos,0.15 0.0 -0.1
+limits.xml,geom,1,quat,0.8816745987679437 0.0 -0.4718579255320243 0.0
+limits.xml,geom,1,friction,1.0 0.005 0.0001
+limits.xml,geom,1,condim,3.0
+limits.xml,geom,1,contype,1.0
+limits.xml,geom,1,conaffinity,1.0
+limits.xml,geom,1,solref,0.02 1.0
+limits.xml,geom,1,solimp,0.9 0.95 0.001 0.5 2.0
+limits.xml,geom,1,margin,0.0
+limits.xml,geom,1,gap,0.0
+limits.xml,geom,1,priority,0.0
+limits.xml,geom,1,sameframe,2.0
+limits.xml,geom,2,type,6.0
+limits.xml,geom,2,bodyid,3.0
+limits.xml,geom,2,size,0.05 0.05 0.05
+limits.xml,geom,2,pos,0.0 0.0 0.0
+limits.xml,geom,2,quat,1.0 0.0 0.0 0.0
+limits.xml,geom,2,friction,1.0 0.005 0.0001
+limits.xml,geom,2,condim,3.0
+limits.xml,geom,2,contype,1.0
+limits.xml,geom,2,conaffinity,1.0
+limits.xml,geom,2,solref,0.02 1.0
+limits.xml,geom,2,solimp,0.9 0.95 0.001 0.5 2.0
+limits.xml,geom,2,margin,0.0
+limits.xml,geom,2,gap,0.0
+limits.xml,geom,2,priority,0.0
+limits.xml,geom,2,sameframe,1.0
+limits.xml,geom,3,type,3.0
+limits.xml,geom,3,bodyid,4.0
+limits.xml,geom,3,size,0.03 0.15 0.0
+limits.xml,geom,3,pos,0.0 0.15 0.0
+limits.xml,geom,3,quat,0.7071067811865476 0.7071067811865475 0.0 -0.0
+limits.xml,geom,3,friction,1.0 0.005 0.0001
+limits.xml,geom,3,condim,3.0
+limits.xml,geom,3,contype,1.0
+limits.xml,geom,3,conaffinity,1.0
+limits.xml,geom,3,solref,0.02 1.0
+limits.xml,geom,3,solimp,0.9 0.95 0.001 0.5 2.0
+limits.xml,geom,3,margin,0.0
+limits.xml,geom,3,gap,0.0
+limits.xml,geom,3,priority,0.0
+limits.xml,geom,3,sameframe,2.0
 pendulum.xml,option,0,timestep,0.002
 pendulum.xml,option,0,gravity,0.0 0.0 -9.81
 pendulum.xml,option,0,integrator,0.0
@@ -2477,3 +2717,1690 @@ pendulum.xml,geom,1,margin,0.0
 pendulum.xml,geom,1,gap,0.0
 pendulum.xml,geom,1,priority,0.0
 pendulum.xml,geom,1,sameframe,3.0
+rolling.xml,option,0,timestep,0.002
+rolling.xml,option,0,gravity,0.0 0.0 -9.81
+rolling.xml,option,0,integrator,0.0
+rolling.xml,option,0,cone,0.0
+rolling.xml,option,0,solver,2.0
+rolling.xml,option,0,iterations,100.0
+rolling.xml,option,0,tolerance,1e-08
+rolling.xml,qpos0,0,values,0.0 0.0 0.3 1.0 0.0 0.0 0.0
+rolling.xml,qpos_spring,0,values,0.0 0.0 0.3 1.0 0.0 0.0 0.0
+rolling.xml,body,0,parentid,0.0
+rolling.xml,body,0,rootid,0.0
+rolling.xml,body,0,pos,0.0 0.0 0.0
+rolling.xml,body,0,quat,1.0 0.0 0.0 0.0
+rolling.xml,body,0,ipos,0.0 0.0 0.0
+rolling.xml,body,0,iquat,1.0 0.0 0.0 0.0
+rolling.xml,body,0,mass,0.0
+rolling.xml,body,0,inertia,0.0 0.0 0.0
+rolling.xml,body,0,jntadr,-1.0
+rolling.xml,body,0,jntnum,0.0
+rolling.xml,body,0,dofadr,-1.0
+rolling.xml,body,0,dofnum,0.0
+rolling.xml,body,0,geomadr,0.0
+rolling.xml,body,0,geomnum,1.0
+rolling.xml,body,0,sameframe,1.0
+rolling.xml,body,1,parentid,0.0
+rolling.xml,body,1,rootid,1.0
+rolling.xml,body,1,pos,0.0 0.0 0.3
+rolling.xml,body,1,quat,1.0 0.0 0.0 0.0
+rolling.xml,body,1,ipos,0.0 0.0 0.0
+rolling.xml,body,1,iquat,1.0 0.0 0.0 0.0
+rolling.xml,body,1,mass,4.188790204786391
+rolling.xml,body,1,inertia,0.01675516081914557 0.01675516081914557 0.01675516081914557
+rolling.xml,body,1,jntadr,0.0
+rolling.xml,body,1,jntnum,1.0
+rolling.xml,body,1,dofadr,0.0
+rolling.xml,body,1,dofnum,6.0
+rolling.xml,body,1,geomadr,1.0
+rolling.xml,body,1,geomnum,1.0
+rolling.xml,body,1,sameframe,1.0
+rolling.xml,jnt,0,type,0.0
+rolling.xml,jnt,0,bodyid,1.0
+rolling.xml,jnt,0,pos,0.0 0.0 0.0
+rolling.xml,jnt,0,axis,0.0 0.0 1.0
+rolling.xml,jnt,0,limited,0.0
+rolling.xml,jnt,0,range,0.0 0.0
+rolling.xml,jnt,0,stiffness,0.0
+rolling.xml,jnt,0,qposadr,0.0
+rolling.xml,jnt,0,dofadr,0.0
+rolling.xml,jnt,0,solref,0.02 1.0
+rolling.xml,jnt,0,solimp,0.9 0.95 0.001 0.5 2.0
+rolling.xml,jnt,0,margin,0.0
+rolling.xml,dof,0,bodyid,1.0
+rolling.xml,dof,0,jntid,0.0
+rolling.xml,dof,0,parentid,-1.0
+rolling.xml,dof,0,armature,0.0
+rolling.xml,dof,0,damping,0.0
+rolling.xml,dof,0,frictionloss,0.0
+rolling.xml,dof,0,solref,0.02 1.0
+rolling.xml,dof,0,solimp,0.9 0.95 0.001 0.5 2.0
+rolling.xml,dof,1,bodyid,1.0
+rolling.xml,dof,1,jntid,0.0
+rolling.xml,dof,1,parentid,0.0
+rolling.xml,dof,1,armature,0.0
+rolling.xml,dof,1,damping,0.0
+rolling.xml,dof,1,frictionloss,0.0
+rolling.xml,dof,1,solref,0.02 1.0
+rolling.xml,dof,1,solimp,0.9 0.95 0.001 0.5 2.0
+rolling.xml,dof,2,bodyid,1.0
+rolling.xml,dof,2,jntid,0.0
+rolling.xml,dof,2,parentid,1.0
+rolling.xml,dof,2,armature,0.0
+rolling.xml,dof,2,damping,0.0
+rolling.xml,dof,2,frictionloss,0.0
+rolling.xml,dof,2,solref,0.02 1.0
+rolling.xml,dof,2,solimp,0.9 0.95 0.001 0.5 2.0
+rolling.xml,dof,3,bodyid,1.0
+rolling.xml,dof,3,jntid,0.0
+rolling.xml,dof,3,parentid,2.0
+rolling.xml,dof,3,armature,0.0
+rolling.xml,dof,3,damping,0.0
+rolling.xml,dof,3,frictionloss,0.0
+rolling.xml,dof,3,solref,0.02 1.0
+rolling.xml,dof,3,solimp,0.9 0.95 0.001 0.5 2.0
+rolling.xml,dof,4,bodyid,1.0
+rolling.xml,dof,4,jntid,0.0
+rolling.xml,dof,4,parentid,3.0
+rolling.xml,dof,4,armature,0.0
+rolling.xml,dof,4,damping,0.0
+rolling.xml,dof,4,frictionloss,0.0
+rolling.xml,dof,4,solref,0.02 1.0
+rolling.xml,dof,4,solimp,0.9 0.95 0.001 0.5 2.0
+rolling.xml,dof,5,bodyid,1.0
+rolling.xml,dof,5,jntid,0.0
+rolling.xml,dof,5,parentid,4.0
+rolling.xml,dof,5,armature,0.0
+rolling.xml,dof,5,damping,0.0
+rolling.xml,dof,5,frictionloss,0.0
+rolling.xml,dof,5,solref,0.02 1.0
+rolling.xml,dof,5,solimp,0.9 0.95 0.001 0.5 2.0
+rolling.xml,geom,0,type,0.0
+rolling.xml,geom,0,bodyid,0.0
+rolling.xml,geom,0,size,0.0 0.0 1.0
+rolling.xml,geom,0,pos,0.0 0.0 0.0
+rolling.xml,geom,0,quat,1.0 0.0 0.0 0.0
+rolling.xml,geom,0,friction,0.5 0.005 0.0001
+rolling.xml,geom,0,condim,3.0
+rolling.xml,geom,0,contype,1.0
+rolling.xml,geom,0,conaffinity,1.0
+rolling.xml,geom,0,solref,0.02 1.0
+rolling.xml,geom,0,solimp,0.9 0.95 0.001 0.5 2.0
+rolling.xml,geom,0,margin,0.0
+rolling.xml,geom,0,gap,0.0
+rolling.xml,geom,0,priority,0.0
+rolling.xml,geom,0,sameframe,1.0
+rolling.xml,geom,1,type,2.0
+rolling.xml,geom,1,bodyid,1.0
+rolling.xml,geom,1,size,0.1 0.0 0.0
+rolling.xml,geom,1,pos,0.0 0.0 0.0
+rolling.xml,geom,1,quat,1.0 0.0 0.0 0.0
+rolling.xml,geom,1,friction,0.5 0.005 0.0001
+rolling.xml,geom,1,condim,3.0
+rolling.xml,geom,1,contype,1.0
+rolling.xml,geom,1,conaffinity,1.0
+rolling.xml,geom,1,solref,0.02 1.0
+rolling.xml,geom,1,solimp,0.9 0.95 0.001 0.5 2.0
+rolling.xml,geom,1,margin,0.0
+rolling.xml,geom,1,gap,0.0
+rolling.xml,geom,1,priority,0.0
+rolling.xml,geom,1,sameframe,1.0
+sliding.xml,option,0,timestep,0.002
+sliding.xml,option,0,gravity,0.0 0.0 -9.81
+sliding.xml,option,0,integrator,0.0
+sliding.xml,option,0,cone,0.0
+sliding.xml,option,0,solver,2.0
+sliding.xml,option,0,iterations,100.0
+sliding.xml,option,0,tolerance,1e-08
+sliding.xml,qpos0,0,values,0.0 0.0 0.1 1.0 0.0 0.0 0.0 0.0 1.0 0.05 0.7071067811865476 0.0 0.7071067811865475 0.0
+sliding.xml,qpos_spring,0,values,0.0 0.0 0.1 1.0 0.0 0.0 0.0 0.0 1.0 0.05 0.7071067811865476 0.0 0.7071067811865475 0.0
+sliding.xml,body,0,parentid,0.0
+sliding.xml,body,0,rootid,0.0
+sliding.xml,body,0,pos,0.0 0.0 0.0
+sliding.xml,body,0,quat,1.0 0.0 0.0 0.0
+sliding.xml,body,0,ipos,0.0 0.0 0.0
+sliding.xml,body,0,iquat,1.0 0.0 0.0 0.0
+sliding.xml,body,0,mass,0.0
+sliding.xml,body,0,inertia,0.0 0.0 0.0
+sliding.xml,body,0,jntadr,-1.0
+sliding.xml,body,0,jntnum,0.0
+sliding.xml,body,0,dofadr,-1.0
+sliding.xml,body,0,dofnum,0.0
+sliding.xml,body,0,geomadr,0.0
+sliding.xml,body,0,geomnum,1.0
+sliding.xml,body,0,sameframe,1.0
+sliding.xml,body,1,parentid,0.0
+sliding.xml,body,1,rootid,1.0
+sliding.xml,body,1,pos,0.0 0.0 0.1
+sliding.xml,body,1,quat,1.0 0.0 0.0 0.0
+sliding.xml,body,1,ipos,0.0 0.0 0.0
+sliding.xml,body,1,iquat,1.0 0.0 0.0 0.0
+sliding.xml,body,1,mass,8.000000000000002
+sliding.xml,body,1,inertia,0.05333333333333335 0.05333333333333335 0.05333333333333335
+sliding.xml,body,1,jntadr,0.0
+sliding.xml,body,1,jntnum,1.0
+sliding.xml,body,1,dofadr,0.0
+sliding.xml,body,1,dofnum,6.0
+sliding.xml,body,1,geomadr,1.0
+sliding.xml,body,1,geomnum,1.0
+sliding.xml,body,1,sameframe,1.0
+sliding.xml,body,2,parentid,0.0
+sliding.xml,body,2,rootid,2.0
+sliding.xml,body,2,pos,0.0 1.0 0.05
+sliding.xml,body,2,quat,0.7071067811865476 0.0 0.7071067811865475 0.0
+sliding.xml,body,2,ipos,0.0 0.0 0.0
+sliding.xml,body,2,iquat,1.0 0.0 0.0 0.0
+sliding.xml,body,2,mass,3.665191429188093
+sliding.xml,body,2,inertia,0.06924593807287505 0.06924593807287505 0.004450589592585542
+sliding.xml,body,2,jntadr,1.0
+sliding.xml,body,2,jntnum,1.0
+sliding.xml,body,2,dofadr,6.0
+sliding.xml,body,2,dofnum,6.0
+sliding.xml,body,2,geomadr,2.0
+sliding.xml,body,2,geomnum,1.0
+sliding.xml,body,2,sameframe,1.0
+sliding.xml,jnt,0,type,0.0
+sliding.xml,jnt,0,bodyid,1.0
+sliding.xml,jnt,0,pos,0.0 0.0 0.0
+sliding.xml,jnt,0,axis,0.0 0.0 1.0
+sliding.xml,jnt,0,limited,0.0
+sliding.xml,jnt,0,range,0.0 0.0
+sliding.xml,jnt,0,stiffness,0.0
+sliding.xml,jnt,0,qposadr,0.0
+sliding.xml,jnt,0,dofadr,0.0
+sliding.xml,jnt,0,solref,0.02 1.0
+sliding.xml,jnt,0,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,jnt,0,margin,0.0
+sliding.xml,jnt,1,type,0.0
+sliding.xml,jnt,1,bodyid,2.0
+sliding.xml,jnt,1,pos,0.0 0.0 0.0
+sliding.xml,jnt,1,axis,0.0 0.0 1.0
+sliding.xml,jnt,1,limited,0.0
+sliding.xml,jnt,1,range,0.0 0.0
+sliding.xml,jnt,1,stiffness,0.0
+sliding.xml,jnt,1,qposadr,7.0
+sliding.xml,jnt,1,dofadr,6.0
+sliding.xml,jnt,1,solref,0.02 1.0
+sliding.xml,jnt,1,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,jnt,1,margin,0.0
+sliding.xml,dof,0,bodyid,1.0
+sliding.xml,dof,0,jntid,0.0
+sliding.xml,dof,0,parentid,-1.0
+sliding.xml,dof,0,armature,0.0
+sliding.xml,dof,0,damping,0.0
+sliding.xml,dof,0,frictionloss,0.0
+sliding.xml,dof,0,solref,0.02 1.0
+sliding.xml,dof,0,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,dof,1,bodyid,1.0
+sliding.xml,dof,1,jntid,0.0
+sliding.xml,dof,1,parentid,0.0
+sliding.xml,dof,1,armature,0.0
+sliding.xml,dof,1,damping,0.0
+sliding.xml,dof,1,frictionloss,0.0
+sliding.xml,dof,1,solref,0.02 1.0
+sliding.xml,dof,1,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,dof,2,bodyid,1.0
+sliding.xml,dof,2,jntid,0.0
+sliding.xml,dof,2,parentid,1.0
+sliding.xml,dof,2,armature,0.0
+sliding.xml,dof,2,damping,0.0
+sliding.xml,dof,2,frictionloss,0.0
+sliding.xml,dof,2,solref,0.02 1.0
+sliding.xml,dof,2,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,dof,3,bodyid,1.0
+sliding.xml,dof,3,jntid,0.0
+sliding.xml,dof,3,parentid,2.0
+sliding.xml,dof,3,armature,0.0
+sliding.xml,dof,3,damping,0.0
+sliding.xml,dof,3,frictionloss,0.0
+sliding.xml,dof,3,solref,0.02 1.0
+sliding.xml,dof,3,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,dof,4,bodyid,1.0
+sliding.xml,dof,4,jntid,0.0
+sliding.xml,dof,4,parentid,3.0
+sliding.xml,dof,4,armature,0.0
+sliding.xml,dof,4,damping,0.0
+sliding.xml,dof,4,frictionloss,0.0
+sliding.xml,dof,4,solref,0.02 1.0
+sliding.xml,dof,4,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,dof,5,bodyid,1.0
+sliding.xml,dof,5,jntid,0.0
+sliding.xml,dof,5,parentid,4.0
+sliding.xml,dof,5,armature,0.0
+sliding.xml,dof,5,damping,0.0
+sliding.xml,dof,5,frictionloss,0.0
+sliding.xml,dof,5,solref,0.02 1.0
+sliding.xml,dof,5,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,dof,6,bodyid,2.0
+sliding.xml,dof,6,jntid,1.0
+sliding.xml,dof,6,parentid,-1.0
+sliding.xml,dof,6,armature,0.0
+sliding.xml,dof,6,damping,0.0
+sliding.xml,dof,6,frictionloss,0.0
+sliding.xml,dof,6,solref,0.02 1.0
+sliding.xml,dof,6,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,dof,7,bodyid,2.0
+sliding.xml,dof,7,jntid,1.0
+sliding.xml,dof,7,parentid,6.0
+sliding.xml,dof,7,armature,0.0
+sliding.xml,dof,7,damping,0.0
+sliding.xml,dof,7,frictionloss,0.0
+sliding.xml,dof,7,solref,0.02 1.0
+sliding.xml,dof,7,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,dof,8,bodyid,2.0
+sliding.xml,dof,8,jntid,1.0
+sliding.xml,dof,8,parentid,7.0
+sliding.xml,dof,8,armature,0.0
+sliding.xml,dof,8,damping,0.0
+sliding.xml,dof,8,frictionloss,0.0
+sliding.xml,dof,8,solref,0.02 1.0
+sliding.xml,dof,8,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,dof,9,bodyid,2.0
+sliding.xml,dof,9,jntid,1.0
+sliding.xml,dof,9,parentid,8.0
+sliding.xml,dof,9,armature,0.0
+sliding.xml,dof,9,damping,0.0
+sliding.xml,dof,9,frictionloss,0.0
+sliding.xml,dof,9,solref,0.02 1.0
+sliding.xml,dof,9,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,dof,10,bodyid,2.0
+sliding.xml,dof,10,jntid,1.0
+sliding.xml,dof,10,parentid,9.0
+sliding.xml,dof,10,armature,0.0
+sliding.xml,dof,10,damping,0.0
+sliding.xml,dof,10,frictionloss,0.0
+sliding.xml,dof,10,solref,0.02 1.0
+sliding.xml,dof,10,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,dof,11,bodyid,2.0
+sliding.xml,dof,11,jntid,1.0
+sliding.xml,dof,11,parentid,10.0
+sliding.xml,dof,11,armature,0.0
+sliding.xml,dof,11,damping,0.0
+sliding.xml,dof,11,frictionloss,0.0
+sliding.xml,dof,11,solref,0.02 1.0
+sliding.xml,dof,11,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,geom,0,type,0.0
+sliding.xml,geom,0,bodyid,0.0
+sliding.xml,geom,0,size,0.0 0.0 1.0
+sliding.xml,geom,0,pos,0.0 0.0 0.0
+sliding.xml,geom,0,quat,1.0 0.0 0.0 0.0
+sliding.xml,geom,0,friction,0.4 0.005 0.0001
+sliding.xml,geom,0,condim,3.0
+sliding.xml,geom,0,contype,1.0
+sliding.xml,geom,0,conaffinity,1.0
+sliding.xml,geom,0,solref,0.02 1.0
+sliding.xml,geom,0,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,geom,0,margin,0.0
+sliding.xml,geom,0,gap,0.0
+sliding.xml,geom,0,priority,0.0
+sliding.xml,geom,0,sameframe,1.0
+sliding.xml,geom,1,type,6.0
+sliding.xml,geom,1,bodyid,1.0
+sliding.xml,geom,1,size,0.1 0.1 0.1
+sliding.xml,geom,1,pos,0.0 0.0 0.0
+sliding.xml,geom,1,quat,1.0 0.0 0.0 0.0
+sliding.xml,geom,1,friction,0.4 0.005 0.0001
+sliding.xml,geom,1,condim,3.0
+sliding.xml,geom,1,contype,1.0
+sliding.xml,geom,1,conaffinity,1.0
+sliding.xml,geom,1,solref,0.02 1.0
+sliding.xml,geom,1,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,geom,1,margin,0.0
+sliding.xml,geom,1,gap,0.0
+sliding.xml,geom,1,priority,0.0
+sliding.xml,geom,1,sameframe,1.0
+sliding.xml,geom,2,type,3.0
+sliding.xml,geom,2,bodyid,2.0
+sliding.xml,geom,2,size,0.05 0.2 0.0
+sliding.xml,geom,2,pos,0.0 0.0 0.0
+sliding.xml,geom,2,quat,1.0 0.0 0.0 0.0
+sliding.xml,geom,2,friction,0.4 0.02 0.01
+sliding.xml,geom,2,condim,6.0
+sliding.xml,geom,2,contype,1.0
+sliding.xml,geom,2,conaffinity,1.0
+sliding.xml,geom,2,solref,0.02 1.0
+sliding.xml,geom,2,solimp,0.9 0.95 0.001 0.5 2.0
+sliding.xml,geom,2,margin,0.0
+sliding.xml,geom,2,gap,0.0
+sliding.xml,geom,2,priority,0.0
+sliding.xml,geom,2,sameframe,1.0
+humanoid.xml,option,0,timestep,0.005
+humanoid.xml,option,0,gravity,0.0 0.0 -9.81
+humanoid.xml,option,0,integrator,0.0
+humanoid.xml,option,0,cone,0.0
+humanoid.xml,option,0,solver,2.0
+humanoid.xml,option,0,iterations,100.0
+humanoid.xml,option,0,tolerance,1e-08
+humanoid.xml,qpos0,0,values,0.0 0.0 1.282 1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,qpos_spring,0,values,0.0 0.0 1.282 1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,body,0,parentid,0.0
+humanoid.xml,body,0,rootid,0.0
+humanoid.xml,body,0,pos,0.0 0.0 0.0
+humanoid.xml,body,0,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,0,ipos,0.0 0.0 0.0
+humanoid.xml,body,0,iquat,1.0 0.0 0.0 0.0
+humanoid.xml,body,0,mass,0.0
+humanoid.xml,body,0,inertia,0.0 0.0 0.0
+humanoid.xml,body,0,jntadr,-1.0
+humanoid.xml,body,0,jntnum,0.0
+humanoid.xml,body,0,dofadr,-1.0
+humanoid.xml,body,0,dofnum,0.0
+humanoid.xml,body,0,geomadr,0.0
+humanoid.xml,body,0,geomnum,1.0
+humanoid.xml,body,0,sameframe,1.0
+humanoid.xml,body,1,parentid,0.0
+humanoid.xml,body,1,rootid,1.0
+humanoid.xml,body,1,pos,0.0 0.0 1.282
+humanoid.xml,body,1,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,1,ipos,-0.0038640429338103748 0.0 -0.0463685152057245
+humanoid.xml,body,1,iquat,0.999136066370562 0.0 0.041558643836874506 0.0
+humanoid.xml,body,1,mass,5.853834311188983
+humanoid.xml,body,1,inertia,0.051274192913416436 0.03196674986261695 0.031149341455289838
+humanoid.xml,body,1,jntadr,0.0
+humanoid.xml,body,1,jntnum,1.0
+humanoid.xml,body,1,dofadr,0.0
+humanoid.xml,body,1,dofnum,6.0
+humanoid.xml,body,1,geomadr,1.0
+humanoid.xml,body,1,geomnum,2.0
+humanoid.xml,body,1,sameframe,0.0
+humanoid.xml,body,2,parentid,1.0
+humanoid.xml,body,2,rootid,1.0
+humanoid.xml,body,2,pos,0.0 0.0 0.19
+humanoid.xml,body,2,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,2,ipos,0.0 0.0 0.0
+humanoid.xml,body,2,iquat,1.0 0.0 0.0 0.0
+humanoid.xml,body,2,mass,3.053628059289279
+humanoid.xml,body,2,inertia,0.009893754912097262 0.009893754912097262 0.009893754912097262
+humanoid.xml,body,2,jntadr,-1.0
+humanoid.xml,body,2,jntnum,0.0
+humanoid.xml,body,2,dofadr,-1.0
+humanoid.xml,body,2,dofnum,0.0
+humanoid.xml,body,2,geomadr,3.0
+humanoid.xml,body,2,geomnum,1.0
+humanoid.xml,body,2,sameframe,1.0
+humanoid.xml,body,3,parentid,1.0
+humanoid.xml,body,3,rootid,1.0
+humanoid.xml,body,3,pos,-0.01 0.0 -0.26
+humanoid.xml,body,3,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,3,ipos,0.0 0.0 0.0
+humanoid.xml,body,3,iquat,0.7071067811865476 0.7071067811865475 0.0 -0.0
+humanoid.xml,body,3,mass,2.261946710584651
+humanoid.xml,body,3,inertia,0.00985303987130674 0.00985303987130674 0.003745783752728182
+humanoid.xml,body,3,jntadr,1.0
+humanoid.xml,body,3,jntnum,2.0
+humanoid.xml,body,3,dofadr,6.0
+humanoid.xml,body,3,dofnum,2.0
+humanoid.xml,body,3,geomadr,4.0
+humanoid.xml,body,3,geomnum,1.0
+humanoid.xml,body,3,sameframe,0.0
+humanoid.xml,body,4,parentid,3.0
+humanoid.xml,body,4,rootid,1.0
+humanoid.xml,body,4,pos,0.0 0.0 -0.165
+humanoid.xml,body,4,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,4,ipos,-0.02 0.0 0.0
+humanoid.xml,body,4,iquat,0.7071067811865476 0.7071067811865475 0.0 -0.0
+humanoid.xml,body,4,mass,6.616194128460103
+humanoid.xml,body,4,inertia,0.05231797918580651 0.05231797918580651 0.0243221474922391
+humanoid.xml,body,4,jntadr,3.0
+humanoid.xml,body,4,jntnum,1.0
+humanoid.xml,body,4,dofadr,8.0
+humanoid.xml,body,4,dofnum,1.0
+humanoid.xml,body,4,geomadr,5.0
+humanoid.xml,body,4,geomnum,1.0
+humanoid.xml,body,4,sameframe,0.0
+humanoid.xml,body,5,parentid,4.0
+humanoid.xml,body,5,rootid,1.0
+humanoid.xml,body,5,pos,0.0 -0.1 -0.04
+humanoid.xml,body,5,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,5,ipos,0.0 0.005 -0.17
+humanoid.xml,body,5,iquat,0.9998919327768259 0.014701114509568982 0.0 -0.0
+humanoid.xml,body,5,mass,4.751750928806242
+humanoid.xml,body,5,inertia,0.07495165386519198 0.07495165386519198 0.008227431345527045
+humanoid.xml,body,5,jntadr,4.0
+humanoid.xml,body,5,jntnum,3.0
+humanoid.xml,body,5,dofadr,9.0
+humanoid.xml,body,5,dofnum,3.0
+humanoid.xml,body,5,geomadr,6.0
+humanoid.xml,body,5,geomnum,1.0
+humanoid.xml,body,5,sameframe,0.0
+humanoid.xml,body,6,parentid,5.0
+humanoid.xml,body,6,rootid,1.0
+humanoid.xml,body,6,pos,0.0 0.01 -0.4
+humanoid.xml,body,6,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,6,ipos,0.0 0.0 -0.15
+humanoid.xml,body,6,iquat,1.0 0.0 0.0 0.0
+humanoid.xml,body,6,mass,2.7556961671836424
+humanoid.xml,body,6,inertia,0.032608015464339946 0.032608015464339946 0.0031898902930933832
+humanoid.xml,body,6,jntadr,7.0
+humanoid.xml,body,6,jntnum,1.0
+humanoid.xml,body,6,dofadr,12.0
+humanoid.xml,body,6,dofnum,1.0
+humanoid.xml,body,6,geomadr,7.0
+humanoid.xml,body,6,geomnum,1.0
+humanoid.xml,body,6,sameframe,3.0
+humanoid.xml,body,7,parentid,6.0
+humanoid.xml,body,7,rootid,1.0
+humanoid.xml,body,7,pos,0.0 0.0 -0.39
+humanoid.xml,body,7,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,7,ipos,0.035 0.0 0.0
+humanoid.xml,body,7,iquat,0.0 0.7071067811865489 0.0 0.7071067811865489
+humanoid.xml,body,7,mass,1.1311412323899843
+humanoid.xml,body,7,inertia,0.006446461543526408 0.005943724376560683 0.0009030172339536749
+humanoid.xml,body,7,jntadr,8.0
+humanoid.xml,body,7,jntnum,2.0
+humanoid.xml,body,7,dofadr,13.0
+humanoid.xml,body,7,dofnum,2.0
+humanoid.xml,body,7,geomadr,8.0
+humanoid.xml,body,7,geomnum,2.0
+humanoid.xml,body,7,sameframe,0.0
+humanoid.xml,body,8,parentid,4.0
+humanoid.xml,body,8,rootid,1.0
+humanoid.xml,body,8,pos,0.0 0.1 -0.04
+humanoid.xml,body,8,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,8,ipos,0.0 -0.005 -0.17
+humanoid.xml,body,8,iquat,0.9998919327768259 -0.014701114509568982 0.0 0.0
+humanoid.xml,body,8,mass,4.751750928806242
+humanoid.xml,body,8,inertia,0.07495165386519198 0.07495165386519198 0.008227431345527045
+humanoid.xml,body,8,jntadr,10.0
+humanoid.xml,body,8,jntnum,3.0
+humanoid.xml,body,8,dofadr,15.0
+humanoid.xml,body,8,dofnum,3.0
+humanoid.xml,body,8,geomadr,10.0
+humanoid.xml,body,8,geomnum,1.0
+humanoid.xml,body,8,sameframe,0.0
+humanoid.xml,body,9,parentid,8.0
+humanoid.xml,body,9,rootid,1.0
+humanoid.xml,body,9,pos,0.0 -0.01 -0.4
+humanoid.xml,body,9,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,9,ipos,0.0 0.0 -0.15
+humanoid.xml,body,9,iquat,1.0 0.0 0.0 0.0
+humanoid.xml,body,9,mass,2.7556961671836424
+humanoid.xml,body,9,inertia,0.032608015464339946 0.032608015464339946 0.0031898902930933832
+humanoid.xml,body,9,jntadr,13.0
+humanoid.xml,body,9,jntnum,1.0
+humanoid.xml,body,9,dofadr,18.0
+humanoid.xml,body,9,dofnum,1.0
+humanoid.xml,body,9,geomadr,11.0
+humanoid.xml,body,9,geomnum,1.0
+humanoid.xml,body,9,sameframe,3.0
+humanoid.xml,body,10,parentid,9.0
+humanoid.xml,body,10,rootid,1.0
+humanoid.xml,body,10,pos,0.0 0.0 -0.39
+humanoid.xml,body,10,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,10,ipos,0.035 0.0 0.0
+humanoid.xml,body,10,iquat,0.0 0.7071067811865489 0.0 0.7071067811865489
+humanoid.xml,body,10,mass,1.1311412323899843
+humanoid.xml,body,10,inertia,0.006446461543526408 0.005943724376560683 0.0009030172339536749
+humanoid.xml,body,10,jntadr,14.0
+humanoid.xml,body,10,jntnum,2.0
+humanoid.xml,body,10,dofadr,19.0
+humanoid.xml,body,10,dofnum,2.0
+humanoid.xml,body,10,geomadr,12.0
+humanoid.xml,body,10,geomnum,2.0
+humanoid.xml,body,10,sameframe,0.0
+humanoid.xml,body,11,parentid,1.0
+humanoid.xml,body,11,rootid,1.0
+humanoid.xml,body,11,pos,0.0 -0.17 0.06
+humanoid.xml,body,11,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,11,ipos,0.08 -0.08 -0.08
+humanoid.xml,body,11,iquat,0.8880738339771153 -0.3250575836718681 -0.3250575836718681 0.0
+humanoid.xml,body,11,mass,1.6610804848382084
+humanoid.xml,body,11,inertia,0.015905542379591853 0.015905542379591853 0.0012859711761735542
+humanoid.xml,body,11,jntadr,16.0
+humanoid.xml,body,11,jntnum,2.0
+humanoid.xml,body,11,dofadr,21.0
+humanoid.xml,body,11,dofnum,2.0
+humanoid.xml,body,11,geomadr,14.0
+humanoid.xml,body,11,geomnum,1.0
+humanoid.xml,body,11,sameframe,0.0
+humanoid.xml,body,12,parentid,11.0
+humanoid.xml,body,12,rootid,1.0
+humanoid.xml,body,12,pos,0.18 -0.18 -0.18
+humanoid.xml,body,12,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,12,ipos,0.09000000000000001 0.09000000000000001 0.09000000000000001
+humanoid.xml,body,12,iquat,0.45970084338098305 0.6279630301995544 -0.6279630301995544 0.0
+humanoid.xml,body,12,mass,0.9614576197247512
+humanoid.xml,body,12,inertia,0.008401616405189098 0.008401616405189098 0.0004499882355497279
+humanoid.xml,body,12,jntadr,18.0
+humanoid.xml,body,12,jntnum,1.0
+humanoid.xml,body,12,dofadr,23.0
+humanoid.xml,body,12,dofnum,1.0
+humanoid.xml,body,12,geomadr,15.0
+humanoid.xml,body,12,geomnum,1.0
+humanoid.xml,body,12,sameframe,0.0
+humanoid.xml,body,13,parentid,12.0
+humanoid.xml,body,13,rootid,1.0
+humanoid.xml,body,13,pos,0.18 0.18 0.18
+humanoid.xml,body,13,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,13,ipos,0.0 0.0 0.0
+humanoid.xml,body,13,iquat,0.8880738339771153 -0.32505758367186816 0.32505758367186816 0.0
+humanoid.xml,body,13,mass,0.26808257310632905
+humanoid.xml,body,13,inertia,0.00017157284678805058 0.00017157284678805058 0.00017157284678805058
+humanoid.xml,body,13,jntadr,-1.0
+humanoid.xml,body,13,jntnum,0.0
+humanoid.xml,body,13,dofadr,-1.0
+humanoid.xml,body,13,dofnum,0.0
+humanoid.xml,body,13,geomadr,16.0
+humanoid.xml,body,13,geomnum,1.0
+humanoid.xml,body,13,sameframe,0.0
+humanoid.xml,body,14,parentid,1.0
+humanoid.xml,body,14,rootid,1.0
+humanoid.xml,body,14,pos,0.0 0.17 0.06
+humanoid.xml,body,14,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,14,ipos,0.08 0.08 -0.08
+humanoid.xml,body,14,iquat,0.8880738339771153 0.3250575836718681 -0.3250575836718681 0.0
+humanoid.xml,body,14,mass,1.6610804848382084
+humanoid.xml,body,14,inertia,0.015905542379591853 0.015905542379591853 0.0012859711761735542
+humanoid.xml,body,14,jntadr,19.0
+humanoid.xml,body,14,jntnum,2.0
+humanoid.xml,body,14,dofadr,24.0
+humanoid.xml,body,14,dofnum,2.0
+humanoid.xml,body,14,geomadr,17.0
+humanoid.xml,body,14,geomnum,1.0
+humanoid.xml,body,14,sameframe,0.0
+humanoid.xml,body,15,parentid,14.0
+humanoid.xml,body,15,rootid,1.0
+humanoid.xml,body,15,pos,0.18 0.18 -0.18
+humanoid.xml,body,15,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,15,ipos,0.09000000000000001 -0.09000000000000001 0.09000000000000001
+humanoid.xml,body,15,iquat,0.45970084338098305 -0.6279630301995544 -0.6279630301995544 0.0
+humanoid.xml,body,15,mass,0.9614576197247512
+humanoid.xml,body,15,inertia,0.008401616405189098 0.008401616405189098 0.0004499882355497279
+humanoid.xml,body,15,jntadr,21.0
+humanoid.xml,body,15,jntnum,1.0
+humanoid.xml,body,15,dofadr,26.0
+humanoid.xml,body,15,dofnum,1.0
+humanoid.xml,body,15,geomadr,18.0
+humanoid.xml,body,15,geomnum,1.0
+humanoid.xml,body,15,sameframe,0.0
+humanoid.xml,body,16,parentid,15.0
+humanoid.xml,body,16,rootid,1.0
+humanoid.xml,body,16,pos,0.18 -0.18 0.18
+humanoid.xml,body,16,quat,1.0 0.0 0.0 0.0
+humanoid.xml,body,16,ipos,0.0 0.0 0.0
+humanoid.xml,body,16,iquat,0.8880738339771153 0.32505758367186816 0.32505758367186816 -0.0
+humanoid.xml,body,16,mass,0.26808257310632905
+humanoid.xml,body,16,inertia,0.00017157284678805058 0.00017157284678805058 0.00017157284678805058
+humanoid.xml,body,16,jntadr,-1.0
+humanoid.xml,body,16,jntnum,0.0
+humanoid.xml,body,16,dofadr,-1.0
+humanoid.xml,body,16,dofnum,0.0
+humanoid.xml,body,16,geomadr,19.0
+humanoid.xml,body,16,geomnum,1.0
+humanoid.xml,body,16,sameframe,0.0
+humanoid.xml,jnt,0,type,0.0
+humanoid.xml,jnt,0,bodyid,1.0
+humanoid.xml,jnt,0,pos,0.0 0.0 0.0
+humanoid.xml,jnt,0,axis,0.0 0.0 1.0
+humanoid.xml,jnt,0,limited,0.0
+humanoid.xml,jnt,0,range,0.0 0.0
+humanoid.xml,jnt,0,stiffness,0.0
+humanoid.xml,jnt,0,qposadr,0.0
+humanoid.xml,jnt,0,dofadr,0.0
+humanoid.xml,jnt,0,solref,0.02 1.0
+humanoid.xml,jnt,0,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,jnt,0,margin,0.0
+humanoid.xml,jnt,1,type,3.0
+humanoid.xml,jnt,1,bodyid,3.0
+humanoid.xml,jnt,1,pos,0.0 0.0 0.065
+humanoid.xml,jnt,1,axis,0.0 0.0 1.0
+humanoid.xml,jnt,1,limited,1.0
+humanoid.xml,jnt,1,range,-0.7853981633974483 0.7853981633974483
+humanoid.xml,jnt,1,stiffness,20.0
+humanoid.xml,jnt,1,qposadr,7.0
+humanoid.xml,jnt,1,dofadr,6.0
+humanoid.xml,jnt,1,solref,0.02 1.0
+humanoid.xml,jnt,1,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,1,margin,0.0
+humanoid.xml,jnt,2,type,3.0
+humanoid.xml,jnt,2,bodyid,3.0
+humanoid.xml,jnt,2,pos,0.0 0.0 0.065
+humanoid.xml,jnt,2,axis,0.0 1.0 0.0
+humanoid.xml,jnt,2,limited,1.0
+humanoid.xml,jnt,2,range,-1.3089969389957472 0.5235987755982988
+humanoid.xml,jnt,2,stiffness,10.0
+humanoid.xml,jnt,2,qposadr,8.0
+humanoid.xml,jnt,2,dofadr,7.0
+humanoid.xml,jnt,2,solref,0.02 1.0
+humanoid.xml,jnt,2,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,2,margin,0.0
+humanoid.xml,jnt,3,type,3.0
+humanoid.xml,jnt,3,bodyid,4.0
+humanoid.xml,jnt,3,pos,0.0 0.0 0.1
+humanoid.xml,jnt,3,axis,1.0 0.0 0.0
+humanoid.xml,jnt,3,limited,1.0
+humanoid.xml,jnt,3,range,-0.6108652381980153 0.6108652381980153
+humanoid.xml,jnt,3,stiffness,10.0
+humanoid.xml,jnt,3,qposadr,9.0
+humanoid.xml,jnt,3,dofadr,8.0
+humanoid.xml,jnt,3,solref,0.02 1.0
+humanoid.xml,jnt,3,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,3,margin,0.0
+humanoid.xml,jnt,4,type,3.0
+humanoid.xml,jnt,4,bodyid,5.0
+humanoid.xml,jnt,4,pos,0.0 0.0 0.0
+humanoid.xml,jnt,4,axis,1.0 0.0 0.0
+humanoid.xml,jnt,4,limited,1.0
+humanoid.xml,jnt,4,range,-0.5235987755982988 0.17453292519943295
+humanoid.xml,jnt,4,stiffness,10.0
+humanoid.xml,jnt,4,qposadr,10.0
+humanoid.xml,jnt,4,dofadr,9.0
+humanoid.xml,jnt,4,solref,0.02 1.0
+humanoid.xml,jnt,4,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,4,margin,0.0
+humanoid.xml,jnt,5,type,3.0
+humanoid.xml,jnt,5,bodyid,5.0
+humanoid.xml,jnt,5,pos,0.0 0.0 0.0
+humanoid.xml,jnt,5,axis,0.0 0.0 1.0
+humanoid.xml,jnt,5,limited,1.0
+humanoid.xml,jnt,5,range,-1.0471975511965976 0.6108652381980153
+humanoid.xml,jnt,5,stiffness,10.0
+humanoid.xml,jnt,5,qposadr,11.0
+humanoid.xml,jnt,5,dofadr,10.0
+humanoid.xml,jnt,5,solref,0.02 1.0
+humanoid.xml,jnt,5,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,5,margin,0.0
+humanoid.xml,jnt,6,type,3.0
+humanoid.xml,jnt,6,bodyid,5.0
+humanoid.xml,jnt,6,pos,0.0 0.0 0.0
+humanoid.xml,jnt,6,axis,0.0 1.0 0.0
+humanoid.xml,jnt,6,limited,1.0
+humanoid.xml,jnt,6,range,-2.6179938779914944 0.3490658503988659
+humanoid.xml,jnt,6,stiffness,10.0
+humanoid.xml,jnt,6,qposadr,12.0
+humanoid.xml,jnt,6,dofadr,11.0
+humanoid.xml,jnt,6,solref,0.02 1.0
+humanoid.xml,jnt,6,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,6,margin,0.0
+humanoid.xml,jnt,7,type,3.0
+humanoid.xml,jnt,7,bodyid,6.0
+humanoid.xml,jnt,7,pos,0.0 0.0 0.02
+humanoid.xml,jnt,7,axis,0.0 -1.0 0.0
+humanoid.xml,jnt,7,limited,1.0
+humanoid.xml,jnt,7,range,-2.792526803190927 0.03490658503988659
+humanoid.xml,jnt,7,stiffness,1.0
+humanoid.xml,jnt,7,qposadr,13.0
+humanoid.xml,jnt,7,dofadr,12.0
+humanoid.xml,jnt,7,solref,0.02 1.0
+humanoid.xml,jnt,7,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,7,margin,0.0
+humanoid.xml,jnt,8,type,3.0
+humanoid.xml,jnt,8,bodyid,7.0
+humanoid.xml,jnt,8,pos,0.0 0.0 0.08
+humanoid.xml,jnt,8,axis,0.0 1.0 0.0
+humanoid.xml,jnt,8,limited,1.0
+humanoid.xml,jnt,8,range,-0.8726646259971648 0.8726646259971648
+humanoid.xml,jnt,8,stiffness,6.0
+humanoid.xml,jnt,8,qposadr,14.0
+humanoid.xml,jnt,8,dofadr,13.0
+humanoid.xml,jnt,8,solref,0.02 1.0
+humanoid.xml,jnt,8,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,8,margin,0.0
+humanoid.xml,jnt,9,type,3.0
+humanoid.xml,jnt,9,bodyid,7.0
+humanoid.xml,jnt,9,pos,0.0 0.0 0.04
+humanoid.xml,jnt,9,axis,0.8944271909999159 0.0 0.4472135954999579
+humanoid.xml,jnt,9,limited,1.0
+humanoid.xml,jnt,9,range,-0.8726646259971648 0.8726646259971648
+humanoid.xml,jnt,9,stiffness,3.0
+humanoid.xml,jnt,9,qposadr,15.0
+humanoid.xml,jnt,9,dofadr,14.0
+humanoid.xml,jnt,9,solref,0.02 1.0
+humanoid.xml,jnt,9,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,9,margin,0.0
+humanoid.xml,jnt,10,type,3.0
+humanoid.xml,jnt,10,bodyid,8.0
+humanoid.xml,jnt,10,pos,0.0 0.0 0.0
+humanoid.xml,jnt,10,axis,-1.0 0.0 0.0
+humanoid.xml,jnt,10,limited,1.0
+humanoid.xml,jnt,10,range,-0.5235987755982988 0.17453292519943295
+humanoid.xml,jnt,10,stiffness,10.0
+humanoid.xml,jnt,10,qposadr,16.0
+humanoid.xml,jnt,10,dofadr,15.0
+humanoid.xml,jnt,10,solref,0.02 1.0
+humanoid.xml,jnt,10,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,10,margin,0.0
+humanoid.xml,jnt,11,type,3.0
+humanoid.xml,jnt,11,bodyid,8.0
+humanoid.xml,jnt,11,pos,0.0 0.0 0.0
+humanoid.xml,jnt,11,axis,0.0 0.0 -1.0
+humanoid.xml,jnt,11,limited,1.0
+humanoid.xml,jnt,11,range,-1.0471975511965976 0.6108652381980153
+humanoid.xml,jnt,11,stiffness,10.0
+humanoid.xml,jnt,11,qposadr,17.0
+humanoid.xml,jnt,11,dofadr,16.0
+humanoid.xml,jnt,11,solref,0.02 1.0
+humanoid.xml,jnt,11,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,11,margin,0.0
+humanoid.xml,jnt,12,type,3.0
+humanoid.xml,jnt,12,bodyid,8.0
+humanoid.xml,jnt,12,pos,0.0 0.0 0.0
+humanoid.xml,jnt,12,axis,0.0 1.0 0.0
+humanoid.xml,jnt,12,limited,1.0
+humanoid.xml,jnt,12,range,-2.6179938779914944 0.3490658503988659
+humanoid.xml,jnt,12,stiffness,10.0
+humanoid.xml,jnt,12,qposadr,18.0
+humanoid.xml,jnt,12,dofadr,17.0
+humanoid.xml,jnt,12,solref,0.02 1.0
+humanoid.xml,jnt,12,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,12,margin,0.0
+humanoid.xml,jnt,13,type,3.0
+humanoid.xml,jnt,13,bodyid,9.0
+humanoid.xml,jnt,13,pos,0.0 0.0 0.02
+humanoid.xml,jnt,13,axis,0.0 -1.0 0.0
+humanoid.xml,jnt,13,limited,1.0
+humanoid.xml,jnt,13,range,-2.792526803190927 0.03490658503988659
+humanoid.xml,jnt,13,stiffness,1.0
+humanoid.xml,jnt,13,qposadr,19.0
+humanoid.xml,jnt,13,dofadr,18.0
+humanoid.xml,jnt,13,solref,0.02 1.0
+humanoid.xml,jnt,13,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,13,margin,0.0
+humanoid.xml,jnt,14,type,3.0
+humanoid.xml,jnt,14,bodyid,10.0
+humanoid.xml,jnt,14,pos,0.0 0.0 0.08
+humanoid.xml,jnt,14,axis,0.0 1.0 0.0
+humanoid.xml,jnt,14,limited,1.0
+humanoid.xml,jnt,14,range,-0.8726646259971648 0.8726646259971648
+humanoid.xml,jnt,14,stiffness,6.0
+humanoid.xml,jnt,14,qposadr,20.0
+humanoid.xml,jnt,14,dofadr,19.0
+humanoid.xml,jnt,14,solref,0.02 1.0
+humanoid.xml,jnt,14,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,14,margin,0.0
+humanoid.xml,jnt,15,type,3.0
+humanoid.xml,jnt,15,bodyid,10.0
+humanoid.xml,jnt,15,pos,0.0 0.0 0.04
+humanoid.xml,jnt,15,axis,-0.8944271909999159 0.0 -0.4472135954999579
+humanoid.xml,jnt,15,limited,1.0
+humanoid.xml,jnt,15,range,-0.8726646259971648 0.8726646259971648
+humanoid.xml,jnt,15,stiffness,3.0
+humanoid.xml,jnt,15,qposadr,21.0
+humanoid.xml,jnt,15,dofadr,20.0
+humanoid.xml,jnt,15,solref,0.02 1.0
+humanoid.xml,jnt,15,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,15,margin,0.0
+humanoid.xml,jnt,16,type,3.0
+humanoid.xml,jnt,16,bodyid,11.0
+humanoid.xml,jnt,16,pos,0.0 0.0 0.0
+humanoid.xml,jnt,16,axis,0.8164965809277261 0.4082482904638631 0.4082482904638631
+humanoid.xml,jnt,16,limited,1.0
+humanoid.xml,jnt,16,range,-1.4835298641951802 1.0471975511965976
+humanoid.xml,jnt,16,stiffness,1.0
+humanoid.xml,jnt,16,qposadr,22.0
+humanoid.xml,jnt,16,dofadr,21.0
+humanoid.xml,jnt,16,solref,0.02 1.0
+humanoid.xml,jnt,16,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,16,margin,0.0
+humanoid.xml,jnt,17,type,3.0
+humanoid.xml,jnt,17,bodyid,11.0
+humanoid.xml,jnt,17,pos,0.0 0.0 0.0
+humanoid.xml,jnt,17,axis,0.0 -0.7071067811865475 0.7071067811865475
+humanoid.xml,jnt,17,limited,1.0
+humanoid.xml,jnt,17,range,-1.4835298641951802 1.0471975511965976
+humanoid.xml,jnt,17,stiffness,1.0
+humanoid.xml,jnt,17,qposadr,23.0
+humanoid.xml,jnt,17,dofadr,22.0
+humanoid.xml,jnt,17,solref,0.02 1.0
+humanoid.xml,jnt,17,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,17,margin,0.0
+humanoid.xml,jnt,18,type,3.0
+humanoid.xml,jnt,18,bodyid,12.0
+humanoid.xml,jnt,18,pos,0.0 0.0 0.0
+humanoid.xml,jnt,18,axis,0.0 -0.7071067811865475 0.7071067811865475
+humanoid.xml,jnt,18,limited,1.0
+humanoid.xml,jnt,18,range,-1.7453292519943295 0.8726646259971648
+humanoid.xml,jnt,18,stiffness,0.0
+humanoid.xml,jnt,18,qposadr,24.0
+humanoid.xml,jnt,18,dofadr,23.0
+humanoid.xml,jnt,18,solref,0.02 1.0
+humanoid.xml,jnt,18,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,18,margin,0.0
+humanoid.xml,jnt,19,type,3.0
+humanoid.xml,jnt,19,bodyid,14.0
+humanoid.xml,jnt,19,pos,0.0 0.0 0.0
+humanoid.xml,jnt,19,axis,-0.8164965809277261 0.4082482904638631 -0.4082482904638631
+humanoid.xml,jnt,19,limited,1.0
+humanoid.xml,jnt,19,range,-1.4835298641951802 1.0471975511965976
+humanoid.xml,jnt,19,stiffness,1.0
+humanoid.xml,jnt,19,qposadr,25.0
+humanoid.xml,jnt,19,dofadr,24.0
+humanoid.xml,jnt,19,solref,0.02 1.0
+humanoid.xml,jnt,19,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,19,margin,0.0
+humanoid.xml,jnt,20,type,3.0
+humanoid.xml,jnt,20,bodyid,14.0
+humanoid.xml,jnt,20,pos,0.0 0.0 0.0
+humanoid.xml,jnt,20,axis,0.0 -0.7071067811865475 -0.7071067811865475
+humanoid.xml,jnt,20,limited,1.0
+humanoid.xml,jnt,20,range,-1.4835298641951802 1.0471975511965976
+humanoid.xml,jnt,20,stiffness,1.0
+humanoid.xml,jnt,20,qposadr,26.0
+humanoid.xml,jnt,20,dofadr,25.0
+humanoid.xml,jnt,20,solref,0.02 1.0
+humanoid.xml,jnt,20,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,20,margin,0.0
+humanoid.xml,jnt,21,type,3.0
+humanoid.xml,jnt,21,bodyid,15.0
+humanoid.xml,jnt,21,pos,0.0 0.0 0.0
+humanoid.xml,jnt,21,axis,0.0 -0.7071067811865475 -0.7071067811865475
+humanoid.xml,jnt,21,limited,1.0
+humanoid.xml,jnt,21,range,-1.7453292519943295 0.8726646259971648
+humanoid.xml,jnt,21,stiffness,0.0
+humanoid.xml,jnt,21,qposadr,27.0
+humanoid.xml,jnt,21,dofadr,26.0
+humanoid.xml,jnt,21,solref,0.02 1.0
+humanoid.xml,jnt,21,solimp,0.0 0.99 0.01 0.5 2.0
+humanoid.xml,jnt,21,margin,0.0
+humanoid.xml,dof,0,bodyid,1.0
+humanoid.xml,dof,0,jntid,0.0
+humanoid.xml,dof,0,parentid,-1.0
+humanoid.xml,dof,0,armature,0.0
+humanoid.xml,dof,0,damping,0.0
+humanoid.xml,dof,0,frictionloss,0.0
+humanoid.xml,dof,0,solref,0.02 1.0
+humanoid.xml,dof,0,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,1,bodyid,1.0
+humanoid.xml,dof,1,jntid,0.0
+humanoid.xml,dof,1,parentid,0.0
+humanoid.xml,dof,1,armature,0.0
+humanoid.xml,dof,1,damping,0.0
+humanoid.xml,dof,1,frictionloss,0.0
+humanoid.xml,dof,1,solref,0.02 1.0
+humanoid.xml,dof,1,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,2,bodyid,1.0
+humanoid.xml,dof,2,jntid,0.0
+humanoid.xml,dof,2,parentid,1.0
+humanoid.xml,dof,2,armature,0.0
+humanoid.xml,dof,2,damping,0.0
+humanoid.xml,dof,2,frictionloss,0.0
+humanoid.xml,dof,2,solref,0.02 1.0
+humanoid.xml,dof,2,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,3,bodyid,1.0
+humanoid.xml,dof,3,jntid,0.0
+humanoid.xml,dof,3,parentid,2.0
+humanoid.xml,dof,3,armature,0.0
+humanoid.xml,dof,3,damping,0.0
+humanoid.xml,dof,3,frictionloss,0.0
+humanoid.xml,dof,3,solref,0.02 1.0
+humanoid.xml,dof,3,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,4,bodyid,1.0
+humanoid.xml,dof,4,jntid,0.0
+humanoid.xml,dof,4,parentid,3.0
+humanoid.xml,dof,4,armature,0.0
+humanoid.xml,dof,4,damping,0.0
+humanoid.xml,dof,4,frictionloss,0.0
+humanoid.xml,dof,4,solref,0.02 1.0
+humanoid.xml,dof,4,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,5,bodyid,1.0
+humanoid.xml,dof,5,jntid,0.0
+humanoid.xml,dof,5,parentid,4.0
+humanoid.xml,dof,5,armature,0.0
+humanoid.xml,dof,5,damping,0.0
+humanoid.xml,dof,5,frictionloss,0.0
+humanoid.xml,dof,5,solref,0.02 1.0
+humanoid.xml,dof,5,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,6,bodyid,3.0
+humanoid.xml,dof,6,jntid,1.0
+humanoid.xml,dof,6,parentid,5.0
+humanoid.xml,dof,6,armature,0.01
+humanoid.xml,dof,6,damping,5.0
+humanoid.xml,dof,6,frictionloss,0.0
+humanoid.xml,dof,6,solref,0.02 1.0
+humanoid.xml,dof,6,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,7,bodyid,3.0
+humanoid.xml,dof,7,jntid,2.0
+humanoid.xml,dof,7,parentid,6.0
+humanoid.xml,dof,7,armature,0.01
+humanoid.xml,dof,7,damping,5.0
+humanoid.xml,dof,7,frictionloss,0.0
+humanoid.xml,dof,7,solref,0.02 1.0
+humanoid.xml,dof,7,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,8,bodyid,4.0
+humanoid.xml,dof,8,jntid,3.0
+humanoid.xml,dof,8,parentid,7.0
+humanoid.xml,dof,8,armature,0.01
+humanoid.xml,dof,8,damping,5.0
+humanoid.xml,dof,8,frictionloss,0.0
+humanoid.xml,dof,8,solref,0.02 1.0
+humanoid.xml,dof,8,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,9,bodyid,5.0
+humanoid.xml,dof,9,jntid,4.0
+humanoid.xml,dof,9,parentid,8.0
+humanoid.xml,dof,9,armature,0.01
+humanoid.xml,dof,9,damping,5.0
+humanoid.xml,dof,9,frictionloss,0.0
+humanoid.xml,dof,9,solref,0.02 1.0
+humanoid.xml,dof,9,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,10,bodyid,5.0
+humanoid.xml,dof,10,jntid,5.0
+humanoid.xml,dof,10,parentid,9.0
+humanoid.xml,dof,10,armature,0.01
+humanoid.xml,dof,10,damping,5.0
+humanoid.xml,dof,10,frictionloss,0.0
+humanoid.xml,dof,10,solref,0.02 1.0
+humanoid.xml,dof,10,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,11,bodyid,5.0
+humanoid.xml,dof,11,jntid,6.0
+humanoid.xml,dof,11,parentid,10.0
+humanoid.xml,dof,11,armature,0.01
+humanoid.xml,dof,11,damping,5.0
+humanoid.xml,dof,11,frictionloss,0.0
+humanoid.xml,dof,11,solref,0.02 1.0
+humanoid.xml,dof,11,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,12,bodyid,6.0
+humanoid.xml,dof,12,jntid,7.0
+humanoid.xml,dof,12,parentid,11.0
+humanoid.xml,dof,12,armature,0.01
+humanoid.xml,dof,12,damping,0.2
+humanoid.xml,dof,12,frictionloss,0.0
+humanoid.xml,dof,12,solref,0.02 1.0
+humanoid.xml,dof,12,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,13,bodyid,7.0
+humanoid.xml,dof,13,jntid,8.0
+humanoid.xml,dof,13,parentid,12.0
+humanoid.xml,dof,13,armature,0.01
+humanoid.xml,dof,13,damping,0.2
+humanoid.xml,dof,13,frictionloss,0.0
+humanoid.xml,dof,13,solref,0.02 1.0
+humanoid.xml,dof,13,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,14,bodyid,7.0
+humanoid.xml,dof,14,jntid,9.0
+humanoid.xml,dof,14,parentid,13.0
+humanoid.xml,dof,14,armature,0.01
+humanoid.xml,dof,14,damping,0.2
+humanoid.xml,dof,14,frictionloss,0.0
+humanoid.xml,dof,14,solref,0.02 1.0
+humanoid.xml,dof,14,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,15,bodyid,8.0
+humanoid.xml,dof,15,jntid,10.0
+humanoid.xml,dof,15,parentid,8.0
+humanoid.xml,dof,15,armature,0.01
+humanoid.xml,dof,15,damping,5.0
+humanoid.xml,dof,15,frictionloss,0.0
+humanoid.xml,dof,15,solref,0.02 1.0
+humanoid.xml,dof,15,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,16,bodyid,8.0
+humanoid.xml,dof,16,jntid,11.0
+humanoid.xml,dof,16,parentid,15.0
+humanoid.xml,dof,16,armature,0.01
+humanoid.xml,dof,16,damping,5.0
+humanoid.xml,dof,16,frictionloss,0.0
+humanoid.xml,dof,16,solref,0.02 1.0
+humanoid.xml,dof,16,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,17,bodyid,8.0
+humanoid.xml,dof,17,jntid,12.0
+humanoid.xml,dof,17,parentid,16.0
+humanoid.xml,dof,17,armature,0.01
+humanoid.xml,dof,17,damping,5.0
+humanoid.xml,dof,17,frictionloss,0.0
+humanoid.xml,dof,17,solref,0.02 1.0
+humanoid.xml,dof,17,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,18,bodyid,9.0
+humanoid.xml,dof,18,jntid,13.0
+humanoid.xml,dof,18,parentid,17.0
+humanoid.xml,dof,18,armature,0.01
+humanoid.xml,dof,18,damping,0.2
+humanoid.xml,dof,18,frictionloss,0.0
+humanoid.xml,dof,18,solref,0.02 1.0
+humanoid.xml,dof,18,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,19,bodyid,10.0
+humanoid.xml,dof,19,jntid,14.0
+humanoid.xml,dof,19,parentid,18.0
+humanoid.xml,dof,19,armature,0.01
+humanoid.xml,dof,19,damping,0.2
+humanoid.xml,dof,19,frictionloss,0.0
+humanoid.xml,dof,19,solref,0.02 1.0
+humanoid.xml,dof,19,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,20,bodyid,10.0
+humanoid.xml,dof,20,jntid,15.0
+humanoid.xml,dof,20,parentid,19.0
+humanoid.xml,dof,20,armature,0.01
+humanoid.xml,dof,20,damping,0.2
+humanoid.xml,dof,20,frictionloss,0.0
+humanoid.xml,dof,20,solref,0.02 1.0
+humanoid.xml,dof,20,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,21,bodyid,11.0
+humanoid.xml,dof,21,jntid,16.0
+humanoid.xml,dof,21,parentid,5.0
+humanoid.xml,dof,21,armature,0.01
+humanoid.xml,dof,21,damping,0.2
+humanoid.xml,dof,21,frictionloss,0.0
+humanoid.xml,dof,21,solref,0.02 1.0
+humanoid.xml,dof,21,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,22,bodyid,11.0
+humanoid.xml,dof,22,jntid,17.0
+humanoid.xml,dof,22,parentid,21.0
+humanoid.xml,dof,22,armature,0.01
+humanoid.xml,dof,22,damping,0.2
+humanoid.xml,dof,22,frictionloss,0.0
+humanoid.xml,dof,22,solref,0.02 1.0
+humanoid.xml,dof,22,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,23,bodyid,12.0
+humanoid.xml,dof,23,jntid,18.0
+humanoid.xml,dof,23,parentid,22.0
+humanoid.xml,dof,23,armature,0.01
+humanoid.xml,dof,23,damping,0.2
+humanoid.xml,dof,23,frictionloss,0.0
+humanoid.xml,dof,23,solref,0.02 1.0
+humanoid.xml,dof,23,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,24,bodyid,14.0
+humanoid.xml,dof,24,jntid,19.0
+humanoid.xml,dof,24,parentid,5.0
+humanoid.xml,dof,24,armature,0.01
+humanoid.xml,dof,24,damping,0.2
+humanoid.xml,dof,24,frictionloss,0.0
+humanoid.xml,dof,24,solref,0.02 1.0
+humanoid.xml,dof,24,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,25,bodyid,14.0
+humanoid.xml,dof,25,jntid,20.0
+humanoid.xml,dof,25,parentid,24.0
+humanoid.xml,dof,25,armature,0.01
+humanoid.xml,dof,25,damping,0.2
+humanoid.xml,dof,25,frictionloss,0.0
+humanoid.xml,dof,25,solref,0.02 1.0
+humanoid.xml,dof,25,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,dof,26,bodyid,15.0
+humanoid.xml,dof,26,jntid,21.0
+humanoid.xml,dof,26,parentid,25.0
+humanoid.xml,dof,26,armature,0.01
+humanoid.xml,dof,26,damping,0.2
+humanoid.xml,dof,26,frictionloss,0.0
+humanoid.xml,dof,26,solref,0.02 1.0
+humanoid.xml,dof,26,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,geom,0,type,0.0
+humanoid.xml,geom,0,bodyid,0.0
+humanoid.xml,geom,0,size,0.0 0.0 0.05
+humanoid.xml,geom,0,pos,0.0 0.0 0.0
+humanoid.xml,geom,0,quat,1.0 0.0 0.0 0.0
+humanoid.xml,geom,0,friction,1.0 0.005 0.0001
+humanoid.xml,geom,0,condim,3.0
+humanoid.xml,geom,0,contype,1.0
+humanoid.xml,geom,0,conaffinity,1.0
+humanoid.xml,geom,0,solref,0.02 1.0
+humanoid.xml,geom,0,solimp,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,geom,0,margin,0.0
+humanoid.xml,geom,0,gap,0.0
+humanoid.xml,geom,0,priority,0.0
+humanoid.xml,geom,0,sameframe,1.0
+humanoid.xml,geom,1,type,3.0
+humanoid.xml,geom,1,bodyid,1.0
+humanoid.xml,geom,1,size,0.07 0.07 0.0
+humanoid.xml,geom,1,pos,0.0 0.0 0.0
+humanoid.xml,geom,1,quat,0.7071067811865476 0.7071067811865475 0.0 -0.0
+humanoid.xml,geom,1,friction,0.7 0.005 0.0001
+humanoid.xml,geom,1,condim,1.0
+humanoid.xml,geom,1,contype,1.0
+humanoid.xml,geom,1,conaffinity,1.0
+humanoid.xml,geom,1,solref,0.015 1.0
+humanoid.xml,geom,1,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,1,margin,0.0
+humanoid.xml,geom,1,gap,0.0
+humanoid.xml,geom,1,priority,0.0
+humanoid.xml,geom,1,sameframe,0.0
+humanoid.xml,geom,2,type,3.0
+humanoid.xml,geom,2,bodyid,1.0
+humanoid.xml,geom,2,size,0.06 0.06 0.0
+humanoid.xml,geom,2,pos,-0.01 0.0 -0.12
+humanoid.xml,geom,2,quat,0.7071067811865476 0.7071067811865475 0.0 -0.0
+humanoid.xml,geom,2,friction,0.7 0.005 0.0001
+humanoid.xml,geom,2,condim,1.0
+humanoid.xml,geom,2,contype,1.0
+humanoid.xml,geom,2,conaffinity,1.0
+humanoid.xml,geom,2,solref,0.015 1.0
+humanoid.xml,geom,2,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,2,margin,0.0
+humanoid.xml,geom,2,gap,0.0
+humanoid.xml,geom,2,priority,0.0
+humanoid.xml,geom,2,sameframe,0.0
+humanoid.xml,geom,3,type,2.0
+humanoid.xml,geom,3,bodyid,2.0
+humanoid.xml,geom,3,size,0.09 0.0 0.0
+humanoid.xml,geom,3,pos,0.0 0.0 0.0
+humanoid.xml,geom,3,quat,1.0 0.0 0.0 0.0
+humanoid.xml,geom,3,friction,0.7 0.005 0.0001
+humanoid.xml,geom,3,condim,1.0
+humanoid.xml,geom,3,contype,1.0
+humanoid.xml,geom,3,conaffinity,1.0
+humanoid.xml,geom,3,solref,0.015 1.0
+humanoid.xml,geom,3,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,3,margin,0.0
+humanoid.xml,geom,3,gap,0.0
+humanoid.xml,geom,3,priority,0.0
+humanoid.xml,geom,3,sameframe,1.0
+humanoid.xml,geom,4,type,3.0
+humanoid.xml,geom,4,bodyid,3.0
+humanoid.xml,geom,4,size,0.06 0.06 0.0
+humanoid.xml,geom,4,pos,0.0 0.0 0.0
+humanoid.xml,geom,4,quat,0.7071067811865476 0.7071067811865475 0.0 -0.0
+humanoid.xml,geom,4,friction,0.7 0.005 0.0001
+humanoid.xml,geom,4,condim,1.0
+humanoid.xml,geom,4,contype,1.0
+humanoid.xml,geom,4,conaffinity,1.0
+humanoid.xml,geom,4,solref,0.015 1.0
+humanoid.xml,geom,4,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,4,margin,0.0
+humanoid.xml,geom,4,gap,0.0
+humanoid.xml,geom,4,priority,0.0
+humanoid.xml,geom,4,sameframe,2.0
+humanoid.xml,geom,5,type,3.0
+humanoid.xml,geom,5,bodyid,4.0
+humanoid.xml,geom,5,size,0.09 0.07 0.0
+humanoid.xml,geom,5,pos,-0.02 0.0 0.0
+humanoid.xml,geom,5,quat,0.7071067811865476 0.7071067811865475 0.0 -0.0
+humanoid.xml,geom,5,friction,0.7 0.005 0.0001
+humanoid.xml,geom,5,condim,1.0
+humanoid.xml,geom,5,contype,1.0
+humanoid.xml,geom,5,conaffinity,1.0
+humanoid.xml,geom,5,solref,0.015 1.0
+humanoid.xml,geom,5,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,5,margin,0.0
+humanoid.xml,geom,5,gap,0.0
+humanoid.xml,geom,5,priority,0.0
+humanoid.xml,geom,5,sameframe,2.0
+humanoid.xml,geom,6,type,3.0
+humanoid.xml,geom,6,bodyid,5.0
+humanoid.xml,geom,6,size,0.06 0.1700735135169495 0.0
+humanoid.xml,geom,6,pos,0.0 0.005 -0.17
+humanoid.xml,geom,6,quat,0.9998919327768259 0.014701114509568982 0.0 -0.0
+humanoid.xml,geom,6,friction,0.7 0.005 0.0001
+humanoid.xml,geom,6,condim,1.0
+humanoid.xml,geom,6,contype,1.0
+humanoid.xml,geom,6,conaffinity,1.0
+humanoid.xml,geom,6,solref,0.015 1.0
+humanoid.xml,geom,6,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,6,margin,0.0
+humanoid.xml,geom,6,gap,0.0
+humanoid.xml,geom,6,priority,0.0
+humanoid.xml,geom,6,sameframe,2.0
+humanoid.xml,geom,7,type,3.0
+humanoid.xml,geom,7,bodyid,6.0
+humanoid.xml,geom,7,size,0.049 0.15 0.0
+humanoid.xml,geom,7,pos,0.0 0.0 -0.15
+humanoid.xml,geom,7,quat,1.0 0.0 0.0 0.0
+humanoid.xml,geom,7,friction,0.7 0.005 0.0001
+humanoid.xml,geom,7,condim,1.0
+humanoid.xml,geom,7,contype,1.0
+humanoid.xml,geom,7,conaffinity,1.0
+humanoid.xml,geom,7,solref,0.015 1.0
+humanoid.xml,geom,7,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,7,margin,0.0
+humanoid.xml,geom,7,gap,0.0
+humanoid.xml,geom,7,priority,0.0
+humanoid.xml,geom,7,sameframe,3.0
+humanoid.xml,geom,8,type,3.0
+humanoid.xml,geom,8,bodyid,7.0
+humanoid.xml,geom,8,size,0.027 0.10547511554864494 0.0
+humanoid.xml,geom,8,pos,0.035 -0.02 0.0
+humanoid.xml,geom,8,quat,0.7071067811865476 -0.06704015231539906 -0.7039215993116904 0.0
+humanoid.xml,geom,8,friction,0.7 0.005 0.0001
+humanoid.xml,geom,8,condim,1.0
+humanoid.xml,geom,8,contype,1.0
+humanoid.xml,geom,8,conaffinity,1.0
+humanoid.xml,geom,8,solref,0.015 1.0
+humanoid.xml,geom,8,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,8,margin,0.0
+humanoid.xml,geom,8,gap,0.0
+humanoid.xml,geom,8,priority,0.0
+humanoid.xml,geom,8,sameframe,0.0
+humanoid.xml,geom,9,type,3.0
+humanoid.xml,geom,9,bodyid,7.0
+humanoid.xml,geom,9,size,0.027 0.10547511554864494 0.0
+humanoid.xml,geom,9,pos,0.035 0.02 0.0
+humanoid.xml,geom,9,quat,0.7071067811865476 0.06704015231539906 -0.7039215993116904 0.0
+humanoid.xml,geom,9,friction,0.7 0.005 0.0001
+humanoid.xml,geom,9,condim,1.0
+humanoid.xml,geom,9,contype,1.0
+humanoid.xml,geom,9,conaffinity,1.0
+humanoid.xml,geom,9,solref,0.015 1.0
+humanoid.xml,geom,9,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,9,margin,0.0
+humanoid.xml,geom,9,gap,0.0
+humanoid.xml,geom,9,priority,0.0
+humanoid.xml,geom,9,sameframe,0.0
+humanoid.xml,geom,10,type,3.0
+humanoid.xml,geom,10,bodyid,8.0
+humanoid.xml,geom,10,size,0.06 0.1700735135169495 0.0
+humanoid.xml,geom,10,pos,0.0 -0.005 -0.17
+humanoid.xml,geom,10,quat,0.9998919327768259 -0.014701114509568982 0.0 0.0
+humanoid.xml,geom,10,friction,0.7 0.005 0.0001
+humanoid.xml,geom,10,condim,1.0
+humanoid.xml,geom,10,contype,1.0
+humanoid.xml,geom,10,conaffinity,1.0
+humanoid.xml,geom,10,solref,0.015 1.0
+humanoid.xml,geom,10,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,10,margin,0.0
+humanoid.xml,geom,10,gap,0.0
+humanoid.xml,geom,10,priority,0.0
+humanoid.xml,geom,10,sameframe,2.0
+humanoid.xml,geom,11,type,3.0
+humanoid.xml,geom,11,bodyid,9.0
+humanoid.xml,geom,11,size,0.049 0.15 0.0
+humanoid.xml,geom,11,pos,0.0 0.0 -0.15
+humanoid.xml,geom,11,quat,1.0 0.0 0.0 0.0
+humanoid.xml,geom,11,friction,0.7 0.005 0.0001
+humanoid.xml,geom,11,condim,1.0
+humanoid.xml,geom,11,contype,1.0
+humanoid.xml,geom,11,conaffinity,1.0
+humanoid.xml,geom,11,solref,0.015 1.0
+humanoid.xml,geom,11,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,11,margin,0.0
+humanoid.xml,geom,11,gap,0.0
+humanoid.xml,geom,11,priority,0.0
+humanoid.xml,geom,11,sameframe,3.0
+humanoid.xml,geom,12,type,3.0
+humanoid.xml,geom,12,bodyid,10.0
+humanoid.xml,geom,12,size,0.027 0.10547511554864494 0.0
+humanoid.xml,geom,12,pos,0.035 -0.02 0.0
+humanoid.xml,geom,12,quat,0.7071067811865476 -0.06704015231539906 -0.7039215993116904 0.0
+humanoid.xml,geom,12,friction,0.7 0.005 0.0001
+humanoid.xml,geom,12,condim,1.0
+humanoid.xml,geom,12,contype,1.0
+humanoid.xml,geom,12,conaffinity,1.0
+humanoid.xml,geom,12,solref,0.015 1.0
+humanoid.xml,geom,12,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,12,margin,0.0
+humanoid.xml,geom,12,gap,0.0
+humanoid.xml,geom,12,priority,0.0
+humanoid.xml,geom,12,sameframe,0.0
+humanoid.xml,geom,13,type,3.0
+humanoid.xml,geom,13,bodyid,10.0
+humanoid.xml,geom,13,size,0.027 0.10547511554864494 0.0
+humanoid.xml,geom,13,pos,0.035 0.02 0.0
+humanoid.xml,geom,13,quat,0.7071067811865476 0.06704015231539906 -0.7039215993116904 0.0
+humanoid.xml,geom,13,friction,0.7 0.005 0.0001
+humanoid.xml,geom,13,condim,1.0
+humanoid.xml,geom,13,contype,1.0
+humanoid.xml,geom,13,conaffinity,1.0
+humanoid.xml,geom,13,solref,0.015 1.0
+humanoid.xml,geom,13,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,13,margin,0.0
+humanoid.xml,geom,13,gap,0.0
+humanoid.xml,geom,13,priority,0.0
+humanoid.xml,geom,13,sameframe,0.0
+humanoid.xml,geom,14,type,3.0
+humanoid.xml,geom,14,bodyid,11.0
+humanoid.xml,geom,14,size,0.04 0.13856406460551018 0.0
+humanoid.xml,geom,14,pos,0.08 -0.08 -0.08
+humanoid.xml,geom,14,quat,0.8880738339771153 -0.3250575836718681 -0.3250575836718681 0.0
+humanoid.xml,geom,14,friction,0.7 0.005 0.0001
+humanoid.xml,geom,14,condim,1.0
+humanoid.xml,geom,14,contype,1.0
+humanoid.xml,geom,14,conaffinity,1.0
+humanoid.xml,geom,14,solref,0.015 1.0
+humanoid.xml,geom,14,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,14,margin,0.0
+humanoid.xml,geom,14,gap,0.0
+humanoid.xml,geom,14,priority,0.0
+humanoid.xml,geom,14,sameframe,2.0
+humanoid.xml,geom,15,type,3.0
+humanoid.xml,geom,15,bodyid,12.0
+humanoid.xml,geom,15,size,0.031 0.13856406460551018 0.0
+humanoid.xml,geom,15,pos,0.09000000000000001 0.09000000000000001 0.09000000000000001
+humanoid.xml,geom,15,quat,0.45970084338098305 0.6279630301995544 -0.6279630301995544 0.0
+humanoid.xml,geom,15,friction,0.7 0.005 0.0001
+humanoid.xml,geom,15,condim,1.0
+humanoid.xml,geom,15,contype,1.0
+humanoid.xml,geom,15,conaffinity,1.0
+humanoid.xml,geom,15,solref,0.015 1.0
+humanoid.xml,geom,15,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,15,margin,0.0
+humanoid.xml,geom,15,gap,0.0
+humanoid.xml,geom,15,priority,0.0
+humanoid.xml,geom,15,sameframe,2.0
+humanoid.xml,geom,16,type,2.0
+humanoid.xml,geom,16,bodyid,13.0
+humanoid.xml,geom,16,size,0.04 0.0 0.0
+humanoid.xml,geom,16,pos,0.0 0.0 0.0
+humanoid.xml,geom,16,quat,0.8880738339771153 -0.32505758367186816 0.32505758367186816 0.0
+humanoid.xml,geom,16,friction,0.7 0.005 0.0001
+humanoid.xml,geom,16,condim,1.0
+humanoid.xml,geom,16,contype,1.0
+humanoid.xml,geom,16,conaffinity,1.0
+humanoid.xml,geom,16,solref,0.015 1.0
+humanoid.xml,geom,16,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,16,margin,0.0
+humanoid.xml,geom,16,gap,0.0
+humanoid.xml,geom,16,priority,0.0
+humanoid.xml,geom,16,sameframe,2.0
+humanoid.xml,geom,17,type,3.0
+humanoid.xml,geom,17,bodyid,14.0
+humanoid.xml,geom,17,size,0.04 0.13856406460551018 0.0
+humanoid.xml,geom,17,pos,0.08 0.08 -0.08
+humanoid.xml,geom,17,quat,0.8880738339771153 0.3250575836718681 -0.3250575836718681 0.0
+humanoid.xml,geom,17,friction,0.7 0.005 0.0001
+humanoid.xml,geom,17,condim,1.0
+humanoid.xml,geom,17,contype,1.0
+humanoid.xml,geom,17,conaffinity,1.0
+humanoid.xml,geom,17,solref,0.015 1.0
+humanoid.xml,geom,17,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,17,margin,0.0
+humanoid.xml,geom,17,gap,0.0
+humanoid.xml,geom,17,priority,0.0
+humanoid.xml,geom,17,sameframe,2.0
+humanoid.xml,geom,18,type,3.0
+humanoid.xml,geom,18,bodyid,15.0
+humanoid.xml,geom,18,size,0.031 0.13856406460551018 0.0
+humanoid.xml,geom,18,pos,0.09000000000000001 -0.09000000000000001 0.09000000000000001
+humanoid.xml,geom,18,quat,0.45970084338098305 -0.6279630301995544 -0.6279630301995544 0.0
+humanoid.xml,geom,18,friction,0.7 0.005 0.0001
+humanoid.xml,geom,18,condim,1.0
+humanoid.xml,geom,18,contype,1.0
+humanoid.xml,geom,18,conaffinity,1.0
+humanoid.xml,geom,18,solref,0.015 1.0
+humanoid.xml,geom,18,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,18,margin,0.0
+humanoid.xml,geom,18,gap,0.0
+humanoid.xml,geom,18,priority,0.0
+humanoid.xml,geom,18,sameframe,2.0
+humanoid.xml,geom,19,type,2.0
+humanoid.xml,geom,19,bodyid,16.0
+humanoid.xml,geom,19,size,0.04 0.0 0.0
+humanoid.xml,geom,19,pos,0.0 0.0 0.0
+humanoid.xml,geom,19,quat,0.8880738339771153 0.32505758367186816 0.32505758367186816 -0.0
+humanoid.xml,geom,19,friction,0.7 0.005 0.0001
+humanoid.xml,geom,19,condim,1.0
+humanoid.xml,geom,19,contype,1.0
+humanoid.xml,geom,19,conaffinity,1.0
+humanoid.xml,geom,19,solref,0.015 1.0
+humanoid.xml,geom,19,solimp,0.9 0.99 0.003 0.5 2.0
+humanoid.xml,geom,19,margin,0.0
+humanoid.xml,geom,19,gap,0.0
+humanoid.xml,geom,19,priority,0.0
+humanoid.xml,geom,19,sameframe,2.0
+humanoid.xml,tendon,0,limited,1.0
+humanoid.xml,tendon,0,range,-0.3 2.0
+humanoid.xml,tendon,0,margin,0.0
+humanoid.xml,tendon,0,frictionloss,0.0
+humanoid.xml,tendon,0,solref_lim,0.02 1.0
+humanoid.xml,tendon,0,solimp_lim,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,tendon,0,solref_fri,0.02 1.0
+humanoid.xml,tendon,0,solimp_fri,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,tendon,1,limited,1.0
+humanoid.xml,tendon,1,range,-0.3 2.0
+humanoid.xml,tendon,1,margin,0.0
+humanoid.xml,tendon,1,frictionloss,0.0
+humanoid.xml,tendon,1,solref_lim,0.02 1.0
+humanoid.xml,tendon,1,solimp_lim,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,tendon,1,solref_fri,0.02 1.0
+humanoid.xml,tendon,1,solimp_fri,0.9 0.95 0.001 0.5 2.0
+humanoid.xml,actuator,0,trntype,0.0
+humanoid.xml,actuator,0,trnid,1.0 -1.0
+humanoid.xml,actuator,0,gear,40.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,0,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,0,ctrllimited,1.0
+humanoid.xml,actuator,0,forcerange,0.0 0.0
+humanoid.xml,actuator,0,forcelimited,0.0
+humanoid.xml,actuator,0,damping,0.0
+humanoid.xml,actuator,0,dyntype,0.0
+humanoid.xml,actuator,0,gaintype,0.0
+humanoid.xml,actuator,0,biastype,0.0
+humanoid.xml,actuator,0,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,0,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,1,trntype,0.0
+humanoid.xml,actuator,1,trnid,2.0 -1.0
+humanoid.xml,actuator,1,gear,40.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,1,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,1,ctrllimited,1.0
+humanoid.xml,actuator,1,forcerange,0.0 0.0
+humanoid.xml,actuator,1,forcelimited,0.0
+humanoid.xml,actuator,1,damping,0.0
+humanoid.xml,actuator,1,dyntype,0.0
+humanoid.xml,actuator,1,gaintype,0.0
+humanoid.xml,actuator,1,biastype,0.0
+humanoid.xml,actuator,1,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,1,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,2,trntype,0.0
+humanoid.xml,actuator,2,trnid,3.0 -1.0
+humanoid.xml,actuator,2,gear,40.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,2,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,2,ctrllimited,1.0
+humanoid.xml,actuator,2,forcerange,0.0 0.0
+humanoid.xml,actuator,2,forcelimited,0.0
+humanoid.xml,actuator,2,damping,0.0
+humanoid.xml,actuator,2,dyntype,0.0
+humanoid.xml,actuator,2,gaintype,0.0
+humanoid.xml,actuator,2,biastype,0.0
+humanoid.xml,actuator,2,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,2,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,3,trntype,0.0
+humanoid.xml,actuator,3,trnid,4.0 -1.0
+humanoid.xml,actuator,3,gear,40.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,3,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,3,ctrllimited,1.0
+humanoid.xml,actuator,3,forcerange,0.0 0.0
+humanoid.xml,actuator,3,forcelimited,0.0
+humanoid.xml,actuator,3,damping,0.0
+humanoid.xml,actuator,3,dyntype,0.0
+humanoid.xml,actuator,3,gaintype,0.0
+humanoid.xml,actuator,3,biastype,0.0
+humanoid.xml,actuator,3,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,3,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,4,trntype,0.0
+humanoid.xml,actuator,4,trnid,5.0 -1.0
+humanoid.xml,actuator,4,gear,40.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,4,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,4,ctrllimited,1.0
+humanoid.xml,actuator,4,forcerange,0.0 0.0
+humanoid.xml,actuator,4,forcelimited,0.0
+humanoid.xml,actuator,4,damping,0.0
+humanoid.xml,actuator,4,dyntype,0.0
+humanoid.xml,actuator,4,gaintype,0.0
+humanoid.xml,actuator,4,biastype,0.0
+humanoid.xml,actuator,4,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,4,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,5,trntype,0.0
+humanoid.xml,actuator,5,trnid,6.0 -1.0
+humanoid.xml,actuator,5,gear,120.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,5,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,5,ctrllimited,1.0
+humanoid.xml,actuator,5,forcerange,0.0 0.0
+humanoid.xml,actuator,5,forcelimited,0.0
+humanoid.xml,actuator,5,damping,0.0
+humanoid.xml,actuator,5,dyntype,0.0
+humanoid.xml,actuator,5,gaintype,0.0
+humanoid.xml,actuator,5,biastype,0.0
+humanoid.xml,actuator,5,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,5,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,6,trntype,0.0
+humanoid.xml,actuator,6,trnid,7.0 -1.0
+humanoid.xml,actuator,6,gear,80.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,6,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,6,ctrllimited,1.0
+humanoid.xml,actuator,6,forcerange,0.0 0.0
+humanoid.xml,actuator,6,forcelimited,0.0
+humanoid.xml,actuator,6,damping,0.0
+humanoid.xml,actuator,6,dyntype,0.0
+humanoid.xml,actuator,6,gaintype,0.0
+humanoid.xml,actuator,6,biastype,0.0
+humanoid.xml,actuator,6,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,6,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,7,trntype,0.0
+humanoid.xml,actuator,7,trnid,8.0 -1.0
+humanoid.xml,actuator,7,gear,20.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,7,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,7,ctrllimited,1.0
+humanoid.xml,actuator,7,forcerange,0.0 0.0
+humanoid.xml,actuator,7,forcelimited,0.0
+humanoid.xml,actuator,7,damping,0.0
+humanoid.xml,actuator,7,dyntype,0.0
+humanoid.xml,actuator,7,gaintype,0.0
+humanoid.xml,actuator,7,biastype,0.0
+humanoid.xml,actuator,7,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,7,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,8,trntype,0.0
+humanoid.xml,actuator,8,trnid,9.0 -1.0
+humanoid.xml,actuator,8,gear,20.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,8,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,8,ctrllimited,1.0
+humanoid.xml,actuator,8,forcerange,0.0 0.0
+humanoid.xml,actuator,8,forcelimited,0.0
+humanoid.xml,actuator,8,damping,0.0
+humanoid.xml,actuator,8,dyntype,0.0
+humanoid.xml,actuator,8,gaintype,0.0
+humanoid.xml,actuator,8,biastype,0.0
+humanoid.xml,actuator,8,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,8,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,9,trntype,0.0
+humanoid.xml,actuator,9,trnid,10.0 -1.0
+humanoid.xml,actuator,9,gear,40.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,9,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,9,ctrllimited,1.0
+humanoid.xml,actuator,9,forcerange,0.0 0.0
+humanoid.xml,actuator,9,forcelimited,0.0
+humanoid.xml,actuator,9,damping,0.0
+humanoid.xml,actuator,9,dyntype,0.0
+humanoid.xml,actuator,9,gaintype,0.0
+humanoid.xml,actuator,9,biastype,0.0
+humanoid.xml,actuator,9,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,9,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,10,trntype,0.0
+humanoid.xml,actuator,10,trnid,11.0 -1.0
+humanoid.xml,actuator,10,gear,40.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,10,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,10,ctrllimited,1.0
+humanoid.xml,actuator,10,forcerange,0.0 0.0
+humanoid.xml,actuator,10,forcelimited,0.0
+humanoid.xml,actuator,10,damping,0.0
+humanoid.xml,actuator,10,dyntype,0.0
+humanoid.xml,actuator,10,gaintype,0.0
+humanoid.xml,actuator,10,biastype,0.0
+humanoid.xml,actuator,10,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,10,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,11,trntype,0.0
+humanoid.xml,actuator,11,trnid,12.0 -1.0
+humanoid.xml,actuator,11,gear,120.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,11,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,11,ctrllimited,1.0
+humanoid.xml,actuator,11,forcerange,0.0 0.0
+humanoid.xml,actuator,11,forcelimited,0.0
+humanoid.xml,actuator,11,damping,0.0
+humanoid.xml,actuator,11,dyntype,0.0
+humanoid.xml,actuator,11,gaintype,0.0
+humanoid.xml,actuator,11,biastype,0.0
+humanoid.xml,actuator,11,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,11,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,12,trntype,0.0
+humanoid.xml,actuator,12,trnid,13.0 -1.0
+humanoid.xml,actuator,12,gear,80.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,12,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,12,ctrllimited,1.0
+humanoid.xml,actuator,12,forcerange,0.0 0.0
+humanoid.xml,actuator,12,forcelimited,0.0
+humanoid.xml,actuator,12,damping,0.0
+humanoid.xml,actuator,12,dyntype,0.0
+humanoid.xml,actuator,12,gaintype,0.0
+humanoid.xml,actuator,12,biastype,0.0
+humanoid.xml,actuator,12,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,12,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,13,trntype,0.0
+humanoid.xml,actuator,13,trnid,14.0 -1.0
+humanoid.xml,actuator,13,gear,20.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,13,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,13,ctrllimited,1.0
+humanoid.xml,actuator,13,forcerange,0.0 0.0
+humanoid.xml,actuator,13,forcelimited,0.0
+humanoid.xml,actuator,13,damping,0.0
+humanoid.xml,actuator,13,dyntype,0.0
+humanoid.xml,actuator,13,gaintype,0.0
+humanoid.xml,actuator,13,biastype,0.0
+humanoid.xml,actuator,13,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,13,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,14,trntype,0.0
+humanoid.xml,actuator,14,trnid,15.0 -1.0
+humanoid.xml,actuator,14,gear,20.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,14,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,14,ctrllimited,1.0
+humanoid.xml,actuator,14,forcerange,0.0 0.0
+humanoid.xml,actuator,14,forcelimited,0.0
+humanoid.xml,actuator,14,damping,0.0
+humanoid.xml,actuator,14,dyntype,0.0
+humanoid.xml,actuator,14,gaintype,0.0
+humanoid.xml,actuator,14,biastype,0.0
+humanoid.xml,actuator,14,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,14,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,15,trntype,0.0
+humanoid.xml,actuator,15,trnid,16.0 -1.0
+humanoid.xml,actuator,15,gear,20.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,15,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,15,ctrllimited,1.0
+humanoid.xml,actuator,15,forcerange,0.0 0.0
+humanoid.xml,actuator,15,forcelimited,0.0
+humanoid.xml,actuator,15,damping,0.0
+humanoid.xml,actuator,15,dyntype,0.0
+humanoid.xml,actuator,15,gaintype,0.0
+humanoid.xml,actuator,15,biastype,0.0
+humanoid.xml,actuator,15,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,15,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,16,trntype,0.0
+humanoid.xml,actuator,16,trnid,17.0 -1.0
+humanoid.xml,actuator,16,gear,20.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,16,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,16,ctrllimited,1.0
+humanoid.xml,actuator,16,forcerange,0.0 0.0
+humanoid.xml,actuator,16,forcelimited,0.0
+humanoid.xml,actuator,16,damping,0.0
+humanoid.xml,actuator,16,dyntype,0.0
+humanoid.xml,actuator,16,gaintype,0.0
+humanoid.xml,actuator,16,biastype,0.0
+humanoid.xml,actuator,16,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,16,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,17,trntype,0.0
+humanoid.xml,actuator,17,trnid,18.0 -1.0
+humanoid.xml,actuator,17,gear,40.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,17,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,17,ctrllimited,1.0
+humanoid.xml,actuator,17,forcerange,0.0 0.0
+humanoid.xml,actuator,17,forcelimited,0.0
+humanoid.xml,actuator,17,damping,0.0
+humanoid.xml,actuator,17,dyntype,0.0
+humanoid.xml,actuator,17,gaintype,0.0
+humanoid.xml,actuator,17,biastype,0.0
+humanoid.xml,actuator,17,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,17,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,18,trntype,0.0
+humanoid.xml,actuator,18,trnid,19.0 -1.0
+humanoid.xml,actuator,18,gear,20.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,18,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,18,ctrllimited,1.0
+humanoid.xml,actuator,18,forcerange,0.0 0.0
+humanoid.xml,actuator,18,forcelimited,0.0
+humanoid.xml,actuator,18,damping,0.0
+humanoid.xml,actuator,18,dyntype,0.0
+humanoid.xml,actuator,18,gaintype,0.0
+humanoid.xml,actuator,18,biastype,0.0
+humanoid.xml,actuator,18,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,18,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,19,trntype,0.0
+humanoid.xml,actuator,19,trnid,20.0 -1.0
+humanoid.xml,actuator,19,gear,20.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,19,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,19,ctrllimited,1.0
+humanoid.xml,actuator,19,forcerange,0.0 0.0
+humanoid.xml,actuator,19,forcelimited,0.0
+humanoid.xml,actuator,19,damping,0.0
+humanoid.xml,actuator,19,dyntype,0.0
+humanoid.xml,actuator,19,gaintype,0.0
+humanoid.xml,actuator,19,biastype,0.0
+humanoid.xml,actuator,19,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,19,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,20,trntype,0.0
+humanoid.xml,actuator,20,trnid,21.0 -1.0
+humanoid.xml,actuator,20,gear,40.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,20,ctrlrange,-1.0 1.0
+humanoid.xml,actuator,20,ctrllimited,1.0
+humanoid.xml,actuator,20,forcerange,0.0 0.0
+humanoid.xml,actuator,20,forcelimited,0.0
+humanoid.xml,actuator,20,damping,0.0
+humanoid.xml,actuator,20,dyntype,0.0
+humanoid.xml,actuator,20,gaintype,0.0
+humanoid.xml,actuator,20,biastype,0.0
+humanoid.xml,actuator,20,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,actuator,20,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+humanoid.xml,tendon,0,joints,6.0 7.0
+humanoid.xml,tendon,0,coefficients,0.5 -0.5
+humanoid.xml,tendon,1,joints,12.0 13.0
+humanoid.xml,tendon,1,coefficients,0.5 -0.5
+humanoid.xml,exclude,0,bodies,3.0 5.0
+humanoid.xml,exclude,1,bodies,3.0 8.0

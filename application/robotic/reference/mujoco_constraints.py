@@ -22,12 +22,14 @@ import mujoco
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MODELS = os.path.join(HERE, '..', 'models')
+HUMANOID = os.path.join(HERE, '..', '..', '..', '3rd_party', 'mujoco',
+                        'humanoid.xml')
 
 NEWTON = mujoco.mjtSolver.mjSOL_NEWTON
 PGS = mujoco.mjtSolver.mjSOL_PGS
 
 # Name, model, steps, solver, starting positions and velocities to set by
-# address.
+# address, and controls.
 CASES = [
     ('rolling', 'rolling.xml', 1500, NEWTON, {}, {0: 2.0}),
     ('sliding', 'sliding.xml', 1000, NEWTON, {}, {0: 2.0, 7: 1.0}),
@@ -39,6 +41,10 @@ CASES = [
     ('stack by PGS', 'boxes.xml', 1000, PGS, {}, {}),
     ('limits by PGS', 'limits.xml', 1500, PGS, {0: 0.3, 5: -0.1},
      {0: 3.0, 1: 2.0, 2: -1.0, 4: 1.5, 5: 2.0}),
+    ('humanoid falling', HUMANOID, 400, NEWTON, {}, {}),
+    ('humanoid driven', HUMANOID, 400, NEWTON, {}, {},
+     [0.3 * ((7 * k) % 11 - 5) / 5 for k in range(21)]),
+    ('humanoid falling by PGS', HUMANOID, 400, PGS, {}, {}),
 ]
 
 
@@ -51,7 +57,7 @@ def main():
               newline='') as f:
         out = csv.writer(f, lineterminator='\n')
         out.writerow(['case', 'step', 'qpos', 'qvel'])
-        for name, file, steps, solver, qpos, qvel in CASES:
+        for name, file, steps, solver, qpos, qvel, *ctrl in CASES:
             model = mujoco.MjModel.from_xml_path(os.path.join(MODELS, file))
             model.opt.solver = solver
             data = mujoco.MjData(model)
@@ -59,6 +65,8 @@ def main():
                 data.qpos[address] = value
             for address, value in qvel.items():
                 data.qvel[address] = value
+            if ctrl:
+                data.ctrl[:] = ctrl[0]
             out.writerow([name, 0, text(data.qpos), text(data.qvel)])
             for step in range(1, steps + 1):
                 mujoco.mj_step(model, data)

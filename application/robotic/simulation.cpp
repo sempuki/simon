@@ -30,7 +30,8 @@ template <typename Capacity>
 auto weigh(const model::ArticulatedModel& m, const model::Tree& tree,
            const model::TreeKernel<Capacity>& kernel,
            InOut<std::vector<double>> body_weight,
-           InOut<std::vector<double>> dof_weight, InOut<double> inertia)
+           InOut<std::vector<double>> dof_weight,
+           InOut<std::vector<double>> tendon_weight, InOut<double> inertia)
     -> void {
   constexpr std::size_t V = Capacity::dofs;
   model::TreeState<Capacity> state;
@@ -72,6 +73,22 @@ auto weigh(const model::ArticulatedModel& m, const model::Tree& tree,
     }
     (*body_weight)[2 * body] = moved / 3;
     (*body_weight)[2 * body + 1] = turned / 3;
+  }
+  // A tendon's share on this tree; trees' inertia is block diagonal.
+  for (std::uint32_t k = 0; k < m.tendons.size(); ++k) {
+    const model::Tendon& tendon = m.tendons[k];
+    std::vector<double> row(n, 0.0);
+    bool touches = false;
+    for (std::size_t i = 0; i < tendon.joints.size(); ++i) {
+      std::uint32_t d = m.joints[tendon.joints[i]].dof;
+      if (d >= tree.first_dof && d < tree.first_dof + n) {
+        row[d - tree.first_dof] += tendon.coefficients[i];
+        touches = true;
+      }
+    }
+    if (touches) {
+      (*tendon_weight)[k] += inverse(row);
+    }
   }
   std::vector<double> unit(n);
   auto diagonal = [&](std::uint32_t c) {
@@ -125,6 +142,7 @@ Mechanics::Mechanics(model::ArticulatedModel model)
   bool implicit = is_implicit(model_);
   body_weight_.assign(2 * model_.bodies.size(), 0.0);
   dof_weight_.assign(model_.dofs.size(), 0.0);
+  tendon_weight_.assign(model_.tendons.size(), 0.0);
   double inertia = 0.0;
   for (std::uint32_t t = 0; t < trees_.size(); ++t) {
     small_.push_back(fits<SmallCapacity>(t)
@@ -137,10 +155,10 @@ Mechanics::Mechanics(model::ArticulatedModel model)
                          : nullptr);
     if (small_.back()) {
       weigh(model_, trees_[t], *small_.back(), InOut(body_weight_),
-            InOut(dof_weight_), InOut(inertia));
+            InOut(dof_weight_), InOut(tendon_weight_), InOut(inertia));
     } else if (large_.back()) {
       weigh(model_, trees_[t], *large_.back(), InOut(body_weight_),
-            InOut(dof_weight_), InOut(inertia));
+            InOut(dof_weight_), InOut(tendon_weight_), InOut(inertia));
     }
   }
   mean_inertia_ = model_.dofs.empty()
@@ -230,6 +248,10 @@ auto Simulation::configure() -> engine::PhaseResult {
       model.physics.cone == model::Physics::Cone::ELLIPTIC) {
     return std::unexpected(lib::raise(format::MjcfError::UNSUPPORTED,
                                       "the elliptic friction cone"));
+  }
+  if (model.physics.integrator != model::Physics::Integrator::EULER) {
+    return std::unexpected(lib::raise(format::MjcfError::UNSUPPORTED,
+                                      "integrators other than Euler"));
   }
   if (scenario_.constrained &&
       model.physics.solver == model::Physics::Solver::CG) {

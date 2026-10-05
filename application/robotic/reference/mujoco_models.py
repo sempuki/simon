@@ -19,9 +19,11 @@ import glob
 import os
 
 import mujoco
+import numpy
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MODELS = os.path.join(HERE, '..', 'models')
+THIRD_PARTY = os.path.join(HERE, '..', '..', '..', '3rd_party', 'mujoco')
 
 FIELDS = {
     'body': ['parentid', 'rootid', 'pos', 'quat', 'ipos', 'iquat', 'mass',
@@ -34,12 +36,14 @@ FIELDS = {
     'geom': ['type', 'bodyid', 'size', 'pos', 'quat', 'friction', 'condim',
              'contype', 'conaffinity', 'solref', 'solimp', 'margin', 'gap',
              'priority', 'sameframe'],
+    'tendon': ['limited', 'range', 'margin', 'frictionloss', 'solref_lim',
+               'solimp_lim', 'solref_fri', 'solimp_fri'],
     'actuator': ['trntype', 'trnid', 'gear', 'ctrlrange', 'ctrllimited',
                  'forcerange', 'forcelimited', 'damping', 'dyntype',
                  'gaintype', 'biastype', 'gainprm', 'biasprm'],
 }
 SIZES = {'body': 'nbody', 'jnt': 'njnt', 'dof': 'nv', 'geom': 'ngeom',
-         'actuator': 'nu'}
+         'tendon': 'ntendon', 'actuator': 'nu'}
 
 
 def text(values):
@@ -51,7 +55,9 @@ def main():
     with open(os.path.join(HERE, 'mujoco_models.csv'), 'w', newline='') as f:
         out = csv.writer(f, lineterminator='\n')
         out.writerow(['model', 'element', 'index', 'field', 'values'])
-        for path in sorted(glob.glob(os.path.join(MODELS, '*.xml'))):
+        paths = sorted(glob.glob(os.path.join(MODELS, '*.xml')))
+        paths.append(os.path.join(THIRD_PARTY, 'humanoid.xml'))
+        for path in paths:
             name = os.path.basename(path)
             model = mujoco.MjModel.from_xml_path(path)
             option = model.opt
@@ -67,6 +73,17 @@ def main():
                     for field in fields:
                         values = getattr(model, element + '_' + field)[index]
                         out.writerow([name, element, index, field, text(values)])
+            for index in range(model.ntendon):
+                adr = model.tendon_adr[index]
+                num = model.tendon_num[index]
+                out.writerow([name, 'tendon', index, 'joints',
+                              text(model.wrap_objid[adr:adr + num])])
+                out.writerow([name, 'tendon', index, 'coefficients',
+                              text(model.wrap_prm[adr:adr + num])])
+            for index in range(model.nexclude):
+                signature = int(model.exclude_signature[index])
+                out.writerow([name, 'exclude', index, 'bodies',
+                              text(numpy.array([signature >> 16, signature & 0xFFFF]))])
             print(name, model.nbody, 'bodies')
 
 

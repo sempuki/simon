@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <memory>
@@ -62,6 +64,16 @@ class Mechanics final {
     return body_weight_;
   }
   auto dof_weight() const -> const std::vector<double>& { return dof_weight_; }
+  auto tendon_weight() const -> const std::vector<double>& {
+    return tendon_weight_;
+  }
+
+  // Whether the model excludes contacts between two bodies.
+  auto excludes(std::uint32_t first, std::uint32_t second) const -> bool {
+    return std::ranges::binary_search(
+        model_.excludes, std::array<std::uint32_t, 2>{std::min(first, second),
+                                                      std::max(first, second)});
+  }
   auto mean_inertia() const -> double { return mean_inertia_; }
 
   template <typename Capacity>
@@ -81,6 +93,7 @@ class Mechanics final {
   std::vector<std::uint32_t> unbounded_;
   std::vector<double> body_weight_;  // 2 by body.
   std::vector<double> dof_weight_;
+  std::vector<double> tendon_weight_;
   double mean_inertia_ = 1.0;
   // Each tree's kernel at each capacity it fits, else none.
   std::vector<std::unique_ptr<model::TreeKernel<SmallCapacity>>> small_;

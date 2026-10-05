@@ -8,8 +8,8 @@ solves them at once. MuJoCo (Todorov, Erez and Tassa, "MuJoCo: A physics
 engine for model-based control", IROS 2012; Apache-2.0) is the reference.
 It is being built in eight steps (see the [Roadmap](#roadmap)); models read
 and compiled as MuJoCo compiles them, their dynamics without constraints,
-their actuators and control, their contacts, and the constraint solver are
-done.
+their actuators and control, their contacts, the constraint solver, and
+MuJoCo's humanoid are done.
 
 ## Choices
 
@@ -73,21 +73,22 @@ as a quaternion, or given explicitly, a full tensor turned to the body's
 axes first; joints' limits from their ranges, positions at rest and spring
 references; and each degree of freedom's place in the tree. Anything that
 would change how a model moves and that simon does not yet run is refused:
-tendons, equalities, meshes, contact pairs and exclusions, and actuators
-other than motors, position and velocity servos and general actuators with
-fixed gains. What only shows a model is left out. A body's inertial frame
+spatial tendons and tendon springs, equalities, meshes, explicit contact
+pairs, actuators other than motors, position and velocity servos and
+general actuators with fixed gains, and integrators other than Euler. Fixed
+tendons, a sum of joints' positions with limits and dry friction, and
+contact exclusions between bodies are read. What only shows a model is left out. A body's inertial frame
 and a geom's frame within 1e-6 of the body's frame, or of the inertial
 frame, are snapped to it, as MuJoCo snaps them; poses in the world then
 come from the same arithmetic.
 
-`model_test` compiles eight test models with every compiler feature (a
+`model_test` compiles eleven test models with every compiler feature (a
 pendulum, a double pendulum, a cart-pole, a tumbling free body of three
 offset geoms, a model of default classes and every orientation, a stack of
-boxes, an actuated arm, and a model of every primitive pair) and checks all
-3,954 compiled values of 2,276 fields against MuJoCo's
+boxes, an actuated arm, a model of every primitive pair, a rolling sphere,
+sliding bodies and limited joints) and MuJoCo's humanoid, with its tendons
+and exclusions, and checks every compiled value against MuJoCo's
 (`reference/mujoco_models.py`): every one is equal, to the last bit.
-MuJoCo's humanoid is refused, for its contact exclusions and tendons, until
-step 6.
 
 ## Dynamics
 
@@ -198,9 +199,9 @@ friction and soft parameter is equal to MuJoCo's to the last bit.
 
 `model/articulated_constraint` solves an island's constraints as MuJoCo
 3.14.0 does (Todorov, ICRA 2014). Each constraint is a soft row of the
-Jacobian: a dof's dry friction, a joint's limit once within its margin (a
-hinge or slide on either side, a ball past its largest angle), and a
-contact, frictionless or a pyramidal friction cone of 2 (dim - 1) edges,
+Jacobian: a dof's or a tendon's dry friction, a joint's or a tendon's limit
+once within its margin (a hinge, a slide or a tendon on either side, a ball
+past its largest angle), and a contact, frictionless or a pyramidal friction cone of 2 (dim - 1) edges,
 torsional and rolling friction among them. Each row's regularization comes
 from the inverse inertia it sees, the bodies' and dofs' at rest, and its
 impedance from solimp at its distance; its reference acceleration from
@@ -214,13 +215,14 @@ elliptic cone and the CG solver are refused until step 8.
 
 `Solve` runs after `Collide`, once a step, on the whole world, in its
 `prepare`: it gathers each tree's mass matrix and smooth accelerations,
-joins the trees that contacts touch into islands by union and find, and
+joins the trees that contacts and tendons touch into islands by union and
+find, and
 solves each island on its own, densely, since an island's rows and dofs are
 few; each tree learns its island. `Integrate` then steps each tree at its
 island's accelerations, or, where any dof of the model is damped, at its
 smooth and constraint forces through M + h B, as MuJoCo does.
 
-`constraint_test` checks eight cases against MuJoCo, every position and
+`constraint_test` checks eleven cases against MuJoCo, every position and
 velocity at every step (`reference/mujoco_constraints.py`):
 
 | Case | Steps | Newton, position | Newton, velocity | PGS, position | PGS, velocity |
@@ -229,6 +231,8 @@ velocity at every step (`reference/mujoco_constraints.py`):
 | A box sliding to rest; a capsule rolling with torsional and rolling friction | 1,000 | 1.7e-14 | 9.8e-14 | 3.9e-7 | 1.1e-5 |
 | Five boxes stacked at rest | 1,000 (PGS 200) | 4.9e-16 | 3.8e-14 | 5.4e-9 | 6.9e-7 |
 | Hinge, ball and slide limits, a margin, dry friction | 1,500 | 6.7e-15 | 4.8e-14 | 6.7e-15 | 5.7e-14 |
+| MuJoCo's humanoid falling from standing | 400 | 1.3e-13 | 1.1e-11 | 6.4e-14 | 5.2e-12 |
+| The humanoid falling, its 21 motors held at controls | 400 | 2.8e-13 | 7.6e-12 | | |
 
 Newton's method converges, and so matches MuJoCo to rounding grown over
 the run. Projected Gauss–Seidel stops at its tolerance; where a sweep ends
@@ -241,7 +245,8 @@ where Coulomb friction of 0.4 gives 0.5097 m; a sphere sliding at 2 m/s on
 the floor rolls at 1.4279 m/s, within 0.05% of five sevenths of 2 m/s, its
 spin matching; the stack rests within 2.1 mm of its height, still to 1e-12
 m/s by Newton's method, and within 5 mm/s by PGS, as MuJoCo's own PGS
-leaves it.
+leaves it. MuJoCo's humanoid, falling for 20 s, lies on the floor 0.070 m
+high, as MuJoCo's does, its tendons and limits holding.
 
 ## Roadmap
 
@@ -258,9 +263,13 @@ leaves it.
 5. Done: the constraint solver: soft contacts, joint limits and dry
    friction, Newton and PGS, by island; a sphere rolling, a box sliding, a
    stack, against MuJoCo and physics.
-6. Whole robots: MuJoCo's humanoid, with its tendons and contact
-   exclusions, and Apache-2.0 models from MuJoCo Menagerie.
+6. Done: MuJoCo's humanoid, with its fixed tendons and contact exclusions,
+   compiled to the last bit and stepped within 1e-11 of MuJoCo through its
+   fall. The Apache-2.0 models of MuJoCo Menagerie move to step 8: each uses
+   the elliptic cone, implicitfast, cylinders that only the convex collider
+   handles, or meshes.
 7. Scale and the viewer: ten thousand loose bodies and a thousand
    humanoids against MuJoCo on one thread, islands in parallel.
 8. Opt-in fidelity: implicitfast and Runge–Kutta 4, the elliptic cone, convex
-   meshes.
+   meshes and the pairs MuJoCo's convex collider handles; then MuJoCo
+   Menagerie's robots.

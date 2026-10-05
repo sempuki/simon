@@ -38,7 +38,8 @@ auto Collide::prepare(SystemWorld& world) -> bool {
   for (std::uint32_t g : mechanics_->unbounded()) {
     std::uint32_t owner = m.geoms[g].body;
     for (std::uint32_t b = 1; b < m.bodies.size(); ++b) {
-      if (b == owner || mechanics_->filter().discards(owner, b)) {
+      if (b == owner || mechanics_->filter().discards(owner, b) ||
+          mechanics_->excludes(owner, b)) {
         continue;
       }
       const model::ArticulatedBody& body = m.bodies[b];
@@ -106,7 +107,8 @@ auto Collide::prepare(SystemWorld& world) -> bool {
 auto Collide::collide_bodies(std::uint32_t first, std::uint32_t second)
     -> void {
   const model::ArticulatedModel& m = mechanics_->model();
-  if (mechanics_->filter().discards(first, second)) {
+  if (mechanics_->filter().discards(first, second) ||
+      mechanics_->excludes(first, second)) {
     return;
   }
   const model::ArticulatedBody& a = m.bodies[first];
@@ -174,6 +176,37 @@ auto Solve::tree_of_geom(std::uint32_t geom) const -> std::uint32_t {
   return trees[t].dofs > 0 ? t : NO_TREE;
 }
 
+auto Solve::tree_of_joint(std::uint32_t joint) const -> std::uint32_t {
+  const std::vector<model::Tree>& trees = mechanics_->trees();
+  auto it =
+      std::ranges::upper_bound(trees, joint, {}, &model::Tree::first_joint);
+  return static_cast<std::uint32_t>(it - trees.begin()) - 1;
+}
+
+auto Solve::tendon_length(std::uint32_t k) const -> double {
+  const model::ArticulatedModel& m = mechanics_->model();
+  const model::Tendon& tendon = m.tendons[k];
+  double length = 0.0;
+  for (std::size_t i = 0; i < tendon.joints.size(); ++i) {
+    const model::Joint& joint = m.joints[tendon.joints[i]];
+    std::uint32_t t = tree_of_joint(tendon.joints[i]);
+    const model::Tree& tree = mechanics_->trees()[t];
+    length +=
+        tendon.coefficients[i] * data_[t].qpos[joint.qpos - tree.first_qpos];
+  }
+  return length;
+}
+
+auto Solve::tendon_reached(std::uint32_t k) const -> bool {
+  const model::Tendon& tendon = mechanics_->model().tendons[k];
+  if (!tendon.limited) {
+    return false;
+  }
+  double length = tendon_length(k);
+  return length - tendon.range[0] < tendon.margin ||
+         tendon.range[1] - length < tendon.margin;
+}
+
 auto Solve::prepare(SystemWorld& world) -> bool {
   const model::ArticulatedModel& m = mechanics_->model();
   const std::vector<model::Tree>& trees = mechanics_->trees();
@@ -224,10 +257,28 @@ auto Solve::prepare(SystemWorld& world) -> bool {
     }
   }
 
-  // Islands: trees joined by contacts, by union and find.
+  // Islands: trees joined by contacts and tendons, by union and find.
   parent_.resize(count);
   for (std::uint32_t t = 0; t < count; ++t) {
     parent_[t] = t;
+  }
+  for (std::uint32_t k = 0; k < m.tendons.size(); ++k) {
+    const model::Tendon& tendon = m.tendons[k];
+    if (tendon.friction_loss == 0 && !tendon_reached(k)) {
+      continue;
+    }
+    std::uint32_t first = NO_TREE;
+    for (std::uint32_t j : tendon.joints) {
+      std::uint32_t t = tree_of_joint(j);
+      marked[t] = 1;
+      if (first == NO_TREE) {
+        first = t;
+      } else {
+        std::uint32_t ra = find_root(first);
+        std::uint32_t rb = find_root(t);
+        parent_[std::max(ra, rb)] = std::min(ra, rb);
+      }
+    }
   }
   const std::vector<model::Contact>& contacts = contacts_->contacts;
   for (const model::Contact& contact : contacts) {
@@ -290,6 +341,7 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
   const std::vector<model::Tree>& trees = mechanics_->trees();
   const std::vector<double>& body_weight = mechanics_->body_weight();
   const std::vector<double>& dof_weight = mechanics_->dof_weight();
+  const std::vector<double>& tendon_weight = mechanics_->tendon_weight();
   model::ConstraintProblem& p = problem_;
 
   // The island's dofs, its trees' in order.
@@ -369,6 +421,30 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
     }
   }
 
+  // A tendon's row: its coefficients on its joints' dofs.
+  auto tendon_row = [&](const model::Tendon& tendon, double scale) {
+    std::ranges::fill(row, 0.0);
+    for (std::size_t i = 0; i < tendon.joints.size(); ++i) {
+      const model::Joint& joint = m.joints[tendon.joints[i]];
+      std::uint32_t t = tree_of_joint(tendon.joints[i]);
+      row[offset[t] + joint.dof - trees[t].first_dof] +=
+          scale * tendon.coefficients[i];
+    }
+  };
+  auto in_island = [&](const model::Tendon& tendon) {
+    std::uint32_t t = tree_of_joint(tendon.joints.front());
+    return std::ranges::contains(members, t);
+  };
+  for (std::uint32_t k = 0; k < m.tendons.size(); ++k) {
+    const model::Tendon& tendon = m.tendons[k];
+    if (tendon.friction_loss == 0 || !in_island(tendon)) {
+      continue;
+    }
+    tendon_row(tendon, 1.0);
+    append(model::ConstraintKind::FRICTION, p.rows(), 0.0, 0.0,
+           tendon.friction_loss, tendon_weight[k], 0.0, tendon.friction);
+  }
+
   // Limits, by joint: each side a hinge or slide is within its margin of,
   // and a ball's angle past its largest (mj_instantiateLimit).
   for (std::uint32_t t : members) {
@@ -405,6 +481,23 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
           append(model::ConstraintKind::LIMIT, p.rows(), dist, joint.margin,
                  0.0, dof_weight[joint.dof], 0.0, joint.limit);
         }
+      }
+    }
+  }
+
+  // Then by tendon, each side its length is within its margin of.
+  for (std::uint32_t k = 0; k < m.tendons.size(); ++k) {
+    const model::Tendon& tendon = m.tendons[k];
+    if (!tendon.limited || !in_island(tendon)) {
+      continue;
+    }
+    double length = tendon_length(k);
+    for (int side = -1; side <= 1; side += 2) {
+      double dist = side * (tendon.range[(side + 1) / 2] - length);
+      if (dist < tendon.margin) {
+        tendon_row(tendon, -static_cast<double>(side));
+        append(model::ConstraintKind::LIMIT, p.rows(), dist, tendon.margin, 0.0,
+               tendon_weight[k], 0.0, tendon.limit);
       }
     }
   }

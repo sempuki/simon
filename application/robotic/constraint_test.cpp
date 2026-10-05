@@ -19,6 +19,7 @@ namespace simon::robotic {
 namespace {
 
 constexpr std::string_view MODELS = "application/robotic/models/";
+constexpr std::string_view HUMANOID = "3rd_party/mujoco/humanoid.xml";
 
 auto parse_numbers(const std::string& text) -> std::vector<double> {
   std::vector<double> values;
@@ -108,6 +109,10 @@ TEST_CASE("ConstraintsAgainstMuJoCo") {
     // ending a step apart by rounding: a stack over its first 0.4 s.
     std::map<std::string, Run> runs = load_runs();
     using Solver = model::Physics::Solver;
+    std::vector<double> driven;
+    for (int k = 0; k < 21; ++k) {
+      driven.push_back(0.3 * ((7 * k) % 11 - 5) / 5);
+    }
     // clang-format off
     std::vector<Case> cases{
         {"rolling", "rolling.xml", {.qvel = {{0, 2.0}}}, 1e-11, 1e-10},
@@ -128,11 +133,17 @@ TEST_CASE("ConstraintsAgainstMuJoCo") {
          {.qpos = {{0, 0.3}, {5, -0.1}},
           .qvel = {{0, 3.0}, {1, 2.0}, {2, -1.0}, {4, 1.5}, {5, 2.0}},
           .solver = Solver::PGS}, 1e-12, 1e-12},
+        {"humanoid falling", "humanoid", {}, 1e-12, 1e-10, 400},
+        {"humanoid driven", "humanoid", {.control = driven}, 1e-12, 1e-10,
+         400},
+        {"humanoid falling by PGS", "humanoid", {.solver = Solver::PGS}, 1e-12,
+         1e-10, 400},
     };
     // clang-format on
     for (Case& c : cases) {
       CAPTURE(c.name);
-      c.scenario.model = std::string{MODELS} + c.file;
+      c.scenario.model = c.file == "humanoid" ? std::string{HUMANOID}
+                                              : std::string{MODELS} + c.file;
       Simulation simulation{c.scenario};
       auto configured = simulation.configure();
       if (!configured) {
@@ -168,6 +179,23 @@ TEST_CASE("ConstraintsAgainstPhysics") {
     };
     CHECK(islands("sliding.xml") == std::vector<std::uint32_t>{0, 1});
     CHECK(islands("boxes.xml") == std::vector<std::uint32_t>{0, 0, 0, 0, 0});
+  }
+
+  SECTION("ShouldComeToRestGivenAFallenHumanoid") {
+    // MuJoCo's humanoid falls from standing, slumps, and lies on the
+    // floor, as MuJoCo's does: 0.070 m high at 20 s, still settling.
+    Simulation simulation{Scenario{.model = std::string{HUMANOID}}};
+    REQUIRE(simulation.configure());
+    step_for(InOut(simulation), 20.0);
+    std::vector<double> q = simulation.read_qpos();
+    std::vector<double> v = simulation.read_qvel();
+    double speed = 0.0;
+    for (double x : v) {
+      speed = std::max(speed, std::abs(x));
+    }
+    CAPTURE(q[2], speed);
+    CHECK(q[2] < 0.1);
+    CHECK(speed < 0.1);
   }
 
   SECTION("ShouldSlideAsFarAsCoulombFrictionAllows") {

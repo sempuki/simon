@@ -147,6 +147,20 @@ auto find_value(const ArticulatedModel& m, const Row& row)
     if (f == "gap") return number(g.gap);
     if (f == "priority") return number(g.priority);
     if (f == "sameframe") return number(static_cast<double>(g.frame));
+  } else if (row.element == "tendon") {
+    const model::Tendon& t = m.tendons.at(i);
+    if (f == "limited") return number(t.limited ? 1 : 0);
+    if (f == "range") return doubles(t.range);
+    if (f == "margin") return number(t.margin);
+    if (f == "frictionloss") return number(t.friction_loss);
+    if (f == "solref_lim") return doubles(t.limit.reference);
+    if (f == "solimp_lim") return doubles(t.limit.impedance);
+    if (f == "solref_fri") return doubles(t.friction.reference);
+    if (f == "solimp_fri") return doubles(t.friction.impedance);
+    if (f == "joints") return doubles(t.joints);
+    if (f == "coefficients") return t.coefficients;
+  } else if (row.element == "exclude") {
+    return doubles(m.excludes.at(i));
   } else if (row.element == "actuator") {
     const model::Actuator& a = m.actuators.at(i);
     if (f == "trntype") return number(0);  // A joint.
@@ -183,7 +197,9 @@ TEST_CASE("ModelAgainstMuJoCo") {
     std::size_t compared = 0;
     for (const Row& row : load_rows()) {
       if (!models.contains(row.model)) {
-        auto loaded = format::load_mjcf(std::string{MODELS} + row.model);
+        auto loaded = format::load_mjcf(row.model == "humanoid.xml"
+                                            ? "3rd_party/mujoco/humanoid.xml"
+                                            : std::string{MODELS} + row.model);
         if (!loaded) {
           FAIL(row.model << ": " << loaded.error().message());
         }
@@ -211,25 +227,25 @@ TEST_CASE("ModelAgainstMuJoCo") {
 
 TEST_CASE("Mjcf") {
   SECTION("ShouldRefuseWhatItDoesNotRun") {
-    // Tendons, meshes and actuators other than motors change how a model
-    // moves, and are refused with their names; MuJoCo's humanoid, for its
-    // contact exclusions, the first of those and its tendons.
+    // Spatial tendons, explicit contact pairs, meshes and actuators with
+    // activation change how a model moves, and are refused with their
+    // names.
     auto refused = [](std::string_view text) {
       auto read = format::parse_mjcf(text);
       REQUIRE(!read.has_value());
       return read.error().message();
     };
-    CHECK(refused(R"(<mujoco><tendon/></mujoco>)").find("tendon") !=
-          std::string::npos);
+    CHECK(refused(R"(<mujoco><tendon><spatial/></tendon></mujoco>)")
+              .find("spatial") != std::string::npos);
+    CHECK(refused(R"(<mujoco><contact><pair geom1="a" geom2="b"/></contact>
+            </mujoco>)")
+              .find("pair") != std::string::npos);
     CHECK(refused(R"(<mujoco><worldbody><body><freejoint/>
             <geom type="mesh" mesh="m"/></body></worldbody></mujoco>)")
               .find("mesh") != std::string::npos);
     CHECK(refused(R"(<mujoco><actuator><intvelocity joint="j"/></actuator>
             </mujoco>)")
               .find("intvelocity") != std::string::npos);
-    auto humanoid = format::load_mjcf("3rd_party/mujoco/humanoid.xml");
-    REQUIRE(!humanoid.has_value());
-    CHECK(humanoid.error().message().find("contact") != std::string::npos);
   }
 
   SECTION("ShouldNotReadGivenMalformedModel") {

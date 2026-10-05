@@ -145,6 +145,21 @@ struct Actuator final {
   bool force_limited = false;
 };
 
+// A fixed tendon: a length that is the sum of hinges' and slides'
+// positions, each times its coefficient, with limits on it and dry friction
+// along it.
+struct Tendon final {
+  std::string name;
+  std::vector<std::uint32_t> joints;
+  std::vector<double> coefficients;
+  std::array<double, 2> range{};  // m.
+  double margin = 0.0;
+  double friction_loss = 0.0;
+  SoftConstraint limit;
+  SoftConstraint friction;
+  bool limited = false;
+};
+
 // How the model steps, as MuJoCo's option element sets it.
 struct Physics final {
   enum class Integrator : std::uint8_t { EULER, RK4, IMPLICIT, IMPLICIT_FAST };
@@ -185,6 +200,9 @@ struct ArticulatedModel final {
   std::vector<Dof> dofs;
   std::vector<Geom> geoms;
   std::vector<Actuator> actuators;
+  std::vector<Tendon> tendons;
+  // Pairs of bodies whose geoms never touch, the lower first, in order.
+  std::vector<std::array<std::uint32_t, 2>> excludes;
   std::vector<double> qpos0;        // Each position at rest.
   std::vector<double> qpos_spring;  // Where each spring is unstretched.
 };

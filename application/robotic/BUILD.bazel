@@ -92,7 +92,10 @@ cc_test(
     size = "small",
     srcs = ["constraint_test.cpp"],
     copts = COPTS,
-    data = glob(["models/*.xml"]) + ["reference/mujoco_constraints.csv"],
+    data = glob(["models/*.xml"]) + [
+        "reference/mujoco_constraints.csv",
+        "//3rd_party:mujoco",
+    ],
     deps = [
         ":robotic_library",
         "@lib//base:testing",

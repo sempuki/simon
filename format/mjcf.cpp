@@ -44,6 +44,7 @@ using model::Physics;
 using model::Quaternion4;
 using model::SameFrame;
 using model::SoftConstraint;
+using model::Tendon;
 
 using Failure = std::unexpected<lib::Status>;
 using lib::InOut;
@@ -304,6 +305,12 @@ struct JointSpec final {
   double friction_loss = 0.0;
 };
 
+struct TendonSpec final {
+  Tendon tendon;
+  std::vector<std::string> joints;
+  Limited limited = Limited::AUTO;
+};
+
 struct ActuatorSpec final {
   Actuator actuator;
   std::string joint;
@@ -390,6 +397,24 @@ class Reader final {
       } else if (kind == "actuator") {
         for (pugi::xml_node actuator : node.children()) {
           RETURN_IF_UNEXPECTED(read_actuator(actuator));
+        }
+      } else if (kind == "tendon") {
+        for (pugi::xml_node tendon : node.children()) {
+          RETURN_IF_UNEXPECTED(read_tendon(tendon));
+        }
+      } else if (kind == "contact") {
+        for (pugi::xml_node contact : node.children()) {
+          if (std::string_view{contact.name()} != "exclude") {
+            return refuse(contact);
+          }
+          for (pugi::xml_attribute attribute : contact.attributes()) {
+            std::string_view name = attribute.name();
+            if (name != "name" && name != "body1" && name != "body2") {
+              return refuse(contact, name);
+            }
+          }
+          excludes_.push_back({contact.attribute("body1").as_string(),
+                               contact.attribute("body2").as_string()});
         }
       } else if (kind == "visual" || kind == "asset" || kind == "statistic" ||
                  kind == "sensor" || kind == "keyframe" || kind == "custom" ||
@@ -1112,6 +1137,57 @@ class Reader final {
     return {};
   }
 
+  // A fixed tendon and its joints' coefficients; spatial tendons, which
+  // wrap around sites and geoms, and tendon springs are refused.
+  auto read_tendon(pugi::xml_node node) -> std::expected<void, lib::Status> {
+    if (std::string_view{node.name()} != "fixed") {
+      return refuse(node);
+    }
+    for (pugi::xml_attribute attribute : node.attributes()) {
+      std::string_view name = attribute.name();
+      static constexpr std::array<std::string_view, 15> KNOWN{
+          "name",           "limited",     "range",       "margin",
+          "frictionloss",   "solreflimit", "solimplimit", "solreffriction",
+          "solimpfriction", "group",       "rgba",        "width",
+          "material",       "user",        "class"};
+      bool spring = (name == "stiffness" || name == "damping") &&
+                    attribute.as_double() == 0.0;
+      if (!std::ranges::contains(KNOWN, name) && !spring) {
+        return refuse(node, name);
+      }
+    }
+    if (node.attribute("class")) {
+      return refuse(node, "class");
+    }
+    TendonSpec spec;
+    Tendon& tendon = spec.tendon;
+    tendon.name = node.attribute("name").as_string();
+    RETURN_IF_UNEXPECTED(read_limited(node, "limited", InOut(spec.limited)));
+    RETURN_IF_UNEXPECTED(read_array(node, "range", InOut(tendon.range)));
+    RETURN_IF_UNEXPECTED(read_number(node, "margin", InOut(tendon.margin)));
+    RETURN_IF_UNEXPECTED(
+        read_number(node, "frictionloss", InOut(tendon.friction_loss)));
+    RETURN_IF_UNEXPECTED(
+        read_array(node, "solreflimit", InOut(tendon.limit.reference)));
+    RETURN_IF_UNEXPECTED(
+        read_array(node, "solimplimit", InOut(tendon.limit.impedance)));
+    RETURN_IF_UNEXPECTED(
+        read_array(node, "solreffriction", InOut(tendon.friction.reference)));
+    RETURN_IF_UNEXPECTED(
+        read_array(node, "solimpfriction", InOut(tendon.friction.impedance)));
+    for (pugi::xml_node joint : node.children()) {
+      if (std::string_view{joint.name()} != "joint") {
+        return refuse(joint);
+      }
+      spec.joints.emplace_back(joint.attribute("joint").as_string());
+      double coefficient = 1.0;
+      RETURN_IF_UNEXPECTED(read_number(joint, "coef", InOut(coefficient)));
+      tendon.coefficients.push_back(coefficient);
+    }
+    tendons_.push_back(std::move(spec));
+    return {};
+  }
+
   auto read_actuator(pugi::xml_node node) -> std::expected<void, lib::Status> {
     std::string_view kind = node.name();
     if (kind != "motor" && kind != "position" && kind != "velocity" &&
@@ -1270,6 +1346,34 @@ class Reader final {
           resolve_limited(spec.force_limited, actuator.force_range);
       model->actuators.push_back(actuator);
     }
+    for (TendonSpec& spec : tendons_) {
+      Tendon tendon = spec.tendon;
+      for (const std::string& name : spec.joints) {
+        auto joint = std::ranges::find(model->joints, name, &Joint::name);
+        if (joint == model->joints.end()) {
+          return fail("no joint " + name + " for tendon " + tendon.name);
+        }
+        if (joint->type == JointType::FREE || joint->type == JointType::BALL) {
+          return fail("tendon " + tendon.name + " on a ball or free joint");
+        }
+        tendon.joints.push_back(
+            static_cast<std::uint32_t>(joint - model->joints.begin()));
+      }
+      tendon.limited = resolve_limited(spec.limited, tendon.range);
+      model->tendons.push_back(std::move(tendon));
+    }
+    for (const auto& [first, second] : excludes_) {
+      auto a = std::ranges::find(model->bodies, first, &ArticulatedBody::name);
+      auto b = std::ranges::find(model->bodies, second, &ArticulatedBody::name);
+      if (a == model->bodies.end() || b == model->bodies.end()) {
+        return fail("no body " + (a == model->bodies.end() ? first : second) +
+                    " for a contact exclusion");
+      }
+      auto i = static_cast<std::uint32_t>(a - model->bodies.begin());
+      auto j = static_cast<std::uint32_t>(b - model->bodies.begin());
+      model->excludes.push_back({std::min(i, j), std::max(i, j)});
+    }
+    std::ranges::sort(model->excludes);
     classify_frames(model);
     return {};
   }
@@ -1594,6 +1698,8 @@ class Reader final {
   CompilerSpec compiler_;
   std::map<std::string, Defaults> defaults_;
   std::vector<ActuatorSpec> actuators_;
+  std::vector<TendonSpec> tendons_;
+  std::vector<std::pair<std::string, std::string>> excludes_;
 };
 
 }  // namespace

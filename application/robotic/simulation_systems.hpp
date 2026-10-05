@@ -136,9 +136,10 @@ struct Collide final    //
   std::vector<std::uint32_t> touching_;   // By tree.
 };
 
-// After Collide, the constraints of every tree, as rows: its dofs' dry
-// friction, its joints' limits, and the contacts' pyramidal friction cones.
-// Trees that contacts join form an island, and each island is solved on
+// After Collide, the constraints of every tree, as rows: its dofs' and
+// tendons' dry friction, its joints' and tendons' limits, and the contacts'
+// pyramidal friction cones. Trees that contacts and tendons join form an
+// island, and each island is solved on
 // its own, by Newton's method or projected Gauss–Seidel as the model says;
 // each tree is told its island.
 struct Solve final    //
@@ -183,6 +184,9 @@ struct Solve final    //
   auto gather(SystemWorld& world) -> void;
   auto find_root(std::uint32_t tree) -> std::uint32_t;
   auto tree_of_geom(std::uint32_t geom) const -> std::uint32_t;
+  auto tree_of_joint(std::uint32_t joint) const -> std::uint32_t;
+  auto tendon_length(std::uint32_t tendon) const -> double;
+  auto tendon_reached(std::uint32_t tendon) const -> bool;
   auto solve_island(std::span<const std::uint32_t> trees,
                     std::span<const std::uint32_t> contacts) -> std::uint32_t;
 
