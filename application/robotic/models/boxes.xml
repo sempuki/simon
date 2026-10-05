@@ -1,0 +1,12 @@
+<!-- Copyright 2026 -- CONTRIBUTORS. See LICENSE. -->
+<!-- Five boxes stacked on the floor, each free. -->
+<mujoco model="boxes">
+  <worldbody>
+    <geom name="floor" type="plane" size="0 0 0.1"/>
+    <body name="box0" pos="0 0 0.1"><freejoint/><geom type="box" size="0.1 0.1 0.1"/></body>
+    <body name="box1" pos="0 0 0.3"><freejoint/><geom type="box" size="0.1 0.1 0.1"/></body>
+    <body name="box2" pos="0 0 0.5"><freejoint/><geom type="box" size="0.1 0.1 0.1"/></body>
+    <body name="box3" pos="0 0 0.7"><freejoint/><geom type="box" size="0.1 0.1 0.1"/></body>
+    <body name="box4" pos="0 0 0.9"><freejoint/><geom type="box" size="0.1 0.1 0.1"/></body>
+  </worldbody>
+</mujoco>

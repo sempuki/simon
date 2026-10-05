@@ -120,3 +120,11 @@ full where it first appears, and as "above" after.
 
 The aeronautic application's references, which compare simon with JSBSim, are
 described in `application/aeronautic/reference/README.md`.
+
+## Articulated bodies
+
+| Where | What | Source |
+|---|---|---|
+| `articulated.hpp` | Kinematic trees of rigid bodies on joints in generalized coordinates, their shapes, actuators and options, as a compiled model holds them | E. Todorov, T. Erez and Y. Tassa, "MuJoCo: A physics engine for model-based control", IROS 2012; MuJoCo 3.14.0 (Apache-2.0), its documentation's Modeling and Computation chapters and mjModel |
+| `format/mjcf.cpp` | Compiling MJCF: default classes, orientations, fromto, geom volumes and moments, inertia combined and put on principal axes, limits from ranges, positions at rest | MuJoCo 3.14.0's compiler, src/user/user_objects.cc, user_util.cc and user_model.cc, in their order of operations |
+| `format/mjcf.cpp` | Principal axes of inertia by Jacobi rotations, each the symmetric Schur decomposition of the largest off-diagonal element | G. H. Golub and C. F. Van Loan, *Matrix Computations*, 4th edition, Johns Hopkins, 2013, section 8.5; as MuJoCo's mjuu_eig3 keeps them, as a quaternion |

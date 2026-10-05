@@ -1,0 +1,19 @@
+<!-- Copyright 2026 -- CONTRIBUTORS. See LICENSE. -->
+<!-- A cart on a rail with a pole on a hinge, the cart pushed by a motor. -->
+<mujoco model="cartpole">
+  <option timestep="0.01" integrator="Euler"/>
+  <worldbody>
+    <geom name="floor" type="plane" size="5 5 0.1"/>
+    <body name="cart" pos="0 0 0.5">
+      <joint name="slider" type="slide" axis="1 0 0" range="-2 2" damping="0.1"/>
+      <geom name="cart" type="box" size="0.2 0.1 0.05" mass="1"/>
+      <body name="pole">
+        <joint name="hinge" axis="0 1 0" range="-90 90" armature="0.001"/>
+        <geom name="pole" type="capsule" fromto="0 0 0 0 0 0.6" size="0.02" mass="0.1"/>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor name="push" joint="slider" gear="10" ctrlrange="-1 1"/>
+  </actuator>
+</mujoco>

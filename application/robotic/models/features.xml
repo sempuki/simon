@@ -1,0 +1,43 @@
+<!-- Copyright 2026 -- CONTRIBUTORS. See LICENSE. -->
+<!-- The compiler's features: default classes nested and inherited,
+     childclass and class, partial vectors, every orientation, explicit
+     inertia diagonal and full, ball and slide joints, angles in radians and
+     a fixed-axes euler sequence. -->
+<mujoco model="features">
+  <compiler angle="radian" eulerseq="XYZ"/>
+  <option timestep="0.004" gravity="0 0 -9.8" cone="elliptic" solver="PGS"
+          iterations="50" tolerance="1e-10"/>
+  <default>
+    <geom friction="0.8" solref="0.01 0.9"/>
+    <joint damping="0.5" armature="0.02"/>
+    <default class="limb">
+      <geom type="capsule" size="0.03" condim="1" solimp="0.8 0.9"/>
+      <joint stiffness="3" range="-1 1" springref="0.1"/>
+      <default class="stiff">
+        <joint stiffness="9"/>
+      </default>
+    </default>
+  </default>
+  <worldbody>
+    <geom name="ground" type="plane" size="0 0 1" contype="2" conaffinity="3"/>
+    <body name="base" pos="0 0 1" childclass="limb" quat="0.9 0.1 0.2 0.3">
+      <joint name="slide" type="slide" axis="0 0 2" range="-0.5 0.5"/>
+      <inertial pos="0 0 0.1" mass="2" diaginertia="0.1 0.2 0.25"/>
+      <geom name="trunk" fromto="0 0 0 0 0 0.3"/>
+      <body name="arm" pos="0.1 0 0.3" xyaxes="0 1 0 -1 0 0">
+        <joint name="ball" type="ball" range="0 1.2"/>
+        <geom name="arm" fromto="0 0 0 0.3 0 0" friction="0.5 0.01"/>
+        <body name="hand" pos="0.3 0 0" euler="0.1 0.2 0.3">
+          <joint name="wrist" class="stiff" axis="1 1 0"/>
+          <inertial pos="0.05 0 0" mass="0.3"
+                    fullinertia="0.004 0.003 0.002 0.0005 0.0002 0.0001"/>
+          <geom name="hand" type="sphere" size="0.05" pos="0.05 0 0" class="main"/>
+        </body>
+      </body>
+      <body name="leg" pos="0 0 0" zaxis="0 1 -1">
+        <joint name="hip" axis="0 1 0" ref="0.2" limited="false"/>
+        <geom name="leg" type="box" fromto="0 0 0 0 0 0.4" size="0.04 0.05"/>
+      </body>
+    </body>
+  </worldbody>
+</mujoco>

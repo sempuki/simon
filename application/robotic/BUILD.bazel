@@ -1,0 +1,22 @@
+# Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+
+load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_test(
+    name = "model_test",
+    size = "small",
+    srcs = ["model_test.cpp"],
+    copts = COPTS,
+    data = glob(["models/*.xml"]) + [
+        "reference/mujoco_models.csv",
+        "//3rd_party:mujoco",
+    ],
+    deps = [
+        "//format:mjcf",
+        "//model:articulated",
+        "@lib//base:testing",
+    ],
+)

@@ -422,6 +422,12 @@ cc_library(
 )
 
 cc_library(
+    name = "articulated",
+    hdrs = ["articulated.hpp"],
+    copts = COPTS,
+)
+
+cc_library(
     name = "polyline",
     srcs = ["polyline.cpp"],
     hdrs = ["polyline.hpp"],

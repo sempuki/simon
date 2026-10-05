@@ -65,6 +65,11 @@ filegroup(
 )
 
 filegroup(
+    name = "mujoco",
+    srcs = glob(["mujoco/*.xml"]),
+)
+
+filegroup(
     name = "jsbsim",
     srcs = glob(["jsbsim/*.aircraft"]),
 )

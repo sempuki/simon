@@ -1,0 +1,12 @@
+<!-- Copyright 2026 -- CONTRIBUTORS. See LICENSE. -->
+<!-- A pendulum: a capsule on a hinge, swinging under gravity. -->
+<mujoco model="pendulum">
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+  <worldbody>
+    <body name="arm" pos="0 0 1">
+      <joint name="swing" type="hinge" axis="0 1 0" damping="0"/>
+      <geom name="rod" type="capsule" fromto="0 0 0 0.5 0 0" size="0.02"/>
+      <geom name="bob" type="sphere" pos="0.5 0 0" size="0.05"/>
+    </body>
+  </worldbody>
+</mujoco>
