@@ -110,6 +110,7 @@ TEST_CASE("ConstraintsAgainstMuJoCo") {
     std::map<std::string, Run> runs = load_runs();
     using Solver = model::Physics::Solver;
     using Cone = model::Physics::Cone;
+    using Integrator = model::Physics::Integrator;
     std::vector<double> driven;
     for (int k = 0; k < 21; ++k) {
       driven.push_back(0.3 * ((7 * k) % 11 - 5) / 5);
@@ -154,7 +155,21 @@ TEST_CASE("ConstraintsAgainstMuJoCo") {
          {.qvel = {{0, 2.0}, {7, 1.0}},
           .solver = Solver::PGS,
           .cone = Cone::ELLIPTIC},
-         1e-6, 1e-4},
+         1e-6, 1e-4},        {"arm implicitfast", "arm.xml",
+         {.qpos = {{0, 0.3}, {1, -0.5}},
+          .control = {0.8, -1.2, 2.0, 0.5},
+          .integrator = Integrator::IMPLICIT_FAST},
+         1e-15, 1e-15},
+        {"free body implicitfast", "free_body.xml",
+         {.qvel = {{0, 0.3}, {1, -0.1}, {2, 0.2}, {3, 4.0}, {4, 0.5}, {5, 1.5}},
+          .integrator = Integrator::IMPLICIT_FAST},
+         1e-14, 1e-14},
+        {"rolling implicitfast", "rolling.xml",
+         {.qvel = {{0, 2.0}}, .integrator = Integrator::IMPLICIT_FAST}, 1e-12,
+         1e-12},
+        {"humanoid driven implicitfast", "humanoid",
+         {.control = driven, .integrator = Integrator::IMPLICIT_FAST}, 1e-12,
+         1e-10, 400},
     };
     // clang-format on
     for (Case& c : cases) {

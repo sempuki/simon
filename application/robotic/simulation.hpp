@@ -28,6 +28,7 @@ struct Scenario final {
   bool constrained = true;      // Contacts, limits and dry friction.
   std::optional<model::Physics::Solver> solver;  // Overrides the model's.
   std::optional<model::Physics::Cone> cone;      // Likewise.
+  std::optional<model::Physics::Integrator> integrator;
 };
 
 class Simulation final {

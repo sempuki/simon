@@ -256,9 +256,14 @@ auto Simulation::configure() -> engine::PhaseResult {
   if (scenario_.cone) {
     model.physics.cone = *scenario_.cone;
   }
-  if (model.physics.integrator != model::Physics::Integrator::EULER) {
-    return std::unexpected(lib::raise(format::MjcfError::UNSUPPORTED,
-                                      "integrators other than Euler"));
+  if (scenario_.integrator) {
+    model.physics.integrator = *scenario_.integrator;
+  }
+  if (model.physics.integrator != model::Physics::Integrator::EULER &&
+      model.physics.integrator != model::Physics::Integrator::IMPLICIT_FAST) {
+    return std::unexpected(
+        lib::raise(format::MjcfError::UNSUPPORTED,
+                   "integrators other than Euler and implicitfast"));
   }
   if (scenario_.constrained &&
       model.physics.solver == model::Physics::Solver::CG) {

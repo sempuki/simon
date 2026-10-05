@@ -28,10 +28,12 @@ HUMANOID = os.path.join(HERE, '..', '..', '..', '3rd_party', 'mujoco',
 NEWTON = mujoco.mjtSolver.mjSOL_NEWTON
 PGS = mujoco.mjtSolver.mjSOL_PGS
 ELLIPTIC = mujoco.mjtCone.mjCONE_ELLIPTIC
+PYRAMIDAL = mujoco.mjtCone.mjCONE_PYRAMIDAL
+FAST = mujoco.mjtIntegrator.mjINT_IMPLICITFAST
 DRIVEN = [0.3 * ((7 * k) % 11 - 5) / 5 for k in range(21)]
 
 # Name, model, steps, solver, starting positions and velocities to set by
-# address, and optionally controls and the friction cone.
+# address, and optionally controls, the friction cone and the integrator.
 CASES = [
     ('rolling', 'rolling.xml', 1500, NEWTON, {}, {0: 2.0}),
     ('sliding', 'sliding.xml', 1000, NEWTON, {}, {0: 2.0, 7: 1.0}),
@@ -57,6 +59,15 @@ CASES = [
      None, ELLIPTIC),
     ('sliding elliptic by PGS', 'sliding.xml', 1000, PGS, {},
      {0: 2.0, 7: 1.0}, None, ELLIPTIC),
+    ('arm implicitfast', 'arm.xml', 1500, NEWTON, {0: 0.3, 1: -0.5}, {},
+     [0.8, -1.2, 2.0, 0.5], PYRAMIDAL, FAST),
+    ('free body implicitfast', 'free_body.xml', 1000, NEWTON, {},
+     {0: 0.3, 1: -0.1, 2: 0.2, 3: 4.0, 4: 0.5, 5: 1.5}, None, PYRAMIDAL,
+     FAST),
+    ('rolling implicitfast', 'rolling.xml', 1500, NEWTON, {}, {0: 2.0}, None,
+     PYRAMIDAL, FAST),
+    ('humanoid driven implicitfast', HUMANOID, 400, NEWTON, {}, {}, DRIVEN,
+     PYRAMIDAL, FAST),
 ]
 
 
@@ -75,6 +86,8 @@ def main():
             model.opt.solver = solver
             if len(rest) > 1:
                 model.opt.cone = rest[1]
+            if len(rest) > 2:
+                model.opt.integrator = rest[2]
             data = mujoco.MjData(model)
             for address, value in qpos.items():
                 data.qpos[address] = value

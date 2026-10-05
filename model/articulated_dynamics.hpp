@@ -78,8 +78,9 @@ struct TreeDynamics final {
   std::array<double, V> bias{};
   std::array<double, V> passive{};
   std::array<double, V> actuator{};
-  std::array<double, V> smooth{};        // passive - bias + actuator.
-  std::array<double, V> acceleration{};  // M⁻¹ smooth.
+  std::array<double, V> actuator_force{};  // By the tree's actuators.
+  std::array<double, V> smooth{};          // passive - bias + actuator.
+  std::array<double, V> acceleration{};    // M⁻¹ smooth.
 };
 
 namespace articulated {
@@ -403,7 +404,9 @@ class TreeKernel final {
     const ArticulatedModel& m = *model_;
     double h = m.physics.timestep;
     std::array<double, V> qacc{};
-    if (!implicit_) {
+    if (m.physics.integrator == Physics::Integrator::IMPLICIT_FAST) {
+      solve_implicit_fast(dynamics, force, state->qvel, qacc);
+    } else if (!implicit_) {
       for (std::uint32_t i = 0; i < tree_->dofs; ++i) {
         qacc[i] = acceleration[i];
       }
@@ -424,6 +427,192 @@ class TreeKernel final {
       state->qvel[i] += qacc[i] * h;
     }
     integrate_positions(state, h);
+  }
+
+  // The accelerations of implicitfast: (M - h D)⁻¹ force, D the forces'
+  // derivative in the velocities but for the velocity products, by dampers
+  // and actuators; for a lone free body, its own 6 by 6 solve with the
+  // velocity products' derivative too (mj_implicitSkip, mjd_smooth_vel,
+  // mjd_freeMhat).
+  auto solve_implicit_fast(const Dynamics& dynamics,
+                           std::span<const double> force,
+                           std::span<const double> qvel,
+                           std::span<double> qacc) const -> void {
+    const ArticulatedModel& m = *model_;
+    double h = m.physics.timestep;
+    std::uint32_t n = tree_->dofs;
+    std::array<double, V> deriv{};  // Its diagonal; joint actuators and
+                                    // dampers touch nothing else.
+    for (std::size_t a = 0; a < tree_->actuators.size(); ++a) {
+      const Actuator& actuator = m.actuators[tree_->actuators[a]];
+      double f = dynamics.actuator_force[a];
+      if (actuator.force_limited &&
+          (f <= actuator.force_range[0] || f >= actuator.force_range[1])) {
+        continue;
+      }
+      if (actuator.bias_type == Actuator::Bias::AFFINE &&
+          actuator.bias[2] != 0) {
+        double gear = actuator.gear[0];
+        std::uint32_t d = m.joints[actuator.joint].dof - tree_->first_dof;
+        deriv[d] += gear * actuator.bias[2] * gear;
+      }
+    }
+    for (std::uint32_t i = 0; i < n; ++i) {
+      deriv[i] -= damping_[i];
+    }
+    bool free = free_body();
+    std::array<double, V * V> h_mass = dynamics.mass;
+    for (std::uint32_t i = free ? 6 : 0; i < n; ++i) {
+      h_mass[i * V + i] = dynamics.mass[i * V + i] + -h * deriv[i];
+    }
+    std::array<double, V * V> h_factor{};
+    std::array<double, V> h_inverse{};
+    factor(h_mass, Out(h_factor), Out(h_inverse));
+    for (std::uint32_t i = 0; i < n; ++i) {
+      qacc[i] = force[i];
+    }
+    solve(h_factor, h_inverse, qacc);
+    if (free) {
+      solve_free_body(dynamics, force, qvel, deriv, qacc);
+    }
+  }
+
+  // Whether the tree is one free body, its children fixed to it.
+  auto free_body() const -> bool {
+    const ArticulatedBody& root = model_->bodies[tree_->first_body];
+    return root.joints == 1 &&
+           model_->joints[root.first_joint].type == JointType::FREE &&
+           tree_->dofs == 6;
+  }
+
+  // A free body's accelerations from A = M - h D + h B, B the velocity
+  // products' derivative in its angular velocity, by LU with pivoting
+  // (mjd_freeMhat, mjd_freeBias_vel, mju_factorLU6).
+  auto solve_free_body(const Dynamics& dynamics, std::span<const double> force,
+                       std::span<const double> qvel,
+                       const std::array<double, V>& deriv,
+                       std::span<double> qacc) const -> void {
+    using namespace articulated;
+    double h = model_->physics.timestep;
+    std::array<double, 36> a{};
+    for (std::uint32_t r = 0; r < 6; ++r) {
+      for (std::uint32_t c = 0; c <= r; ++c) {
+        a[6 * r + c] = a[6 * c + r] = dynamics.mass[r * V + c];
+      }
+    }
+    for (std::uint32_t r = 0; r < 6; ++r) {
+      a[6 * r + r] -= h * deriv[r];
+    }
+    // The tree's composite inertia about its center of mass.
+    Inertia10 crb{};
+    for (std::uint32_t b = 0; b < tree_->bodies; ++b) {
+      for (int k = 0; k < 10; ++k) {
+        crb[k] += dynamics.cinert[b][k];
+      }
+    }
+    double mass = crb[9];
+    std::array<double, 9> iw{crb[0], crb[3], crb[4], crb[3], crb[1],
+                             crb[5], crb[4], crb[5], crb[2]};
+    const Matrix3& r = dynamics.xmat[0];
+    Array3 s{dynamics.com[0] - dynamics.xpos[0][0],
+             dynamics.com[1] - dynamics.xpos[0][1],
+             dynamics.com[2] - dynamics.xpos[0][2]};
+    Array3 w = multiply(r, Array3{qvel[3], qvel[4], qvel[5]});
+    Array3 ws = cross(w, s);
+    Array3 iww = multiply(iw, w);
+    double w_dot_s = w[0] * s[0] + w[1] * s[1] + w[2] * s[2];
+    std::array<double, 9> k{
+        s[0] * w[0] - w_dot_s, s[0] * w[1] - ws[2],   s[0] * w[2] + ws[1],
+        s[1] * w[0] + ws[2],   s[1] * w[1] - w_dot_s, s[1] * w[2] - ws[0],
+        s[2] * w[0] - ws[1],   s[2] * w[1] + ws[0],   s[2] * w[2] - w_dot_s};
+    auto product = [](const std::array<double, 9>& x,
+                      const std::array<double, 9>& y) {
+      std::array<double, 9> z{};
+      for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+          z[3 * i + j] = x[3 * i] * y[j] + x[3 * i + 1] * y[3 + j] +
+                         x[3 * i + 2] * y[6 + j];
+        }
+      }
+      return z;
+    };
+    std::array<double, 9> rm{r[0], r[1], r[2], r[3], r[4],
+                             r[5], r[6], r[7], r[8]};
+    std::array<double, 9> lin = product(k, rm);
+    std::array<double, 9> c{};
+    for (int col = 0; col < 3; ++col) {
+      double sk0 = s[1] * k[6 + col] - s[2] * k[3 + col];
+      double sk1 = s[2] * k[col] - s[0] * k[6 + col];
+      double sk2 = s[0] * k[3 + col] - s[1] * k[col];
+      double wi0 = w[1] * iw[6 + col] - w[2] * iw[3 + col];
+      double wi1 = w[2] * iw[col] - w[0] * iw[6 + col];
+      double wi2 = w[0] * iw[3 + col] - w[1] * iw[col];
+      c[col] =
+          -mass * sk0 + wi0 + (col == 1 ? iww[2] : (col == 2 ? -iww[1] : 0));
+      c[3 + col] =
+          -mass * sk1 + wi1 + (col == 0 ? -iww[2] : (col == 2 ? iww[0] : 0));
+      c[6 + col] =
+          -mass * sk2 + wi2 + (col == 0 ? iww[1] : (col == 1 ? -iww[0] : 0));
+    }
+    std::array<double, 9> rt{r[0], r[3], r[6], r[1], r[4],
+                             r[7], r[2], r[5], r[8]};
+    std::array<double, 9> rot = product(product(rt, c), rm);
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 3; ++j) {
+        a[6 * i + 3 + j] += h * (-mass * lin[3 * i + j]);
+        a[6 * (i + 3) + 3 + j] += h * rot[3 * i + j];
+      }
+    }
+    // LU with partial pivoting, then the solve.
+    std::array<int, 6> pivot{};
+    for (int col = 0; col < 6; ++col) {
+      pivot[col] = col;
+      double largest = std::abs(a[col * 6 + col]);
+      int row = col;
+      for (int i = col + 1; i < 6; ++i) {
+        if (std::abs(a[i * 6 + col]) > largest) {
+          largest = std::abs(a[i * 6 + col]);
+          row = i;
+        }
+      }
+      if (largest < MINVAL) {
+        return;
+      }
+      if (row != col) {
+        pivot[col] = row;
+        for (int j = 0; j < 6; ++j) {
+          std::swap(a[col * 6 + j], a[row * 6 + j]);
+        }
+      }
+      double inverse = 1.0 / a[col * 6 + col];
+      for (int i = col + 1; i < 6; ++i) {
+        a[i * 6 + col] *= inverse;
+        for (int j = col + 1; j < 6; ++j) {
+          a[i * 6 + j] -= a[i * 6 + col] * a[col * 6 + j];
+        }
+      }
+    }
+    std::array<double, 6> x{};
+    for (int i = 0; i < 6; ++i) {
+      x[i] = force[i];
+    }
+    for (int i = 0; i < 6; ++i) {
+      if (pivot[i] != i) {
+        std::swap(x[i], x[pivot[i]]);
+      }
+      for (int j = 0; j < i; ++j) {
+        x[i] -= a[i * 6 + j] * x[j];
+      }
+    }
+    for (int i = 5; i >= 0; --i) {
+      for (int j = i + 1; j < 6; ++j) {
+        x[i] -= a[i * 6 + j] * x[j];
+      }
+      x[i] /= a[i * 6 + i];
+    }
+    for (int i = 0; i < 6; ++i) {
+      qacc[i] = x[i];
+    }
   }
 
   // Positions moved by the velocities for `dt` (mj_integratePos).
@@ -869,6 +1058,7 @@ class TreeKernel final {
         force =
             std::clamp(force, actuator.force_range[0], actuator.force_range[1]);
       }
+      out->actuator_force[a] = force;
       out->actuator[v] += gear * force;
     }
   }

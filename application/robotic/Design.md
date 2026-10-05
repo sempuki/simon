@@ -103,8 +103,15 @@ joint springs, about their reference positions, quaternions differenced as
 angular velocities; dof dampers; and motors, each control clamped and times
 its gear. Semi-implicit Euler then advances velocities by the accelerations
 and positions by the new velocities, quaternions turned by the angular
-velocity; where a dof is damped or actuated, the step solves M + h B, as
-MuJoCo's does, so that dampers stay stable at any step. MuJoCo also keeps a
+velocity; where a dof of the model is damped or actuated, the step solves
+M + h B, as MuJoCo's does, so that dampers stay stable at any step.
+MuJoCo's implicitfast integrator is there too: it solves M - h D, D the
+derivative of the dampers' and actuators' forces in the velocities, and
+for a lone free body its own 6 by 6 system with the derivative of the
+velocity products, by LU. Runge–Kutta 4 and the fully implicit integrator
+are refused: the first runs the whole step, collision and solver
+included, four times, and the second needs the velocity products'
+derivative for every tree. MuJoCo also keeps a
 fixed inertia for dofs whose bodies never turn; simon recomputes it, which
 can differ in the last bit.
 
@@ -229,7 +236,7 @@ few; each tree learns its island. `Integrate` then steps each tree at its
 island's accelerations, or, where any dof of the model is damped, at its
 smooth and constraint forces through M + h B, as MuJoCo does.
 
-`constraint_test` checks seventeen cases against MuJoCo, every position and
+`constraint_test` checks twenty-one cases against MuJoCo, every position and
 velocity at every step (`reference/mujoco_constraints.py`):
 
 | Case | Steps | Newton, position | Newton, velocity | PGS, position | PGS, velocity |
@@ -244,6 +251,10 @@ velocity at every step (`reference/mujoco_constraints.py`):
 | The box and capsule, elliptic cone | 1,000 | 1.1e-7 | 6.6e-6 | 2.5e-7 | 1.1e-5 |
 | The stack, elliptic cone | 1,000 | 0 | 3.8e-17 | | |
 | The driven humanoid, elliptic cone | 400 | 3.6e-13 | 2.0e-11 | | |
+| The actuated arm, implicitfast | 1,500 | equal | equal | | |
+| The tumbling free body, implicitfast | 1,000 | 7.8e-16 | 8.9e-16 | | |
+| The sphere, implicitfast | 1,500 | 1.7e-14 | 9.2e-14 | | |
+| The driven humanoid, implicitfast | 400 | 2.8e-13 | 7.6e-12 | | |
 
 Newton's method converges, and so matches MuJoCo to rounding grown over
 the run, but where a body comes to stick, the tolerance it stops at can
