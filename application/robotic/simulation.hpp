@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -55,6 +56,7 @@ class Simulation final {
       std::make_unique<ConstraintSolution>();
   World world_;
   std::unique_ptr<Scheduler> scheduler_;
+  std::chrono::nanoseconds pending_{0};  // Driven time not yet stepped.
 };
 
 }  // namespace simon::robotic

@@ -1,6 +1,7 @@
 # Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
@@ -99,5 +100,15 @@ cc_test(
     deps = [
         ":robotic_library",
         "@lib//base:testing",
+    ],
+)
+
+cc_binary(
+    name = "robotic_benchmark",
+    srcs = ["robotic_benchmark.cpp"],
+    copts = COPTS,
+    deps = [
+        ":robotic_library",
+        "//framework:vocabulary",
     ],
 )

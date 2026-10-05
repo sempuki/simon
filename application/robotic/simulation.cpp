@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
+#include <cmath>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -318,7 +320,17 @@ auto Simulation::configure() -> engine::PhaseResult {
 }
 
 auto Simulation::step(const framework::Step& step) -> engine::PhaseResult {
-  scheduler_->step(step, InOut(world_));
+  // As many of the model's steps as the driver's step holds, the rest
+  // carried to the next.
+  auto h = std::chrono::nanoseconds{
+      std::llround(mechanics_->model().physics.timestep * 1e9)};
+  pending_ += step.dt;
+  framework::TimePoint time = step.time;
+  while (pending_ >= h) {
+    scheduler_->step(framework::Step{.time = time, .dt = h}, InOut(world_));
+    pending_ -= h;
+    time += h;
+  }
   return engine::Flow::CONTINUE;
 }
 
