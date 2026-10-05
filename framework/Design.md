@@ -363,6 +363,12 @@ ComponentStore<Health>:     [ drone 0..n      | asset ]
   automatic layout. Archetype-table ECSs (Unity DOTS, flecs) move the whole
   entity to another table instead, which is where their 10 to 30 times slower
   attach and detach comes from.
+- **An application can order an archetype's entities.** `reorder<Archetype>(key)`
+  sorts the archetype's segment by `key(Entity)`, ties keeping their order,
+  and moves every store it requires to match, between steps. Entities that
+  interact by place can so sit near each other in memory: the automotive
+  application keeps vehicles in road order, which saves it 10 to 35% of a
+  step for under 0.5% spent sorting.
 - **Later, hierarchical locality.** Names such as `/blue/radars` could order
   segments within each store, so a system that walks every blue archetype
   streams one range. This is the slab arrangement games have used for decades,

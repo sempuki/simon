@@ -44,11 +44,11 @@ vehicle boxes that match GEOS. A parameter distribution's permutations run
 in batches on threads, each as it runs in esmini and measured as nuPlan
 measures esmini's.
 
-At scale, 100,000 vehicles on 3,770 km of lanes step in 25 ms on one
-thread, 248 ns a vehicle, where SUMO takes 6.5 µs a vehicle on the same
+At scale, 100,000 vehicles on 3,770 km of lanes step in 19 ms on one
+thread, 190 ns a vehicle, where SUMO takes 6.5 µs a vehicle on the same
 network and drivers.
 On a grid of 400 signalized junctions, 10,000 vehicles and 100,000
-pedestrians step in 50 ms, 458 ns an entity, where SUMO takes 2.8 µs on the
+pedestrians step in 35 ms, 320 ns an entity, where SUMO takes 2.8 µs on the
 same network, its vehicles slowing to the same speeds.
 
 ```sh

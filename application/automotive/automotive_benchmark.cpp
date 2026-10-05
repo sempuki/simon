@@ -43,15 +43,19 @@ constexpr int DEFAULT_STEPS = 300;  // 30 s simulated.
 constexpr int SETTLING_STEPS = 600;
 
 // Steps `world` through settling and `steps` more, each of `systems` in its
-// own scheduler in turn, and prints each one's share of the measured time,
-// per step and per entity-step of `entities`.
+// own scheduler in turn, putting the entities back in road order every
+// ROAD_ORDER_STEPS as the simulation does, and prints each one's share of
+// the measured time, per step and per entity-step of `entities`.
 template <typename... Systems>
-auto time_systems(InOut<World> world, int steps, double entities,
+auto time_systems(const Network& network, InOut<World> world, int steps,
+                  double entities,
                   std::array<std::string_view, sizeof...(Systems)> names,
                   Systems... systems) -> void {
   std::tuple<framework::Scheduler<World, SystemList<Systems>>...> schedulers{
       SystemList<Systems>{std::move(systems)}...};
   std::array<double, sizeof...(Systems)> seconds{};
+  double ordering = 0.0;
+  keep_road_order(network, world);
   for (int i = 0; i < SETTLING_STEPS + steps; ++i) {
     framework::Step step{.time = TimePoint{} + i * DT, .dt = DT};
     std::size_t index = 0;
@@ -70,9 +74,17 @@ auto time_systems(InOut<World> world, int steps, double entities,
           (timed(scheduler), ...);
         },
         schedulers);
+    if ((i + 1) % ROAD_ORDER_STEPS == 0) {
+      auto start = WallClock::now();
+      keep_road_order(network, world);
+      if (i >= SETTLING_STEPS) {
+        ordering +=
+            std::chrono::duration<double>(WallClock::now() - start).count();
+      }
+    }
   }
 
-  double total = 0.0;
+  double total = ordering;
   for (double s : seconds) {
     total += s;
   }
@@ -85,6 +97,8 @@ auto time_systems(InOut<World> world, int steps, double entities,
                  1e3 * seconds[i] / steps, 100.0 * seconds[i] / total,
                  bytes[i]);
   }
+  std::println("  {:<22} {:10.3f} ms/step {:6.1f}%", "keep_road_order",
+               1e3 * ordering / steps, 100.0 * ordering / total);
 }
 
 auto measure_rings(const Network& network, int vehicles, int steps) -> void {
@@ -98,8 +112,9 @@ auto measure_rings(const Network& network, int vehicles, int steps) -> void {
       build_scenario(scenario, network, InOut(world)).has_value());
   world.sync();
   std::println("\n{} vehicles: {} steps of 0.1 s", vehicles, steps);
-  time_systems(InOut(world), steps, vehicles, {"Decide", "Drive", "FollowLane"},
-               Decide{network}, Drive{network}, FollowLane{network});
+  time_systems(network, InOut(world), steps, vehicles,
+               {"Decide", "Drive", "FollowLane"}, Decide{network},
+               Drive{network}, FollowLane{network});
 
   double speeds = 0.0;
   world.store_of<LaneState>().for_each([&](Entity, const LaneState& state) {
@@ -122,7 +137,7 @@ auto measure_grid(const Network& network, int vehicles, int pedestrians,
   world.sync();
   std::println("\n{} vehicles and {} pedestrians: {} steps of 0.1 s", vehicles,
                pedestrians, steps);
-  time_systems(InOut(world), steps, vehicles + pedestrians,
+  time_systems(network, InOut(world), steps, vehicles + pedestrians,
                {"RunSignals", "Pace", "Decide", "Drive", "FollowLane", "Walk",
                 "PlaceWalker"},
                RunSignals{}, Pace{network}, Decide{network}, Drive{network},

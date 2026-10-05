@@ -283,6 +283,25 @@ auto build_scenario(const Scenario& scenario, const Network& network,
   return {};
 }
 
+auto keep_road_order(const Network& network, InOut<World> world) -> void {
+  const model::LaneNumbering& numbering = network.graph.numbering();
+  auto road_order = [&](Entity entity) {
+    const LaneState& state = world->store_of<LaneState>().component_of(entity);
+    return std::pair{numbering.number_of(state.lane),
+                     state.s.numerical_value_in(model::meter)};
+  };
+  world->reorder<archetype::Vehicle>(road_order);
+  world->reorder<archetype::TacticalVehicle>(road_order);
+  world->reorder<archetype::Pedestrian>([&](Entity entity) {
+    const WalkState& state = world->store_of<WalkState>().component_of(entity);
+    const WalkRoute& route = world->store_of<WalkRoute>().component_of(entity);
+    std::uint32_t edge = state.leg < route.legs.size()
+                             ? route.legs[state.leg].edge
+                             : model::WalkEdge::NONE;
+    return std::pair{edge, state.along.numerical_value_in(model::meter)};
+  });
+}
+
 Simulation::Simulation(Scenario scenario) : scenario_{std::move(scenario)} {}
 
 auto Simulation::configure() -> engine::PhaseResult {
@@ -293,11 +312,16 @@ auto Simulation::configure() -> engine::PhaseResult {
   RETURN_IF_UNEXPECTED(build_world(scenario_, *network_, Out(world_)));
   RETURN_IF_UNEXPECTED(build_scenario(scenario_, *network_, InOut(world_)));
   world_.sync();
+  keep_road_order(*network_, InOut(world_));
   return engine::Flow::CONTINUE;
 }
 
 auto Simulation::step(const framework::Step& step) -> engine::PhaseResult {
   scheduler_->step(step, InOut(world_));
+  if (++steps_ >= ROAD_ORDER_STEPS && world_.pending() == 0) {
+    keep_road_order(*network_, InOut(world_));
+    steps_ = 0;
+  }
   return engine::Flow::CONTINUE;
 }
 

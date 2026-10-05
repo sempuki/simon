@@ -16,6 +16,8 @@ namespace simon::framework {
 
 using testing::Body;
 using testing::Health;
+using testing::Interceptor;
+using testing::Launcher;
 using testing::Position;
 using testing::TestWorld;
 using testing::Velocity;
@@ -383,6 +385,46 @@ TEST_CASE("ChangeQueryBuilder") {
 TEST_CASE("World") {
   TestWorld world;
   testing::build_small_world(Out(world));
+
+  SECTION("ShouldVisitInKeyOrderGivenReorder") {
+    // Four interceptors created out of order, and a launcher: reordered by
+    // position, the interceptors come in that order in every store they
+    // require, each keeping its own components, and the launcher stays.
+    Entity launcher = *world.create<Launcher>().with(Position{9.0}).build();
+    std::vector<Entity> interceptors;
+    for (double x : {3.0, 1.0, 4.0, 2.0}) {
+      interceptors.push_back(*world.create<Interceptor>()
+                                  .with(Position{x})
+                                  .with(Velocity{10.0 * x})
+                                  .build());
+    }
+    world.sync();
+    world.reorder<Interceptor>([&](Entity entity) {
+      return world.store_of<Position>().component_of(entity).x;
+    });
+
+    std::vector<double> positions;
+    std::vector<double> velocities;
+    world.store_of<Position>().for_each([&](Entity entity, const Position& p) {
+      if (entity != launcher) {
+        positions.push_back(p.x);
+      }
+    });
+    world.store_of<Velocity>().for_each(
+        [&](Entity, const Velocity& v) { velocities.push_back(v.x); });
+    CHECK(positions == std::vector{1.0, 2.0, 3.0, 4.0});
+    CHECK(velocities == std::vector{10.0, 20.0, 30.0, 40.0});
+    for (Entity entity : interceptors) {
+      CHECK(world.store_of<Velocity>().component_of(entity).x ==
+            10.0 * world.store_of<Position>().component_of(entity).x);
+    }
+    CHECK(world.store_of<Position>().component_of(launcher).x == 9.0);
+    std::vector<Entity> near;
+    world.within(Position{1.0}, 0.5, [&](Entity entity, const Position&) {
+      near.push_back(entity);
+    });
+    CHECK(near == std::vector{interceptors[1]});
+  }
 
   SECTION("ShouldDeferComponentsUntilSyncGivenCreate") {
     auto entity =

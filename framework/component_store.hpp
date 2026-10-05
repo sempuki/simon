@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -247,6 +248,31 @@ class ComponentStore final {
         IndexEntry{.slot = slot, .generation = entity.generation};
     ++into.size;
     ++size_;
+  }
+
+  // Reorders `segment`: the entity-component at local index `order[i]`
+  // moves to local index i. `order` holds each of the segment's local
+  // indices once.
+  auto permute(std::size_t segment, std::span<const std::uint32_t> order)
+      -> void {
+    const Segment& in = segments_[segment];
+    CHECK_PRECONDITION(order.size() == in.size);
+    ComponentType* data = data_.data();
+    std::vector<ComponentType> components;
+    std::vector<Entity> owners;
+    components.reserve(order.size());
+    owners.reserve(order.size());
+    for (std::uint32_t local : order) {
+      Slot from = slot_at(in, local);
+      components.push_back(std::move(data[from]));
+      owners.push_back(owner_[from]);
+    }
+    for (std::size_t local = 0; local < order.size(); ++local) {
+      Slot to = slot_at(in, local);
+      data[to] = std::move(components[local]);
+      owner_[to] = owners[local];
+      index_[owners[local].index].slot = to;
+    }
   }
 
   // Erases, moving the segment's last entity-component into the gap.

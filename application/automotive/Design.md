@@ -777,16 +777,27 @@ steps. Both run on an AMD Ryzen 9 5900XT.
 
 | Vehicles | simon, ns per vehicle-step | SUMO, ns per vehicle-step | SUMO / simon | Mean speed at the end, simon / SUMO |
 |---:|---:|---:|---:|---:|
-| 1,000 | 174 | 1,433 | 8.2 | 29.9 / 29.8 m/s |
-| 10,000 | 234 | 7,140 | 31 | 29.3 / 29.5 m/s |
-| 100,000 | 248 | 6,510 | 26 | 20.4 / 22.2 m/s |
+| 1,000 | 151 | 1,433 | 9.5 | 29.9 / 29.8 m/s |
+| 10,000 | 167 | 7,140 | 43 | 29.3 / 29.5 m/s |
+| 100,000 | 190 | 6,510 | 34 | 20.4 / 22.2 m/s |
 
-At 100,000 vehicles simon steps in 25 ms, four times faster than real time
+At 100,000 vehicles simon steps in 19 ms, five times faster than real time
 at 0.1 s steps; SUMO takes 651 ms, 6.5 times slower than real time. simon's
-step splits into `Decide` 57%, `FollowLane` 39% and `Drive` 3%. `Decide`'s
+step splits into `Decide` 49%, `FollowLane` 47% and `Drive` 4%. `Decide`'s
 cost is mostly its index, sorted each step, and the IDM's arithmetic;
 `FollowLane`'s is the road geometry, each vehicle's place found from its
 lane's middle on an arc.
+
+**Entities stay in road order.** Every 10 s of simulated time,
+`keep_road_order` sorts each vehicle archetype's entities by lane number and
+then along the lane, and pedestrians by the edge they walk and along it,
+with the world's `reorder`, so that neighbors on the road are neighbors in
+memory: the index is gathered nearly in order, a leader's state is beside
+its follower's, and vehicles on one road read its geometry in turn. It
+costs under 0.5% of the step, and saves 10 to 35%: on the rings it took 170,
+232 and 255 ns a vehicle-step down to 151, 167 and 190. Results do not
+change, since every system reads the last step's state whatever order it
+visits entities in.
 
 The two drive differently in detail, so the comparison is of cost at the
 same load. SUMO's lane changing is LC2013, simon's
@@ -812,20 +823,20 @@ SUMO's striping model, at Weidmann's speeds.
 
 | Vehicles and pedestrians | simon, ns per entity-step | SUMO, ns per entity-step | SUMO / simon | Mean vehicle speed at the end, simon / SUMO |
 |---:|---:|---:|---:|---:|
-| 1,000 and 1,000 | 560 | 2,200 | 3.9 | 9.8 / 8.8 m/s |
-| 10,000 and 10,000 | 573 | 3,743 | 6.5 | 2.7 / 2.6 m/s |
-| 10,000 and 100,000 | 458 | 2,807 | 6.1 | 1.4 / 1.3 m/s |
+| 1,000 and 1,000 | 444 | 2,200 | 5.0 | 9.8 / 8.8 m/s |
+| 10,000 and 10,000 | 376 | 3,743 | 10 | 2.7 / 2.6 m/s |
+| 10,000 and 100,000 | 320 | 2,807 | 8.8 | 1.4 / 1.3 m/s |
 
 Both slow down alike as the grid fills: single-lane approaches hold the
 traffic behind a car turning left across oncoming traffic, and at 100,000
 pedestrians vehicles stop at crosswalks over and over. simon's step at
-10,000 vehicles and 100,000 pedestrians is 50 ms, twice as fast as real
-time, where SUMO's is 309 ms. Of simon's, `Pace` takes 49%, deciding each
-pedestrian's speed and crossing, `PlaceWalker` 27% and `Decide` 17%. A
-vehicle's decisions cost 700 ns here, against 140 ns on the rings, as each
-looks ahead through several short lanes for lights, crosswalks, junctions
-and leaders; every lookup per lane is an index from the lane's number,
-computed from its key, rather than a search.
+10,000 vehicles and 100,000 pedestrians is 35 ms, nearly three times as
+fast as real time, where SUMO's is 309 ms. Of simon's, `Pace` takes 47%,
+deciding each pedestrian's speed and crossing, `PlaceWalker` 26% and
+`Decide` 17%. A vehicle's decisions cost 435 ns here, against 92 ns on the
+rings, as each looks ahead through several short lanes for lights,
+crosswalks, junctions and leaders; every lookup per lane is an index from
+the lane's number, computed from its key, rather than a search.
 
 The two model pedestrians differently: SUMO's walk in stripes across a
 sidewalk's width and cross on the crossings netconvert builds at junction

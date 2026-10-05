@@ -170,6 +170,50 @@ class World<SpatialType,                  //
 
   auto pending() const -> std::size_t { return commands_.size(); }
 
+  // Reorders the entities of `ArchetypeType` in every store it requires by
+  // `key(Entity)`, least first, ties keeping their order, so that systems
+  // walking them read them in that order: vehicles in road order, say, so
+  // that neighbors on the road are neighbors in memory. Slots change, so it
+  // runs between steps, with nothing pending.
+  template <Archetypal ArchetypeType, typename KeyType>
+  auto reorder(KeyType&& key) -> void {
+    CHECK_PRECONDITION(commands_.empty() && transaction_depth_ == 0);
+    constexpr std::size_t ARCHETYPE = index_of_v<ArchetypeList, ArchetypeType>;
+    using Key = std::invoke_result_t<KeyType&, Entity>;
+    const auto& archetypes = std::get<ComponentStore<EntityArchetype>>(stores_);
+    std::size_t segment = segment_of<EntityArchetype>(ARCHETYPE);
+    std::vector<std::pair<Key, std::uint32_t>> keyed;
+    keyed.reserve(archetypes.segment_size(segment));
+    for (std::size_t ordinal = 0; ordinal < archetypes.chunks_in(segment);
+         ++ordinal) {
+      auto chunk = archetypes.chunk(segment, ordinal);
+      for (std::size_t i = 0; i < chunk.size; ++i) {
+        keyed.emplace_back(key(chunk.owners[i]),
+                           static_cast<std::uint32_t>(keyed.size()));
+      }
+    }
+    std::ranges::stable_sort(keyed, {}, &std::pair<Key, std::uint32_t>::first);
+    std::vector<std::uint32_t> order;
+    order.reserve(keyed.size());
+    for (const auto& [_, local] : keyed) {
+      order.push_back(local);
+    }
+    std::apply(
+        [&]<typename... StoreTypes>(StoreTypes&... stores) {
+          auto permute = [&]<typename ComponentType>(
+                             ComponentStore<ComponentType>& store) {
+            if constexpr (archetype_requires<ComponentType>(ARCHETYPE)) {
+              store.permute(segment_of<ComponentType>(ARCHETYPE), order);
+              if constexpr (std::is_same_v<ComponentType, SpatialType>) {
+                spatial_index_current_ = false;
+              }
+            }
+          };
+          (permute(stores), ...);
+        },
+        stores_);
+  }
+
   // Groups utterances so they take effect together or not at all. Until it
   // commits, everything they planned can be rolled back: entities reserved and
   // their names, aliases given and taken, planned attachments, detachments

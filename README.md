@@ -48,7 +48,7 @@ application's README:
 - **automotive.** Roads match libOpenDRIVE to 8e-14 m, vehicle models match
   CommonRoad's to rounding, the Sedan matches Chrono's handling maneuvers,
   and esmini's scenarios play out to its log's precision. One thread steps
-  100,000 vehicles in 25 ms, 26 times faster than SUMO on the same network.
+  100,000 vehicles in 19 ms, 34 times faster than SUMO on the same network.
 
 ## Build
 

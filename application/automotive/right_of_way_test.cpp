@@ -42,7 +42,7 @@ auto box_of(const RoadPose& pose, const Driver& driver) -> model::OrientedBox {
           .width = WIDTH};
 }
 
-// The pairs of vehicles that overlap.
+// The pairs of vehicles that overlap, the lesser entity first.
 auto find_overlaps(const World& world) -> std::set<std::pair<Entity, Entity>> {
   std::vector<std::pair<Entity, model::OrientedBox>> boxes;
   const auto& drivers = world.store_of<Driver>();
@@ -55,7 +55,8 @@ auto find_overlaps(const World& world) -> std::set<std::pair<Entity, Entity>> {
   for (std::size_t i = 0; i < boxes.size(); ++i) {
     for (std::size_t j = i + 1; j < boxes.size(); ++j) {
       if (model::detect_overlap(boxes[i].second, boxes[j].second)) {
-        overlaps.emplace(boxes[i].first, boxes[j].first);
+        // Each pair once, whichever order the store holds them in.
+        overlaps.insert(std::minmax(boxes[i].first, boxes[j].first));
       }
     }
   }

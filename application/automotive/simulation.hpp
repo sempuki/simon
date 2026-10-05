@@ -84,6 +84,15 @@ auto build_scenario(const Scenario& scenario, const Network& network,
 
 // The automotive simulation: reads the network and builds the scenario when
 // configured, and drives until the driver stops. Any driver can run it.
+// Puts every vehicle in road order, by lane and then along it, and every
+// pedestrian in order of the edge it walks and along it, in each store, so
+// that neighbors on the road are neighbors in memory. Between steps.
+auto keep_road_order(const Network& network, InOut<World> world) -> void;
+
+// How many steps a simulation takes between putting its entities back in
+// road order, as traffic mixes them.
+inline constexpr int ROAD_ORDER_STEPS = 100;
+
 class Simulation final {
  public:
   explicit Simulation(Scenario scenario = {});
@@ -104,6 +113,7 @@ class Simulation final {
   std::unique_ptr<Network> network_;  // Shared by the systems; never moves.
   World world_;                       // Empty until configure builds it.
   std::unique_ptr<Scheduler> scheduler_;
+  int steps_ = 0;  // Since the last road order.
 };
 
 }  // namespace simon::automotive
