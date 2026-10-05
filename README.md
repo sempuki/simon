@@ -34,7 +34,7 @@ The architecture, its decisions and the roadmap are in
 |---|---|---|
 | [aeronautic](application/aeronautic/README.md) | Aircraft flying routes, from point masses to rigid 737s and F-16s with their flight controls, in one world | JSBSim |
 | [automotive](application/automotive/README.md) | Roads, traffic, vehicle dynamics and scenarios, at the level of objects | libOpenDRIVE, CommonRoad, Chrono::Vehicle, SUMO, esmini, nuPlan |
-| [robotic](application/robotic/README.md) | Articulated rigid bodies with contact, in progress: models compiled to the last bit | MuJoCo |
+| [robotic](application/robotic/README.md) | Articulated rigid bodies on joints with contact, friction, limits, tendons and actuators: MuJoCo's humanoid and Menagerie's robots | MuJoCo, MuJoCo Menagerie |
 | [defense](application/defense/README.md) | Red drones against blue radars, launchers and interceptors | Its own benchmarks, idle and under contention |
 | [hello](application/hello/README.md) | Two bouncing balls, the smallest complete use of the framework | |
 
