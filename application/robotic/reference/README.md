@@ -21,10 +21,11 @@ constraints against
 
 | Script | Writes | Read by |
 |---|---|---|
-| `mujoco_models.py` | `mujoco_models.csv`: every compiled field of every model and of `3rd_party/mujoco/humanoid.xml` | `model_test` |
+| `mujoco_models.py` | `mujoco_models.csv`: every compiled field of every model, of `3rd_party/mujoco/humanoid.xml` and of the four Menagerie robots | `model_test` |
 | `mujoco_dynamics.py` | `mujoco_dynamics.csv`: positions and velocities at every step of six cases, constraints off | `dynamics_test` |
 | `mujoco_control.py` | `mujoco_control.csv`: the arm and the balanced cart-pole at every step; `mujoco_feedback.csv`: the cart-pole's regulator, from MuJoCo's linearization | `control_test` |
 | `mujoco_constraints.py` | `mujoco_constraints.csv`: positions and velocities at every step of eleven cases, contacts, limits and dry friction on, by Newton and by PGS, MuJoCo's humanoid among them | `constraint_test` |
+| `mujoco_menagerie.py` | `mujoco_menagerie.csv`: four Menagerie robots from their home keyframes at every step, read with their meshes from a clone of Menagerie | `menagerie_test` |
 | `make_scenes.py` | `bodies_N.xml` and `humanoids_N.xml`: N loose bodies falling and N/10 humanoids, into a directory it is given | `robotic_benchmark` and `mujoco_benchmark.py` |
 | `mujoco_benchmark.py` | Nothing: prints MuJoCo's time a step on one thread for a scene | |
 | `mujoco_contacts.py` | `mujoco_contacts.csv` and `mujoco_convex.csv`: `collisions.xml` and `convex.xml` at 400 random poses each, and every contact MuJoCo finds at each | `collision_test` |

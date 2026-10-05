@@ -9,7 +9,8 @@ engine for model-based control", IROS 2012; Apache-2.0) is the reference.
 It is being built in eight steps (see the [Roadmap](#roadmap)); models read
 and compiled as MuJoCo compiles them, their dynamics without constraints,
 their actuators and control, their contacts, the constraint solver,
-MuJoCo's humanoid, and scale against MuJoCo with a viewer are done.
+MuJoCo's humanoid, scale against MuJoCo with a viewer, and four robots of
+MuJoCo Menagerie are done.
 
 ## Choices
 
@@ -78,7 +79,8 @@ give their body mass, explicit contact pairs, actuators other than motors, posit
 general actuators with fixed gains, and integrators other than Euler. Fixed
 tendons, a sum of joints' positions with limits and dry friction, and
 contact exclusions between bodies are read, and meshes that only show the
-model are kept, unread. What only shows a model is left out. A body's inertial frame
+model are kept, unread. A model may include other files, as Menagerie's
+scenes include their robots. What only shows a model is left out. A body's inertial frame
 and a geom's frame within 1e-6 of the body's frame, or of the inertial
 frame, are snapped to it, as MuJoCo snaps them; poses in the world then
 come from the same arithmetic.
@@ -282,6 +284,25 @@ m/s by Newton's method, and within 5 mm/s by PGS, as MuJoCo's own PGS
 leaves it. MuJoCo's humanoid, falling for 20 s, lies on the floor 0.070 m
 high, as MuJoCo's does, its tendons and limits holding.
 
+## Menagerie
+
+Four of MuJoCo Menagerie's robots run as their authors wrote them, from
+`3rd_party/menagerie`, their meshes left out: Unitree's Go1, standing on
+the elliptic cone with impratio 100, its hips cylinders against its legs'
+capsules and its joints with dry friction; Unitree's H1, a tree of 20
+bodies, falling; Universal Robots' UR5e under implicitfast; and ANYbotics'
+ANYmal C, standing. `model_test` compiles each to MuJoCo's values, all
+equal to the last bit but the meshes' frames and sizes, which come from
+their shapes; `menagerie_test` steps each from its home keyframe, its
+actuators held at the keyframe's controls, for 1,000 steps
+(`reference/mujoco_menagerie.py`): Go1, H1 and ANYmal C within 1e-12 m/s
+of MuJoCo, UR5e within 2e-15.
+
+Others need what is not here yet: meshes that collide or give their body
+mass (Barkour, Spot, OP3, the Allegro hand), and actuator attributes MuJoCo
+derives at compile time from the model's inertia, dampratio and
+inheritrange (G1, T1, the Berkeley humanoid).
+
 ## Scale
 
 `robotic_benchmark` times scenes `reference/make_scenes.py` writes, and
@@ -337,6 +358,8 @@ of the step, and pauses, restarts and speeds the run.
 7. Done: ten thousand loose bodies and a thousand humanoids within 1.2x of
    MuJoCo on one thread, and the viewer. Islands in parallel wait on the
    framework running `prepare` on more than one thread.
-8. Opt-in fidelity: implicitfast and Runge–Kutta 4, the elliptic cone, convex
-   meshes and the pairs MuJoCo's convex collider handles; then MuJoCo
-   Menagerie's robots.
+8. Done: implicitfast, the elliptic cone and impratio, MuJoCo's convex
+   collider for every pair of primitives, models of up to 32 bodies, and
+   four of Menagerie's robots. Left: Runge–Kutta 4 and the fully implicit
+   integrator, meshes that collide (their convex hulls and inertia), and
+   dampratio and inheritrange.

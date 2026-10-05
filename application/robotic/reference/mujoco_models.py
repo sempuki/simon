@@ -24,6 +24,11 @@ import numpy
 HERE = os.path.dirname(os.path.abspath(__file__))
 MODELS = os.path.join(HERE, '..', 'models')
 THIRD_PARTY = os.path.join(HERE, '..', '..', '..', '3rd_party', 'mujoco')
+# Menagerie's robots, with their meshes, as robotic's 3rd_party holds them
+# without (git clone https://github.com/google-deepmind/mujoco_menagerie).
+MENAGERIE = os.path.expanduser('~/.cache/simon-reference/mujoco_menagerie')
+ROBOTS = ['unitree_go1', 'unitree_h1', 'universal_robots_ur5e',
+          'anybotics_anymal_c']
 
 FIELDS = {
     'body': ['parentid', 'rootid', 'pos', 'quat', 'ipos', 'iquat', 'mass',
@@ -57,8 +62,11 @@ def main():
         out.writerow(['model', 'element', 'index', 'field', 'values'])
         paths = sorted(glob.glob(os.path.join(MODELS, '*.xml')))
         paths.append(os.path.join(THIRD_PARTY, 'humanoid.xml'))
+        paths += [os.path.join(MENAGERIE, robot, 'scene.xml') for robot in ROBOTS]
         for path in paths:
             name = os.path.basename(path)
+            if path.startswith(MENAGERIE):
+                name = os.path.relpath(path, MENAGERIE)
             model = mujoco.MjModel.from_xml_path(path)
             option = model.opt
             for field in ['timestep', 'gravity', 'integrator', 'cone', 'solver',

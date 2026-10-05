@@ -14,6 +14,7 @@ cc_test(
     copts = COPTS,
     data = glob(["models/*.xml"]) + [
         "reference/mujoco_models.csv",
+        "//3rd_party:menagerie",
         "//3rd_party:mujoco",
     ],
     deps = [
@@ -159,4 +160,19 @@ cc_test(
     data = VIEWER_DATA,
     env = {"SDL_VIDEODRIVER": "dummy"},
     deps = VIEWER_DEPS,
+)
+
+cc_test(
+    name = "menagerie_test",
+    size = "small",
+    srcs = ["menagerie_test.cpp"],
+    copts = COPTS,
+    data = [
+        "reference/mujoco_menagerie.csv",
+        "//3rd_party:menagerie",
+    ],
+    deps = [
+        ":robotic_library",
+        "@lib//base:testing",
+    ],
 )

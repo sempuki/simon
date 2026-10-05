@@ -29,6 +29,7 @@ through `@lib//base:testing` in `2nd_party/lib`.
 | `chrono/` | `chrono` | `Sedan_Pac02Tire.tir`, the Sedan's PAC2002 tire | [Project Chrono](https://projectchrono.org)'s data | BSD-3-Clause, `chrono/LICENSE` |
 | `esmini/` | `esmini` | Four scenarios and a parameter distribution in `xosc/`, among them one with traffic lights and pedestrians, their roads in `xodr/` with two roads with signs from esmini's unit tests, and the vehicle and pedestrian catalogs | [esmini](https://github.com/esmini/esmini)'s resources | MPL-2.0, `esmini/LICENSE` |
 | `mujoco/` | `mujoco` | `humanoid.xml`, MuJoCo's humanoid | [MuJoCo](https://github.com/google-deepmind/mujoco)'s models, 3.14.0 | Apache-2.0, `mujoco/LICENSE` |
+| `menagerie/` | `menagerie` | Four robots' MJCF and scenes, without their meshes: Unitree's Go1 and H1, Universal Robots' UR5e and ANYbotics' ANYmal C | [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) at 4d038b3 | BSD-3-Clause, each robot's `LICENSE` |
 | `jsbsim/` | `jsbsim` | `737.aircraft` and `f16.aircraft`, converted by `tools/jsbsim/convert.py` | [JSBSim](https://github.com/JSBSim-Team/jsbsim)'s aircraft (see `jsbsim/README.md`) | GPL, named in each file's header |
 
 ## References

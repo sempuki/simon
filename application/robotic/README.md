@@ -18,7 +18,9 @@ their limits within 1e-11 of MuJoCo; the box slides as far as Coulomb
 friction allows, and the sphere rolls at five sevenths of its speed.
 MuJoCo's humanoid, with its tendons, compiles to the last bit and falls
 within 1e-11 of MuJoCo's. Ten thousand loose bodies and a thousand
-humanoids step within 1.2x of MuJoCo's time on one thread.
+humanoids step within 1.2x of MuJoCo's time on one thread. Four robots of
+MuJoCo Menagerie, Go1, H1, UR5e and ANYmal C, run from their own MJCF
+within 1e-11 of MuJoCo.
 
 ```sh
 bazel run //application/robotic:viewer

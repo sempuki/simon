@@ -204,9 +204,12 @@ TEST_CASE("ModelAgainstMuJoCo") {
     std::size_t compared = 0;
     for (const Row& row : load_rows()) {
       if (!models.contains(row.model)) {
-        auto loaded = format::load_mjcf(row.model == "humanoid.xml"
-                                            ? "3rd_party/mujoco/humanoid.xml"
-                                            : std::string{MODELS} + row.model);
+        std::string path = row.model == "humanoid.xml"
+                               ? "3rd_party/mujoco/humanoid.xml"
+                           : row.model.find('/') != std::string::npos
+                               ? "3rd_party/menagerie/" + row.model
+                               : std::string{MODELS} + row.model;
+        auto loaded = format::load_mjcf(path);
         if (!loaded) {
           FAIL(row.model << ": " << loaded.error().message());
         }

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <numbers>
@@ -1726,15 +1727,57 @@ auto parse_mjcf(std::string_view text)
   return Reader{}.read(text);
 }
 
+namespace {
+
+// Replaces each include element under `node` by the children of the root of
+// the file it names, found beside the model, as MuJoCo's include does;
+// included files may include others.
+auto expand_includes(pugi::xml_node node, const std::filesystem::path& folder,
+                     int depth) -> std::expected<void, lib::Status> {
+  if (depth > 16) {
+    return std::unexpected(
+        lib::raise(MjcfError::MALFORMED, "includes nested too deeply"));
+  }
+  for (pugi::xml_node child = node.first_child(); child;) {
+    pugi::xml_node next = child.next_sibling();
+    if (std::string_view{child.name()} == "include") {
+      std::filesystem::path path = folder / child.attribute("file").as_string();
+      pugi::xml_document included;
+      if (!included.load_file(path.c_str())) {
+        return std::unexpected(
+            lib::raise(MjcfError::UNREADABLE, "cannot read " + path.string()));
+      }
+      pugi::xml_node root = included.child("mujoco");
+      if (!root) {
+        return std::unexpected(lib::raise(
+            MjcfError::MALFORMED, "no mujoco element in " + path.string()));
+      }
+      for (pugi::xml_node part : root.children()) {
+        node.insert_copy_before(part, child);
+      }
+      node.remove_child(child);
+      next = node.first_child();  // Expand what came in, too.
+    } else {
+      RETURN_IF_UNEXPECTED(expand_includes(child, folder, depth + 1));
+    }
+    child = next;
+  }
+  return {};
+}
+
+}  // namespace
+
 auto load_mjcf(const std::string& path)
     -> std::expected<model::ArticulatedModel, lib::Status> {
-  std::ifstream file{path};
-  if (!file) {
+  pugi::xml_document document;
+  if (!document.load_file(path.c_str())) {
     return std::unexpected(
         lib::raise(MjcfError::UNREADABLE, "cannot open " + path));
   }
+  RETURN_IF_UNEXPECTED(
+      expand_includes(document, std::filesystem::path{path}.parent_path(), 0));
   std::stringstream text;
-  text << file.rdbuf();
+  document.save(text);
   return parse_mjcf(text.str());
 }
 
