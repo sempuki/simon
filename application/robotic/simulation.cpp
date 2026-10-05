@@ -253,10 +253,8 @@ auto Simulation::configure() -> engine::PhaseResult {
   if (scenario_.solver) {
     model.physics.solver = *scenario_.solver;
   }
-  if (scenario_.constrained &&
-      model.physics.cone == model::Physics::Cone::ELLIPTIC) {
-    return std::unexpected(lib::raise(format::MjcfError::UNSUPPORTED,
-                                      "the elliptic friction cone"));
+  if (scenario_.cone) {
+    model.physics.cone = *scenario_.cone;
   }
   if (model.physics.integrator != model::Physics::Integrator::EULER) {
     return std::unexpected(lib::raise(format::MjcfError::UNSUPPORTED,

@@ -143,6 +143,8 @@ namespace simon::robotic {
 
 namespace {
 
+constexpr std::array<double, 5> NO_FRICTION{};
+
 // MuJoCo's quaternion as a rotation vector (mju_quat2Vel, dt 1).
 auto convert_to_rotation(model::Quaternion4 quat) -> model::Array3 {
   model::articulated::normalize4(quat);
@@ -421,7 +423,8 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
   row.assign(n, 0.0);
   auto append = [&](model::ConstraintKind kind, std::uint32_t group, double pos,
                     double margin, double loss, double diagonal,
-                    double friction, const model::SoftConstraint& soft) {
+                    const std::array<double, 5>& friction,
+                    const model::SoftConstraint& soft) {
     p.jacobian.insert(p.jacobian.end(), row.begin(), row.end());
     p.kind.push_back(kind);
     p.group.push_back(group);
@@ -450,7 +453,7 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
       std::ranges::fill(row, 0.0);
       row[offset[t] + d - tree.first_dof] = 1;
       append(model::ConstraintKind::FRICTION, p.rows(), 0.0, 0.0,
-             dof.friction_loss, dof_weight[d], 0.0,
+             dof.friction_loss, dof_weight[d], NO_FRICTION,
              m.joints[dof.joint].friction);
     }
   }
@@ -480,7 +483,8 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
     }
     tendon_row(tendon, 1.0);
     append(model::ConstraintKind::FRICTION, p.rows(), 0.0, 0.0,
-           tendon.friction_loss, tendon_weight[k], 0.0, tendon.friction);
+           tendon.friction_loss, tendon_weight[k], NO_FRICTION,
+           tendon.friction);
   }
 
   // Limits, by joint: each side a hinge or slide is within its margin of,
@@ -507,7 +511,7 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
             row[c + k] = -r[k];
           }
           append(model::ConstraintKind::LIMIT, p.rows(), dist, joint.margin,
-                 0.0, dof_weight[joint.dof], 0.0, joint.limit);
+                 0.0, dof_weight[joint.dof], NO_FRICTION, joint.limit);
         }
         continue;
       }
@@ -517,7 +521,7 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
           std::ranges::fill(row, 0.0);
           row[c] = -static_cast<double>(side);
           append(model::ConstraintKind::LIMIT, p.rows(), dist, joint.margin,
-                 0.0, dof_weight[joint.dof], 0.0, joint.limit);
+                 0.0, dof_weight[joint.dof], NO_FRICTION, joint.limit);
         }
       }
     }
@@ -535,7 +539,7 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
       if (dist < tendon.margin) {
         tendon_row(tendon, -static_cast<double>(side));
         append(model::ConstraintKind::LIMIT, p.rows(), dist, tendon.margin, 0.0,
-               tendon_weight[k], 0.0, tendon.limit);
+               tendon_weight[k], NO_FRICTION, tendon.limit);
       }
     }
   }
@@ -595,7 +599,19 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
     if (dim == 1) {
       std::copy_n(framed.begin(), n, row.begin());
       append(model::ConstraintKind::FRICTIONLESS, group, contact.dist,
-             contact.include_margin, 0.0, moved, 0.0, contact.soft);
+             contact.include_margin, 0.0, moved, contact.friction,
+             contact.soft);
+      continue;
+    }
+    if (m.physics.cone == model::Physics::Cone::ELLIPTIC) {
+      // The normal, then the tangents, torsion and rolling, each its row.
+      for (std::uint32_t k = 0; k < dim; ++k) {
+        std::copy_n(framed.begin() + std::size_t{k} * n, n, row.begin());
+        append(model::ConstraintKind::ELLIPTIC, group,
+               k == 0 ? contact.dist : 0.0,
+               k == 0 ? contact.include_margin : 0.0, 0.0,
+               k < 3 ? moved : turned, contact.friction, contact.soft);
+      }
       continue;
     }
     for (std::uint32_t k = 1; k < dim; ++k) {
@@ -606,7 +622,7 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
           row[i] = framed[i] + sign * mu * framed[k * n + i];
         }
         append(model::ConstraintKind::PYRAMIDAL, group, contact.dist,
-               contact.include_margin, 0.0, diagonal, contact.friction[0],
+               contact.include_margin, 0.0, diagonal, contact.friction,
                contact.soft);
       }
     }

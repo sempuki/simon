@@ -27,9 +27,11 @@ HUMANOID = os.path.join(HERE, '..', '..', '..', '3rd_party', 'mujoco',
 
 NEWTON = mujoco.mjtSolver.mjSOL_NEWTON
 PGS = mujoco.mjtSolver.mjSOL_PGS
+ELLIPTIC = mujoco.mjtCone.mjCONE_ELLIPTIC
+DRIVEN = [0.3 * ((7 * k) % 11 - 5) / 5 for k in range(21)]
 
 # Name, model, steps, solver, starting positions and velocities to set by
-# address, and controls.
+# address, and optionally controls and the friction cone.
 CASES = [
     ('rolling', 'rolling.xml', 1500, NEWTON, {}, {0: 2.0}),
     ('sliding', 'sliding.xml', 1000, NEWTON, {}, {0: 2.0, 7: 1.0}),
@@ -42,9 +44,19 @@ CASES = [
     ('limits by PGS', 'limits.xml', 1500, PGS, {0: 0.3, 5: -0.1},
      {0: 3.0, 1: 2.0, 2: -1.0, 4: 1.5, 5: 2.0}),
     ('humanoid falling', HUMANOID, 400, NEWTON, {}, {}),
-    ('humanoid driven', HUMANOID, 400, NEWTON, {}, {},
-     [0.3 * ((7 * k) % 11 - 5) / 5 for k in range(21)]),
+    ('humanoid driven', HUMANOID, 400, NEWTON, {}, {}, DRIVEN),
     ('humanoid falling by PGS', HUMANOID, 400, PGS, {}, {}),
+    ('rolling elliptic', 'rolling.xml', 1500, NEWTON, {}, {0: 2.0}, None,
+     ELLIPTIC),
+    ('sliding elliptic', 'sliding.xml', 1000, NEWTON, {},
+     {0: 2.0, 7: 1.0}, None, ELLIPTIC),
+    ('stack elliptic', 'boxes.xml', 1000, NEWTON, {}, {}, None, ELLIPTIC),
+    ('humanoid driven elliptic', HUMANOID, 400, NEWTON, {}, {}, DRIVEN,
+     ELLIPTIC),
+    ('rolling elliptic by PGS', 'rolling.xml', 1500, PGS, {}, {0: 2.0},
+     None, ELLIPTIC),
+    ('sliding elliptic by PGS', 'sliding.xml', 1000, PGS, {},
+     {0: 2.0, 7: 1.0}, None, ELLIPTIC),
 ]
 
 
@@ -57,16 +69,19 @@ def main():
               newline='') as f:
         out = csv.writer(f, lineterminator='\n')
         out.writerow(['case', 'step', 'qpos', 'qvel'])
-        for name, file, steps, solver, qpos, qvel, *ctrl in CASES:
+        for name, file, steps, solver, qpos, qvel, *rest in CASES:
+            ctrl = rest[0] if rest else None
             model = mujoco.MjModel.from_xml_path(os.path.join(MODELS, file))
             model.opt.solver = solver
+            if len(rest) > 1:
+                model.opt.cone = rest[1]
             data = mujoco.MjData(model)
             for address, value in qpos.items():
                 data.qpos[address] = value
             for address, value in qvel.items():
                 data.qvel[address] = value
             if ctrl:
-                data.ctrl[:] = ctrl[0]
+                data.ctrl[:] = ctrl
             out.writerow([name, 0, text(data.qpos), text(data.qvel)])
             for step in range(1, steps + 1):
                 mujoco.mj_step(model, data)

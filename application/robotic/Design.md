@@ -203,17 +203,22 @@ friction and soft parameter is equal to MuJoCo's to the last bit.
 3.14.0 does (Todorov, ICRA 2014). Each constraint is a soft row of the
 Jacobian: a dof's or a tendon's dry friction, a joint's or a tendon's limit
 once within its margin (a hinge, a slide or a tendon on either side, a ball
-past its largest angle), and a contact, frictionless or a pyramidal friction cone of 2 (dim - 1) edges,
-torsional and rolling friction among them. Each row's regularization comes
+past its largest angle), and a contact, frictionless, a pyramidal friction cone of 2 (dim - 1) edges,
+or an elliptic cone of dim directions, torsional and rolling friction among
+them. Each row's regularization comes
 from the inverse inertia it sees, the bodies' and dofs' at rest, and its
 impedance from solimp at its distance; its reference acceleration from
 solref's stiffness and damping. The forces minimize a convex cost in the
 accelerations: Newton's method, its Hessian M + Jᵀ D J over the active rows
 by Cholesky, its line search exact on the piecewise quadratic, as MuJoCo's;
 or projected Gauss–Seidel on the dual, its rows swept in MuJoCo's shuffled
-order with Nesterov's momentum. Each step starts from the last step's
-accelerations where they cost less, as MuJoCo's warmstart does. The
-elliptic cone and the CG solver are refused until step 8.
+order with Nesterov's momentum. An elliptic cone's cost has three zones,
+above the cone, below it, and between, where it is quadratic in the
+distance to the cone's surface; Newton's method takes the cone's own
+Hessian there, and projected Gauss–Seidel solves each cone's friction as
+one block by a quadratically constrained quadratic program. Each step
+starts from the last step's accelerations where they cost less, as
+MuJoCo's warmstart does. The CG solver is refused.
 
 `Solve` runs after `Collide`, once a step, on the whole world, in its
 `prepare`: it gathers each tree's mass matrix and smooth accelerations,
@@ -224,7 +229,7 @@ few; each tree learns its island. `Integrate` then steps each tree at its
 island's accelerations, or, where any dof of the model is damped, at its
 smooth and constraint forces through M + h B, as MuJoCo does.
 
-`constraint_test` checks eleven cases against MuJoCo, every position and
+`constraint_test` checks seventeen cases against MuJoCo, every position and
 velocity at every step (`reference/mujoco_constraints.py`):
 
 | Case | Steps | Newton, position | Newton, velocity | PGS, position | PGS, velocity |
@@ -235,9 +240,14 @@ velocity at every step (`reference/mujoco_constraints.py`):
 | Hinge, ball and slide limits, a margin, dry friction | 1,500 | 6.7e-15 | 4.8e-14 | 6.7e-15 | 5.7e-14 |
 | MuJoCo's humanoid falling from standing | 400 | 1.3e-13 | 1.1e-11 | 6.4e-14 | 5.2e-12 |
 | The humanoid falling, its 21 motors held at controls | 400 | 2.8e-13 | 7.6e-12 | | |
+| The sphere, elliptic cone | 1,500 | 3.1e-14 | 1.5e-13 | 5.8e-15 | 2.8e-14 |
+| The box and capsule, elliptic cone | 1,000 | 1.1e-7 | 6.6e-6 | 2.5e-7 | 1.1e-5 |
+| The stack, elliptic cone | 1,000 | 0 | 3.8e-17 | | |
+| The driven humanoid, elliptic cone | 400 | 3.6e-13 | 2.0e-11 | | |
 
 Newton's method converges, and so matches MuJoCo to rounding grown over
-the run. Projected Gauss–Seidel stops at its tolerance; where a sweep ends
+the run, but where a body comes to stick, the tolerance it stops at can
+tip it a step apart from MuJoCo's: the capsule, on the elliptic cone. Projected Gauss–Seidel stops at its tolerance; where a sweep ends
 a step earlier or later than MuJoCo's, by rounding, the two part by its
 tolerance, and a stack's resting contacts then come and go apart, so the
 stack is compared over 0.4 s.

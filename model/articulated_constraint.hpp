@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -18,17 +19,21 @@
 namespace simon::model {
 
 // A row's kind, in the order an island lists them: a degree of freedom's
-// dry friction, a joint's limit, a contact without friction, and an edge of
-// a contact's pyramidal friction cone.
+// dry friction, a joint's limit, a contact without friction, an edge of a
+// contact's pyramidal friction cone, and a direction of a contact's
+// elliptic friction cone: its normal, then its tangents, torsion and
+// rolling.
 enum class ConstraintKind : std::uint8_t {
   FRICTION,
   LIMIT,
   FRICTIONLESS,
   PYRAMIDAL,
+  ELLIPTIC,
 };
 
 // An island's dynamics without constraints, and its rows. A group is the
-// rows one constraint makes, one but for a pyramidal contact's 2 (dim - 1).
+// rows one constraint makes: one, but a pyramidal contact's 2 (dim - 1) and
+// an elliptic contact's dim.
 struct ConstraintProblem final {
   std::uint32_t dofs = 0;
   std::vector<double> mass;  // dofs by dofs.
@@ -45,7 +50,8 @@ struct ConstraintProblem final {
   std::vector<double> friction_loss;
   std::vector<double> diagonal;  // The inverse inertia it sees, roughly.
   std::vector<double> velocity;  // J qvel.
-  std::vector<double> friction;  // A pyramid's sliding friction.
+  // A contact's friction: sliding twice, torsional, rolling twice.
+  std::vector<std::array<double, 5>> friction;
   std::vector<SoftConstraint> soft;
 
   auto rows() const -> std::uint32_t {

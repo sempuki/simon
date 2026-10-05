@@ -109,6 +109,7 @@ TEST_CASE("ConstraintsAgainstMuJoCo") {
     // ending a step apart by rounding: a stack over its first 0.4 s.
     std::map<std::string, Run> runs = load_runs();
     using Solver = model::Physics::Solver;
+    using Cone = model::Physics::Cone;
     std::vector<double> driven;
     for (int k = 0; k < 21; ++k) {
       driven.push_back(0.3 * ((7 * k) % 11 - 5) / 5);
@@ -138,6 +139,22 @@ TEST_CASE("ConstraintsAgainstMuJoCo") {
          400},
         {"humanoid falling by PGS", "humanoid", {.solver = Solver::PGS}, 1e-12,
          1e-10, 400},
+        {"rolling elliptic", "rolling.xml",
+         {.qvel = {{0, 2.0}}, .cone = Cone::ELLIPTIC}, 1e-12, 1e-12},
+        {"sliding elliptic", "sliding.xml",
+         {.qvel = {{0, 2.0}, {7, 1.0}}, .cone = Cone::ELLIPTIC}, 1e-6, 1e-4},
+        {"stack elliptic", "boxes.xml", {.cone = Cone::ELLIPTIC}, 1e-12,
+         1e-12},
+        {"humanoid driven elliptic", "humanoid",
+         {.control = driven, .cone = Cone::ELLIPTIC}, 1e-12, 1e-10, 400},
+        {"rolling elliptic by PGS", "rolling.xml",
+         {.qvel = {{0, 2.0}}, .solver = Solver::PGS, .cone = Cone::ELLIPTIC},
+         1e-12, 1e-12},
+        {"sliding elliptic by PGS", "sliding.xml",
+         {.qvel = {{0, 2.0}, {7, 1.0}},
+          .solver = Solver::PGS,
+          .cone = Cone::ELLIPTIC},
+         1e-6, 1e-4},
     };
     // clang-format on
     for (Case& c : cases) {

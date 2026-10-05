@@ -27,6 +27,7 @@ struct Scenario final {
   Feedback feedback;            // Overrides the controls, if given.
   bool constrained = true;      // Contacts, limits and dry friction.
   std::optional<model::Physics::Solver> solver;  // Overrides the model's.
+  std::optional<model::Physics::Cone> cone;      // Likewise.
 };
 
 class Simulation final {
