@@ -42,6 +42,7 @@ cc_library(
     hdrs = ["testing.hpp"],
     copts = COPTS,
     deps = [
+        "//application:testing",
         "//framework:vocabulary",
         "//model:rigid_body",
         "//model:units",

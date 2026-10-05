@@ -3,13 +3,12 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <fstream>
 #include <map>
-#include <sstream>
 #include <string>
 #include <vector>
 
 #include "application/robotic/simulation.hpp"
+#include "application/robotic/testing.hpp"
 #include "base/testing.hpp"
 
 // robotic's test models stepped without constraints by simon and by MuJoCo,
@@ -20,45 +19,7 @@ namespace simon::robotic {
 namespace {
 
 using namespace std::chrono_literals;
-
-constexpr std::string_view MODELS = "application/robotic/models/";
-
-// Each case's positions and velocities after each step, step 0 the start.
-struct Run final {
-  std::vector<std::vector<double>> qpos;
-  std::vector<std::vector<double>> qvel;
-};
-
-auto parse_numbers(const std::string& text) -> std::vector<double> {
-  std::vector<double> values;
-  std::stringstream stream{text};
-  double value = 0.0;
-  while (stream >> value) {
-    values.push_back(value);
-  }
-  return values;
-}
-
-auto load_runs() -> std::map<std::string, Run> {
-  std::ifstream file{"application/robotic/reference/mujoco_dynamics.csv"};
-  REQUIRE(file);
-  std::map<std::string, Run> runs;
-  std::string line;
-  std::getline(file, line);
-  while (std::getline(file, line)) {
-    std::vector<std::string> cells;
-    std::stringstream stream{line};
-    std::string cell;
-    while (std::getline(stream, cell, ',')) {
-      cells.push_back(cell);
-    }
-    REQUIRE(cells.size() == 4);
-    Run& run = runs[cells[0]];
-    run.qpos.push_back(parse_numbers(cells[2]));
-    run.qvel.push_back(parse_numbers(cells[3]));
-  }
-  return runs;
-}
+using namespace testing;
 
 struct Case final {
   std::string name;
@@ -75,7 +36,8 @@ TEST_CASE("DynamicsAgainstMuJoCo") {
     // Every step equal to MuJoCo's but where a ball or free joint's
     // quaternion is in play, there within 2e-14: the double pendulum, chaotic,
     // equal through all 3,000 steps.
-    std::map<std::string, Run> runs = load_runs();
+    std::map<std::string, Run, std::less<>> runs =
+        load_runs("mujoco_dynamics.csv");
     // clang-format off
     std::vector<Case> cases{
         {"pendulum", "pendulum.xml", {.qpos = {{0, 0.7}}}, 1e-15, 1e-15},
@@ -104,26 +66,7 @@ TEST_CASE("DynamicsAgainstMuJoCo") {
       if (!configured) {
         FAIL(configured.error().message());
       }
-      auto dt = std::chrono::nanoseconds{
-          std::llround(simulation.mechanics().model().physics.timestep * 1e9)};
-      double position = 0.0;
-      double velocity = 0.0;
-      for (std::size_t k = 0; k < theirs.qpos.size(); ++k) {
-        if (k > 0) {
-          REQUIRE(simulation.step(framework::Step{
-              .time = framework::TimePoint{} + (k - 1) * dt, .dt = dt}));
-        }
-        std::vector<double> qpos = simulation.read_qpos();
-        std::vector<double> qvel = simulation.read_qvel();
-        REQUIRE(qpos.size() == theirs.qpos[k].size());
-        REQUIRE(qvel.size() == theirs.qvel[k].size());
-        for (std::size_t i = 0; i < qpos.size(); ++i) {
-          position = std::max(position, std::abs(qpos[i] - theirs.qpos[k][i]));
-        }
-        for (std::size_t i = 0; i < qvel.size(); ++i) {
-          velocity = std::max(velocity, std::abs(qvel[i] - theirs.qvel[k][i]));
-        }
-      }
+      auto [position, velocity] = compare_run(InOut(simulation), theirs);
       CAPTURE(theirs.qpos.size(), position, velocity);
       CHECK(position < c.position);
       CHECK(velocity < c.velocity);

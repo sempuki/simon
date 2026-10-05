@@ -7,7 +7,7 @@
 namespace simon::model {
 
 namespace {
-auto value_of(const Acceleration& acceleration) -> QuantityVector {
+auto convert_to_si(const Acceleration& acceleration) -> QuantityVector {
   return acceleration.numerical_value_in(meter_per_second_squared);
 }
 }  // namespace
@@ -22,7 +22,7 @@ TEST_CASE("ProportionalNavigation") {
     target.position = meters(1000.0, 0.0, 0.0);
     target.velocity = meters_per_second(-50.0, 0.0, 0.0);
 
-    CHECK(value_of(compute_proportional_navigation(self, target, 4.0))
+    CHECK(convert_to_si(compute_proportional_navigation(self, target, 4.0))
               .is_approximately(QuantityVector{0.0, 0.0, 0.0}));
   }
 
@@ -33,7 +33,7 @@ TEST_CASE("ProportionalNavigation") {
     target.velocity = meters_per_second(0.0, 50.0, 0.0);
 
     QuantityVector command =
-        value_of(compute_proportional_navigation(self, target, 3.0));
+        convert_to_si(compute_proportional_navigation(self, target, 3.0));
 
     // omega = (r x v)/|r|^2 = 0.05 rad/s about z; Vc = 100 m/s;
     // a = 3 * 100 * 0.05 = 15 m/s^2 along +y.
@@ -41,7 +41,7 @@ TEST_CASE("ProportionalNavigation") {
   }
 
   SECTION("ShouldCommandNothingGivenTargetAtSelf") {
-    CHECK(value_of(compute_proportional_navigation(self, target, 4.0)) ==
+    CHECK(convert_to_si(compute_proportional_navigation(self, target, 4.0)) ==
           QuantityVector{0.0, 0.0, 0.0});
   }
 }
@@ -50,7 +50,8 @@ TEST_CASE("Limit") {
   SECTION("ShouldScaleToLimitGivenLargerCommand") {
     Acceleration limited = limit(meters_per_second_squared(30.0, 40.0, 0.0),
                                  10.0 * meter_per_second_squared);
-    CHECK(value_of(limited).is_approximately(QuantityVector{6.0, 8.0, 0.0}));
+    CHECK(
+        convert_to_si(limited).is_approximately(QuantityVector{6.0, 8.0, 0.0}));
   }
 
   SECTION("ShouldPassThroughGivenSmallerCommand") {
@@ -75,7 +76,8 @@ TEST_CASE("SteerToward") {
     Acceleration command =
         steer_toward(self, meters(100.0, 0.0, 0.0), 20.0 * meter_per_second,
                      0.5 * per_second);
-    CHECK(value_of(command).is_approximately(QuantityVector{10.0, 0.0, 0.0}));
+    CHECK(convert_to_si(command).is_approximately(
+        QuantityVector{10.0, 0.0, 0.0}));
   }
 }
 
@@ -85,7 +87,8 @@ TEST_CASE("HoldSpeed") {
     self.velocity = meters_per_second(0.0, 50.0, 0.0);
     Acceleration command =
         hold_speed(self, 100.0 * meter_per_second, 2.0 * per_second);
-    CHECK(value_of(command).is_approximately(QuantityVector{0.0, 100.0, 0.0}));
+    CHECK(convert_to_si(command).is_approximately(
+        QuantityVector{0.0, 100.0, 0.0}));
   }
 }
 

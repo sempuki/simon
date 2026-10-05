@@ -129,6 +129,9 @@ cc_library(
     hdrs = ["testing.hpp"],
     copts = COPTS,
     deps = [
+        ":automotive_library",
+        "//application:testing",
+        "//model:collision",
         "//model:units",
         "//model:vehicle",
         "@lib//base:testing",

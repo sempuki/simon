@@ -1,15 +1,13 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
-#include <fstream>
 #include <map>
-#include <sstream>
 #include <string>
 #include <vector>
 
 #include "application/robotic/simulation.hpp"
+#include "application/robotic/testing.hpp"
 #include "base/testing.hpp"
 
 // Contacts, limits and dry friction by simon and by MuJoCo, against the
@@ -18,43 +16,7 @@ namespace simon::robotic {
 
 namespace {
 
-constexpr std::string_view MODELS = "application/robotic/models/";
-constexpr std::string_view HUMANOID = "3rd_party/mujoco/humanoid.xml";
-
-auto parse_numbers(const std::string& text) -> std::vector<double> {
-  std::vector<double> values;
-  std::stringstream stream{text};
-  double value = 0.0;
-  while (stream >> value) {
-    values.push_back(value);
-  }
-  return values;
-}
-
-struct Run final {
-  std::vector<std::vector<double>> qpos;
-  std::vector<std::vector<double>> qvel;
-};
-
-auto load_runs() -> std::map<std::string, Run> {
-  std::ifstream file{"application/robotic/reference/mujoco_constraints.csv"};
-  REQUIRE(file);
-  std::map<std::string, Run> runs;
-  std::string line;
-  std::getline(file, line);
-  while (std::getline(file, line)) {
-    std::vector<std::string> cells;
-    std::stringstream stream{line};
-    std::string cell;
-    while (std::getline(stream, cell, ',')) {
-      cells.push_back(cell);
-    }
-    Run& run = runs[cells[0]];
-    run.qpos.push_back(parse_numbers(cells[2]));
-    run.qvel.push_back(parse_numbers(cells[3]));
-  }
-  return runs;
-}
+using namespace testing;
 
 struct Case final {
   std::string name;
@@ -65,41 +27,6 @@ struct Case final {
   std::size_t steps = 1500;
 };
 
-auto step_for(InOut<Simulation> simulation, double seconds) -> void {
-  double h = simulation->mechanics().model().physics.timestep;
-  auto dt = std::chrono::nanoseconds{std::llround(h * 1e9)};
-  auto steps = static_cast<std::size_t>(std::llround(seconds / h));
-  for (std::size_t k = 0; k < steps; ++k) {
-    REQUIRE(simulation->step(
-        framework::Step{.time = framework::TimePoint{} + k * dt, .dt = dt}));
-  }
-}
-
-// Steps `simulation` through every step of `run`, and the largest
-// differences from it.
-auto compare(InOut<Simulation> simulation, const Run& run, std::size_t steps)
-    -> std::pair<double, double> {
-  auto dt = std::chrono::nanoseconds{
-      std::llround(simulation->mechanics().model().physics.timestep * 1e9)};
-  double position = 0.0;
-  double velocity = 0.0;
-  for (std::size_t k = 0; k <= std::min(steps, run.qpos.size() - 1); ++k) {
-    if (k > 0) {
-      REQUIRE(simulation->step(framework::Step{
-          .time = framework::TimePoint{} + (k - 1) * dt, .dt = dt}));
-    }
-    std::vector<double> q = simulation->read_qpos();
-    std::vector<double> v = simulation->read_qvel();
-    for (std::size_t i = 0; i < q.size(); ++i) {
-      position = std::max(position, std::abs(q[i] - run.qpos[k][i]));
-    }
-    for (std::size_t i = 0; i < v.size(); ++i) {
-      velocity = std::max(velocity, std::abs(v[i] - run.qvel[k][i]));
-    }
-  }
-  return {position, velocity};
-}
-
 }  // namespace
 
 TEST_CASE("ConstraintsAgainstMuJoCo") {
@@ -107,7 +34,8 @@ TEST_CASE("ConstraintsAgainstMuJoCo") {
     // Newton's method to 1e-11 m and 1e-10 m/s of MuJoCo's at every step;
     // PGS likewise where it converges, else to its tolerance, its sweeps
     // ending a step apart by rounding: a stack over its first 0.4 s.
-    std::map<std::string, Run> runs = load_runs();
+    std::map<std::string, Run, std::less<>> runs =
+        load_runs("mujoco_constraints.csv");
     using Solver = model::Physics::Solver;
     using Cone = model::Physics::Cone;
     using Integrator = model::Physics::Integrator;
@@ -182,7 +110,7 @@ TEST_CASE("ConstraintsAgainstMuJoCo") {
         FAIL(configured.error().message());
       }
       auto [position, velocity] =
-          compare(InOut(simulation), runs.at(c.name), c.steps);
+          compare_run(InOut(simulation), runs.at(c.name), c.steps);
       CAPTURE(position, velocity);
       CHECK(position < c.position);
       CHECK(velocity < c.velocity);

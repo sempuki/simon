@@ -2,12 +2,11 @@
 
 #include <algorithm>
 #include <cmath>
-#include <fstream>
 #include <map>
-#include <sstream>
 #include <string>
 #include <vector>
 
+#include "application/robotic/testing.hpp"
 #include "base/testing.hpp"
 #include "format/mjcf.hpp"
 #include "model/articulated.hpp"
@@ -22,7 +21,7 @@ namespace {
 
 using model::ArticulatedModel;
 
-constexpr std::string_view MODELS = "application/robotic/models/";
+using namespace testing;
 
 struct Row final {
   std::string model;
@@ -33,29 +32,15 @@ struct Row final {
 };
 
 auto load_rows() -> std::vector<Row> {
-  std::ifstream file{"application/robotic/reference/mujoco_models.csv"};
-  REQUIRE(file);
   std::vector<Row> rows;
-  std::string line;
-  std::getline(file, line);
-  while (std::getline(file, line)) {
-    std::vector<std::string> cells;
-    std::stringstream stream{line};
-    std::string cell;
-    while (std::getline(stream, cell, ',')) {
-      cells.push_back(cell);
-    }
+  for (const std::vector<std::string>& cells :
+       load_table(std::string{REFERENCE} + "mujoco_models.csv").lines) {
     REQUIRE(cells.size() == 5);
-    Row row{.model = cells[0],
-            .element = cells[1],
-            .index = std::stoul(cells[2]),
-            .field = cells[3]};
-    std::stringstream numbers{cells[4]};
-    double value = 0.0;
-    while (numbers >> value) {
-      row.values.push_back(value);
-    }
-    rows.push_back(std::move(row));
+    rows.push_back(Row{.model = cells[0],
+                       .element = cells[1],
+                       .index = std::stoul(cells[2]),
+                       .field = cells[3],
+                       .values = parse_numbers(cells[4])});
   }
   return rows;
 }
@@ -204,10 +189,9 @@ TEST_CASE("ModelAgainstMuJoCo") {
     std::size_t compared = 0;
     for (const Row& row : load_rows()) {
       if (!models.contains(row.model)) {
-        std::string path = row.model == "humanoid.xml"
-                               ? "3rd_party/mujoco/humanoid.xml"
+        std::string path = row.model == "humanoid.xml" ? std::string{HUMANOID}
                            : row.model.find('/') != std::string::npos
-                               ? "3rd_party/menagerie/" + row.model
+                               ? std::string{MENAGERIE} + row.model
                                : std::string{MODELS} + row.model;
         auto loaded = format::load_mjcf(path);
         if (!loaded) {

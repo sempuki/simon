@@ -31,7 +31,7 @@ using model::radian_per_second;
 using model::VehicleInput;
 using model::VehicleParameters;
 
-auto state_of(const Row& row) -> KinematicSingleTrack {
+auto read_state(const Row& row) -> KinematicSingleTrack {
   return {.x = number(row, "x") * meter,
           .y = number(row, "y") * meter,
           .steering = number(row, "steering") * radian,
@@ -117,7 +117,7 @@ TEST_CASE("KinematicSingleTrackAgainstCommonRoad") {
           by_id.at(static_cast<int>(number(row, "vehicle")));
       KinematicSingleTrackRate rate =
           model::compute_kinematic_single_track_rate(
-              state_of(row),
+              read_state(row),
               {.steering_rate =
                    number(row, "steering_rate") * radian_per_second,
                .acceleration =
@@ -156,7 +156,7 @@ TEST_CASE("KinematicSingleTrackAgainstCommonRoad") {
           continue;
         }
         (number(row, "step") == 0.05 ? theirs : converged)
-            .push_back(state_of(row));
+            .push_back(read_state(row));
       }
       std::vector<KinematicSingleTrack> ours = drive(vehicle, 50ms);
       REQUIRE(ours.size() == theirs.size());

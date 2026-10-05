@@ -32,12 +32,6 @@ using model::meter_per_second;
 
 constexpr double WALK = 1.34;  // m/s, every pedestrian's here.
 
-auto network_of(std::string_view file) -> Network {
-  auto network = load_network(find_road_path(file));
-  REQUIRE(network);
-  return std::move(*network);
-}
-
 // The crosswalk's crossing, and the sidewalk piece leading to its end from
 // the east (lower s) and away from its other end to the east.
 struct Crossing final {
@@ -115,19 +109,6 @@ auto wait_for_gap(std::span<const std::pair<double, double>> on, double at,
   return t - at;
 }
 
-constexpr double WIDTH = 1.8;  // m, a car's.
-
-auto box_of(const RoadPose& pose, const Driver& driver) -> model::OrientedBox {
-  Vector3 front = pose.position.numerical_value_in(meter).eigen();
-  double heading = pose.heading.numerical_value_in(model::radian);
-  double length = driver.length.numerical_value_in(meter);
-  return {.x = front.x() - 0.5 * length * std::cos(heading),
-          .y = front.y() - 0.5 * length * std::sin(heading),
-          .heading = heading,
-          .length = length,
-          .width = WIDTH};
-}
-
 }  // namespace
 
 TEST_CASE("Crossing") {
@@ -138,7 +119,7 @@ TEST_CASE("Crossing") {
     // Pedestrians arriving evenly through the cycle wait on average
     // (C - g)^2 / 2C, as the Highway Capacity Manual has it: 600 of them,
     // 15.1 s apart, one at each tenth of a second of the cycle.
-    Network network = network_of("midblock.xodr");
+    Network network = create_network("midblock.xodr");
     REQUIRE(network.crosswalk_groups.size() == 1);
     REQUIRE(network.crosswalk_groups[0]);
     Crossing crossing = find_crossing(network);
@@ -235,7 +216,7 @@ TEST_CASE("Crossing") {
     // manual's rule has it against the vehicles as they passed. Following
     // each other, they keep their distance, and no longer arrive at random,
     // so the manual's formula does not hold.
-    Network network = network_of("zebra.xodr");
+    Network network = create_network("zebra.xodr");
     network.vehicles_yield = false;
     Crossing crossing = find_crossing(network);
     double across = network.walking.edges()[crossing.crossing].length() / WALK;
@@ -361,7 +342,7 @@ TEST_CASE("Crossing") {
     // Vehicles that yield, 300 an hour each way, and a pedestrian every
     // 10 s: every pedestrian crosses, vehicles stop for them, and none
     // touches one.
-    Network network = network_of("zebra.xodr");
+    Network network = create_network("zebra.xodr");
     REQUIRE(network.vehicles_yield);
     Crossing crossing = find_crossing(network);
     World world;
@@ -427,21 +408,21 @@ TEST_CASE("Crossing") {
             }
           });
       const auto& drivers = world.store_of<Driver>();
-      world.store_of<LaneState>().for_each(
-          [&](Entity owner, const LaneState& state) {
-            model::OrientedBox box =
-                box_of(poses.component_of(owner), drivers.component_of(owner));
-            for (const model::OrientedBox& walker : walkers) {
-              touches += model::detect_overlap(box, walker) ? 1 : 0;
-            }
-            if (state.speed.numerical_value_in(meter_per_second) < 0.1 &&
-                stopped.insert(owner).second) {
-              ++stops;
-            }
-            if (along_lane(network, state.lane, state.s) > 390.0) {
-              done.push_back(owner);
-            }
-          });
+      world.store_of<LaneState>().for_each([&](Entity owner,
+                                               const LaneState& state) {
+        model::OrientedBox box =
+            create_box(poses.component_of(owner), drivers.component_of(owner));
+        for (const model::OrientedBox& walker : walkers) {
+          touches += model::detect_overlap(box, walker) ? 1 : 0;
+        }
+        if (state.speed.numerical_value_in(meter_per_second) < 0.1 &&
+            stopped.insert(owner).second) {
+          ++stops;
+        }
+        if (along_lane(network, state.lane, state.s) > 390.0) {
+          done.push_back(owner);
+        }
+      });
       for (Entity e : done) {
         REQUIRE(world.destroy(e).build());
       }

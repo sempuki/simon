@@ -19,3 +19,11 @@ cc_library(
         "//3rd_party:sdl2",
     ],
 )
+
+cc_library(
+    name = "testing",
+    testonly = True,
+    hdrs = ["testing.hpp"],
+    copts = COPTS,
+    deps = ["@lib//base:testing"],
+)

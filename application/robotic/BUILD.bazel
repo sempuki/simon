@@ -18,6 +18,7 @@ cc_test(
         "//3rd_party:mujoco",
     ],
     deps = [
+        ":testing",
         "//format:mjcf",
         "//model:articulated",
         "@lib//base:testing",
@@ -50,6 +51,19 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "testing",
+    testonly = True,
+    hdrs = ["testing.hpp"],
+    copts = COPTS,
+    deps = [
+        ":robotic_library",
+        "//application:testing",
+        "//framework:vocabulary",
+        "@lib//base:testing",
+    ],
+)
+
 cc_test(
     name = "dynamics_test",
     size = "small",
@@ -57,6 +71,7 @@ cc_test(
     copts = COPTS,
     data = glob(["models/*.xml"]) + ["reference/mujoco_dynamics.csv"],
     deps = [
+        ":testing",
         ":robotic_library",
         "@lib//base:testing",
     ],
@@ -72,6 +87,7 @@ cc_test(
         "reference/mujoco_feedback.csv",
     ],
     deps = [
+        ":testing",
         ":robotic_library",
         "@lib//base:testing",
     ],
@@ -87,6 +103,7 @@ cc_test(
         "reference/mujoco_convex.csv",
     ],
     deps = [
+        ":testing",
         ":robotic_library",
         "@lib//base:testing",
     ],
@@ -102,6 +119,7 @@ cc_test(
         "//3rd_party:mujoco",
     ],
     deps = [
+        ":testing",
         ":robotic_library",
         "@lib//base:testing",
     ],
@@ -172,6 +190,7 @@ cc_test(
         "//3rd_party:menagerie",
     ],
     deps = [
+        ":testing",
         ":robotic_library",
         "@lib//base:testing",
     ],

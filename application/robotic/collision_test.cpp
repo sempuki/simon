@@ -1,17 +1,14 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <cstdint>
-#include <filesystem>
-#include <fstream>
-#include <sstream>
 #include <string>
 #include <tuple>
 #include <vector>
 
 #include "application/robotic/simulation.hpp"
+#include "application/robotic/testing.hpp"
 #include "base/testing.hpp"
 
 // Contacts by simon and by MuJoCo, against the table
@@ -21,17 +18,7 @@ namespace simon::robotic {
 
 namespace {
 
-constexpr std::string_view MODELS = "application/robotic/models/";
-
-auto parse_numbers(const std::string& text) -> std::vector<double> {
-  std::vector<double> values;
-  std::stringstream stream{text};
-  double value = 0.0;
-  while (stream >> value) {
-    values.push_back(value);
-  }
-  return values;
-}
+using namespace testing;
 
 // A contact as the table holds it: geoms, distance, position, frame,
 // dimension, friction, solref, solimp, included margin, excluded.
@@ -66,32 +53,17 @@ struct Pose final {
 
 auto load_poses(std::string_view table = "mujoco_contacts.csv")
     -> std::vector<Pose> {
-  std::ifstream file{"application/robotic/reference/" + std::string{table}};
-  REQUIRE(file);
   std::vector<Pose> poses;
-  std::string line;
-  std::getline(file, line);
-  while (std::getline(file, line)) {
-    std::stringstream stream{line};
-    std::string index;
-    std::string kind;
-    std::string values;
-    std::getline(stream, index, ',');
-    std::getline(stream, kind, ',');
-    std::getline(stream, values, ',');
-    if (kind == "qpos") {
-      poses.push_back(Pose{.qpos = parse_numbers(values)});
+  for (const std::vector<std::string>& cells :
+       load_table(std::string{REFERENCE} + std::string{table}).lines) {
+    REQUIRE(cells.size() == 3);
+    if (cells[1] == "qpos") {
+      poses.push_back(Pose{.qpos = parse_numbers(cells[2])});
     } else {
-      poses.back().contacts.push_back(parse_numbers(values));
+      poses.back().contacts.push_back(parse_numbers(cells[2]));
     }
   }
   return poses;
-}
-
-auto step_once(InOut<Simulation> simulation) -> void {
-  auto dt = std::chrono::nanoseconds{2'000'000};
-  REQUIRE(simulation->step(
-      framework::Step{.time = framework::TimePoint{}, .dt = dt}));
 }
 
 struct Comparison final {
@@ -117,7 +89,7 @@ auto compare_poses(std::string_view model, std::string_view table)
     if (!configured) {
       FAIL(configured.error().message());
     }
-    step_once(InOut(simulation));
+    step_once(InOut(simulation), 0);
     std::vector<Row> found;
     for (const model::Contact& contact : simulation.contacts()) {
       found.push_back(flatten(contact));
@@ -179,7 +151,7 @@ TEST_CASE("CollisionAgainstMuJoCo") {
     }
     Simulation simulation{scenario};
     REQUIRE(simulation.configure());
-    step_once(InOut(simulation));
+    step_once(InOut(simulation), 0);
     const model::ArticulatedModel& m = simulation.mechanics().model();
     std::uint32_t arm =
         static_cast<std::uint32_t>(simulation.mechanics().trees().size() - 1);

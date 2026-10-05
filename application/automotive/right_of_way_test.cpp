@@ -29,26 +29,13 @@ using namespace testing;
 using model::meter;
 using model::meter_per_second;
 
-constexpr double WIDTH = 1.8;  // m, a car's.
-
-auto box_of(const RoadPose& pose, const Driver& driver) -> model::OrientedBox {
-  Vector3 front = pose.position.numerical_value_in(meter).eigen();
-  double heading = pose.heading.numerical_value_in(model::radian);
-  double length = driver.length.numerical_value_in(meter);
-  return {.x = front.x() - 0.5 * length * std::cos(heading),
-          .y = front.y() - 0.5 * length * std::sin(heading),
-          .heading = heading,
-          .length = length,
-          .width = WIDTH};
-}
-
 // The pairs of vehicles that overlap, the lesser entity first.
 auto find_overlaps(const World& world) -> std::set<std::pair<Entity, Entity>> {
   std::vector<std::pair<Entity, model::OrientedBox>> boxes;
   const auto& drivers = world.store_of<Driver>();
   world.store_of<RoadPose>().for_each([&](Entity owner, const RoadPose& pose) {
     if (const Driver* driver = drivers.maybe_component_of(owner)) {
-      boxes.emplace_back(owner, box_of(pose, *driver));
+      boxes.emplace_back(owner, create_box(pose, *driver));
     }
   });
   std::set<std::pair<Entity, Entity>> overlaps;

@@ -49,10 +49,6 @@ constexpr std::array<std::string_view, 8> SURFACES{
     "flaps_norm", "gear",         "speedbrake_norm", "spoilers_norm",
 };
 
-auto name_of(FlightSignal signal) -> std::string {
-  return std::string{flight_signal_name(signal)};
-}
-
 }  // namespace
 
 TEST_CASE("FlightControl737") {
@@ -82,7 +78,7 @@ TEST_CASE("FlightControl737") {
     for (std::size_t i = 1; i < rows.size(); ++i) {
       const Row& row = rows[i];
       for (FlightSignal command : COMMANDS) {
-        signals[command] = row.at(name_of(command));
+        signals[command] = row.at(flight_signal_name(command));
       }
       run_flight_controls(controls, InOut(signals), DT * second);
       for (std::string_view surface : SURFACES) {

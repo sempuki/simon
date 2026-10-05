@@ -26,12 +26,6 @@ using namespace testing;
 using model::meter;
 using model::meter_per_second;
 
-auto network_of(std::string_view file) -> Network {
-  auto network = load_network(find_road_path(file));
-  REQUIRE(network);
-  return std::move(*network);
-}
-
 // How many edges of each kind, and how many components.
 struct Census final {
   int sidewalks = 0;
@@ -69,24 +63,24 @@ TEST_CASE("Walking") {
   SECTION("ShouldJoinSidewalksByCrossingsAndCorners") {
     // Four arms, each sidewalk split by its crosswalk; four corners, 7.8 m
     // across; every sidewalk reachable.
-    Census signalized = take_census(network_of("signalized.xodr"));
+    Census signalized = take_census(create_network("signalized.xodr"));
     CHECK(signalized.sidewalks == 16);
     CHECK(signalized.crossings == 4);
     CHECK(signalized.corners == 4);
     CHECK(signalized.components == 1);
     // A curve with two crosswalks and no junction.
-    Census crosswalks = take_census(network_of("crosswalks.xodr"));
+    Census crosswalks = take_census(create_network("crosswalks.xodr"));
     CHECK(crosswalks.sidewalks == 6);
     CHECK(crosswalks.crossings == 2);
     CHECK(crosswalks.corners == 0);
     CHECK(crosswalks.components == 1);
     // A T with no crosswalks: its far side, and each corner of the minor
     // road, cut off from each other by the roads.
-    Census priority = take_census(network_of("priority.xodr"));
+    Census priority = take_census(create_network("priority.xodr"));
     CHECK(priority.corners == 3);
     CHECK(priority.components == 3);
     // Town01 has no crosswalks: each block is its own.
-    Census town = take_census(network_of("Town01.xodr"));
+    Census town = take_census(create_network("Town01.xodr"));
     CHECK(town.sidewalks == 52);
     CHECK(town.crossings == 0);
     CHECK(town.components == 8);
@@ -96,7 +90,7 @@ TEST_CASE("Walking") {
     // Every route's length against Floyd and Warshall's all-pairs shortest
     // distances.
     for (const char* file : {"signalized.xodr", "Town01.xodr"}) {
-      Network network = network_of(file);
+      Network network = create_network(file);
       std::size_t n = network.walking.nodes().size();
       constexpr double FAR = std::numeric_limits<double>::infinity();
       std::vector<std::vector<double>> best(n, std::vector<double>(n, FAR));
@@ -147,7 +141,7 @@ TEST_CASE("Walking") {
     // A walker at 1.6 m/s behind one at 0.8 m/s, 10 m apart on one
     // sidewalk: it closes in and walks at 0.8 m/s behind, its half meter and
     // a second's walk, 1.3 m, behind.
-    Network network = network_of("crosswalks.xodr");
+    Network network = create_network("crosswalks.xodr");
     World world;
     REQUIRE(World::set_up().numbered(1).holding<archetype::Pedestrian>(2).build(
         Out(world)));

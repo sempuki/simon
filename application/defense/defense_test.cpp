@@ -131,7 +131,7 @@ auto make_interceptor(Position position, Entity target, TimePoint expires_at,
 
 // The owners of every `ComponentType`, in store order.
 template <typename ComponentType>
-auto owners_of(const World& world) -> std::vector<Entity> {
+auto collect_owners(const World& world) -> std::vector<Entity> {
   std::vector<Entity> owners;
   world.store_of<ComponentType>().for_each(
       [&](Entity owner, const ComponentType&) { owners.push_back(owner); });
@@ -259,11 +259,11 @@ TEST_CASE("DefenseSimulation") {
         build_scenario(scenario, InOut(world));
     REQUIRE(first.has_value());
 
-    std::vector<Entity> assets = owners_of<Asset>(world);
+    std::vector<Entity> assets = collect_owners<Asset>(world);
     REQUIRE(assets.size() == 4u);
     CHECK(assets.front() == *first);
-    CHECK(owners_of<RedDrone>(world).size() == 40u);
-    CHECK(owners_of<Radar>(world).size() == 12u);
+    CHECK(collect_owners<RedDrone>(world).size() == 40u);
+    CHECK(collect_owners<Radar>(world).size() == 12u);
     // Each drone flies at the asset of the site it spawned in, which is the
     // nearest asset: sites are 20 km apart and drones spawn within 6.5 km.
     world.store_of<Target>().for_each([&](Entity drone, const Target& target) {
@@ -333,7 +333,7 @@ TEST_CASE("DetectDrones") {
     step(TimePoint{}, InOut(scheduler), InOut(world));
 
     REQUIRE(world.store_of<Track>().size() == 1u);
-    Entity track = owners_of<Track>(world).front();
+    Entity track = collect_owners<Track>(world).front();
     CHECK(world.store_of<Track>().component_of(track).target == drone);
     CHECK(world.store_of<Tracked>().component_of(drone).track == track);
   }
@@ -436,7 +436,7 @@ TEST_CASE("Engaging") {
 
     REQUIRE(world.store_of<Interceptor>().size() == 1u);
     // The nearer launcher, at 50 m, won the engagement.
-    Entity interceptor = owners_of<Interceptor>(world).front();
+    Entity interceptor = collect_owners<Interceptor>(world).front();
     Entity launcher = *world.parent_of(interceptor);
     CHECK(world.store_of<Kinematics>().component_of(launcher).position ==
           model::meters(50.0, 0.0, 0.0));
@@ -523,7 +523,8 @@ TEST_CASE("OperatorCommands") {
     step(TimePoint{}, InOut(scheduler), InOut(world));
 
     REQUIRE(world.store_of<Interceptor>().size() == 1u);
-    CHECK(world.parent_of(owners_of<Interceptor>(world).front()) == distant);
+    CHECK(world.parent_of(collect_owners<Interceptor>(world).front()) ==
+          distant);
   }
 
   SECTION("ShouldSkipHeldLaunchersGivenSecondHoldBeforeSync") {

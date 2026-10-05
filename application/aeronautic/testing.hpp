@@ -3,18 +3,16 @@
 #pragma once
 
 #include <algorithm>
-#include <charconv>
 #include <cmath>
 #include <cstddef>
-#include <fstream>
 #include <functional>
 #include <map>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <utility>
 #include <vector>
 
+#include "application/testing.hpp"
 #include "base/testing.hpp"
 #include "framework/vocabulary.hpp"
 #include "model/rigid_body.hpp"
@@ -23,38 +21,21 @@
 // Shared by the aeronautic tests.
 namespace simon::aeronautic::testing {
 
-inline constexpr std::string_view BOEING_737 =
-    "3rd_party/jsbsim/737.aircraft";
-inline constexpr std::string_view F16 =
-    "3rd_party/jsbsim/f16.aircraft";
+inline constexpr std::string_view BOEING_737 = "3rd_party/jsbsim/737.aircraft";
+inline constexpr std::string_view F16 = "3rd_party/jsbsim/f16.aircraft";
 
 // One row of a recording, as columns by name.
 using Row = std::map<std::string, double, std::less<>>;
 
 // Every row of the CSV at `path`, named by its header.
 inline auto load_rows(std::string_view path) -> std::vector<Row> {
-  std::ifstream file{std::string{path}};
-  REQUIRE(file);
-  std::string line;
-  std::getline(file, line);
-  std::vector<std::string> names;
-  for (std::size_t at = 0; at <= line.size();) {
-    std::size_t comma = std::min(line.find(',', at), line.size());
-    names.emplace_back(line.substr(at, comma - at));
-    at = comma + 1;
-  }
-
+  simon::testing::Table table = simon::testing::load_table(path);
   std::vector<Row> rows;
-  while (std::getline(file, line)) {
+  for (const std::vector<std::string>& cells : table.lines) {
+    REQUIRE(cells.size() == table.header.size());
     Row row;
-    const char* next = line.data();
-    const char* end = line.data() + line.size();
-    for (const std::string& name : names) {
-      double value = 0.0;
-      auto [stop, error] = std::from_chars(next, end, value);
-      REQUIRE(error == std::errc{});
-      row[name] = value;
-      next = stop + 1;
+    for (std::size_t i = 0; i < cells.size(); ++i) {
+      row[table.header[i]] = simon::testing::parse_number(cells[i]);
     }
     rows.push_back(std::move(row));
   }

@@ -2,23 +2,27 @@
 
 #pragma once
 
-#include <algorithm>
-#include <charconv>
-#include <fstream>
+#include <cmath>
 #include <functional>
 #include <map>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <vector>
 
+#include "application/automotive/simulation.hpp"
+#include "application/testing.hpp"
 #include "base/testing.hpp"
+#include "model/collision.hpp"
 #include "model/units.hpp"
 #include "model/vehicle.hpp"
 
 // Shared by the automotive tests: the reference tables in
 // application/automotive/reference, read as rows of text by column name.
 namespace simon::automotive::testing {
+
+using simon::testing::load_table;
+using simon::testing::parse_number;
+using simon::testing::split_cells;
 
 inline constexpr std::string_view ROADS = "application/automotive/roads/";
 inline constexpr std::string_view REFERENCE =
@@ -38,62 +42,53 @@ inline auto find_road_path(std::string_view file) -> std::string {
   return std::string{directory} + std::string{file};
 }
 
+// The network of the road file `file`, read for a test.
+inline auto create_network(std::string_view file) -> Network {
+  auto network = load_network(find_road_path(file));
+  REQUIRE(network);
+  return std::move(*network);
+}
+
+// A car's width, every test vehicle's.
+inline constexpr double CAR_WIDTH = 1.8;  // m.
+
+// The box a vehicle covers, from its front at `pose` back its length.
+inline auto create_box(const RoadPose& pose, const Driver& driver)
+    -> model::OrientedBox {
+  Vector3 front = pose.position.numerical_value_in(model::meter).eigen();
+  double heading = pose.heading.numerical_value_in(model::radian);
+  double length = driver.length.numerical_value_in(model::meter);
+  return {.x = front.x() - 0.5 * length * std::cos(heading),
+          .y = front.y() - 0.5 * length * std::sin(heading),
+          .heading = heading,
+          .length = length,
+          .width = CAR_WIDTH};
+}
+
 // One row of a table, as text by column name.
 using Row = std::map<std::string, std::string, std::less<>>;
-
-// The cells of one line of a table.
-inline auto split_cells(const std::string& line) -> std::vector<std::string> {
-  std::vector<std::string> cells;
-  for (std::size_t at = 0; at <= line.size();) {
-    std::size_t comma = std::min(line.find(',', at), line.size());
-    cells.emplace_back(line.substr(at, comma - at));
-    at = comma + 1;
-  }
-  return cells;
-}
 
 // Every line of the reference table `name` but its header, as cells, for
 // tables whose rows differ in length.
 inline auto load_cells(std::string_view name)
     -> std::vector<std::vector<std::string>> {
-  std::ifstream file{std::string{REFERENCE} + std::string{name}};
-  REQUIRE(file);
-  std::string line;
-  std::getline(file, line);
-  std::vector<std::vector<std::string>> lines;
-  while (std::getline(file, line)) {
-    lines.push_back(split_cells(line));
-  }
-  return lines;
+  return load_table(std::string{REFERENCE} + std::string{name}).lines;
 }
 
 // Every row of the reference table `name`, named by its header.
 inline auto load_rows(std::string_view name) -> std::vector<Row> {
-  std::ifstream file{std::string{REFERENCE} + std::string{name}};
-  REQUIRE(file);
-  std::string line;
-  std::getline(file, line);
-  std::vector<std::string> names = split_cells(line);
+  simon::testing::Table table =
+      load_table(std::string{REFERENCE} + std::string{name});
   std::vector<Row> rows;
-  while (std::getline(file, line)) {
-    std::vector<std::string> cells = split_cells(line);
-    REQUIRE(cells.size() == names.size());
+  for (const std::vector<std::string>& cells : table.lines) {
+    REQUIRE(cells.size() == table.header.size());
     Row row;
-    for (std::size_t i = 0; i < names.size(); ++i) {
-      row[names[i]] = cells[i];
+    for (std::size_t i = 0; i < cells.size(); ++i) {
+      row[table.header[i]] = cells[i];
     }
     rows.push_back(std::move(row));
   }
   return rows;
-}
-
-// The number `text` holds.
-inline auto parse_number(std::string_view text) -> double {
-  double value = 0.0;
-  auto [end, error] =
-      std::from_chars(text.data(), text.data() + text.size(), value);
-  REQUIRE(error == std::errc{});
-  return value;
 }
 
 // The number in `row`'s `column`.

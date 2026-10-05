@@ -16,7 +16,7 @@ namespace {
 
 using namespace testing;
 
-auto box_of(const Row& row, std::string_view which) -> model::OrientedBox {
+auto read_box(const Row& row, std::string_view which) -> model::OrientedBox {
   std::string prefix{which};
   return {.x = number(row, prefix + "x"),
           .y = number(row, prefix + "y"),
@@ -34,8 +34,8 @@ TEST_CASE("CollisionAgainstShapely") {
   int overlapping = 0;
   double distance = 0.0;
   for (const Row& row : rows) {
-    model::OrientedBox a = box_of(row, "a");
-    model::OrientedBox b = box_of(row, "b");
+    model::OrientedBox a = read_box(row, "a");
+    model::OrientedBox b = read_box(row, "b");
     bool theirs = number(row, "intersects") != 0.0;
     agree += model::detect_overlap(a, b) == theirs ? 1 : 0;
     overlapping += theirs ? 1 : 0;

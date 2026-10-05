@@ -36,7 +36,7 @@ using namespace testing;
 constexpr std::size_t EDGES = 387;
 
 // Each file's road network, read once.
-auto network_of(std::string_view file) -> const model::RoadNetwork& {
+auto find_network(std::string_view file) -> const model::RoadNetwork& {
   static std::map<std::string, model::RoadNetwork, std::less<>> networks;
   auto found = networks.find(file);
   if (found == networks.end()) {
@@ -47,23 +47,23 @@ auto network_of(std::string_view file) -> const model::RoadNetwork& {
   return found->second;
 }
 
-auto road_of(const Row& row) -> const model::Road& {
+auto find_road(const Row& row) -> const model::Road& {
   const model::Road* road =
-      network_of(row.at("file")).find_road(row.at("road"));
+      find_network(row.at("file")).find_road(row.at("road"));
   REQUIRE(road);
   return *road;
 }
 
-auto signal_of(const Row& row) -> const model::Signal& {
-  const model::Road& road = road_of(row);
+auto find_signal(const Row& row) -> const model::Signal& {
+  const model::Road& road = find_road(row);
   auto found =
       std::ranges::find(road.signals, row.at("id"), &model::Signal::id);
   REQUIRE(found != road.signals.end());
   return *found;
 }
 
-auto object_of(const Row& row) -> const model::RoadObject& {
-  const model::Road& road = road_of(row);
+auto find_object(const Row& row) -> const model::RoadObject& {
+  const model::Road& road = find_road(row);
   auto found =
       std::ranges::find(road.objects, row.at("id"), &model::RoadObject::id);
   REQUIRE(found != road.objects.end());
@@ -90,7 +90,7 @@ auto position_errors(std::string_view table) -> Largest {
   Largest largest;
   for (const Row& row : load_rows(table)) {
     model::Position position = model::compute_road_position(
-        road_of(row), number(row, "s") * meter, number(row, "t") * meter,
+        find_road(row), number(row, "s") * meter, number(row, "t") * meter,
         number(row, "h") * meter);
     Vector3 apart =
         position.numerical_value_in(meter).eigen() -
@@ -146,7 +146,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
     Largest largest;
     for (const Row& row : load_rows("libopendrive_borders.csv")) {
       double border =
-          model::compute_lane_border(road_of(row), number(row, "s") * meter,
+          model::compute_lane_border(find_road(row), number(row, "s") * meter,
                                      static_cast<int>(number(row, "lane")))
               .numerical_value_in(meter);
       double& most = largest[row.at("file")];
@@ -173,7 +173,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
     }
     std::set<Edge> ours;
     for (const std::string& file : files) {
-      const model::RoadNetwork& network = network_of(file);
+      const model::RoadNetwork& network = find_network(file);
       for (const model::LaneGraph::Edge& edge :
            model::build_lane_graph(network).edges()) {
         const model::Road& from = network.roads[edge.from.road];
@@ -193,7 +193,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
     std::map<std::string, std::set<std::pair<int, int>>, std::less<>> theirs;
     double farthest = 0.0;
     for (const Row& row : load_rows("libopendrive_signals.csv")) {
-      const model::Signal& signal = signal_of(row);
+      const model::Signal& signal = find_signal(row);
       CAPTURE(row.at("file"), row.at("road"), row.at("id"));
       CHECK(signal.name == row.at("name"));
       CHECK(signal.s == number(row, "s"));
@@ -214,7 +214,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
                            static_cast<int>(number(row, "to_lane")));
       }
       model::Position position = model::compute_road_position(
-          road_of(row), signal.s * meter, signal.t * meter,
+          find_road(row), signal.s * meter, signal.t * meter,
           signal.z_offset * meter);
       Vector3 apart =
           position.numerical_value_in(meter).eigen() -
@@ -225,7 +225,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
       std::vector<std::string> cells = split_cells(key);
       Row row{{"file", cells[0]}, {"road", cells[1]}, {"id", cells[2]}};
       std::set<std::pair<int, int>> ours;
-      for (const model::LaneValidity& validity : signal_of(row).validities) {
+      for (const model::LaneValidity& validity : find_signal(row).validities) {
         ours.emplace(validity.from, validity.to);
       }
       CAPTURE(key);
@@ -243,7 +243,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
     std::set<std::string> objects;
     double farthest = 0.0;
     for (const Row& row : load_rows("libopendrive_objects.csv")) {
-      const model::RoadObject& object = object_of(row);
+      const model::RoadObject& object = find_object(row);
       CAPTURE(row.at("file"), row.at("road"), row.at("id"));
       objects.insert(row.at("file") + "," + row.at("id"));
       CHECK(object.type == row.at("type"));
@@ -263,7 +263,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
       const model::RoadObject::Outline& outline =
           object.outlines.at(static_cast<std::size_t>(number(row, "outline")));
       std::vector<model::Position> corners =
-          model::compute_outline(road_of(row), object, outline);
+          model::compute_outline(find_road(row), object, outline);
       Vector3 apart =
           corners.at(static_cast<std::size_t>(number(row, "corner")))
               .numerical_value_in(meter)
@@ -289,7 +289,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
     }
     std::set<std::string> ours;
     for (const std::string& file : files) {
-      for (const model::Junction& junction : network_of(file).junctions) {
+      for (const model::Junction& junction : find_network(file).junctions) {
         for (const model::JunctionPriority& priority : junction.priorities) {
           ours.insert(file + "," + junction.id + ",priority," + priority.high +
                       "," + priority.low + ",");
@@ -312,7 +312,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
     // the neighbor's middle. That is the only way the two may differ.
     int differ = 0;
     for (const Row& row : load_rows("libopendrive_lanes.csv")) {
-      const model::Road& road = road_of(row);
+      const model::Road& road = find_road(row);
       auto s = number(row, "s") * meter;
       std::optional<int> lane =
           model::find_lane(road, s, number(row, "t") * meter);
