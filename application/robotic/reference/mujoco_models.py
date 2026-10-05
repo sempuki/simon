@@ -62,7 +62,7 @@ def main():
             model = mujoco.MjModel.from_xml_path(path)
             option = model.opt
             for field in ['timestep', 'gravity', 'integrator', 'cone', 'solver',
-                          'iterations', 'tolerance']:
+                          'iterations', 'tolerance', 'impratio']:
                 out.writerow([name, 'option', 0, field,
                               text(getattr(option, field))])
             out.writerow([name, 'qpos0', 0, 'values', text(model.qpos0)])

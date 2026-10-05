@@ -740,6 +740,9 @@ class Reader final {
       } else if (name == "tolerance") {
         RETURN_IF_UNEXPECTED(
             read_number(node, "tolerance", InOut(physics->tolerance)));
+      } else if (name == "impratio") {
+        RETURN_IF_UNEXPECTED(
+            read_number(node, "impratio", InOut(physics->impratio)));
       } else {
         return refuse(node, name);
       }
@@ -810,8 +813,8 @@ class Reader final {
           "fromto",  "mass",        "density",  "friction", "condim",
           "contype", "conaffinity", "priority", "solref",   "solimp",
           "margin"};
-      static constexpr std::array<std::string_view, 4> SHOWN{"rgba", "material",
-                                                             "group", "user"};
+      static constexpr std::array<std::string_view, 5> SHOWN{
+          "rgba", "material", "group", "user", "mesh"};
       if (name == "gap" || std::ranges::contains(KNOWN, name) ||
           std::ranges::contains(SHOWN, name)) {
         continue;
@@ -825,13 +828,14 @@ class Reader final {
       geom.name = node.attribute("name").as_string();
     }
     if (pugi::xml_attribute type = node.attribute("type")) {
-      static constexpr std::array<std::pair<std::string_view, GeomType>, 6>
+      static constexpr std::array<std::pair<std::string_view, GeomType>, 7>
           TYPES{{{"plane", GeomType::PLANE},
                  {"sphere", GeomType::SPHERE},
                  {"capsule", GeomType::CAPSULE},
                  {"ellipsoid", GeomType::ELLIPSOID},
                  {"cylinder", GeomType::CYLINDER},
-                 {"box", GeomType::BOX}}};
+                 {"box", GeomType::BOX},
+                 {"mesh", GeomType::MESH}}};
       auto found = std::ranges::find(TYPES, std::string_view{type.as_string()},
                                      &decltype(TYPES)::value_type::first);
       if (found == TYPES.end()) {
@@ -1299,6 +1303,19 @@ class Reader final {
       geom.quat = rotate_z_to(v);
     } else {
       RETURN_OR_ASSIGN(geom.quat, resolve(spec.orientation));
+    }
+    // A mesh only shows the model: it may neither collide nor weigh, as
+    // its shape is not read.
+    if (geom.type == GeomType::MESH) {
+      if (geom.contype != 0 || geom.conaffinity != 0) {
+        return Failure{
+            lib::raise(MjcfError::UNSUPPORTED, "a mesh geom that collides")};
+      }
+      if (infer && (spec.mass ? *spec.mass != 0.0 : spec.density != 0.0)) {
+        return Failure{lib::raise(MjcfError::UNSUPPORTED,
+                                  "a mesh geom that gives its body mass")};
+      }
+      return std::pair{geom, 0.0};
     }
     if (infer) {
       double volume = compute_volume(geom);

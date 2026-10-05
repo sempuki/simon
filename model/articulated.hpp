@@ -173,6 +173,7 @@ struct Physics final {
   Solver solver = Solver::NEWTON;
   std::uint32_t iterations = 100;
   double tolerance = 1e-8;
+  double impratio = 1.0;  // The friction's regularization over the normal's.
 };
 
 // One kinematic tree of a model: a child of the world and every body under

@@ -25,6 +25,7 @@ namespace simon::robotic {
 using SingleCapacity = model::TreeCapacity<1, 6>;
 using SmallCapacity = model::TreeCapacity<4, 8>;
 using LargeCapacity = model::TreeCapacity<16, 32>;
+using HugeCapacity = model::TreeCapacity<32, 64>;
 
 template <typename Capacity>
 using TreeState = model::TreeState<Capacity>;
@@ -83,8 +84,10 @@ class Mechanics final {
       return *single_[tree];
     } else if constexpr (std::is_same_v<Capacity, SmallCapacity>) {
       return *small_[tree];
-    } else {
+    } else if constexpr (std::is_same_v<Capacity, LargeCapacity>) {
       return *large_[tree];
+    } else {
+      return *huge_[tree];
     }
   }
 
@@ -102,6 +105,7 @@ class Mechanics final {
   std::vector<std::unique_ptr<model::TreeKernel<SingleCapacity>>> single_;
   std::vector<std::unique_ptr<model::TreeKernel<SmallCapacity>>> small_;
   std::vector<std::unique_ptr<model::TreeKernel<LargeCapacity>>> large_;
+  std::vector<std::unique_ptr<model::TreeKernel<HugeCapacity>>> huge_;
 };
 
 // A linear state feedback on the model's actuators: each control
@@ -205,6 +209,15 @@ struct LargeTree final                                      //
                          TreeControl<LargeCapacity>,        //
                          TreeDynamics<LargeCapacity>>> {};  //
 
+// A tree of at most 32 bodies and 64 degrees of freedom: a humanoid with
+// hands.
+struct HugeTree final                                      //
+    : Archetype<"huge tree",                               //
+                Requires<TreeBound, Mechanism, Touching,   //
+                         Island, TreeState<HugeCapacity>,  //
+                         TreeControl<HugeCapacity>,        //
+                         TreeDynamics<HugeCapacity>>> {};  //
+
 }  // namespace archetype
 
 using World = framework::World<
@@ -214,8 +227,9 @@ using World = framework::World<
                         TreeDynamics<SingleCapacity>, TreeState<SmallCapacity>,
                         TreeControl<SmallCapacity>, TreeDynamics<SmallCapacity>,
                         TreeState<LargeCapacity>, TreeControl<LargeCapacity>,
-                        TreeDynamics<LargeCapacity>>,
+                        TreeDynamics<LargeCapacity>, TreeState<HugeCapacity>,
+                        TreeControl<HugeCapacity>, TreeDynamics<HugeCapacity>>,
     framework::TypeList<archetype::SingleBody, archetype::SmallTree,
-                        archetype::LargeTree>>;
+                        archetype::LargeTree, archetype::HugeTree>>;
 
 }  // namespace simon::robotic

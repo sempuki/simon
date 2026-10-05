@@ -34,6 +34,7 @@ auto Collide::prepare(SystemWorld& world) -> bool {
   place_geoms<SingleCapacity>(world);
   place_geoms<SmallCapacity>(world);
   place_geoms<LargeCapacity>(world);
+  place_geoms<HugeCapacity>(world);
 
   // The world's geoms and the planes, with every body that may touch them.
   for (std::uint32_t g : mechanics_->unbounded()) {
@@ -246,6 +247,7 @@ auto Solve::prepare(SystemWorld& world) -> bool {
   gather<SingleCapacity>(world);
   gather<SmallCapacity>(world);
   gather<LargeCapacity>(world);
+  gather<HugeCapacity>(world);
   ConstraintSolution& out = *solution_;
   out.qacc.assign(m.dofs.size(), 0.0);
   out.qfrc_constraint.assign(m.dofs.size(), 0.0);
@@ -635,7 +637,8 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
       .iterations = physics.iterations,
       .tolerance = physics.tolerance,
       .mean_inertia = mechanics_->mean_inertia(),
-      .model_dofs = static_cast<std::uint32_t>(m.dofs.size())};
+      .model_dofs = static_cast<std::uint32_t>(m.dofs.size()),
+      .impratio = physics.impratio};
   model::solve_constraints(p, settings, Out(answer_));
   ConstraintSolution& out = *solution_;
   for (std::uint32_t t : members) {

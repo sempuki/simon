@@ -14,7 +14,6 @@ namespace {
 constexpr double MINVAL = 1e-15;       // mjMINVAL.
 constexpr double MINIMP = 0.0001;      // mjMINIMP.
 constexpr double MAXIMP = 0.9999;      // mjMAXIMP.
-constexpr double IMPRATIO = 1.0;       // mjOption's impratio.
 constexpr double LS_TOLERANCE = 0.01;  // mjOption's ls_tolerance.
 constexpr std::uint32_t LS_ITERATIONS = 50;
 
@@ -174,7 +173,8 @@ auto group_end(const ConstraintProblem& p, std::uint32_t first)
   return end;
 }
 
-auto regularize(const ConstraintProblem& p, double timestep) -> Regularized {
+auto regularize(const ConstraintProblem& p, double timestep, double impratio)
+    -> Regularized {
   std::uint32_t rows = p.rows();
   Regularized out{std::vector<double>(rows), std::vector<double>(rows),
                   std::vector<double>(rows), std::vector<double>(rows)};
@@ -211,7 +211,7 @@ auto regularize(const ConstraintProblem& p, double timestep) -> Regularized {
     }
     const std::array<double, 5>& f = p.friction[i];
     std::uint32_t end = group_end(p, i);
-    double r1 = out.r[i] / std::max(MINVAL, IMPRATIO);
+    double r1 = out.r[i] / std::max(MINVAL, impratio);
     double mu = f[0] * std::sqrt(r1 / out.r[i]);
     out.mu[i] = mu;
     if (pyramid) {
@@ -1303,7 +1303,7 @@ auto solve_pgs(const ConstraintProblem& p, const Regularized& reg,
 auto solve_constraints(const ConstraintProblem& problem,
                        const ConstraintSettings& settings,
                        Out<ConstraintSolution> solution) -> void {
-  Regularized reg = regularize(problem, settings.timestep);
+  Regularized reg = regularize(problem, settings.timestep, settings.impratio);
   if (settings.solver == Physics::Solver::PGS) {
     solve_pgs(problem, reg, settings, solution);
   } else {

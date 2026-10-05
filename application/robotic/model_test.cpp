@@ -81,6 +81,7 @@ auto find_value(const ArticulatedModel& m, const Row& row)
     if (f == "solver") return number(static_cast<double>(p.solver));
     if (f == "iterations") return number(p.iterations);
     if (f == "tolerance") return number(p.tolerance);
+    if (f == "impratio") return number(p.impratio);
   } else if (row.element == "qpos0") {
     return m.qpos0;
   } else if (row.element == "qpos_spring") {
@@ -132,6 +133,12 @@ auto find_value(const ArticulatedModel& m, const Row& row)
     if (f == "solimp") return doubles(m.joints.at(d.joint).friction.impedance);
   } else if (row.element == "geom") {
     const model::Geom& g = m.geoms.at(i);
+    // A mesh's frame and size come from its shape, which is not read; it
+    // only shows the model.
+    if (g.type == model::GeomType::MESH &&
+        (f == "size" || f == "pos" || f == "quat" || f == "sameframe")) {
+      return row.values;
+    }
     if (f == "type") return number(static_cast<double>(g.type));
     if (f == "bodyid") return number(g.body);
     if (f == "size") return doubles(g.size);

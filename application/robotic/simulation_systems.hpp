@@ -106,10 +106,11 @@ struct Collide final    //
   using AllowComponentList =
       framework::TypeList<TreeBound, Mechanism, TreeDynamics<SingleCapacity>,
                           TreeDynamics<SmallCapacity>,
-                          TreeDynamics<LargeCapacity>>;
+                          TreeDynamics<LargeCapacity>,
+                          TreeDynamics<HugeCapacity>>;
   using SequenceAfterSystemList =
       SystemList<Bound<SingleCapacity>, Bound<SmallCapacity>,
-                 Bound<LargeCapacity>>;
+                 Bound<LargeCapacity>, Bound<HugeCapacity>>;
 
   Collide(const Mechanics& mechanics, Depend<ContactSet> contacts)
       : mechanics_{&mechanics}, contacts_{contacts.get()} {}
@@ -148,10 +149,12 @@ struct Solve final    //
     : System<Island,  //
              const Mechanism> {
   using SystemWorld = ProjectedWorld<Solve>;
-  using AllowComponentList = framework::TypeList<
-      Mechanism, TreeState<SingleCapacity>, TreeDynamics<SingleCapacity>,
-      TreeState<SmallCapacity>, TreeDynamics<SmallCapacity>,
-      TreeState<LargeCapacity>, TreeDynamics<LargeCapacity>>;
+  using AllowComponentList =
+      framework::TypeList<Mechanism, TreeState<SingleCapacity>,
+                          TreeDynamics<SingleCapacity>,
+                          TreeState<SmallCapacity>, TreeDynamics<SmallCapacity>,
+                          TreeState<LargeCapacity>, TreeDynamics<LargeCapacity>,
+                          TreeState<HugeCapacity>, TreeDynamics<HugeCapacity>>;
   using SequenceAfterSystemList = SystemList<Collide>;
 
   Solve(const Mechanics& mechanics, const ContactSet& contacts,
@@ -266,13 +269,13 @@ struct Integrate final                      //
   const ConstraintSolution* solution_ = nullptr;
 };
 
-using Schedule =
-    SystemList<Control<SingleCapacity>, Control<SmallCapacity>,
-               Control<LargeCapacity>, Forward<SingleCapacity>,
-               Forward<SmallCapacity>, Forward<LargeCapacity>,
-               Bound<SingleCapacity>, Bound<SmallCapacity>,
-               Bound<LargeCapacity>, Collide, Solve, Integrate<SingleCapacity>,
-               Integrate<SmallCapacity>, Integrate<LargeCapacity>>;
+using Schedule = SystemList<
+    Control<SingleCapacity>, Control<SmallCapacity>, Control<LargeCapacity>,
+    Control<HugeCapacity>, Forward<SingleCapacity>, Forward<SmallCapacity>,
+    Forward<LargeCapacity>, Forward<HugeCapacity>, Bound<SingleCapacity>,
+    Bound<SmallCapacity>, Bound<LargeCapacity>, Bound<HugeCapacity>, Collide,
+    Solve, Integrate<SingleCapacity>, Integrate<SmallCapacity>,
+    Integrate<LargeCapacity>, Integrate<HugeCapacity>>;
 
 inline auto make_schedule(const Mechanics& mechanics, const Feedback& feedback,
                           Depend<ContactSet> contacts,
@@ -281,17 +284,21 @@ inline auto make_schedule(const Mechanics& mechanics, const Feedback& feedback,
   return Schedule{Control<SingleCapacity>{mechanics, feedback},
                   Control<SmallCapacity>{mechanics, feedback},
                   Control<LargeCapacity>{mechanics, feedback},
+                  Control<HugeCapacity>{mechanics, feedback},
                   Forward<SingleCapacity>{mechanics},
                   Forward<SmallCapacity>{mechanics},
                   Forward<LargeCapacity>{mechanics},
+                  Forward<HugeCapacity>{mechanics},
                   Bound<SingleCapacity>{mechanics},
                   Bound<SmallCapacity>{mechanics},
                   Bound<LargeCapacity>{mechanics},
+                  Bound<HugeCapacity>{mechanics},
                   Collide{mechanics, contacts},
                   Solve{mechanics, *contacts, solution, constrained},
                   Integrate<SingleCapacity>{mechanics, *solution},
                   Integrate<SmallCapacity>{mechanics, *solution},
-                  Integrate<LargeCapacity>{mechanics, *solution}};
+                  Integrate<LargeCapacity>{mechanics, *solution},
+                  Integrate<HugeCapacity>{mechanics, *solution}};
 }
 using Scheduler = framework::Scheduler<World, Schedule>;
 

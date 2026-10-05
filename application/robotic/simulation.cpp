@@ -159,6 +159,10 @@ Mechanics::Mechanics(model::ArticulatedModel model)
                          ? std::make_unique<model::TreeKernel<LargeCapacity>>(
                                model_, trees_[t], implicit)
                          : nullptr);
+    huge_.push_back(fits<HugeCapacity>(t)
+                        ? std::make_unique<model::TreeKernel<HugeCapacity>>(
+                              model_, trees_[t], implicit)
+                        : nullptr);
     if (single_.back()) {
       weigh(model_, trees_[t], *single_.back(), InOut(body_weight_),
             InOut(dof_weight_), InOut(tendon_weight_), InOut(inertia));
@@ -167,6 +171,9 @@ Mechanics::Mechanics(model::ArticulatedModel model)
             InOut(dof_weight_), InOut(tendon_weight_), InOut(inertia));
     } else if (large_.back()) {
       weigh(model_, trees_[t], *large_.back(), InOut(body_weight_),
+            InOut(dof_weight_), InOut(tendon_weight_), InOut(inertia));
+    } else if (huge_.back()) {
+      weigh(model_, trees_[t], *huge_.back(), InOut(body_weight_),
             InOut(dof_weight_), InOut(tendon_weight_), InOut(inertia));
     }
   }
@@ -283,6 +290,7 @@ auto Simulation::configure() -> engine::PhaseResult {
   std::size_t single = 0;
   std::size_t small = 0;
   std::size_t large = 0;
+  std::size_t huge = 0;
   for (std::uint32_t t = 0; t < mechanics_->trees().size(); ++t) {
     if (mechanics_->fits<SingleCapacity>(t)) {
       ++single;
@@ -290,10 +298,12 @@ auto Simulation::configure() -> engine::PhaseResult {
       ++small;
     } else if (mechanics_->fits<LargeCapacity>(t)) {
       ++large;
+    } else if (mechanics_->fits<HugeCapacity>(t)) {
+      ++huge;
     } else {
       return std::unexpected(
           lib::raise(format::MjcfError::UNSUPPORTED,
-                     "a tree of more than 16 bodies or 32 degrees of freedom"));
+                     "a tree of more than 32 bodies or 64 degrees of freedom"));
     }
   }
   RETURN_IF_UNEXPECTED(World::set_up()
@@ -301,6 +311,7 @@ auto Simulation::configure() -> engine::PhaseResult {
                            .holding<archetype::SingleBody>(single)
                            .holding<archetype::SmallTree>(small)
                            .holding<archetype::LargeTree>(large)
+                           .holding<archetype::HugeTree>(huge)
                            .build(Out(world_)));
   auto transaction = world_.transaction();
   // Each tree in the smallest archetype it fits.
@@ -325,9 +336,12 @@ auto Simulation::configure() -> engine::PhaseResult {
     } else if (mechanics_->fits<SmallCapacity>(t)) {
       RETURN_IF_UNEXPECTED(
           (create.operator()<archetype::SmallTree, SmallCapacity>(t)));
-    } else {
+    } else if (mechanics_->fits<LargeCapacity>(t)) {
       RETURN_IF_UNEXPECTED(
           (create.operator()<archetype::LargeTree, LargeCapacity>(t)));
+    } else {
+      RETURN_IF_UNEXPECTED(
+          (create.operator()<archetype::HugeTree, HugeCapacity>(t)));
     }
   }
   transaction.commit();
@@ -405,6 +419,7 @@ auto Simulation::read_geom_frames() const -> std::vector<model::GeomFrame> {
   place<SingleCapacity>(world_, *mechanics_, InOut(frames));
   place<SmallCapacity>(world_, *mechanics_, InOut(frames));
   place<LargeCapacity>(world_, *mechanics_, InOut(frames));
+  place<HugeCapacity>(world_, *mechanics_, InOut(frames));
   return frames;
 }
 
@@ -416,6 +431,8 @@ auto Simulation::read_qpos() const -> std::vector<double> {
                         false, InOut(qpos));
   gather<LargeCapacity>(world_, *mechanics_, &TreeState<LargeCapacity>::qpos,
                         false, InOut(qpos));
+  gather<HugeCapacity>(world_, *mechanics_, &TreeState<HugeCapacity>::qpos,
+                       false, InOut(qpos));
   return qpos;
 }
 
@@ -427,6 +444,8 @@ auto Simulation::read_qvel() const -> std::vector<double> {
                         true, InOut(qvel));
   gather<LargeCapacity>(world_, *mechanics_, &TreeState<LargeCapacity>::qvel,
                         true, InOut(qvel));
+  gather<HugeCapacity>(world_, *mechanics_, &TreeState<HugeCapacity>::qvel,
+                       true, InOut(qvel));
   return qvel;
 }
 

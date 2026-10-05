@@ -68,6 +68,7 @@ struct ConstraintSettings final {
   double tolerance = 1e-8;
   double mean_inertia = 1.0;
   std::uint32_t model_dofs = 1;
+  double impratio = 1.0;
 };
 
 struct ConstraintSolution final {

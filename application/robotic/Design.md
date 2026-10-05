@@ -73,11 +73,12 @@ as a quaternion, or given explicitly, a full tensor turned to the body's
 axes first; joints' limits from their ranges, positions at rest and spring
 references; and each degree of freedom's place in the tree. Anything that
 would change how a model moves and that simon does not yet run is refused:
-spatial tendons and tendon springs, equalities, meshes, explicit contact
-pairs, actuators other than motors, position and velocity servos and
+spatial tendons and tendon springs, equalities, meshes that collide or
+give their body mass, explicit contact pairs, actuators other than motors, position and velocity servos and
 general actuators with fixed gains, and integrators other than Euler. Fixed
 tendons, a sum of joints' positions with limits and dry friction, and
-contact exclusions between bodies are read. What only shows a model is left out. A body's inertial frame
+contact exclusions between bodies are read, and meshes that only show the
+model are kept, unread. What only shows a model is left out. A body's inertial frame
 and a geom's frame within 1e-6 of the body's frame, or of the inertial
 frame, are snapped to it, as MuJoCo snaps them; poses in the world then
 come from the same arithmetic.
@@ -115,9 +116,10 @@ derivative for every tree. MuJoCo also keeps a
 fixed inertia for dofs whose bodies never turn; simon recomputes it, which
 can differ in the last bit.
 
-In the ECS, an entity is a tree, of one of three archetypes by its
+In the ECS, an entity is a tree, of one of four archetypes by its
 capacity: a single body of at most 6 degrees of freedom, a small tree of
-at most 4 bodies and 8, and a large tree of at most 16 and 32. Each tree
+at most 4 bodies and 8, a large tree of at most 16 and 32, and a huge tree
+of at most 32 and 64. Each tree
 takes the smallest that fits, so a loose body streams half the bytes it
 would as a small tree. Each archetype's state and work are sized at compile
 time, inline in its components. `Forward` computes each tree's poses, its
