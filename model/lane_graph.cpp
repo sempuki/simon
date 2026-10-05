@@ -103,25 +103,30 @@ auto compute_lane_middle(const RoadNetwork& network, const LaneKey& key,
                 compute_lane_border(road, section, s, inner));
 }
 
+LaneNumbering::LaneNumbering(const RoadNetwork& network) {
+  for (const Road& road : network.roads) {
+    first_section_.push_back(static_cast<std::uint32_t>(sections_.size()));
+    for (const LaneSection& section : road.lane_sections) {
+      Section numbered{.first = count_,
+                       .right = static_cast<std::int32_t>(section.right.size()),
+                       .left = static_cast<std::int32_t>(section.left.size())};
+      count_ += static_cast<std::uint32_t>(numbered.right + numbered.left);
+      sections_.push_back(numbered);
+    }
+  }
+  first_section_.push_back(static_cast<std::uint32_t>(sections_.size()));
+}
+
 auto LaneGraph::successors_of(const LaneKey& lane) const
     -> std::span<const LaneKey> {
-  auto found = std::ranges::lower_bound(from_, lane);
-  if (found == from_.end() || *found != lane) {
-    return {};
-  }
-  auto i = static_cast<std::size_t>(found - from_.begin());
-  return std::span{to_}.subspan(first_[i], first_[i + 1] - first_[i]);
+  auto [first, last] = successors_.range_of(numbering_.number_of(lane));
+  return std::span{to_}.subspan(first, last - first);
 }
 
 auto LaneGraph::predecessors_of(const LaneKey& lane) const
     -> std::span<const LaneKey> {
-  auto found = std::ranges::lower_bound(into_, lane);
-  if (found == into_.end() || *found != lane) {
-    return {};
-  }
-  auto i = static_cast<std::size_t>(found - into_.begin());
-  return std::span{before_}.subspan(first_from_[i],
-                                    first_from_[i + 1] - first_from_[i]);
+  auto [first, last] = predecessors_.range_of(numbering_.number_of(lane));
+  return std::span{before_}.subspan(first, last - first);
 }
 
 auto LaneGraph::edges() const -> std::vector<Edge> {
@@ -140,6 +145,9 @@ auto LaneGraph::edges() const -> std::vector<Edge> {
 // At a junction, each connection's lane links lead from the incoming road's
 // section at the junction into the connecting road's section where it is
 // entered.
+auto build_graph(const LaneNumbering& numbering,
+                 std::vector<std::pair<LaneKey, LaneKey>> edges) -> LaneGraph;
+
 auto build_lane_graph(const RoadNetwork& network) -> LaneGraph {
   RoadIndex roads{network};
   std::vector<std::pair<LaneKey, LaneKey>> edges;
@@ -214,11 +222,32 @@ auto build_lane_graph(const RoadNetwork& network) -> LaneGraph {
     }
   }
 
+  return build_graph(LaneNumbering{network}, std::move(edges));
+}
+
+auto build_lane_graph(const RoadNetwork& network, std::string_view type)
+    -> LaneGraph {
+  std::vector<std::pair<LaneKey, LaneKey>> edges;
+  for (const LaneGraph::Edge& edge : build_lane_graph(network).edges()) {
+    if (find_lane(network, edge.from).type == type &&
+        find_lane(network, edge.to).type == type) {
+      edges.emplace_back(edge.from, edge.to);
+    }
+  }
+  return build_graph(LaneNumbering{network}, std::move(edges));
+}
+
+// The graph of `edges`, each lane's successors and predecessors in order.
+auto build_graph(const LaneNumbering& numbering,
+                 std::vector<std::pair<LaneKey, LaneKey>> edges) -> LaneGraph {
   std::ranges::sort(edges);
   auto [end, _] = std::ranges::unique(edges);
   edges.erase(end, edges.end());
 
   LaneGraph graph;
+  graph.numbering_ = numbering;
+  graph.successors_ = LaneRanges{numbering, edges.size(),
+                                 [&](std::size_t i) { return edges[i].first; }};
   for (const auto& [from, to] : edges) {
     if (graph.from_.empty() || graph.from_.back() != from) {
       graph.from_.push_back(from);
@@ -239,6 +268,8 @@ auto build_lane_graph(const RoadNetwork& network) -> LaneGraph {
     graph.before_.push_back(from);
   }
   graph.first_from_.push_back(static_cast<std::uint32_t>(graph.before_.size()));
+  graph.predecessors_ = LaneRanges{
+      numbering, edges.size(), [&](std::size_t i) { return edges[i].second; }};
   return graph;
 }
 

@@ -85,6 +85,8 @@ class TrafficControl final {
 
   std::vector<SignalGroup> groups_;
   std::vector<StopLine> stop_lines_;
+  LaneNumbering numbering_;
+  LaneRanges lines_;  // Into stop_lines_, by lane number.
 };
 
 // The signal groups of `network`, one per controller, in its order, and a

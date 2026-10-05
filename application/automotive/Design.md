@@ -488,8 +488,8 @@ IDM decides how hard to accelerate behind one leader; the tactical layer
 decides where a vehicle must stop, and pedestrians decide when to cross.
 Traffic lights, right of way at junctions, pedestrians walking and
 crossing, vehicles yielding to them, and OpenSCENARIO's signals and
-pedestrians are built; the scale benchmark and the viewer come next (see
-the [Roadmap](#roadmap)).
+pedestrians are built, timed at scale against SUMO and drawn by the viewer
+(see [Scale](#scale) and the [Roadmap](#roadmap)).
 
 **Everything a vehicle stops for is a point to stop at.** The tactical layer
 finds the first point ahead where the vehicle must stop, and the vehicle's
@@ -744,9 +744,12 @@ on an OpenDRIVE network, or plays an OpenSCENARIO scenario, under
 lane by its OpenDRIVE type, the center line where lanes run either way, and
 every vehicle as its box; a box smaller than a few pixels becomes a dot, and
 the lanes are sampled no closer than two pixels apart, so a network as large
-as the scale benchmark's 100 rings draws whole. Traffic is colored by speed.
-In a scenario the ego is blue, the others orange, and a vehicle touching the
-ego red, and the map starts 200 m wide about the ego. A click on a vehicle
+as the scale benchmark's 100 rings draws whole. Each crosswalk's outline is
+drawn, each stop line in its light's color, and each pedestrian as a dot:
+cyan on a crosswalk, orange standing, white walking. Traffic is colored by
+speed. In a scenario the ego is blue, pedestrians grey, the others orange,
+and a vehicle touching the ego red, and the map starts 200 m wide about the
+ego. A click on a vehicle
 follows it, the map keeping it in the middle; the panel reads out its lane,
 s, speed and acceleration in traffic, and in a scenario every vehicle's
 speed and the ego's gap and time to collision, which charts under the map
@@ -790,6 +793,45 @@ same load. SUMO's lane changing is LC2013, simon's
 MOBIL, and SUMO updates by Euler where simon holds the acceleration over the
 step. At 100,000 vehicles, 26.5 vehicles a lane-kilometer, traffic is near
 the IDM's capacity at 30 m/s, and both slow down.
+
+### Signals and pedestrians
+
+`automotive_benchmark --grid` drives vehicles and pedestrians on a grid of
+20 by 20 signalized junctions 200 m apart (`roads/grid.xodr`): roads of one
+lane each way with sidewalks, a light and a crosswalk on every approach,
+the grid's edges turning around, 840 roads and 5,720 with those in the
+junctions and turnarounds. Drivers want 50 km/h,
+spread by 10%, and take random turns; the lights take turns, 30 s green,
+3 s yellow and 2 s all red; pedestrians walk from place to place. Every
+system of the schedule is timed. `reference/sumo_benchmark.py --grid`
+converts the same file by netconvert, with SUMO's OpenDRIVE type maps for
+the sidewalks, crossings and walking areas at every junction, and its
+lights set to the same cycle and greens; its vehicles drive the same IDM on
+random walks through the grid, and its pedestrians walk to random places by
+SUMO's striping model, at Weidmann's speeds.
+
+| Vehicles and pedestrians | simon, ns per entity-step | SUMO, ns per entity-step | SUMO / simon | Mean vehicle speed at the end, simon / SUMO |
+|---:|---:|---:|---:|---:|
+| 1,000 and 1,000 | 560 | 2,200 | 3.9 | 9.8 / 8.8 m/s |
+| 10,000 and 10,000 | 573 | 3,743 | 6.5 | 2.7 / 2.6 m/s |
+| 10,000 and 100,000 | 458 | 2,807 | 6.1 | 1.4 / 1.3 m/s |
+
+Both slow down alike as the grid fills: single-lane approaches hold the
+traffic behind a car turning left across oncoming traffic, and at 100,000
+pedestrians vehicles stop at crosswalks over and over. simon's step at
+10,000 vehicles and 100,000 pedestrians is 50 ms, twice as fast as real
+time, where SUMO's is 309 ms. Of simon's, `Pace` takes 49%, deciding each
+pedestrian's speed and crossing, `PlaceWalker` 27% and `Decide` 17%. A
+vehicle's decisions cost 700 ns here, against 140 ns on the rings, as each
+looks ahead through several short lanes for lights, crosswalks, junctions
+and leaders; every lookup per lane is an index from the lane's number,
+computed from its key, rather than a search.
+
+The two model pedestrians differently: SUMO's walk in stripes across a
+sidewalk's width and cross on the crossings netconvert builds at junction
+corners, simon's walk the walking graph in one dimension and cross on the
+network's own crosswalk objects. The comparison is of cost at the same
+load.
 
 Waymax is not measured. Its scenarios come from the Waymo Open Motion
 Dataset, whose license allows only non-commercial use, and its throughput
@@ -835,8 +877,8 @@ claim checked against an open reference:
    nuPlan.
 8. A viewer for traffic and for scenarios.
 
-**Tactical layer (in progress).** Where vehicles must stop, and pedestrians
-who decide when to cross (see [Tactical layer](#tactical-layer)):
+**Tactical layer.** Where vehicles must stop, and pedestrians who decide
+when to cross (see [Tactical layer](#tactical-layer)):
 
 1. Done: signals, controllers, junction priorities and crosswalks, read
    from OpenDRIVE and checked against libOpenDRIVE.
@@ -851,5 +893,5 @@ who decide when to cross (see [Tactical layer](#tactical-layer)):
 6. Done: OpenSCENARIO's pedestrians, routes, trajectories, traffic signal
    actions and conditions, against esmini; its signal controllers, which
    esmini does not run, against the standard.
-7. The scale benchmark with signals and pedestrians, against SUMO, and the
-   viewer.
+7. Done: the scale benchmark with signals and pedestrians, against SUMO,
+   and the viewer.

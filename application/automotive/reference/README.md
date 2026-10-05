@@ -11,6 +11,7 @@ OpenDRIVE library that renders and queries road networks, on the roads in
 | `paramPoly3.xodr` | `make_test_roads.py` | Parametric cubics over arcLength and normalized ranges, one at map coordinates 500 km east and 5,400 km north |
 | `ring.xodr` | `make_test_roads.py` | Two half circles leading into each other, two lanes each way, for traffic |
 | `rings.xodr` | `make_test_roads.py` | 100 rings of 1 km radius, three lanes each way, for the scale benchmark |
+| `grid.xodr` | `make_test_roads.py` | 20 by 20 of `signalized.xodr`'s junctions, 200 m apart, joined by roads of one lane each way with sidewalks, a light and a crosswalk on every approach, the grid's edges turning around, for the scale benchmark with signals and pedestrians |
 | `signalized.xodr` | `make_test_roads.py` | Four 100 m arms with sidewalks meeting in a junction, each approach with a traffic light at its stop line and a crosswalk, two in road coordinates and two in their own frame; two controllers group the lights; each arm's far end turns around into it |
 | `priority.xodr` | `make_test_roads.py` | A T whose minor road gives way, with the junction's priorities, a give-way sign and a speed limit; each arm's far end turns around into it |
 | `light.xodr` | `make_test_roads.py` | One lane, 1 km, with a traffic light halfway |
@@ -25,7 +26,7 @@ OpenDRIVE library that renders and queries road networks, on the roads in
 
 | Script | Table | Test |
 |---|---|---|
-| `make_test_roads.py` | `../roads/curves.xodr`, `../roads/paramPoly3.xodr`, `../roads/ring.xodr`, `../roads/rings.xodr`, `../roads/signalized.xodr`, `../roads/priority.xodr`, `../roads/crosswalks.xodr`, `../roads/light.xodr`, `../roads/crossing.xodr`, `../roads/crossroads.xodr`, `../roads/midblock.xodr`, `../roads/zebra.xodr` | `opendrive_reference_test`, `automotive_test`, `automotive_benchmark`, `signal_test`, `right_of_way_test`, `walking_test`, `crossing_test` |
+| `make_test_roads.py` | `../roads/curves.xodr`, `../roads/paramPoly3.xodr`, `../roads/ring.xodr`, `../roads/rings.xodr`, `../roads/signalized.xodr`, `../roads/priority.xodr`, `../roads/crosswalks.xodr`, `../roads/light.xodr`, `../roads/crossing.xodr`, `../roads/crossroads.xodr`, `../roads/midblock.xodr`, `../roads/zebra.xodr`, `../roads/grid.xodr` | `opendrive_reference_test`, `automotive_test`, `automotive_benchmark`, `signal_test`, `right_of_way_test`, `walking_test`, `crossing_test` |
 | `libopendrive_reference.cpp` | `libopendrive_positions.csv`, `libopendrive_borders.csv`, `libopendrive_lanes.csv`, `libopendrive_successors.csv` (its routing graph), `libopendrive_signals.csv`, `libopendrive_objects.csv` (outline corners), `libopendrive_junctions.csv` (priorities and controllers) | `opendrive_reference_test` |
 | `commonroad_kinematic.py` | `commonroad_rates.csv`, `commonroad_paths.csv`: CommonRoad's kinematic single-track model ([commonroad-vehicle-models](https://commonroad.in.tum.de), BSD) | `single_track_test` |
 | `commonroad_dynamic.py` | `commonroad_vehicles.csv`: every parameter of CommonRoad's vehicles; `commonroad_tires.csv`, `commonroad_dynamic_rates.csv`, `commonroad_dynamic_paths.csv`: its tire and its dynamic, drift and multibody models, with four corrections patched in | `single_track_test`, `vehicle_dynamics_test` |
@@ -36,7 +37,7 @@ OpenDRIVE library that renders and queries road networks, on the roads in
 | `esmini_scenarios.py` | `esmini_scenarios.csv`: [esmini](https://github.com/esmini/esmini)'s scenarios played in esmini, every entity at every step (MPL-2.0, see `3rd_party/esmini/LICENSE`); `esmini_permutations.csv`, `esmini_parameters.csv`: the 12 permutations of cut-in_parameter_set, every entity at every step with its box, and the parameter values esmini gave each | `scenario_test`, `batch_test` |
 | `shapely_boxes.py` | `shapely_boxes.csv`: 2,000 pairs of boxes, whether they intersect and how far apart they are, by [Shapely](https://shapely.readthedocs.io) 2.1.2 on GEOS 3.13.1 (BSD-3-Clause, LGPL-2.1) | `collision_test` |
 | `nuplan_metrics.py` | `nuplan_metrics.csv`: the ego's comfort signals and time to collision in esmini's scenarios, by [nuPlan](https://github.com/motional/nuplan-devkit)'s devkit 1.2.2 (Apache-2.0); `nuplan_permutations.csv`, `nuplan_verdicts.csv`: its time to collision and gap at every sample of esmini's permutations, and each run's verdicts | `metrics_test`, `batch_test` |
-| `sumo_benchmark.py` | None: SUMO's time per vehicle-step on `rings.xodr`, printed | `automotive_benchmark`, by comparison |
+| `sumo_benchmark.py` | None: SUMO's time per vehicle-step on `rings.xodr`, and per entity-step of vehicles and pedestrians on `grid.xodr` with `--grid`, printed | `automotive_benchmark`, by comparison |
 | `exact_param_poly3.py` | `exact_positions.csv`: the parametric cubics by exact arc length | `opendrive_reference_test` |
 
 `make_test_roads.py` and `exact_param_poly3.py` need NumPy, and

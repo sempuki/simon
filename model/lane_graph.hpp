@@ -5,6 +5,8 @@
 #include <compare>
 #include <cstdint>
 #include <span>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include "model/road.hpp"
@@ -28,6 +30,83 @@ struct LaneKey final {
 // Whether traffic in `lane` moves with s.
 inline auto runs_with_s(const LaneKey& lane) -> bool { return lane.lane < 0; }
 
+// Every lane of a network numbered densely, road by road and section by
+// section, each section's lanes in order of id, so a lane's number comes from
+// its key at once and orders lanes as their keys do. Ids in a section run
+// from -1 and 1 outward without gaps, as OpenDRIVE has them.
+class LaneNumbering final {
+ public:
+  static constexpr std::uint32_t NONE = ~std::uint32_t{0};
+
+  LaneNumbering() = default;
+  explicit LaneNumbering(const RoadNetwork& network);
+
+  auto size() const -> std::uint32_t { return count_; }
+
+  // `key`'s number; NONE if the network has no such lane.
+  auto number_of(const LaneKey& key) const -> std::uint32_t {
+    if (key.road + 1 >= first_section_.size()) {
+      return NONE;
+    }
+    std::uint32_t at = first_section_[key.road] + key.section;
+    if (at >= first_section_[key.road + 1]) {
+      return NONE;
+    }
+    const Section& section = sections_[at];
+    if (key.lane == 0 || key.lane < -section.right || key.lane > section.left) {
+      return NONE;
+    }
+    return section.first +
+           static_cast<std::uint32_t>(key.lane + section.right) -
+           (key.lane > 0 ? 1 : 0);
+  }
+
+ private:
+  struct Section final {
+    std::uint32_t first = 0;  // Its outermost right lane's number.
+    std::int32_t right = 0;   // Lanes right of the reference line.
+    std::int32_t left = 0;
+  };
+
+  std::vector<std::uint32_t> first_section_;  // Each road's; one more.
+  std::vector<Section> sections_;
+  std::uint32_t count_ = 0;
+};
+
+// Where each lane's items lie in a list sorted by lane: for each lane by
+// number, its first item and one past its last.
+class LaneRanges final {
+ public:
+  LaneRanges() = default;
+
+  // The ranges of `count` items, the `i`th in lane `lane_of(i)`, sorted.
+  template <typename LaneOf>
+  LaneRanges(const LaneNumbering& numbering, std::size_t count, LaneOf lane_of)
+      : first_(numbering.size() + 1, 0) {
+    for (std::size_t i = 0; i < count; ++i) {
+      std::uint32_t number = numbering.number_of(lane_of(i));
+      if (number != LaneNumbering::NONE) {
+        ++first_[number + 1];
+      }
+    }
+    for (std::size_t n = 1; n < first_.size(); ++n) {
+      first_[n] += first_[n - 1];
+    }
+  }
+
+  // Lane `number`'s first item and one past its last; none for NONE.
+  auto range_of(std::uint32_t number) const
+      -> std::pair<std::uint32_t, std::uint32_t> {
+    if (number + 1 >= first_.size()) {
+      return {0, 0};
+    }
+    return {first_[number], first_[number + 1]};
+  }
+
+ private:
+  std::vector<std::uint32_t> first_;
+};
+
 class LaneGraph final {
  public:
   // The lanes traffic moves into from `lane`, in order; none if it has none or
@@ -45,8 +124,17 @@ class LaneGraph final {
   };
   auto edges() const -> std::vector<Edge>;
 
+  // The network's lanes, numbered.
+  auto numbering() const -> const LaneNumbering& { return numbering_; }
+
  private:
-  friend auto build_lane_graph(const RoadNetwork& network) -> LaneGraph;
+  friend auto build_graph(const LaneNumbering& numbering,
+                          std::vector<std::pair<LaneKey, LaneKey>> edges)
+      -> LaneGraph;
+
+  LaneNumbering numbering_;
+  LaneRanges successors_;    // Into to_, by lane number.
+  LaneRanges predecessors_;  // Into before_, by lane number.
 
   std::vector<LaneKey> from_;         // Each lane with successors, in order.
   std::vector<std::uint32_t> first_;  // Its successors' start; one more.
@@ -71,5 +159,10 @@ auto compute_lane_middle(const RoadNetwork& network, const LaneKey& key,
 // The lane graph of every lane of `network`, of every type. A link to a lane
 // or road the network lacks adds no edge.
 auto build_lane_graph(const RoadNetwork& network) -> LaneGraph;
+
+// The lane graph of `network`'s lanes of `type` alone, such as "driving",
+// each lane's successors in the same order as in the whole graph.
+auto build_lane_graph(const RoadNetwork& network, std::string_view type)
+    -> LaneGraph;
 
 }  // namespace simon::model

@@ -68,13 +68,7 @@ inline auto s_along(const Network& network, const LaneKey& lane, double along)
 inline auto choose_next_lane(const Network& network, const LaneKey& lane,
                              std::uint64_t seed, std::uint32_t turns)
     -> std::optional<LaneKey> {
-  std::span<const LaneKey> next = network.graph.successors_of(lane);
-  std::vector<LaneKey> driving;
-  for (const LaneKey& key : next) {
-    if (model::find_lane(network.roads, key).type == "driving") {
-      driving.push_back(key);
-    }
-  }
+  std::span<const LaneKey> driving = network.driving.successors_of(lane);
   if (driving.empty()) {
     return std::nullopt;
   }
@@ -165,13 +159,12 @@ class LaneOccupancy final {
       return std::tie(a.lane, a.along, a.entity) <
              std::tie(b.lane, b.along, b.entity);
     });
-    lanes_.clear();
+    numbering_ = &network.graph.numbering();
+    lanes_ =
+        model::LaneRanges{*numbering_, occupants_.size(),
+                          [&](std::size_t i) { return occupants_[i].lane; }};
     places_.assign(places_.size(), NOWHERE);
     for (std::uint32_t i = 0; i < occupants_.size(); ++i) {
-      if (lanes_.empty() || lanes_.back().lane != occupants_[i].lane) {
-        lanes_.push_back(Span{.lane = occupants_[i].lane, .first = i});
-      }
-      lanes_.back().last = i + 1;
       std::uint32_t index = occupants_[i].entity.index;
       if (index >= places_.size()) {
         places_.resize(index + 1, NOWHERE);
@@ -258,13 +251,6 @@ class LaneOccupancy final {
     return occupant.along < along;
   }
 
-  // The occupants of one lane, as indices into the occupants.
-  struct Span final {
-    LaneKey lane;
-    std::uint32_t first = 0;
-    std::uint32_t last = 0;
-  };
-
   // Where `self` is among the occupants, if it is in `lane`.
   auto place_of(Entity self, const LaneKey& lane) const -> std::uint32_t {
     if (self.index >= places_.size()) {
@@ -278,15 +264,16 @@ class LaneOccupancy final {
   }
 
   auto in_lane(const LaneKey& lane) const -> std::pair<Iterator, Iterator> {
-    auto span = std::ranges::lower_bound(lanes_, lane, {}, &Span::lane);
-    if (span == lanes_.end() || span->lane != lane) {
+    if (numbering_ == nullptr) {
       return {occupants_.end(), occupants_.end()};
     }
-    return {occupants_.begin() + span->first, occupants_.begin() + span->last};
+    auto [first, last] = lanes_.range_of(numbering_->number_of(lane));
+    return {occupants_.begin() + first, occupants_.begin() + last};
   }
 
-  std::vector<Occupant> occupants_;    // By lane, then along it.
-  std::vector<Span> lanes_;            // Each occupied lane, in order.
+  std::vector<Occupant> occupants_;  // By lane, then along it.
+  const model::LaneNumbering* numbering_ = nullptr;
+  model::LaneRanges lanes_;            // Into occupants_, by lane number.
   std::vector<std::uint32_t> places_;  // Each entity's place, by its index.
   std::vector<Stop> stops_;            // Each entity's stop, by its index.
 };

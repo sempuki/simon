@@ -4,11 +4,14 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <map>
 #include <optional>
 #include <queue>
+#include <span>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 
 #include "base/core.hpp"
@@ -66,6 +69,59 @@ auto crosses(const WalkPoint& a0, const WalkPoint& a1, const WalkPoint& b0,
   return ((d1 > 0) != (d2 > 0)) && ((d3 > 0) != (d4 > 0));
 }
 
+// Segments by the square cells their bounding boxes touch, so that a
+// segment is tested against those near it alone; two segments that cross
+// share the cell of the point where they do.
+class SegmentGrid final {
+ public:
+  SegmentGrid(std::span<const std::pair<WalkPoint, WalkPoint>> segments,
+              double cell)
+      : segments_{segments}, cell_{cell} {
+    for (std::uint32_t i = 0; i < segments.size(); ++i) {
+      visit(segments[i].first, segments[i].second,
+            [&](std::int64_t key) { cells_[key].push_back(i); });
+    }
+  }
+
+  // Whether a0-a1 crosses any of the segments.
+  auto crosses_any(const WalkPoint& a0, const WalkPoint& a1) const -> bool {
+    bool found = false;
+    visit(a0, a1, [&](std::int64_t key) {
+      auto cell = cells_.find(key);
+      if (found || cell == cells_.end()) {
+        return;
+      }
+      for (std::uint32_t i : cell->second) {
+        if (crosses(a0, a1, segments_[i].first, segments_[i].second)) {
+          found = true;
+          return;
+        }
+      }
+    });
+    return found;
+  }
+
+ private:
+  // Calls `f` with the key of each cell the box of p-q touches.
+  template <typename F>
+  auto visit(const WalkPoint& p, const WalkPoint& q, F f) const -> void {
+    auto index = [&](double v) {
+      return static_cast<std::int64_t>(std::floor(v / cell_));
+    };
+    for (std::int64_t i = index(std::min(p.x, q.x));
+         i <= index(std::max(p.x, q.x)); ++i) {
+      for (std::int64_t j = index(std::min(p.y, q.y));
+           j <= index(std::max(p.y, q.y)); ++j) {
+        f(i * 0x100000000LL + j);
+      }
+    }
+  }
+
+  std::span<const std::pair<WalkPoint, WalkPoint>> segments_;
+  double cell_ = 1.0;
+  std::unordered_map<std::int64_t, std::vector<std::uint32_t>> cells_;
+};
+
 // Builds edges and merges their ends into nodes.
 class Builder final {
  public:
@@ -112,9 +168,8 @@ auto WalkingGraph::edges_at(std::uint32_t node) const
 
 auto WalkingGraph::zones_on(const LaneKey& lane) const
     -> std::span<const CrosswalkZone> {
-  auto [first, last] =
-      std::ranges::equal_range(zones_, lane, {}, &CrosswalkZone::lane);
-  return {first, last};
+  auto [first, last] = zone_ranges_.range_of(numbering_.number_of(lane));
+  return std::span{zones_}.subspan(first, last - first);
 }
 
 auto WalkingGraph::find_route(std::uint32_t from, std::uint32_t to) const
@@ -361,6 +416,7 @@ auto build_walking_graph(const RoadNetwork& network, double corner_reach)
       dangling.emplace_back(node, road);
     }
   }
+  SegmentGrid near{driving, corner_reach};
   for (std::size_t i = 0; i < dangling.size(); ++i) {
     for (std::size_t j = i + 1; j < dangling.size(); ++j) {
       auto [a, road_a] = dangling[i];
@@ -370,10 +426,7 @@ auto build_walking_graph(const RoadNetwork& network, double corner_reach)
       if (road_a == road_b || a == b || apart(pa, pb) >= corner_reach) {
         continue;
       }
-      bool clear = std::ranges::none_of(driving, [&](const auto& piece) {
-        return crosses(pa, pb, piece.first, piece.second);
-      });
-      if (clear) {
+      if (!near.crosses_any(pa, pb)) {
         builder.add({pa, pb}, WalkEdge::Kind::CORNER);
       }
     }
@@ -383,6 +436,10 @@ auto build_walking_graph(const RoadNetwork& network, double corner_reach)
       graph.zones_, [](const CrosswalkZone& a, const CrosswalkZone& b) {
         return std::tie(a.lane, a.near) < std::tie(b.lane, b.near);
       });
+  graph.numbering_ = LaneNumbering{network};
+  graph.zone_ranges_ =
+      LaneRanges{graph.numbering_, graph.zones_.size(),
+                 [&](std::size_t i) { return graph.zones_[i].lane; }};
   graph.nodes_ = std::move(builder.nodes_);
   graph.edges_ = std::move(builder.edges_);
   std::vector<std::vector<std::uint32_t>> at(graph.nodes_.size());

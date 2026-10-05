@@ -229,36 +229,32 @@ auto who_yields(const RoadNetwork& network, const Junction& junction,
 
 auto RightOfWay::conflicts_on(const LaneKey& lane) const
     -> std::span<const Conflict> {
-  auto [first, last] =
-      std::ranges::equal_range(conflicts_, lane, {}, &Conflict::lane);
-  return {first, last};
+  auto [first, last] = on_.range_of(numbering_.number_of(lane));
+  return std::span{conflicts_}.subspan(first, last - first);
 }
 
 auto RightOfWay::conflicts_against(const LaneKey& lane) const
     -> std::span<const std::uint32_t> {
-  auto [first, last] = std::ranges::equal_range(
-      against_, lane, {}, [&](std::uint32_t c) { return conflicts_[c].foe; });
-  return {first, last};
+  auto [first, last] = against_ranges_.range_of(numbering_.number_of(lane));
+  return std::span{against_}.subspan(first, last - first);
 }
 
 auto RightOfWay::find_parting(const LaneKey& lane) const
     -> std::optional<double> {
-  auto found = std::ranges::lower_bound(partings_, lane, {},
-                                        &std::pair<LaneKey, double>::first);
-  if (found == partings_.end() || found->first != lane) {
+  auto [first, last] = parting_ranges_.range_of(numbering_.number_of(lane));
+  if (first == last) {
     return std::nullopt;
   }
-  return found->second;
+  return partings_[first].second;
 }
 
 auto RightOfWay::find_merge(const LaneKey& lane) const
     -> std::optional<double> {
-  auto found = std::ranges::lower_bound(merges_, lane, {},
-                                        &std::pair<LaneKey, double>::first);
-  if (found == merges_.end() || found->first != lane) {
+  auto [first, last] = merge_ranges_.range_of(numbering_.number_of(lane));
+  if (first == last) {
     return std::nullopt;
   }
-  return found->second;
+  return merges_[first].second;
 }
 
 auto RightOfWay::approaches_of(std::uint32_t index) const
@@ -363,6 +359,19 @@ auto build_right_of_way(const RoadNetwork& network, const LaneGraph& graph,
   std::ranges::stable_sort(right.against_, {}, [&](std::uint32_t c) {
     return right.conflicts_[c].foe;
   });
+  right.numbering_ = graph.numbering();
+  right.on_ =
+      LaneRanges{right.numbering_, right.conflicts_.size(),
+                 [&](std::size_t i) { return right.conflicts_[i].lane; }};
+  right.against_ranges_ = LaneRanges{
+      right.numbering_, right.against_.size(),
+      [&](std::size_t i) { return right.conflicts_[right.against_[i]].foe; }};
+  right.merge_ranges_ =
+      LaneRanges{right.numbering_, right.merges_.size(),
+                 [&](std::size_t i) { return right.merges_[i].first; }};
+  right.parting_ranges_ =
+      LaneRanges{right.numbering_, right.partings_.size(),
+                 [&](std::size_t i) { return right.partings_[i].first; }};
 
   // Each conflict's approaches, back from its foe lane, breadth first.
   for (const Conflict& conflict : right.conflicts_) {

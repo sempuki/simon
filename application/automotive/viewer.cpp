@@ -4,13 +4,16 @@
 // real time:
 //
 //   bazel run //application/automotive:viewer -- [roads.xodr | scenario.xosc]
-//       [vehicles] [seed] [--scale=N] [--frames=N] [--screenshot=PATH]
+//       [vehicles] [seed] [pedestrians] [--scale=N] [--frames=N]
+//       [--screenshot=PATH]
 //
-// The map draws each lane by its type and every vehicle as its box. Traffic
-// is colored by speed; in a scenario the ego is blue, the others orange, and
-// a vehicle touching the ego red. A click on a vehicle follows it, the map
-// keeping it in the middle; the panel reads out its state and the charts
-// under the map trace it: in traffic its speed against the mean, in a
+// The map draws each lane by its type, each crosswalk, each stop line in
+// its light's color, and every vehicle as its box and pedestrian as a dot.
+// Traffic is colored by speed, and pedestrians by whether they walk, wait
+// or cross; in a scenario the ego is blue, the others orange, and a vehicle
+// touching the ego red, and pedestrians grey. A click on a vehicle follows it,
+// the map keeping it in the middle; the panel reads out its state and the
+// charts under the map trace it: in traffic its speed against the mean, in a
 // scenario the ego's time to collision and gap as nuPlan measures them.
 // Space pauses and resumes; Esc or Ctrl+Q quits. The map pans with the left
 // mouse button and zooms with the wheel. See application/viewing.hpp for the
@@ -24,6 +27,7 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -50,6 +54,9 @@ constexpr ImVec4 ORANGE{1.00f, 0.60f, 0.20f, 1.00f};
 constexpr ImVec4 RED{1.00f, 0.25f, 0.25f, 1.00f};
 constexpr ImVec4 YELLOW{1.00f, 0.85f, 0.25f, 1.00f};
 constexpr ImVec4 GREY{0.60f, 0.62f, 0.65f, 1.00f};
+constexpr ImVec4 GREEN{0.30f, 0.85f, 0.40f, 1.00f};
+constexpr ImVec4 WHITE{0.95f, 0.95f, 0.95f, 1.00f};
+constexpr ImVec4 CYAN{0.30f, 0.90f, 0.95f, 1.00f};
 
 // The most border samples the map holds: the spacing grows on large
 // networks so it holds no more.
@@ -58,6 +65,8 @@ constexpr double MOST_SAMPLES = 200'000.0;
 constexpr double CHART_SECONDS = 60.0;
 // How wide a scenario's map starts, about the ego.
 constexpr double VIEW_WIDTH = 200.0;  // m.
+// A pedestrian's dot, across.
+constexpr double PEDESTRIAN_SIZE = 0.6;  // m.
 // A traffic vehicle's width, which its driver does not carry.
 constexpr double TRAFFIC_WIDTH = 1.8;  // m.
 
@@ -189,6 +198,35 @@ class RoadMap final {
       draw_->AddQuad(pixels[0], pixels[1], pixels[2], pixels[3], *outline,
                      1.5f * scale_);
     }
+  }
+
+  // Draws a line from `a` to `b`, `width` meters wide but at least a pixel.
+  auto draw_line(model::Point2 a, model::Point2 b, ImU32 color, double width)
+      -> void {
+    float pixels =
+        static_cast<float>(width * size_.x / (limits_.X.Max - limits_.X.Min));
+    draw_->AddLine(ImPlot::PlotToPixels(a.x, a.y),
+                   ImPlot::PlotToPixels(b.x, b.y), color,
+                   std::max(pixels, scale_));
+  }
+
+  // Draws a dot at `at`, `size` meters across but at least a few pixels.
+  auto draw_dot(model::Point2 at, double size, ImU32 color) -> void {
+    float pixels =
+        static_cast<float>(size * size_.x / (limits_.X.Max - limits_.X.Min));
+    draw_->AddCircleFilled(ImPlot::PlotToPixels(at.x, at.y),
+                           std::max(0.5f * pixels, 1.5f * scale_), color);
+  }
+
+  // Draws the closed polygon through `corners`, filled.
+  auto draw_polygon(std::span<const model::Point2> corners, ImU32 fill)
+      -> void {
+    std::vector<ImVec2> pixels;
+    for (const model::Point2& corner : corners) {
+      pixels.push_back(ImPlot::PlotToPixels(corner.x, corner.y));
+    }
+    draw_->AddConvexPolyFilled(pixels.data(), static_cast<int>(pixels.size()),
+                               fill);
   }
 
   // Where a click without a drag landed this frame, if one did.
@@ -355,6 +393,7 @@ class TrafficViewer final {
     bool running = check_running(*session_);
     if (running && !map_.ready()) {
       map_.set_roads(session_->simulation().network().roads);
+      set_furniture(session_->simulation().network());
     }
     if (running) {
       record();
@@ -409,6 +448,81 @@ class TrafficViewer final {
                     : std::numeric_limits<double>::quiet_NaN());
   }
 
+  // Each stop line across its lane, and each crosswalk's outline, which
+  // never move.
+  auto set_furniture(const Network& network) -> void {
+    stop_lines_.clear();
+    for (const model::StopLine& line : network.control.stop_lines()) {
+      const model::Road& road = network.roads.roads[line.lane.road];
+      const model::LaneSection& section = road.lane_sections[line.lane.section];
+      Length s = s_along(network, line.lane, line.along);
+      int inner = line.lane.lane > 0 ? line.lane.lane - 1 : line.lane.lane + 1;
+      auto at = [&](int id) {
+        Vector3 p = model::eigen(model::compute_road_position(
+            road, s, model::compute_lane_border(road, section, s, id)));
+        return model::Point2{.x = p.x(), .y = p.y()};
+      };
+      stop_lines_.push_back(
+          {.from = at(line.lane.lane), .to = at(inner), .group = line.group});
+    }
+    crosswalks_.clear();
+    for (const model::Crosswalk& crosswalk : network.walking.crosswalks()) {
+      const model::Road& road = network.roads.roads[crosswalk.road];
+      const model::RoadObject& object = road.objects[crosswalk.object];
+      if (object.outlines.empty()) {
+        continue;
+      }
+      std::vector<model::Point2> corners;
+      for (const Position& corner :
+           model::compute_outline(road, object, object.outlines.front())) {
+        Vector3 p = model::eigen(corner);
+        corners.push_back({.x = p.x(), .y = p.y()});
+      }
+      crosswalks_.push_back(std::move(corners));
+    }
+  }
+
+  // The crosswalks, the stop lines in their lights' colors, and the
+  // pedestrians: crossing cyan, standing orange, walking white.
+  auto draw_furniture_and_walkers(const World& world) -> void {
+    ImU32 zebra = IM_COL32(235, 235, 235, 70);
+    for (const std::vector<model::Point2>& corners : crosswalks_) {
+      map_.draw_polygon(corners, zebra);
+    }
+    std::vector<model::Aspect> aspects(
+        session_->simulation().network().control.groups().size(),
+        model::Aspect::GREEN);
+    world.store_of<SignalState>().for_each(
+        [&](Entity, const SignalState& signal) {
+          if (signal.group < aspects.size()) {
+            aspects[signal.group] = signal.aspect;
+          }
+        });
+    for (const StopLineDrawing& line : stop_lines_) {
+      model::Aspect aspect = aspects[line.group];
+      ImVec4 color = aspect == model::Aspect::GREEN    ? GREEN
+                     : aspect == model::Aspect::YELLOW ? YELLOW
+                                                       : RED;
+      map_.draw_line(line.from, line.to, convert_color(color), 0.5);
+    }
+    const auto& commands = world.store_of<WalkCommand>();
+    world.store_of<WalkState>().for_each(
+        [&](Entity entity, const WalkState& state) {
+          const RoadPose* pose =
+              world.store_of<RoadPose>().maybe_component_of(entity);
+          if (!pose) {
+            return;
+          }
+          const WalkCommand* command = commands.maybe_component_of(entity);
+          ImVec4 color = command && command->on                         ? CYAN
+                         : state.speed < 0.05 * model::meter_per_second ? ORANGE
+                                                                        : WHITE;
+          Vector3 at = model::eigen(pose->position);
+          map_.draw_dot({.x = at.x(), .y = at.y()}, PEDESTRIAN_SIZE,
+                        convert_color(color));
+        });
+  }
+
   // A vehicle's box: its pose is its front bumper.
   auto convert_to_box(const RoadPose& pose, const Driver& driver) const
       -> model::OrientedBox {
@@ -426,6 +540,7 @@ class TrafficViewer final {
     ImGui::SeparatorText("Traffic");
     ImGui::TextWrapped("%s", scenario_.roads.c_str());
     ImGui::InputInt("Vehicles", &scenario_.vehicles, 10, 100);
+    ImGui::InputInt("Pedestrians", &scenario_.pedestrians, 10, 100);
     ImGui::InputScalar("Seed", ImGuiDataType_U64, &scenario_.seed);
     ImGui::SliderFloat("Desired", &desired_, 5.0f, 40.0f, "%.0f m/s");
     if (viewing::draw_run_buttons(InOut(quitting_))) {
@@ -445,6 +560,18 @@ class TrafficViewer final {
       slowest = std::min(slowest, v);
       fastest = std::max(fastest, v);
     });
+    std::size_t crossing = 0;
+    std::size_t standing = 0;
+    world.store_of<WalkCommand>().for_each([&](Entity,
+                                               const WalkCommand& command) {
+      crossing += command.on ? 1 : 0;
+      standing +=
+          !command.on && command.speed < 0.05 * model::meter_per_second ? 1 : 0;
+    });
+    ImGui::SeparatorText("Pedestrians");
+    ImGui::Text("Walking       %7zu", world.store_of<WalkState>().size());
+    ImGui::Text("Crossing      %7zu", crossing);
+    ImGui::Text("Standing      %7zu", standing);
     ImGui::SeparatorText("Vehicles");
     ImGui::Text("Driving       %7zu", world.store_of<LaneState>().size());
     if (!mean_.values.empty()) {
@@ -502,6 +629,7 @@ class TrafficViewer final {
       return;
     }
     if (running) {
+      draw_furniture_and_walkers(world);
       std::optional<model::Point2> clicked = map_.clicked();
       double nearest = std::numeric_limits<double>::infinity();
       world.store_of<RoadPose>().for_each(
@@ -535,7 +663,16 @@ class TrafficViewer final {
     map_.end();
   }
 
+  // A stop line across its lane, and its light's group.
+  struct StopLineDrawing final {
+    model::Point2 from;
+    model::Point2 to;
+    std::uint32_t group = 0;
+  };
+
   Scenario scenario_;
+  std::vector<StopLineDrawing> stop_lines_;
+  std::vector<std::vector<model::Point2>> crosswalks_;
   float desired_ = 20.0f;  // m/s.
   float speed_ = 1.0f;
   float scale_ = 1.0f;
@@ -712,7 +849,12 @@ class ScenarioViewer final {
       for (std::size_t i = 0; i < samples_.size(); ++i) {
         model::OrientedBox box = convert_to_box(i);
         bool touching = i > 0 && model::compute_gap(ego, box) == 0.0;
-        ImU32 fill = convert_color(touching ? RED : i == 0 ? BLUE : ORANGE);
+        bool walking = session_->simulation().scenario().entities[i].kind ==
+                       scenario::Entity::Kind::PEDESTRIAN;
+        ImU32 fill = convert_color(touching  ? RED
+                                   : i == 0  ? BLUE
+                                   : walking ? GREY
+                                             : ORANGE);
         map_.draw_box(
             box, fill,
             i == followed_ ? std::optional{IM_COL32_WHITE} : std::nullopt);
@@ -764,6 +906,7 @@ auto main(int argc, char** argv) -> int {
           static_cast<std::uint64_t>(viewing::parse_integer(arguments, 2, 1)),
       .roads = file,
       .vehicles = static_cast<int>(viewing::parse_integer(arguments, 1, 40)),
+      .pedestrians = static_cast<int>(viewing::parse_integer(arguments, 3, 0)),
   };
   return viewing::run(options, [&](float scale) {
     return automotive::TrafficViewer{scenario, scale};

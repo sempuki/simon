@@ -102,6 +102,8 @@ class WalkingGraph final {
   std::vector<WalkEdge> edges_;
   std::vector<Crosswalk> crosswalks_;
   std::vector<CrosswalkZone> zones_;
+  LaneNumbering numbering_;
+  LaneRanges zone_ranges_;            // Into zones_, by lane number.
   std::vector<std::uint32_t> first_;  // Each node's edges' start; one more.
   std::vector<std::uint32_t> at_;
 };

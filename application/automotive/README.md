@@ -47,11 +47,15 @@ measures esmini's.
 At scale, 100,000 vehicles on 3,770 km of lanes step in 25 ms on one
 thread, 248 ns a vehicle, where SUMO takes 6.5 µs a vehicle on the same
 network and drivers.
+On a grid of 400 signalized junctions, 10,000 vehicles and 100,000
+pedestrians step in 50 ms, 458 ns an entity, where SUMO takes 2.8 µs on the
+same network, its vehicles slowing to the same speeds.
 
 ```sh
 bazel test //application/automotive/...
 bazel run -c opt //application/automotive -- 3rd_party/carla/Town01.xodr 60 120
 bazel run -c opt //application/automotive:automotive_benchmark
+bazel run -c opt //application/automotive:automotive_benchmark -- --grid
 bazel run //application/automotive:scenario -- 3rd_party/esmini/xosc/cut-in.xosc
 bazel run -c opt //application/automotive:scenario_batch -- 3rd_party/esmini/xosc/cut-in_parameter_set.xosc
 ```

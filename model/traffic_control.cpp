@@ -105,9 +105,8 @@ auto plan_in_turn(std::size_t groups, std::chrono::nanoseconds green,
 
 auto TrafficControl::stop_lines_on(const LaneKey& lane) const
     -> std::span<const StopLine> {
-  auto [first, last] =
-      std::ranges::equal_range(stop_lines_, lane, {}, &StopLine::lane);
-  return {first, last};
+  auto [first, last] = lines_.range_of(numbering_.number_of(lane));
+  return std::span{stop_lines_}.subspan(first, last - first);
 }
 
 auto build_traffic_control(const RoadNetwork& network) -> TrafficControl {
@@ -160,6 +159,10 @@ auto build_traffic_control(const RoadNetwork& network) -> TrafficControl {
                       return std::tie(a.lane, a.along, a.group) <
                              std::tie(b.lane, b.along, b.group);
                     });
+  control.numbering_ = LaneNumbering{network};
+  control.lines_ =
+      LaneRanges{control.numbering_, control.stop_lines_.size(),
+                 [&](std::size_t i) { return control.stop_lines_[i].lane; }};
   return control;
 }
 

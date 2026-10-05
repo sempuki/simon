@@ -49,6 +49,7 @@ using model::Speed;
 struct Network final {
   model::RoadNetwork roads;
   model::LaneGraph graph;
+  model::LaneGraph driving;  // The driving lanes' graph alone.
   model::TrafficControl control;
   model::RightOfWay rights;
   model::WalkingGraph walking;

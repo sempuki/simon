@@ -74,6 +74,7 @@ auto load_network(const std::string& path)
     -> std::expected<Network, framework::Status> {
   RETURN_OR_ASSIGN(model::RoadNetwork roads, format::load_opendrive(path));
   model::LaneGraph graph = model::build_lane_graph(roads);
+  model::LaneGraph driving = model::build_lane_graph(roads, "driving");
   model::TrafficControl control = model::build_traffic_control(roads);
   model::RightOfWay rights = model::build_right_of_way(roads, graph, control);
   model::WalkingGraph walking = model::build_walking_graph(roads);
@@ -89,6 +90,7 @@ auto load_network(const std::string& path)
   }
   return Network{.roads = std::move(roads),
                  .graph = std::move(graph),
+                 .driving = std::move(driving),
                  .control = std::move(control),
                  .rights = std::move(rights),
                  .walking = std::move(walking),

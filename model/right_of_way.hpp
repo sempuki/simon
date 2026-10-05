@@ -92,6 +92,12 @@ class RightOfWay final {
   std::vector<std::pair<LaneKey, double>> merges_;    // By lane.
   std::vector<std::pair<LaneKey, double>> partings_;  // By lane.
   std::vector<std::uint32_t> against_;                // Conflicts by foe lane.
+  // Into conflicts_, against_, merges_ and partings_, by lane number.
+  LaneNumbering numbering_;
+  LaneRanges on_;
+  LaneRanges against_ranges_;
+  LaneRanges merge_ranges_;
+  LaneRanges parting_ranges_;
 };
 
 // The conflicts of every junction of `network`: each pair of driving lanes
