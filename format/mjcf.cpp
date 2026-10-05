@@ -1333,7 +1333,7 @@ class Reader final {
       -> std::expected<void, lib::Status> {
     model->bodies.push_back(ArticulatedBody{.name = "world"});
     std::vector<std::uint32_t> last_dof{Dof::NONE};  // By body.
-    RETURN_IF_UNEXPECTED(compile_geoms_of(world, 0, model));
+    RETURN_IF_UNEXPECTED(compile_world_geoms(world, 0, model));
     for (const BodySpec& child : world.children) {
       RETURN_IF_UNEXPECTED(compile_body(child, 0, Out(last_dof), model));
     }
@@ -1434,8 +1434,8 @@ class Reader final {
   }
 
   // The world's geoms, which carry no mass.
-  auto compile_geoms_of(const BodySpec& body, std::uint32_t index,
-                        Out<ArticulatedModel> model)
+  auto compile_world_geoms(const BodySpec& body, std::uint32_t index,
+                           Out<ArticulatedModel> model)
       -> std::expected<void, lib::Status> {
     model->bodies[index].first_geom =
         static_cast<std::uint32_t>(model->geoms.size());

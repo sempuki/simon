@@ -1212,7 +1212,7 @@ using World = framework::World<
     instead of every store for every entity. Capacity is pooled, not reserved
     per archetype: one archetype may use another's slack.
   - The spatial index sizes its cells at every rebuild to how densely the
-    entities lie (see below). `cells_of(size)` fixes the cell edge instead,
+    entities lie (see below). `size_cells(size)` fixes the cell edge instead,
     converted with `coordinate_length`.
   - `build(lib::Out(world))` fills the caller's world, discarding everything it
     held, and returns `std::expected<void, Status>`. It refuses a given cell
@@ -1291,7 +1291,7 @@ cells at every rebuild for about one point per cell over the box the points
 span, counting only the axes they spread along, so points on a plane get
 square cells and height is ignored. Choosing costs one pass over the points.
 The world's own index sizes
-itself the same way unless `cells_of` fixes it.
+itself the same way unless `size_cells` fixes it.
 
 The index's cost at scale, and the defense step's under contention, are in
 [Spatial index](#spatial-index) and [Contention](#contention).

@@ -36,8 +36,8 @@ struct Movement final {
   double heading_out = 0.0;
 };
 
-auto movement_of(const RoadNetwork& network, const LaneGraph& graph,
-                 const LaneKey& lane, const LaneKey& incoming) -> Movement {
+auto build_movement(const RoadNetwork& network, const LaneGraph& graph,
+                    const LaneKey& lane, const LaneKey& incoming) -> Movement {
   Movement movement{.lane = lane, .incoming = incoming};
   std::span<const LaneKey> next = graph.successors_of(lane);
   movement.exits.assign(next.begin(), next.end());
@@ -132,7 +132,7 @@ auto find_crossing(const Movement& a, const Movement& b)
 
 enum class Turn : std::uint8_t { LEFT, STRAIGHT, RIGHT };
 
-auto turn_of(const Movement& movement) -> Turn {
+auto classify_turn(const Movement& movement) -> Turn {
   double change = wrap(movement.heading_out - movement.heading_in);
   if (change > std::numbers::pi / 6.0) {
     return Turn::LEFT;
@@ -163,7 +163,7 @@ auto has_yield_sign(const RoadNetwork& network, const LaneKey& lane) -> bool {
 }
 
 // The signal group of the first stop line on `lane`, if it has one.
-auto group_of(const TrafficControl& control, const LaneKey& lane)
+auto find_group(const TrafficControl& control, const LaneKey& lane)
     -> std::optional<std::uint32_t> {
   std::span<const StopLine> lines = control.stop_lines_on(lane);
   if (lines.empty()) {
@@ -193,10 +193,12 @@ auto who_yields(const RoadNetwork& network, const Junction& junction,
   }
   double from = wrap(b.heading_in - a.heading_in);  // b's way from a's.
   bool opposite = std::abs(from) > 3.0 * std::numbers::pi / 4.0;
-  if (opposite && turn_of(a) == Turn::LEFT && turn_of(b) != Turn::LEFT) {
+  if (opposite && classify_turn(a) == Turn::LEFT &&
+      classify_turn(b) != Turn::LEFT) {
     return std::pair{true, Yielding::TURN};
   }
-  if (opposite && turn_of(b) == Turn::LEFT && turn_of(a) != Turn::LEFT) {
+  if (opposite && classify_turn(b) == Turn::LEFT &&
+      classify_turn(a) != Turn::LEFT) {
     return std::pair{false, Yielding::TURN};
   }
   if (from > std::numbers::pi / 4.0 && from < 3.0 * std::numbers::pi / 4.0) {
@@ -269,7 +271,7 @@ auto build_right_of_way(const RoadNetwork& network, const LaneGraph& graph,
       const Road& from = network.roads[edge.from.road];
       if (to.junction == junction.id && from.junction != junction.id &&
           is_driving(edge.to) && is_driving(edge.from)) {
-        movements.push_back(movement_of(network, graph, edge.to, edge.from));
+        movements.push_back(build_movement(network, graph, edge.to, edge.from));
       }
     }
     for (std::size_t i = 0; i < movements.size(); ++i) {
@@ -295,8 +297,8 @@ auto build_right_of_way(const RoadNetwork& network, const LaneGraph& graph,
           right.merges_.emplace_back(a.lane, at->first);
           right.merges_.emplace_back(b.lane, at->second);
         }
-        std::optional<std::uint32_t> group_a = group_of(control, a.incoming);
-        std::optional<std::uint32_t> group_b = group_of(control, b.incoming);
+        std::optional<std::uint32_t> group_a = find_group(control, a.incoming);
+        std::optional<std::uint32_t> group_b = find_group(control, b.incoming);
         if (group_a && group_b && *group_a != *group_b) {
           for (bool a_keeps : {true, false}) {
             right.conflicts_.push_back(

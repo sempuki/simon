@@ -50,7 +50,7 @@ struct Point final {
   double y = 0.0;
 };
 
-auto point_of(const Kinematics& kinematics) -> Point {
+auto project_point(const Kinematics& kinematics) -> Point {
   model::QuantityVector position =
       kinematics.position.numerical_value_in(model::meter);
   return Point{.x = position.x(), .y = position.y()};
@@ -117,7 +117,7 @@ class Viewer final {
             if (const Kinematics* kinematics =
                     world.store_of<Kinematics>().maybe_component_of(entity)) {
               seen.emplace(world.name_of(entity),
-                           Sighting{.point = point_of(*kinematics),
+                           Sighting{.point = project_point(*kinematics),
                                     .radius = radius,
                                     .color = color});
             }
@@ -205,7 +205,7 @@ class Viewer final {
           [&](Entity entity, const ComponentType&) {
             if (const Kinematics* kinematics =
                     world.store_of<Kinematics>().maybe_component_of(entity)) {
-              Point point = point_of(*kinematics);
+              Point point = project_point(*kinematics);
               scatter.append(point.x, point.y);
             }
           });
@@ -216,7 +216,7 @@ class Viewer final {
     world.store_of<Radar>().for_each([&](Entity owner, const Radar& radar) {
       if (const Kinematics* kinematics =
               world.store_of<Kinematics>().maybe_component_of(owner)) {
-        plot_circle("Radar coverage", point_of(*kinematics),
+        plot_circle("Radar coverage", project_point(*kinematics),
                     radar.range.numerical_value_in(model::meter), FAINT_GREEN,
                     scale_);
       }
@@ -225,7 +225,7 @@ class Viewer final {
         [&](Entity owner, const Launcher& launcher) {
           if (const Kinematics* kinematics =
                   world.store_of<Kinematics>().maybe_component_of(owner)) {
-            plot_circle("Launcher range", point_of(*kinematics),
+            plot_circle("Launcher range", project_point(*kinematics),
                         launcher.range.numerical_value_in(model::meter),
                         FAINT_BLUE, scale_);
           }

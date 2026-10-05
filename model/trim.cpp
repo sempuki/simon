@@ -52,7 +52,7 @@ constexpr double BALANCED = 1e-9;
 // The pitch at which a body at angle of attack `alpha` and bank `bank`, with
 // no sideslip, climbs at `gamma`: the rate-of-climb constraint of steady
 // flight (Stevens and Lewis; see model/REFERENCES.md).
-auto pitch_of(double alpha, double bank, double gamma) -> double {
+auto solve_pitch(double alpha, double bank, double gamma) -> double {
   double a = std::cos(alpha);
   double b = std::sin(alpha) * std::cos(bank);
   return std::atan2(b, a) + std::asin(std::sin(gamma) / std::hypot(a, b));
@@ -76,7 +76,7 @@ class Trimmer final {
     double gamma = radians(condition_.flight_path_angle);
     Trim trim{
         .alpha = x[ALPHA] * radian,
-        .pitch = pitch_of(x[ALPHA], x[BANK], gamma) * radian,
+        .pitch = solve_pitch(x[ALPHA], x[BANK], gamma) * radian,
         .bank = x[BANK] * radian,
         .throttle = x[THROTTLE],
         .pitch_trim = x[PITCH_TRIM],

@@ -49,7 +49,7 @@ TEST_CASE("SetUpBuilder") {
   SECTION("ShouldRefuseGivenCellSizeNotPositive") {
     TestWorld world;
     auto built =
-        TestWorld::set_up().holding<Body>(1).cells_of(0.0).build(Out(world));
+        TestWorld::set_up().holding<Body>(1).size_cells(0.0).build(Out(world));
 
     REQUIRE_FALSE(built.has_value());
     CHECK(built.error() == lib::watch(BuildError::CELL_SIZE_INVALID));
@@ -105,7 +105,7 @@ TEST_CASE("SetUpBuilder") {
     Entity entity = *world.create<Body>().build();
     world.sync();
 
-    auto built = TestWorld::set_up().cells_of(-1.0).build(Out(world));
+    auto built = TestWorld::set_up().size_cells(-1.0).build(Out(world));
 
     REQUIRE_FALSE(built.has_value());
     CHECK(world.alive(entity));

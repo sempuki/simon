@@ -47,7 +47,7 @@ auto read(const FlightBlock::Input& input, const FlightSignals& signals)
   return input.negated ? -value : value;
 }
 
-auto input_of(const FlightBlock& block, const FlightSignals& signals)
+auto read_input(const FlightBlock& block, const FlightSignals& signals)
     -> double {
   if (block.inputs.empty()) {
     return 0.0;
@@ -55,15 +55,15 @@ auto input_of(const FlightBlock& block, const FlightSignals& signals)
   return read(block.inputs.front(), signals);
 }
 
-auto value_of(const FlightBlock::Operand& operand, const FlightSignals& signals)
-    -> double {
+auto read_operand(const FlightBlock::Operand& operand,
+                  const FlightSignals& signals) -> double {
   return operand.input ? read(*operand.input, signals) : operand.value;
 }
 
 auto holds(const FlightBlock::Condition& condition,
            const FlightSignals& signals) -> bool {
   double left = signals.values[condition.signal];
-  double right = value_of(condition.right, signals);
+  double right = read_operand(condition.right, signals);
   using enum FlightBlock::Condition::Comparison;
   switch (condition.comparison) {
     case LT:
@@ -92,10 +92,10 @@ auto run_switch(const FlightBlock& block, const FlightSignals& signals)
     bool passes = test.any ? std::ranges::any_of(test.conditions, check)
                            : std::ranges::all_of(test.conditions, check);
     if (passes) {
-      return value_of(test.value, signals);
+      return read_operand(test.value, signals);
     }
   }
-  return value_of(block.fallback, signals);
+  return read_operand(block.fallback, signals);
 }
 
 // JSBSim's PID (FGPID), with its state in three of the block's signals.
@@ -198,7 +198,7 @@ auto run_function(const FlightBlock& block, const FlightSignals& signals)
 
 // Where a kinematic block starts a step: from its output, if it has one, as
 // JSBSim's does, so that a block that writes the same output moves it.
-auto start_of(const FlightBlock& block, const FlightSignals& signals)
+auto read_start(const FlightBlock& block, const FlightSignals& signals)
     -> double {
   if (block.output) {
     return signals.values[*block.output] / block.output_scale;
@@ -282,7 +282,7 @@ auto run_blocks(const FlightControlData& controls, InOut<FlightSignals> signals,
         signals->values[index_of(FlightSignal::THROTTLE_COMMAND_0) + i];
   }
   for (const FlightBlock& block : controls.blocks) {
-    double input = input_of(block, *signals);
+    double input = read_input(block, *signals);
     double value = 0.0;
     switch (block.kind) {
       case FlightBlock::Kind::SUMMER:
@@ -320,7 +320,7 @@ auto run_blocks(const FlightControlData& controls, InOut<FlightSignals> signals,
         value =
             steady
                 ? std::clamp(input, block.detents.front(), block.detents.back())
-                : traverse(block, start_of(block, *signals), input, seconds);
+                : traverse(block, read_start(block, *signals), input, seconds);
         break;
       case FlightBlock::Kind::SWITCH:
         value = run_switch(block, *signals);

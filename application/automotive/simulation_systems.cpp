@@ -17,7 +17,7 @@ using model::sign;
 
 constexpr double SMALL = 1e-10;
 
-auto seconds_of(const Step& step) -> double {
+auto convert_to_seconds(const Step& step) -> double {
   return std::chrono::duration<double>(step.dt).count();
 }
 
@@ -44,7 +44,7 @@ auto ControlSpeed::operator()(SystemWorld&, Entity,          //
   const ScenarioContext& context = *context_;
   const osc::Vehicle& vehicle =
       context.scenario->entities[actor->entity].vehicle;
-  double dt = seconds_of(step);
+  double dt = convert_to_seconds(step);
   double before = speed.speed;
 
   // A vehicle stuck at the end of its road has stopped.
@@ -186,7 +186,7 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
   }
   const ScenarioContext& context = *context_;
   const model::RoadNetwork& roads = *context.roads;
-  double dt = seconds_of(step);
+  double dt = convert_to_seconds(step);
   model::RoadPlacement& placement = motion.placement;
 
   if (motion.change && stopped(orders, motion.change->handle)) {

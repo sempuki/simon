@@ -63,7 +63,7 @@ class [[nodiscard]] SetUpBuilder final {
   // Fixes the edge of a spatial index cell. Unless given, the index sizes its
   // cells at every rebuild to how densely the entities lie, which suits most
   // worlds; see SpatialIndex.
-  auto cells_of(distance_of_t<SpatialType> size) && -> SetUpBuilder {
+  auto size_cells(distance_of_t<SpatialType> size) && -> SetUpBuilder {
     static_assert(std::default_initializable<SpatialType>,
                   "Sizing cells needs a default spatial component to convert "
                   "the distance with.");

@@ -34,7 +34,7 @@ auto seek(double value, double target, double up, double down, double dt)
   return value;
 }
 
-auto inputs_of(const EngineAir& air) -> AeroInputs {
+auto collect_inputs(const EngineAir& air) -> AeroInputs {
   AeroInputs inputs;
   inputs[AeroVariable::MACH] = air.mach;
   inputs[AeroVariable::DENSITY_ALTITUDE] =
@@ -46,7 +46,7 @@ auto inputs_of(const EngineAir& air) -> AeroInputs {
 // full.
 auto gross_thrust(const TurbineData& turbine, const EngineAir& air,
                   double n2_fraction) -> double {
-  AeroInputs inputs = inputs_of(air);
+  AeroInputs inputs = collect_inputs(air);
   double military = turbine.military_thrust.numerical_value_in(newton);
   double idle = military * (*turbine.idle_thrust)(inputs);
   // JSBSim scales the span from idle by the military table.
@@ -55,7 +55,7 @@ auto gross_thrust(const TurbineData& turbine, const EngineAir& air,
 }
 
 // How far the reheat is lit, from 0 to 1, at `throttle`.
-auto reheat_of(const TurbineData& turbine, double throttle) -> double {
+auto compute_reheat(const TurbineData& turbine, double throttle) -> double {
   return turbine.has_reheat() ? std::clamp(throttle - 1.0, 0.0, 1.0) : 0.0;
 }
 
@@ -63,7 +63,7 @@ auto reheat_of(const TurbineData& turbine, double throttle) -> double {
 auto reheated(const TurbineData& turbine, const EngineAir& air, double thrust,
               double reheat) -> double {
   double maximum = turbine.max_thrust.numerical_value_in(newton) *
-                   (*turbine.max_thrust_factor)(inputs_of(air));
+                   (*turbine.max_thrust_factor)(collect_inputs(air));
   return thrust + (maximum - thrust) * reheat;
 }
 
@@ -90,7 +90,7 @@ auto spool_rate(double rate, double n2_fraction, double density_ratio)
 auto compute_steady_turbine(const TurbineData& turbine, double throttle,
                             const EngineAir& air) -> TurbineState {
   double fraction = std::clamp(throttle, 0.0, 1.0);
-  double reheat = reheat_of(turbine, throttle);
+  double reheat = compute_reheat(turbine, throttle);
   double gross = gross_thrust(turbine, air, fraction);
   double thrust = gross * (1.0 - turbine.bleed);
   double flow = std::max(gross * consumption(turbine, air, fraction),
@@ -112,7 +112,7 @@ auto run_turbine(const TurbineData& turbine, const TurbineState& state,
                  double throttle, const EngineAir& air, Time dt)
     -> TurbineState {
   double seconds = dt.numerical_value_in(second);
-  double reheat = reheat_of(turbine, throttle);
+  double reheat = compute_reheat(turbine, throttle);
   throttle = std::clamp(throttle, 0.0, 1.0);
   double n1_span = turbine.max_n1 - turbine.idle_n1;
   double n2_span = turbine.max_n2 - turbine.idle_n2;
