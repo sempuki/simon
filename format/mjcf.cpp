@@ -42,9 +42,11 @@ using model::Joint;
 using model::JointType;
 using model::Physics;
 using model::Quaternion4;
+using model::SameFrame;
 using model::SoftConstraint;
 
 using Failure = std::unexpected<lib::Status>;
+using lib::InOut;
 using lib::Out;
 
 constexpr double PI = std::numbers::pi;
@@ -418,7 +420,7 @@ class Reader final {
 
   // Up to `into.size()` numbers from the attribute, if it is there, the
   // rest left as they were, as MuJoCo reads a partial vector.
-  auto read_numbers(pugi::xml_node node, const char* name,
+  auto read_numbers(pugi::xml_node node, std::string_view name,
                     std::span<double> into) const
       -> std::expected<bool, lib::Status> {
     pugi::xml_attribute attribute = node.attribute(name);
@@ -461,30 +463,32 @@ class Reader final {
   }
 
   template <std::size_t N>
-  auto read_array(pugi::xml_node node, const char* name,
-                  std::array<double, N>& into) const
+  auto read_array(pugi::xml_node node, std::string_view name,
+                  InOut<std::array<double, N>> into) const
       -> std::expected<bool, lib::Status> {
-    return read_numbers(node, name, into);
+    return read_numbers(node, name, *into);
   }
 
-  auto read_number(pugi::xml_node node, const char* name, double& into) const
+  auto read_number(pugi::xml_node node, std::string_view name,
+                   InOut<double> into) const
       -> std::expected<bool, lib::Status> {
-    return read_numbers(node, name, std::span<double>{&into, 1});
+    return read_numbers(node, name, std::span<double>{&*into, 1});
   }
 
   template <typename Integer>
-  auto read_integer(pugi::xml_node node, const char* name, Integer& into) const
+  auto read_integer(pugi::xml_node node, std::string_view name,
+                    InOut<Integer> into) const
       -> std::expected<void, lib::Status> {
     double value = 0.0;
-    RETURN_OR_ASSIGN(bool read, read_number(node, name, value));
+    RETURN_OR_ASSIGN(bool read, read_number(node, name, InOut(value)));
     if (read) {
-      into = static_cast<Integer>(value);
+      *into = static_cast<Integer>(value);
     }
     return {};
   }
 
-  auto read_flag(pugi::xml_node node, const char* name, bool& into) const
-      -> std::expected<void, lib::Status> {
+  auto read_flag(pugi::xml_node node, std::string_view name,
+                 InOut<bool> into) const -> std::expected<void, lib::Status> {
     pugi::xml_attribute attribute = node.attribute(name);
     if (!attribute) {
       return {};
@@ -494,53 +498,57 @@ class Reader final {
       return fail("<" + std::string{node.name()} + "> " + name +
                   " must be true or false");
     }
-    into = text == "true";
+    *into = text == "true";
     return {};
   }
 
-  auto read_limited(pugi::xml_node node, const char* name, Limited& into) const
+  auto read_limited(pugi::xml_node node, std::string_view name,
+                    InOut<Limited> into) const
       -> std::expected<void, lib::Status> {
     pugi::xml_attribute attribute = node.attribute(name);
     if (!attribute) {
       return {};
     }
     std::string_view text = attribute.as_string();
-    into = text == "true"    ? Limited::YES
-           : text == "false" ? Limited::NO
-                             : Limited::AUTO;
+    *into = text == "true"    ? Limited::YES
+            : text == "false" ? Limited::NO
+                              : Limited::AUTO;
     return {};
   }
 
   // The one orientation the element gives, if any.
-  auto read_orientation(pugi::xml_node node, Orientation& into) const
+  auto read_orientation(pugi::xml_node node, InOut<Orientation> into) const
       -> std::expected<void, lib::Status> {
     int given = 0;
-    std::array<double, 4> quat = into.quat;
-    RETURN_OR_ASSIGN(bool has_quat, read_array(node, "quat", quat));
+    std::array<double, 4> quat = into->quat;
+    RETURN_OR_ASSIGN(bool has_quat, read_array(node, "quat", InOut(quat)));
     if (has_quat) {
-      into.kind = Orientation::Kind::QUAT;
-      into.quat = quat;
+      into->kind = Orientation::Kind::QUAT;
+      into->quat = quat;
       ++given;
     }
     RETURN_OR_ASSIGN(bool has_axis,
-                     read_array(node, "axisangle", into.axis_angle));
+                     read_array(node, "axisangle", InOut(into->axis_angle)));
     if (has_axis) {
-      into.kind = Orientation::Kind::AXIS_ANGLE;
+      into->kind = Orientation::Kind::AXIS_ANGLE;
       ++given;
     }
-    RETURN_OR_ASSIGN(bool has_xy, read_array(node, "xyaxes", into.xy_axes));
+    RETURN_OR_ASSIGN(bool has_xy,
+                     read_array(node, "xyaxes", InOut(into->xy_axes)));
     if (has_xy) {
-      into.kind = Orientation::Kind::XY_AXES;
+      into->kind = Orientation::Kind::XY_AXES;
       ++given;
     }
-    RETURN_OR_ASSIGN(bool has_z, read_array(node, "zaxis", into.z_axis));
+    RETURN_OR_ASSIGN(bool has_z,
+                     read_array(node, "zaxis", InOut(into->z_axis)));
     if (has_z) {
-      into.kind = Orientation::Kind::Z_AXIS;
+      into->kind = Orientation::Kind::Z_AXIS;
       ++given;
     }
-    RETURN_OR_ASSIGN(bool has_euler, read_array(node, "euler", into.euler));
+    RETURN_OR_ASSIGN(bool has_euler,
+                     read_array(node, "euler", InOut(into->euler)));
     if (has_euler) {
-      into.kind = Orientation::Kind::EULER;
+      into->kind = Orientation::Kind::EULER;
       ++given;
     }
     if (given > 1) {
@@ -640,19 +648,20 @@ class Reader final {
                                                  : CompilerSpec::FromGeom::AUTO;
       } else if (name == "autolimits") {
         RETURN_IF_UNEXPECTED(
-            read_flag(node, "autolimits", compiler_.auto_limits));
+            read_flag(node, "autolimits", InOut(compiler_.auto_limits)));
       } else if (name == "boundmass") {
         RETURN_IF_UNEXPECTED(
-            read_number(node, "boundmass", compiler_.bound_mass));
+            read_number(node, "boundmass", InOut(compiler_.bound_mass)));
       } else if (name == "boundinertia") {
         RETURN_IF_UNEXPECTED(
-            read_number(node, "boundinertia", compiler_.bound_inertia));
+            read_number(node, "boundinertia", InOut(compiler_.bound_inertia)));
       } else if (name == "balanceinertia") {
-        RETURN_IF_UNEXPECTED(
-            read_flag(node, "balanceinertia", compiler_.balance_inertia));
+        RETURN_IF_UNEXPECTED(read_flag(node, "balanceinertia",
+                                       InOut(compiler_.balance_inertia)));
       } else if (name == "inertiagrouprange") {
         std::array<double, 2> range{0, 5};
-        RETURN_IF_UNEXPECTED(read_array(node, "inertiagrouprange", range));
+        RETURN_IF_UNEXPECTED(
+            read_array(node, "inertiagrouprange", InOut(range)));
         compiler_.inertia_groups = {static_cast<int>(range[0]),
                                     static_cast<int>(range[1])};
       } else if (name == "meshdir" || name == "texturedir" ||
@@ -675,9 +684,11 @@ class Reader final {
       std::string_view name = attribute.name();
       std::string_view value = attribute.as_string();
       if (name == "timestep") {
-        RETURN_IF_UNEXPECTED(read_number(node, "timestep", physics->timestep));
+        RETURN_IF_UNEXPECTED(
+            read_number(node, "timestep", InOut(physics->timestep)));
       } else if (name == "gravity") {
-        RETURN_IF_UNEXPECTED(read_array(node, "gravity", physics->gravity));
+        RETURN_IF_UNEXPECTED(
+            read_array(node, "gravity", InOut(physics->gravity)));
       } else if (name == "integrator") {
         static constexpr std::array<
             std::pair<std::string_view, Physics::Integrator>, 4>
@@ -700,10 +711,10 @@ class Reader final {
                                           : Physics::Solver::NEWTON;
       } else if (name == "iterations") {
         RETURN_IF_UNEXPECTED(
-            read_integer(node, "iterations", physics->iterations));
+            read_integer(node, "iterations", InOut(physics->iterations)));
       } else if (name == "tolerance") {
         RETURN_IF_UNEXPECTED(
-            read_number(node, "tolerance", physics->tolerance));
+            read_number(node, "tolerance", InOut(physics->tolerance)));
       } else {
         return refuse(node, name);
       }
@@ -724,12 +735,12 @@ class Reader final {
     for (pugi::xml_node child : node.children()) {
       std::string_view kind = child.name();
       if (kind == "geom") {
-        RETURN_IF_UNEXPECTED(apply_geom(child, defaults.geom));
+        RETURN_IF_UNEXPECTED(apply_geom(child, InOut(defaults.geom)));
       } else if (kind == "joint") {
-        RETURN_IF_UNEXPECTED(apply_joint(child, defaults.joint));
+        RETURN_IF_UNEXPECTED(apply_joint(child, InOut(defaults.joint)));
       } else if (kind == "motor" || kind == "position" || kind == "velocity" ||
                  kind == "general") {
-        RETURN_IF_UNEXPECTED(apply_actuator(child, defaults.actuator));
+        RETURN_IF_UNEXPECTED(apply_actuator(child, InOut(defaults.actuator)));
       } else if (kind == "default") {
         continue;
       } else if (kind == "site" || kind == "camera" || kind == "light" ||
@@ -763,9 +774,9 @@ class Reader final {
 
   //-- Elements ----------------------------------------------------------------
 
-  auto apply_geom(pugi::xml_node node, GeomSpec& spec) const
+  auto apply_geom(pugi::xml_node node, InOut<GeomSpec> spec) const
       -> std::expected<void, lib::Status> {
-    Geom& geom = spec.geom;
+    Geom& geom = spec->geom;
     for (pugi::xml_attribute attribute : node.attributes()) {
       std::string_view name = attribute.name();
       static constexpr std::array<std::string_view, 21> KNOWN{
@@ -803,36 +814,40 @@ class Reader final {
       }
       geom.type = found->second;
     }
-    RETURN_IF_UNEXPECTED(read_array(node, "size", geom.size));
-    RETURN_IF_UNEXPECTED(read_array(node, "pos", geom.pos));
-    RETURN_IF_UNEXPECTED(read_orientation(node, spec.orientation));
+    RETURN_IF_UNEXPECTED(read_array(node, "size", InOut(geom.size)));
+    RETURN_IF_UNEXPECTED(read_array(node, "pos", InOut(geom.pos)));
+    RETURN_IF_UNEXPECTED(read_orientation(node, InOut(spec->orientation)));
     std::array<double, 6> fromto{};
-    RETURN_OR_ASSIGN(bool has_fromto, read_array(node, "fromto", fromto));
+    RETURN_OR_ASSIGN(bool has_fromto,
+                     read_array(node, "fromto", InOut(fromto)));
     if (has_fromto) {
-      spec.fromto = fromto;
+      spec->fromto = fromto;
     }
     double mass = 0.0;
-    RETURN_OR_ASSIGN(bool has_mass, read_number(node, "mass", mass));
+    RETURN_OR_ASSIGN(bool has_mass, read_number(node, "mass", InOut(mass)));
     if (has_mass) {
-      spec.mass = mass;
+      spec->mass = mass;
     }
-    RETURN_IF_UNEXPECTED(read_number(node, "density", spec.density));
-    RETURN_IF_UNEXPECTED(read_array(node, "friction", geom.friction));
-    RETURN_IF_UNEXPECTED(read_integer(node, "condim", geom.condim));
-    RETURN_IF_UNEXPECTED(read_integer(node, "contype", geom.contype));
-    RETURN_IF_UNEXPECTED(read_integer(node, "conaffinity", geom.conaffinity));
-    RETURN_IF_UNEXPECTED(read_integer(node, "priority", geom.priority));
-    RETURN_IF_UNEXPECTED(read_array(node, "solref", geom.contact.reference));
-    RETURN_IF_UNEXPECTED(read_array(node, "solimp", geom.contact.impedance));
-    RETURN_IF_UNEXPECTED(read_number(node, "margin", geom.margin));
-    RETURN_IF_UNEXPECTED(read_number(node, "gap", geom.gap));
-    RETURN_IF_UNEXPECTED(read_integer(node, "group", spec.group));
+    RETURN_IF_UNEXPECTED(read_number(node, "density", InOut(spec->density)));
+    RETURN_IF_UNEXPECTED(read_array(node, "friction", InOut(geom.friction)));
+    RETURN_IF_UNEXPECTED(read_integer(node, "condim", InOut(geom.condim)));
+    RETURN_IF_UNEXPECTED(read_integer(node, "contype", InOut(geom.contype)));
+    RETURN_IF_UNEXPECTED(
+        read_integer(node, "conaffinity", InOut(geom.conaffinity)));
+    RETURN_IF_UNEXPECTED(read_integer(node, "priority", InOut(geom.priority)));
+    RETURN_IF_UNEXPECTED(
+        read_array(node, "solref", InOut(geom.contact.reference)));
+    RETURN_IF_UNEXPECTED(
+        read_array(node, "solimp", InOut(geom.contact.impedance)));
+    RETURN_IF_UNEXPECTED(read_number(node, "margin", InOut(geom.margin)));
+    RETURN_IF_UNEXPECTED(read_number(node, "gap", InOut(geom.gap)));
+    RETURN_IF_UNEXPECTED(read_integer(node, "group", InOut(spec->group)));
     return {};
   }
 
-  auto apply_joint(pugi::xml_node node, JointSpec& spec) const
+  auto apply_joint(pugi::xml_node node, InOut<JointSpec> spec) const
       -> std::expected<void, lib::Status> {
-    Joint& joint = spec.joint;
+    Joint& joint = spec->joint;
     for (pugi::xml_attribute attribute : node.attributes()) {
       std::string_view name = attribute.name();
       static constexpr std::array<std::string_view, 20> KNOWN{
@@ -881,30 +896,33 @@ class Reader final {
         return fail("unknown joint type " + std::string{text});
       }
     }
-    RETURN_IF_UNEXPECTED(read_array(node, "pos", joint.pos));
-    RETURN_IF_UNEXPECTED(read_array(node, "axis", joint.axis));
-    RETURN_IF_UNEXPECTED(read_array(node, "range", joint.range));
-    RETURN_IF_UNEXPECTED(read_limited(node, "limited", spec.limited));
-    RETURN_IF_UNEXPECTED(read_number(node, "stiffness", joint.stiffness));
-    RETURN_IF_UNEXPECTED(read_number(node, "springref", spec.springref));
-    RETURN_IF_UNEXPECTED(read_number(node, "damping", spec.damping));
-    RETURN_IF_UNEXPECTED(read_number(node, "armature", spec.armature));
-    RETURN_IF_UNEXPECTED(read_number(node, "frictionloss", spec.friction_loss));
-    RETURN_IF_UNEXPECTED(read_number(node, "ref", spec.ref));
-    RETURN_IF_UNEXPECTED(read_number(node, "margin", joint.margin));
+    RETURN_IF_UNEXPECTED(read_array(node, "pos", InOut(joint.pos)));
+    RETURN_IF_UNEXPECTED(read_array(node, "axis", InOut(joint.axis)));
+    RETURN_IF_UNEXPECTED(read_array(node, "range", InOut(joint.range)));
+    RETURN_IF_UNEXPECTED(read_limited(node, "limited", InOut(spec->limited)));
     RETURN_IF_UNEXPECTED(
-        read_array(node, "solreflimit", joint.limit.reference));
+        read_number(node, "stiffness", InOut(joint.stiffness)));
     RETURN_IF_UNEXPECTED(
-        read_array(node, "solimplimit", joint.limit.impedance));
+        read_number(node, "springref", InOut(spec->springref)));
+    RETURN_IF_UNEXPECTED(read_number(node, "damping", InOut(spec->damping)));
+    RETURN_IF_UNEXPECTED(read_number(node, "armature", InOut(spec->armature)));
+    RETURN_IF_UNEXPECTED(
+        read_number(node, "frictionloss", InOut(spec->friction_loss)));
+    RETURN_IF_UNEXPECTED(read_number(node, "ref", InOut(spec->ref)));
+    RETURN_IF_UNEXPECTED(read_number(node, "margin", InOut(joint.margin)));
+    RETURN_IF_UNEXPECTED(
+        read_array(node, "solreflimit", InOut(joint.limit.reference)));
+    RETURN_IF_UNEXPECTED(
+        read_array(node, "solimplimit", InOut(joint.limit.impedance)));
     return {};
   }
 
   // An actuator's attributes, and its kind's gain and bias, as MuJoCo's
   // mjs_setToMotor, mjs_setToPosition and mjs_setToVelocity set them.
-  auto apply_actuator(pugi::xml_node node, ActuatorSpec& spec) const
+  auto apply_actuator(pugi::xml_node node, InOut<ActuatorSpec> spec) const
       -> std::expected<void, lib::Status> {
     std::string_view kind = node.name();
-    Actuator& actuator = spec.actuator;
+    Actuator& actuator = spec->actuator;
     for (pugi::xml_attribute attribute : node.attributes()) {
       std::string_view name = attribute.name();
       std::string_view value = attribute.as_string();
@@ -930,26 +948,28 @@ class Reader final {
       actuator.name = node.attribute("name").as_string();
     }
     if (node.attribute("joint")) {
-      spec.joint = node.attribute("joint").as_string();
+      spec->joint = node.attribute("joint").as_string();
     }
-    RETURN_IF_UNEXPECTED(read_array(node, "gear", actuator.gear));
-    RETURN_IF_UNEXPECTED(read_array(node, "ctrlrange", actuator.control_range));
+    RETURN_IF_UNEXPECTED(read_array(node, "gear", InOut(actuator.gear)));
     RETURN_IF_UNEXPECTED(
-        read_limited(node, "ctrllimited", spec.control_limited));
-    RETURN_IF_UNEXPECTED(read_array(node, "forcerange", actuator.force_range));
+        read_array(node, "ctrlrange", InOut(actuator.control_range)));
     RETURN_IF_UNEXPECTED(
-        read_limited(node, "forcelimited", spec.force_limited));
-    RETURN_IF_UNEXPECTED(read_number(node, "damping", actuator.damping));
+        read_limited(node, "ctrllimited", InOut(spec->control_limited)));
+    RETURN_IF_UNEXPECTED(
+        read_array(node, "forcerange", InOut(actuator.force_range)));
+    RETURN_IF_UNEXPECTED(
+        read_limited(node, "forcelimited", InOut(spec->force_limited)));
+    RETURN_IF_UNEXPECTED(read_number(node, "damping", InOut(actuator.damping)));
     if (kind == "motor") {
       actuator.gain[0] = 1;
       actuator.bias_type = Actuator::Bias::NONE;
     } else if (kind == "position") {
       double kp = actuator.gain[0];
-      RETURN_IF_UNEXPECTED(read_number(node, "kp", kp));
+      RETURN_IF_UNEXPECTED(read_number(node, "kp", InOut(kp)));
       actuator.gain[0] = kp;
       actuator.bias[1] = -kp;
       double kv = 0.0;
-      RETURN_OR_ASSIGN(bool has_kv, read_number(node, "kv", kv));
+      RETURN_OR_ASSIGN(bool has_kv, read_number(node, "kv", InOut(kv)));
       if (has_kv) {
         if (kv < 0) {
           return fail("kv cannot be negative");
@@ -959,7 +979,7 @@ class Reader final {
       actuator.bias_type = Actuator::Bias::AFFINE;
     } else if (kind == "velocity") {
       double kv = actuator.gain[0];
-      RETURN_IF_UNEXPECTED(read_number(node, "kv", kv));
+      RETURN_IF_UNEXPECTED(read_number(node, "kv", InOut(kv)));
       actuator.bias = {};
       actuator.gain[0] = kv;
       actuator.bias[2] = -kv;
@@ -969,8 +989,8 @@ class Reader final {
       std::array<double, 10> bias{};
       std::ranges::copy(actuator.gain, gain.begin());
       std::ranges::copy(actuator.bias, bias.begin());
-      RETURN_IF_UNEXPECTED(read_array(node, "gainprm", gain));
-      RETURN_IF_UNEXPECTED(read_array(node, "biasprm", bias));
+      RETURN_IF_UNEXPECTED(read_array(node, "gainprm", InOut(gain)));
+      RETURN_IF_UNEXPECTED(read_array(node, "biasprm", InOut(bias)));
       if (std::ranges::any_of(gain.begin() + 3, gain.end(),
                               [](double x) { return x != 0.0; }) ||
           std::ranges::any_of(bias.begin() + 3, bias.end(),
@@ -1000,16 +1020,18 @@ class Reader final {
         return refuse(node, name);
       }
     }
-    RETURN_IF_UNEXPECTED(read_array(node, "pos", spec.pos));
-    RETURN_IF_UNEXPECTED(read_orientation(node, spec.orientation));
-    RETURN_OR_ASSIGN(bool has_mass, read_number(node, "mass", spec.mass));
+    RETURN_IF_UNEXPECTED(read_array(node, "pos", InOut(spec.pos)));
+    RETURN_IF_UNEXPECTED(read_orientation(node, InOut(spec.orientation)));
+    RETURN_OR_ASSIGN(bool has_mass,
+                     read_number(node, "mass", InOut(spec.mass)));
     if (!has_mass) {
       return fail("<inertial> needs a mass");
     }
     RETURN_OR_ASSIGN(bool diagonal,
-                     read_array(node, "diaginertia", spec.diagonal));
+                     read_array(node, "diaginertia", InOut(spec.diagonal)));
     std::array<double, 6> full{};
-    RETURN_OR_ASSIGN(bool has_full, read_array(node, "fullinertia", full));
+    RETURN_OR_ASSIGN(bool has_full,
+                     read_array(node, "fullinertia", InOut(full)));
     if (has_full) {
       spec.full = full;
     }
@@ -1032,7 +1054,7 @@ class Reader final {
                          find_defaults(child, classes));
         GeomSpec geom = defaults->geom;
         geom.geom.name.clear();
-        RETURN_IF_UNEXPECTED(apply_geom(child, geom));
+        RETURN_IF_UNEXPECTED(apply_geom(child, InOut(geom)));
         body->geoms.push_back(std::move(geom));
       } else if (kind == "joint" || kind == "freejoint") {
         JointSpec joint;
@@ -1041,7 +1063,7 @@ class Reader final {
                            find_defaults(child, classes));
           joint = defaults->joint;
           joint.joint.name.clear();
-          RETURN_IF_UNEXPECTED(apply_joint(child, joint));
+          RETURN_IF_UNEXPECTED(apply_joint(child, InOut(joint)));
         } else {
           for (pugi::xml_attribute attribute : child.attributes()) {
             std::string_view name = attribute.name();
@@ -1071,8 +1093,8 @@ class Reader final {
             return refuse(child, name);
           }
         }
-        RETURN_IF_UNEXPECTED(read_array(child, "pos", spec.pos));
-        RETURN_IF_UNEXPECTED(read_orientation(child, spec.orientation));
+        RETURN_IF_UNEXPECTED(read_array(child, "pos", InOut(spec.pos)));
+        RETURN_IF_UNEXPECTED(read_orientation(child, InOut(spec.orientation)));
         RETURN_IF_UNEXPECTED(read_body_contents(child, classes, Out(spec)));
         body->children.push_back(std::move(spec));
       } else if (kind == "site" || kind == "camera" || kind == "light") {
@@ -1094,7 +1116,7 @@ class Reader final {
     ActuatorSpec actuator = defaults->actuator;
     actuator.actuator.name.clear();
     actuator.joint.clear();
-    RETURN_IF_UNEXPECTED(apply_actuator(node, actuator));
+    RETURN_IF_UNEXPECTED(apply_actuator(node, InOut(actuator)));
     if (actuator.joint.empty()) {
       return fail("<" + std::string{kind} + "> needs a joint");
     }
@@ -1242,7 +1264,48 @@ class Reader final {
           resolve_limited(spec.force_limited, actuator.force_range);
       model->actuators.push_back(actuator);
     }
+    classify_frames(model);
     return {};
+  }
+
+  // Which frames MuJoCo treats as one: within 1e-6 of each other, a
+  // quaternion either sign (IsSamePose, IsNullPose).
+  static auto classify_frames(Out<ArticulatedModel> model) -> void {
+    constexpr double EPS = 1e-6;
+    auto same_pos = [&](const Array3& a, const Array3& b) {
+      return std::abs(a[0] - b[0]) < EPS && std::abs(a[1] - b[1]) < EPS &&
+             std::abs(a[2] - b[2]) < EPS;
+    };
+    auto same_quat = [&](const Quaternion4& a, const Quaternion4& b) {
+      bool minus = true;
+      bool plus = true;
+      for (int k = 0; k < 4; ++k) {
+        minus = minus && std::abs(a[k] - b[k]) < EPS;
+        plus = plus && std::abs(a[k] + b[k]) < EPS;
+      }
+      return minus || plus;
+    };
+    const Array3 zero{};
+    const Quaternion4 unit{1.0, 0.0, 0.0, 0.0};
+    for (ArticulatedBody& body : model->bodies) {
+      body.inertial_frame = same_pos(body.inertial_pos, zero) &&
+                                    same_quat(body.inertial_quat, unit)
+                                ? SameFrame::BODY
+                            : same_quat(body.inertial_quat, unit)
+                                ? SameFrame::BODY_ROTATION
+                                : SameFrame::NONE;
+    }
+    for (Geom& geom : model->geoms) {
+      const ArticulatedBody& body = model->bodies[geom.body];
+      bool rotation = same_quat(geom.quat, unit);
+      bool inertial_rotation = same_quat(geom.quat, body.inertial_quat);
+      geom.frame = same_pos(geom.pos, zero) && rotation ? SameFrame::BODY
+                   : rotation ? SameFrame::BODY_ROTATION
+                   : same_pos(geom.pos, body.inertial_pos) && inertial_rotation
+                       ? SameFrame::INERTIA
+                   : inertial_rotation ? SameFrame::INERTIA_ROTATION
+                                       : SameFrame::NONE;
+    }
   }
 
   // The world's geoms, which carry no mass.
@@ -1501,8 +1564,15 @@ class Reader final {
 
     body.first_geom = static_cast<std::uint32_t>(model->geoms.size());
     body.geoms = static_cast<std::uint32_t>(geoms.size());
+    // A plane only on a body welded to the world: no joints on it or on
+    // any body above it.
+    bool fixed = body.joints == 0;
+    for (std::uint32_t b = parent; fixed && b != 0;
+         b = model->bodies[b].parent) {
+      fixed = model->bodies[b].joints == 0;
+    }
     for (auto& [geom, mass] : geoms) {
-      if (geom.type == GeomType::PLANE) {
+      if (geom.type == GeomType::PLANE && !fixed) {
         return fail("plane only allowed in static bodies");
       }
       geom.body = index;

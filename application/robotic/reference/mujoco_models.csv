@@ -22,6 +22,7 @@ arm.xml,body,0,dofadr,-1.0
 arm.xml,body,0,dofnum,0.0
 arm.xml,body,0,geomadr,-1.0
 arm.xml,body,0,geomnum,0.0
+arm.xml,body,0,sameframe,1.0
 arm.xml,body,1,parentid,0.0
 arm.xml,body,1,rootid,1.0
 arm.xml,body,1,pos,0.0 0.0 1.0
@@ -36,6 +37,7 @@ arm.xml,body,1,dofadr,0.0
 arm.xml,body,1,dofnum,1.0
 arm.xml,body,1,geomadr,0.0
 arm.xml,body,1,geomnum,1.0
+arm.xml,body,1,sameframe,0.0
 arm.xml,body,2,parentid,1.0
 arm.xml,body,2,rootid,1.0
 arm.xml,body,2,pos,0.4 0.0 0.0
@@ -50,6 +52,7 @@ arm.xml,body,2,dofadr,1.0
 arm.xml,body,2,dofnum,1.0
 arm.xml,body,2,geomadr,1.0
 arm.xml,body,2,geomnum,1.0
+arm.xml,body,2,sameframe,0.0
 arm.xml,body,3,parentid,2.0
 arm.xml,body,3,rootid,1.0
 arm.xml,body,3,pos,0.3 0.0 0.0
@@ -64,6 +67,7 @@ arm.xml,body,3,dofadr,2.0
 arm.xml,body,3,dofnum,1.0
 arm.xml,body,3,geomadr,2.0
 arm.xml,body,3,geomnum,1.0
+arm.xml,body,3,sameframe,3.0
 arm.xml,body,4,parentid,3.0
 arm.xml,body,4,rootid,1.0
 arm.xml,body,4,pos,0.1 0.0 0.0
@@ -78,6 +82,7 @@ arm.xml,body,4,dofadr,3.0
 arm.xml,body,4,dofnum,1.0
 arm.xml,body,4,geomadr,3.0
 arm.xml,body,4,geomnum,1.0
+arm.xml,body,4,sameframe,1.0
 arm.xml,jnt,0,type,3.0
 arm.xml,jnt,0,bodyid,1.0
 arm.xml,jnt,0,pos,0.0 0.0 0.0
@@ -164,6 +169,7 @@ arm.xml,geom,0,solimp,0.9 0.95 0.001 0.5 2.0
 arm.xml,geom,0,margin,0.0
 arm.xml,geom,0,gap,0.0
 arm.xml,geom,0,priority,0.0
+arm.xml,geom,0,sameframe,2.0
 arm.xml,geom,1,type,3.0
 arm.xml,geom,1,bodyid,2.0
 arm.xml,geom,1,size,0.03 0.15 0.0
@@ -178,6 +184,7 @@ arm.xml,geom,1,solimp,0.9 0.95 0.001 0.5 2.0
 arm.xml,geom,1,margin,0.0
 arm.xml,geom,1,gap,0.0
 arm.xml,geom,1,priority,0.0
+arm.xml,geom,1,sameframe,2.0
 arm.xml,geom,2,type,6.0
 arm.xml,geom,2,bodyid,3.0
 arm.xml,geom,2,size,0.05 0.04 0.02
@@ -192,6 +199,7 @@ arm.xml,geom,2,solimp,0.9 0.95 0.001 0.5 2.0
 arm.xml,geom,2,margin,0.0
 arm.xml,geom,2,gap,0.0
 arm.xml,geom,2,priority,0.0
+arm.xml,geom,2,sameframe,3.0
 arm.xml,geom,3,type,6.0
 arm.xml,geom,3,bodyid,4.0
 arm.xml,geom,3,size,0.03 0.01 0.01
@@ -206,6 +214,7 @@ arm.xml,geom,3,solimp,0.9 0.95 0.001 0.5 2.0
 arm.xml,geom,3,margin,0.0
 arm.xml,geom,3,gap,0.0
 arm.xml,geom,3,priority,0.0
+arm.xml,geom,3,sameframe,1.0
 arm.xml,actuator,0,trntype,0.0
 arm.xml,actuator,0,trnid,0.0 -1.0
 arm.xml,actuator,0,gear,1.0 0.0 0.0 0.0 0.0 0.0
@@ -281,6 +290,7 @@ boxes.xml,body,0,dofadr,-1.0
 boxes.xml,body,0,dofnum,0.0
 boxes.xml,body,0,geomadr,0.0
 boxes.xml,body,0,geomnum,1.0
+boxes.xml,body,0,sameframe,1.0
 boxes.xml,body,1,parentid,0.0
 boxes.xml,body,1,rootid,1.0
 boxes.xml,body,1,pos,0.0 0.0 0.1
@@ -295,6 +305,7 @@ boxes.xml,body,1,dofadr,0.0
 boxes.xml,body,1,dofnum,6.0
 boxes.xml,body,1,geomadr,1.0
 boxes.xml,body,1,geomnum,1.0
+boxes.xml,body,1,sameframe,1.0
 boxes.xml,body,2,parentid,0.0
 boxes.xml,body,2,rootid,2.0
 boxes.xml,body,2,pos,0.0 0.0 0.3
@@ -309,6 +320,7 @@ boxes.xml,body,2,dofadr,6.0
 boxes.xml,body,2,dofnum,6.0
 boxes.xml,body,2,geomadr,2.0
 boxes.xml,body,2,geomnum,1.0
+boxes.xml,body,2,sameframe,1.0
 boxes.xml,body,3,parentid,0.0
 boxes.xml,body,3,rootid,3.0
 boxes.xml,body,3,pos,0.0 0.0 0.5
@@ -323,6 +335,7 @@ boxes.xml,body,3,dofadr,12.0
 boxes.xml,body,3,dofnum,6.0
 boxes.xml,body,3,geomadr,3.0
 boxes.xml,body,3,geomnum,1.0
+boxes.xml,body,3,sameframe,1.0
 boxes.xml,body,4,parentid,0.0
 boxes.xml,body,4,rootid,4.0
 boxes.xml,body,4,pos,0.0 0.0 0.7
@@ -337,6 +350,7 @@ boxes.xml,body,4,dofadr,18.0
 boxes.xml,body,4,dofnum,6.0
 boxes.xml,body,4,geomadr,4.0
 boxes.xml,body,4,geomnum,1.0
+boxes.xml,body,4,sameframe,1.0
 boxes.xml,body,5,parentid,0.0
 boxes.xml,body,5,rootid,5.0
 boxes.xml,body,5,pos,0.0 0.0 0.9
@@ -351,6 +365,7 @@ boxes.xml,body,5,dofadr,24.0
 boxes.xml,body,5,dofnum,6.0
 boxes.xml,body,5,geomadr,5.0
 boxes.xml,body,5,geomnum,1.0
+boxes.xml,body,5,sameframe,1.0
 boxes.xml,jnt,0,type,0.0
 boxes.xml,jnt,0,bodyid,1.0
 boxes.xml,jnt,0,pos,0.0 0.0 0.0
@@ -605,6 +620,7 @@ boxes.xml,geom,0,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,geom,0,margin,0.0
 boxes.xml,geom,0,gap,0.0
 boxes.xml,geom,0,priority,0.0
+boxes.xml,geom,0,sameframe,1.0
 boxes.xml,geom,1,type,6.0
 boxes.xml,geom,1,bodyid,1.0
 boxes.xml,geom,1,size,0.1 0.1 0.1
@@ -619,6 +635,7 @@ boxes.xml,geom,1,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,geom,1,margin,0.0
 boxes.xml,geom,1,gap,0.0
 boxes.xml,geom,1,priority,0.0
+boxes.xml,geom,1,sameframe,1.0
 boxes.xml,geom,2,type,6.0
 boxes.xml,geom,2,bodyid,2.0
 boxes.xml,geom,2,size,0.1 0.1 0.1
@@ -633,6 +650,7 @@ boxes.xml,geom,2,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,geom,2,margin,0.0
 boxes.xml,geom,2,gap,0.0
 boxes.xml,geom,2,priority,0.0
+boxes.xml,geom,2,sameframe,1.0
 boxes.xml,geom,3,type,6.0
 boxes.xml,geom,3,bodyid,3.0
 boxes.xml,geom,3,size,0.1 0.1 0.1
@@ -647,6 +665,7 @@ boxes.xml,geom,3,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,geom,3,margin,0.0
 boxes.xml,geom,3,gap,0.0
 boxes.xml,geom,3,priority,0.0
+boxes.xml,geom,3,sameframe,1.0
 boxes.xml,geom,4,type,6.0
 boxes.xml,geom,4,bodyid,4.0
 boxes.xml,geom,4,size,0.1 0.1 0.1
@@ -661,6 +680,7 @@ boxes.xml,geom,4,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,geom,4,margin,0.0
 boxes.xml,geom,4,gap,0.0
 boxes.xml,geom,4,priority,0.0
+boxes.xml,geom,4,sameframe,1.0
 boxes.xml,geom,5,type,6.0
 boxes.xml,geom,5,bodyid,5.0
 boxes.xml,geom,5,size,0.1 0.1 0.1
@@ -675,6 +695,7 @@ boxes.xml,geom,5,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,geom,5,margin,0.0
 boxes.xml,geom,5,gap,0.0
 boxes.xml,geom,5,priority,0.0
+boxes.xml,geom,5,sameframe,1.0
 cartpole.xml,option,0,timestep,0.01
 cartpole.xml,option,0,gravity,0.0 0.0 -9.81
 cartpole.xml,option,0,integrator,0.0
@@ -698,6 +719,7 @@ cartpole.xml,body,0,dofadr,-1.0
 cartpole.xml,body,0,dofnum,0.0
 cartpole.xml,body,0,geomadr,0.0
 cartpole.xml,body,0,geomnum,1.0
+cartpole.xml,body,0,sameframe,1.0
 cartpole.xml,body,1,parentid,0.0
 cartpole.xml,body,1,rootid,1.0
 cartpole.xml,body,1,pos,0.0 0.0 0.5
@@ -712,6 +734,7 @@ cartpole.xml,body,1,dofadr,0.0
 cartpole.xml,body,1,dofnum,1.0
 cartpole.xml,body,1,geomadr,1.0
 cartpole.xml,body,1,geomnum,1.0
+cartpole.xml,body,1,sameframe,1.0
 cartpole.xml,body,2,parentid,1.0
 cartpole.xml,body,2,rootid,1.0
 cartpole.xml,body,2,pos,0.0 0.0 0.0
@@ -726,6 +749,7 @@ cartpole.xml,body,2,dofadr,1.0
 cartpole.xml,body,2,dofnum,1.0
 cartpole.xml,body,2,geomadr,2.0
 cartpole.xml,body,2,geomnum,1.0
+cartpole.xml,body,2,sameframe,0.0
 cartpole.xml,jnt,0,type,2.0
 cartpole.xml,jnt,0,bodyid,1.0
 cartpole.xml,jnt,0,pos,0.0 0.0 0.0
@@ -776,6 +800,7 @@ cartpole.xml,geom,0,solimp,0.9 0.95 0.001 0.5 2.0
 cartpole.xml,geom,0,margin,0.0
 cartpole.xml,geom,0,gap,0.0
 cartpole.xml,geom,0,priority,0.0
+cartpole.xml,geom,0,sameframe,1.0
 cartpole.xml,geom,1,type,6.0
 cartpole.xml,geom,1,bodyid,1.0
 cartpole.xml,geom,1,size,0.2 0.1 0.05
@@ -790,6 +815,7 @@ cartpole.xml,geom,1,solimp,0.9 0.95 0.001 0.5 2.0
 cartpole.xml,geom,1,margin,0.0
 cartpole.xml,geom,1,gap,0.0
 cartpole.xml,geom,1,priority,0.0
+cartpole.xml,geom,1,sameframe,1.0
 cartpole.xml,geom,2,type,3.0
 cartpole.xml,geom,2,bodyid,2.0
 cartpole.xml,geom,2,size,0.02 0.3 0.0
@@ -804,6 +830,7 @@ cartpole.xml,geom,2,solimp,0.9 0.95 0.001 0.5 2.0
 cartpole.xml,geom,2,margin,0.0
 cartpole.xml,geom,2,gap,0.0
 cartpole.xml,geom,2,priority,0.0
+cartpole.xml,geom,2,sameframe,2.0
 cartpole.xml,actuator,0,trntype,0.0
 cartpole.xml,actuator,0,trnid,0.0 -1.0
 cartpole.xml,actuator,0,gear,10.0 0.0 0.0 0.0 0.0 0.0
@@ -817,6 +844,855 @@ cartpole.xml,actuator,0,gaintype,0.0
 cartpole.xml,actuator,0,biastype,0.0
 cartpole.xml,actuator,0,gainprm,1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
 cartpole.xml,actuator,0,biasprm,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+collisions.xml,option,0,timestep,0.002
+collisions.xml,option,0,gravity,0.0 0.0 -9.81
+collisions.xml,option,0,integrator,0.0
+collisions.xml,option,0,cone,0.0
+collisions.xml,option,0,solver,2.0
+collisions.xml,option,0,iterations,100.0
+collisions.xml,option,0,tolerance,1e-08
+collisions.xml,qpos0,0,values,0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0
+collisions.xml,qpos_spring,0,values,0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0
+collisions.xml,body,0,parentid,0.0
+collisions.xml,body,0,rootid,0.0
+collisions.xml,body,0,pos,0.0 0.0 0.0
+collisions.xml,body,0,quat,1.0 0.0 0.0 0.0
+collisions.xml,body,0,ipos,0.0 0.0 0.0
+collisions.xml,body,0,iquat,1.0 0.0 0.0 0.0
+collisions.xml,body,0,mass,0.0
+collisions.xml,body,0,inertia,0.0 0.0 0.0
+collisions.xml,body,0,jntadr,-1.0
+collisions.xml,body,0,jntnum,0.0
+collisions.xml,body,0,dofadr,-1.0
+collisions.xml,body,0,dofnum,0.0
+collisions.xml,body,0,geomadr,0.0
+collisions.xml,body,0,geomnum,1.0
+collisions.xml,body,0,sameframe,1.0
+collisions.xml,body,1,parentid,0.0
+collisions.xml,body,1,rootid,1.0
+collisions.xml,body,1,pos,0.3 0.0 0.2
+collisions.xml,body,1,quat,0.8925389352890299 -0.07338689100003824 -0.4161977407267834 0.15737869562426265
+collisions.xml,body,1,ipos,0.3 0.0 0.2
+collisions.xml,body,1,iquat,0.8925389352890299 -0.07338689100003824 -0.4161977407267834 0.15737869562426265
+collisions.xml,body,1,mass,0.0
+collisions.xml,body,1,inertia,0.0 0.0 0.0
+collisions.xml,body,1,jntadr,-1.0
+collisions.xml,body,1,jntnum,0.0
+collisions.xml,body,1,dofadr,-1.0
+collisions.xml,body,1,dofnum,0.0
+collisions.xml,body,1,geomadr,1.0
+collisions.xml,body,1,geomnum,1.0
+collisions.xml,body,1,sameframe,0.0
+collisions.xml,body,2,parentid,0.0
+collisions.xml,body,2,rootid,2.0
+collisions.xml,body,2,pos,-0.2 0.2 0.15
+collisions.xml,body,2,quat,0.943714364147489 0.12767944069578063 0.14487812541736914 0.2685358227515692
+collisions.xml,body,2,ipos,0.0 0.0 0.0
+collisions.xml,body,2,iquat,1.0 0.0 0.0 0.0
+collisions.xml,body,2,mass,6.0
+collisions.xml,body,2,inertia,0.05000000000000001 0.025000000000000005 0.065
+collisions.xml,body,2,jntadr,-1.0
+collisions.xml,body,2,jntnum,0.0
+collisions.xml,body,2,dofadr,-1.0
+collisions.xml,body,2,dofnum,0.0
+collisions.xml,body,2,geomadr,2.0
+collisions.xml,body,2,geomnum,1.0
+collisions.xml,body,2,sameframe,1.0
+collisions.xml,body,3,parentid,0.0
+collisions.xml,body,3,rootid,3.0
+collisions.xml,body,3,pos,0.0 0.0 0.0
+collisions.xml,body,3,quat,1.0 0.0 0.0 0.0
+collisions.xml,body,3,ipos,0.0 0.0 0.0
+collisions.xml,body,3,iquat,1.0 0.0 0.0 0.0
+collisions.xml,body,3,mass,4.188790204786391
+collisions.xml,body,3,inertia,0.01675516081914557 0.01675516081914557 0.01675516081914557
+collisions.xml,body,3,jntadr,0.0
+collisions.xml,body,3,jntnum,1.0
+collisions.xml,body,3,dofadr,0.0
+collisions.xml,body,3,dofnum,6.0
+collisions.xml,body,3,geomadr,3.0
+collisions.xml,body,3,geomnum,1.0
+collisions.xml,body,3,sameframe,1.0
+collisions.xml,body,4,parentid,0.0
+collisions.xml,body,4,rootid,4.0
+collisions.xml,body,4,pos,0.0 0.0 0.0
+collisions.xml,body,4,quat,1.0 0.0 0.0 0.0
+collisions.xml,body,4,ipos,0.0 0.0 0.0
+collisions.xml,body,4,iquat,1.0 0.0 0.0 0.0
+collisions.xml,body,4,mass,1.4367550402417326
+collisions.xml,body,4,inertia,0.002816039878873797 0.002816039878873797 0.002816039878873797
+collisions.xml,body,4,jntadr,1.0
+collisions.xml,body,4,jntnum,1.0
+collisions.xml,body,4,dofadr,6.0
+collisions.xml,body,4,dofnum,6.0
+collisions.xml,body,4,geomadr,4.0
+collisions.xml,body,4,geomnum,1.0
+collisions.xml,body,4,sameframe,1.0
+collisions.xml,body,5,parentid,0.0
+collisions.xml,body,5,rootid,5.0
+collisions.xml,body,5,pos,0.0 0.0 0.0
+collisions.xml,body,5,quat,1.0 0.0 0.0 0.0
+collisions.xml,body,5,ipos,0.0 0.0 0.0
+collisions.xml,body,5,iquat,1.0 0.0 0.0 0.0
+collisions.xml,body,5,mass,2.879793265790644
+collisions.xml,body,5,inertia,0.03439389457211326 0.03439389457211326 0.00346884188833873
+collisions.xml,body,5,jntadr,2.0
+collisions.xml,body,5,jntnum,1.0
+collisions.xml,body,5,dofadr,12.0
+collisions.xml,body,5,dofnum,6.0
+collisions.xml,body,5,geomadr,5.0
+collisions.xml,body,5,geomnum,1.0
+collisions.xml,body,5,sameframe,1.0
+collisions.xml,body,6,parentid,0.0
+collisions.xml,body,6,rootid,6.0
+collisions.xml,body,6,pos,0.0 0.0 0.0
+collisions.xml,body,6,quat,1.0 0.0 0.0 0.0
+collisions.xml,body,6,ipos,0.0 0.0 0.0
+collisions.xml,body,6,iquat,1.0 0.0 0.0 0.0
+collisions.xml,body,6,mass,1.273392222255063
+collisions.xml,body,6,inertia,0.007409802320658937 0.007409802320658937 0.0009758205661070378
+collisions.xml,body,6,jntadr,3.0
+collisions.xml,body,6,jntnum,1.0
+collisions.xml,body,6,dofadr,18.0
+collisions.xml,body,6,dofnum,6.0
+collisions.xml,body,6,geomadr,6.0
+collisions.xml,body,6,geomnum,1.0
+collisions.xml,body,6,sameframe,1.0
+collisions.xml,body,7,parentid,0.0
+collisions.xml,body,7,rootid,7.0
+collisions.xml,body,7,pos,0.0 0.0 0.0
+collisions.xml,body,7,quat,1.0 0.0 0.0 0.0
+collisions.xml,body,7,ipos,0.0 0.0 0.0
+collisions.xml,body,7,iquat,1.0 0.0 0.0 0.0
+collisions.xml,body,7,mass,4.0212385965949355
+collisions.xml,body,7,inertia,0.01983811040986835 0.01983811040986835 0.012867963509103795
+collisions.xml,body,7,jntadr,4.0
+collisions.xml,body,7,jntnum,1.0
+collisions.xml,body,7,dofadr,24.0
+collisions.xml,body,7,dofnum,6.0
+collisions.xml,body,7,geomadr,7.0
+collisions.xml,body,7,geomnum,1.0
+collisions.xml,body,7,sameframe,1.0
+collisions.xml,body,8,parentid,0.0
+collisions.xml,body,8,rootid,8.0
+collisions.xml,body,8,pos,0.0 0.0 0.0
+collisions.xml,body,8,quat,1.0 0.0 0.0 0.0
+collisions.xml,body,8,ipos,0.0 0.0 0.0
+collisions.xml,body,8,iquat,1.0 0.0 0.0 0.0
+collisions.xml,body,8,mass,3.8400000000000003
+collisions.xml,body,8,inertia,0.0128 0.017408000000000003 0.020992
+collisions.xml,body,8,jntadr,5.0
+collisions.xml,body,8,jntnum,1.0
+collisions.xml,body,8,dofadr,30.0
+collisions.xml,body,8,dofnum,6.0
+collisions.xml,body,8,geomadr,8.0
+collisions.xml,body,8,geomnum,1.0
+collisions.xml,body,8,sameframe,1.0
+collisions.xml,body,9,parentid,0.0
+collisions.xml,body,9,rootid,9.0
+collisions.xml,body,9,pos,0.0 0.0 0.0
+collisions.xml,body,9,quat,1.0 0.0 0.0 0.0
+collisions.xml,body,9,ipos,0.0 0.0 0.0
+collisions.xml,body,9,iquat,1.0 0.0 0.0 0.0
+collisions.xml,body,9,mass,2.4000000000000004
+collisions.xml,body,9,inertia,0.004000000000000001 0.013519999999999999 0.013519999999999999
+collisions.xml,body,9,jntadr,6.0
+collisions.xml,body,9,jntnum,1.0
+collisions.xml,body,9,dofadr,36.0
+collisions.xml,body,9,dofnum,6.0
+collisions.xml,body,9,geomadr,9.0
+collisions.xml,body,9,geomnum,1.0
+collisions.xml,body,9,sameframe,1.0
+collisions.xml,body,10,parentid,0.0
+collisions.xml,body,10,rootid,10.0
+collisions.xml,body,10,pos,0.0 0.0 0.0
+collisions.xml,body,10,quat,1.0 0.0 0.0 0.0
+collisions.xml,body,10,ipos,0.0 0.0 0.0
+collisions.xml,body,10,iquat,1.0 0.0 0.0 0.0
+collisions.xml,body,10,mass,2.0480000000000005
+collisions.xml,body,10,inertia,0.0054613333333333345 0.0054613333333333345 0.008738133333333335
+collisions.xml,body,10,jntadr,7.0
+collisions.xml,body,10,jntnum,1.0
+collisions.xml,body,10,dofadr,42.0
+collisions.xml,body,10,dofnum,6.0
+collisions.xml,body,10,geomadr,10.0
+collisions.xml,body,10,geomnum,1.0
+collisions.xml,body,10,sameframe,1.0
+collisions.xml,body,11,parentid,10.0
+collisions.xml,body,11,rootid,10.0
+collisions.xml,body,11,pos,0.08 0.0 0.0
+collisions.xml,body,11,quat,1.0 0.0 0.0 0.0
+collisions.xml,body,11,ipos,0.1 0.0 0.0
+collisions.xml,body,11,iquat,0.7071067811865476 0.0 -0.7071067811865475 0.0
+collisions.xml,body,11,mass,0.6785840131753953
+collisions.xml,body,11,inertia,0.003438347495647885 0.003438347495647885 0.000295184045731297
+collisions.xml,body,11,jntadr,8.0
+collisions.xml,body,11,jntnum,1.0
+collisions.xml,body,11,dofadr,48.0
+collisions.xml,body,11,dofnum,1.0
+collisions.xml,body,11,geomadr,11.0
+collisions.xml,body,11,geomnum,1.0
+collisions.xml,body,11,sameframe,0.0
+collisions.xml,body,12,parentid,11.0
+collisions.xml,body,12,rootid,10.0
+collisions.xml,body,12,pos,0.1 0.0 0.0
+collisions.xml,body,12,quat,1.0 0.0 0.0 0.0
+collisions.xml,body,12,ipos,0.0 0.0 0.0
+collisions.xml,body,12,iquat,1.0 0.0 0.0 0.0
+collisions.xml,body,12,mass,0.8
+collisions.xml,body,12,inertia,0.0013333333333333337 0.0010933333333333335 0.0010933333333333335
+collisions.xml,body,12,jntadr,-1.0
+collisions.xml,body,12,jntnum,0.0
+collisions.xml,body,12,dofadr,-1.0
+collisions.xml,body,12,dofnum,0.0
+collisions.xml,body,12,geomadr,12.0
+collisions.xml,body,12,geomnum,1.0
+collisions.xml,body,12,sameframe,1.0
+collisions.xml,body,13,parentid,11.0
+collisions.xml,body,13,rootid,10.0
+collisions.xml,body,13,pos,0.2 0.0 0.0
+collisions.xml,body,13,quat,1.0 0.0 0.0 0.0
+collisions.xml,body,13,ipos,0.0 0.0 0.0
+collisions.xml,body,13,iquat,1.0 0.0 0.0 0.0
+collisions.xml,body,13,mass,0.5235987755982989
+collisions.xml,body,13,inertia,0.000523598775598299 0.000523598775598299 0.000523598775598299
+collisions.xml,body,13,jntadr,9.0
+collisions.xml,body,13,jntnum,1.0
+collisions.xml,body,13,dofadr,49.0
+collisions.xml,body,13,dofnum,1.0
+collisions.xml,body,13,geomadr,13.0
+collisions.xml,body,13,geomnum,1.0
+collisions.xml,body,13,sameframe,1.0
+collisions.xml,jnt,0,type,0.0
+collisions.xml,jnt,0,bodyid,3.0
+collisions.xml,jnt,0,pos,0.0 0.0 0.0
+collisions.xml,jnt,0,axis,0.0 0.0 1.0
+collisions.xml,jnt,0,limited,0.0
+collisions.xml,jnt,0,range,0.0 0.0
+collisions.xml,jnt,0,stiffness,0.0
+collisions.xml,jnt,0,qposadr,0.0
+collisions.xml,jnt,0,dofadr,0.0
+collisions.xml,jnt,0,solref,0.02 1.0
+collisions.xml,jnt,0,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,jnt,0,margin,0.0
+collisions.xml,jnt,1,type,0.0
+collisions.xml,jnt,1,bodyid,4.0
+collisions.xml,jnt,1,pos,0.0 0.0 0.0
+collisions.xml,jnt,1,axis,0.0 0.0 1.0
+collisions.xml,jnt,1,limited,0.0
+collisions.xml,jnt,1,range,0.0 0.0
+collisions.xml,jnt,1,stiffness,0.0
+collisions.xml,jnt,1,qposadr,7.0
+collisions.xml,jnt,1,dofadr,6.0
+collisions.xml,jnt,1,solref,0.02 1.0
+collisions.xml,jnt,1,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,jnt,1,margin,0.0
+collisions.xml,jnt,2,type,0.0
+collisions.xml,jnt,2,bodyid,5.0
+collisions.xml,jnt,2,pos,0.0 0.0 0.0
+collisions.xml,jnt,2,axis,0.0 0.0 1.0
+collisions.xml,jnt,2,limited,0.0
+collisions.xml,jnt,2,range,0.0 0.0
+collisions.xml,jnt,2,stiffness,0.0
+collisions.xml,jnt,2,qposadr,14.0
+collisions.xml,jnt,2,dofadr,12.0
+collisions.xml,jnt,2,solref,0.02 1.0
+collisions.xml,jnt,2,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,jnt,2,margin,0.0
+collisions.xml,jnt,3,type,0.0
+collisions.xml,jnt,3,bodyid,6.0
+collisions.xml,jnt,3,pos,0.0 0.0 0.0
+collisions.xml,jnt,3,axis,0.0 0.0 1.0
+collisions.xml,jnt,3,limited,0.0
+collisions.xml,jnt,3,range,0.0 0.0
+collisions.xml,jnt,3,stiffness,0.0
+collisions.xml,jnt,3,qposadr,21.0
+collisions.xml,jnt,3,dofadr,18.0
+collisions.xml,jnt,3,solref,0.02 1.0
+collisions.xml,jnt,3,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,jnt,3,margin,0.0
+collisions.xml,jnt,4,type,0.0
+collisions.xml,jnt,4,bodyid,7.0
+collisions.xml,jnt,4,pos,0.0 0.0 0.0
+collisions.xml,jnt,4,axis,0.0 0.0 1.0
+collisions.xml,jnt,4,limited,0.0
+collisions.xml,jnt,4,range,0.0 0.0
+collisions.xml,jnt,4,stiffness,0.0
+collisions.xml,jnt,4,qposadr,28.0
+collisions.xml,jnt,4,dofadr,24.0
+collisions.xml,jnt,4,solref,0.02 1.0
+collisions.xml,jnt,4,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,jnt,4,margin,0.0
+collisions.xml,jnt,5,type,0.0
+collisions.xml,jnt,5,bodyid,8.0
+collisions.xml,jnt,5,pos,0.0 0.0 0.0
+collisions.xml,jnt,5,axis,0.0 0.0 1.0
+collisions.xml,jnt,5,limited,0.0
+collisions.xml,jnt,5,range,0.0 0.0
+collisions.xml,jnt,5,stiffness,0.0
+collisions.xml,jnt,5,qposadr,35.0
+collisions.xml,jnt,5,dofadr,30.0
+collisions.xml,jnt,5,solref,0.02 1.0
+collisions.xml,jnt,5,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,jnt,5,margin,0.0
+collisions.xml,jnt,6,type,0.0
+collisions.xml,jnt,6,bodyid,9.0
+collisions.xml,jnt,6,pos,0.0 0.0 0.0
+collisions.xml,jnt,6,axis,0.0 0.0 1.0
+collisions.xml,jnt,6,limited,0.0
+collisions.xml,jnt,6,range,0.0 0.0
+collisions.xml,jnt,6,stiffness,0.0
+collisions.xml,jnt,6,qposadr,42.0
+collisions.xml,jnt,6,dofadr,36.0
+collisions.xml,jnt,6,solref,0.02 1.0
+collisions.xml,jnt,6,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,jnt,6,margin,0.0
+collisions.xml,jnt,7,type,0.0
+collisions.xml,jnt,7,bodyid,10.0
+collisions.xml,jnt,7,pos,0.0 0.0 0.0
+collisions.xml,jnt,7,axis,0.0 0.0 1.0
+collisions.xml,jnt,7,limited,0.0
+collisions.xml,jnt,7,range,0.0 0.0
+collisions.xml,jnt,7,stiffness,0.0
+collisions.xml,jnt,7,qposadr,49.0
+collisions.xml,jnt,7,dofadr,42.0
+collisions.xml,jnt,7,solref,0.02 1.0
+collisions.xml,jnt,7,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,jnt,7,margin,0.0
+collisions.xml,jnt,8,type,3.0
+collisions.xml,jnt,8,bodyid,11.0
+collisions.xml,jnt,8,pos,0.0 0.0 0.0
+collisions.xml,jnt,8,axis,0.0 1.0 0.0
+collisions.xml,jnt,8,limited,0.0
+collisions.xml,jnt,8,range,0.0 0.0
+collisions.xml,jnt,8,stiffness,0.0
+collisions.xml,jnt,8,qposadr,56.0
+collisions.xml,jnt,8,dofadr,48.0
+collisions.xml,jnt,8,solref,0.02 1.0
+collisions.xml,jnt,8,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,jnt,8,margin,0.0
+collisions.xml,jnt,9,type,3.0
+collisions.xml,jnt,9,bodyid,13.0
+collisions.xml,jnt,9,pos,0.0 0.0 0.0
+collisions.xml,jnt,9,axis,0.0 0.0 1.0
+collisions.xml,jnt,9,limited,0.0
+collisions.xml,jnt,9,range,0.0 0.0
+collisions.xml,jnt,9,stiffness,0.0
+collisions.xml,jnt,9,qposadr,57.0
+collisions.xml,jnt,9,dofadr,49.0
+collisions.xml,jnt,9,solref,0.02 1.0
+collisions.xml,jnt,9,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,jnt,9,margin,0.0
+collisions.xml,dof,0,bodyid,3.0
+collisions.xml,dof,0,jntid,0.0
+collisions.xml,dof,0,parentid,-1.0
+collisions.xml,dof,0,armature,0.0
+collisions.xml,dof,0,damping,0.0
+collisions.xml,dof,0,frictionloss,0.0
+collisions.xml,dof,1,bodyid,3.0
+collisions.xml,dof,1,jntid,0.0
+collisions.xml,dof,1,parentid,0.0
+collisions.xml,dof,1,armature,0.0
+collisions.xml,dof,1,damping,0.0
+collisions.xml,dof,1,frictionloss,0.0
+collisions.xml,dof,2,bodyid,3.0
+collisions.xml,dof,2,jntid,0.0
+collisions.xml,dof,2,parentid,1.0
+collisions.xml,dof,2,armature,0.0
+collisions.xml,dof,2,damping,0.0
+collisions.xml,dof,2,frictionloss,0.0
+collisions.xml,dof,3,bodyid,3.0
+collisions.xml,dof,3,jntid,0.0
+collisions.xml,dof,3,parentid,2.0
+collisions.xml,dof,3,armature,0.0
+collisions.xml,dof,3,damping,0.0
+collisions.xml,dof,3,frictionloss,0.0
+collisions.xml,dof,4,bodyid,3.0
+collisions.xml,dof,4,jntid,0.0
+collisions.xml,dof,4,parentid,3.0
+collisions.xml,dof,4,armature,0.0
+collisions.xml,dof,4,damping,0.0
+collisions.xml,dof,4,frictionloss,0.0
+collisions.xml,dof,5,bodyid,3.0
+collisions.xml,dof,5,jntid,0.0
+collisions.xml,dof,5,parentid,4.0
+collisions.xml,dof,5,armature,0.0
+collisions.xml,dof,5,damping,0.0
+collisions.xml,dof,5,frictionloss,0.0
+collisions.xml,dof,6,bodyid,4.0
+collisions.xml,dof,6,jntid,1.0
+collisions.xml,dof,6,parentid,-1.0
+collisions.xml,dof,6,armature,0.0
+collisions.xml,dof,6,damping,0.0
+collisions.xml,dof,6,frictionloss,0.0
+collisions.xml,dof,7,bodyid,4.0
+collisions.xml,dof,7,jntid,1.0
+collisions.xml,dof,7,parentid,6.0
+collisions.xml,dof,7,armature,0.0
+collisions.xml,dof,7,damping,0.0
+collisions.xml,dof,7,frictionloss,0.0
+collisions.xml,dof,8,bodyid,4.0
+collisions.xml,dof,8,jntid,1.0
+collisions.xml,dof,8,parentid,7.0
+collisions.xml,dof,8,armature,0.0
+collisions.xml,dof,8,damping,0.0
+collisions.xml,dof,8,frictionloss,0.0
+collisions.xml,dof,9,bodyid,4.0
+collisions.xml,dof,9,jntid,1.0
+collisions.xml,dof,9,parentid,8.0
+collisions.xml,dof,9,armature,0.0
+collisions.xml,dof,9,damping,0.0
+collisions.xml,dof,9,frictionloss,0.0
+collisions.xml,dof,10,bodyid,4.0
+collisions.xml,dof,10,jntid,1.0
+collisions.xml,dof,10,parentid,9.0
+collisions.xml,dof,10,armature,0.0
+collisions.xml,dof,10,damping,0.0
+collisions.xml,dof,10,frictionloss,0.0
+collisions.xml,dof,11,bodyid,4.0
+collisions.xml,dof,11,jntid,1.0
+collisions.xml,dof,11,parentid,10.0
+collisions.xml,dof,11,armature,0.0
+collisions.xml,dof,11,damping,0.0
+collisions.xml,dof,11,frictionloss,0.0
+collisions.xml,dof,12,bodyid,5.0
+collisions.xml,dof,12,jntid,2.0
+collisions.xml,dof,12,parentid,-1.0
+collisions.xml,dof,12,armature,0.0
+collisions.xml,dof,12,damping,0.0
+collisions.xml,dof,12,frictionloss,0.0
+collisions.xml,dof,13,bodyid,5.0
+collisions.xml,dof,13,jntid,2.0
+collisions.xml,dof,13,parentid,12.0
+collisions.xml,dof,13,armature,0.0
+collisions.xml,dof,13,damping,0.0
+collisions.xml,dof,13,frictionloss,0.0
+collisions.xml,dof,14,bodyid,5.0
+collisions.xml,dof,14,jntid,2.0
+collisions.xml,dof,14,parentid,13.0
+collisions.xml,dof,14,armature,0.0
+collisions.xml,dof,14,damping,0.0
+collisions.xml,dof,14,frictionloss,0.0
+collisions.xml,dof,15,bodyid,5.0
+collisions.xml,dof,15,jntid,2.0
+collisions.xml,dof,15,parentid,14.0
+collisions.xml,dof,15,armature,0.0
+collisions.xml,dof,15,damping,0.0
+collisions.xml,dof,15,frictionloss,0.0
+collisions.xml,dof,16,bodyid,5.0
+collisions.xml,dof,16,jntid,2.0
+collisions.xml,dof,16,parentid,15.0
+collisions.xml,dof,16,armature,0.0
+collisions.xml,dof,16,damping,0.0
+collisions.xml,dof,16,frictionloss,0.0
+collisions.xml,dof,17,bodyid,5.0
+collisions.xml,dof,17,jntid,2.0
+collisions.xml,dof,17,parentid,16.0
+collisions.xml,dof,17,armature,0.0
+collisions.xml,dof,17,damping,0.0
+collisions.xml,dof,17,frictionloss,0.0
+collisions.xml,dof,18,bodyid,6.0
+collisions.xml,dof,18,jntid,3.0
+collisions.xml,dof,18,parentid,-1.0
+collisions.xml,dof,18,armature,0.0
+collisions.xml,dof,18,damping,0.0
+collisions.xml,dof,18,frictionloss,0.0
+collisions.xml,dof,19,bodyid,6.0
+collisions.xml,dof,19,jntid,3.0
+collisions.xml,dof,19,parentid,18.0
+collisions.xml,dof,19,armature,0.0
+collisions.xml,dof,19,damping,0.0
+collisions.xml,dof,19,frictionloss,0.0
+collisions.xml,dof,20,bodyid,6.0
+collisions.xml,dof,20,jntid,3.0
+collisions.xml,dof,20,parentid,19.0
+collisions.xml,dof,20,armature,0.0
+collisions.xml,dof,20,damping,0.0
+collisions.xml,dof,20,frictionloss,0.0
+collisions.xml,dof,21,bodyid,6.0
+collisions.xml,dof,21,jntid,3.0
+collisions.xml,dof,21,parentid,20.0
+collisions.xml,dof,21,armature,0.0
+collisions.xml,dof,21,damping,0.0
+collisions.xml,dof,21,frictionloss,0.0
+collisions.xml,dof,22,bodyid,6.0
+collisions.xml,dof,22,jntid,3.0
+collisions.xml,dof,22,parentid,21.0
+collisions.xml,dof,22,armature,0.0
+collisions.xml,dof,22,damping,0.0
+collisions.xml,dof,22,frictionloss,0.0
+collisions.xml,dof,23,bodyid,6.0
+collisions.xml,dof,23,jntid,3.0
+collisions.xml,dof,23,parentid,22.0
+collisions.xml,dof,23,armature,0.0
+collisions.xml,dof,23,damping,0.0
+collisions.xml,dof,23,frictionloss,0.0
+collisions.xml,dof,24,bodyid,7.0
+collisions.xml,dof,24,jntid,4.0
+collisions.xml,dof,24,parentid,-1.0
+collisions.xml,dof,24,armature,0.0
+collisions.xml,dof,24,damping,0.0
+collisions.xml,dof,24,frictionloss,0.0
+collisions.xml,dof,25,bodyid,7.0
+collisions.xml,dof,25,jntid,4.0
+collisions.xml,dof,25,parentid,24.0
+collisions.xml,dof,25,armature,0.0
+collisions.xml,dof,25,damping,0.0
+collisions.xml,dof,25,frictionloss,0.0
+collisions.xml,dof,26,bodyid,7.0
+collisions.xml,dof,26,jntid,4.0
+collisions.xml,dof,26,parentid,25.0
+collisions.xml,dof,26,armature,0.0
+collisions.xml,dof,26,damping,0.0
+collisions.xml,dof,26,frictionloss,0.0
+collisions.xml,dof,27,bodyid,7.0
+collisions.xml,dof,27,jntid,4.0
+collisions.xml,dof,27,parentid,26.0
+collisions.xml,dof,27,armature,0.0
+collisions.xml,dof,27,damping,0.0
+collisions.xml,dof,27,frictionloss,0.0
+collisions.xml,dof,28,bodyid,7.0
+collisions.xml,dof,28,jntid,4.0
+collisions.xml,dof,28,parentid,27.0
+collisions.xml,dof,28,armature,0.0
+collisions.xml,dof,28,damping,0.0
+collisions.xml,dof,28,frictionloss,0.0
+collisions.xml,dof,29,bodyid,7.0
+collisions.xml,dof,29,jntid,4.0
+collisions.xml,dof,29,parentid,28.0
+collisions.xml,dof,29,armature,0.0
+collisions.xml,dof,29,damping,0.0
+collisions.xml,dof,29,frictionloss,0.0
+collisions.xml,dof,30,bodyid,8.0
+collisions.xml,dof,30,jntid,5.0
+collisions.xml,dof,30,parentid,-1.0
+collisions.xml,dof,30,armature,0.0
+collisions.xml,dof,30,damping,0.0
+collisions.xml,dof,30,frictionloss,0.0
+collisions.xml,dof,31,bodyid,8.0
+collisions.xml,dof,31,jntid,5.0
+collisions.xml,dof,31,parentid,30.0
+collisions.xml,dof,31,armature,0.0
+collisions.xml,dof,31,damping,0.0
+collisions.xml,dof,31,frictionloss,0.0
+collisions.xml,dof,32,bodyid,8.0
+collisions.xml,dof,32,jntid,5.0
+collisions.xml,dof,32,parentid,31.0
+collisions.xml,dof,32,armature,0.0
+collisions.xml,dof,32,damping,0.0
+collisions.xml,dof,32,frictionloss,0.0
+collisions.xml,dof,33,bodyid,8.0
+collisions.xml,dof,33,jntid,5.0
+collisions.xml,dof,33,parentid,32.0
+collisions.xml,dof,33,armature,0.0
+collisions.xml,dof,33,damping,0.0
+collisions.xml,dof,33,frictionloss,0.0
+collisions.xml,dof,34,bodyid,8.0
+collisions.xml,dof,34,jntid,5.0
+collisions.xml,dof,34,parentid,33.0
+collisions.xml,dof,34,armature,0.0
+collisions.xml,dof,34,damping,0.0
+collisions.xml,dof,34,frictionloss,0.0
+collisions.xml,dof,35,bodyid,8.0
+collisions.xml,dof,35,jntid,5.0
+collisions.xml,dof,35,parentid,34.0
+collisions.xml,dof,35,armature,0.0
+collisions.xml,dof,35,damping,0.0
+collisions.xml,dof,35,frictionloss,0.0
+collisions.xml,dof,36,bodyid,9.0
+collisions.xml,dof,36,jntid,6.0
+collisions.xml,dof,36,parentid,-1.0
+collisions.xml,dof,36,armature,0.0
+collisions.xml,dof,36,damping,0.0
+collisions.xml,dof,36,frictionloss,0.0
+collisions.xml,dof,37,bodyid,9.0
+collisions.xml,dof,37,jntid,6.0
+collisions.xml,dof,37,parentid,36.0
+collisions.xml,dof,37,armature,0.0
+collisions.xml,dof,37,damping,0.0
+collisions.xml,dof,37,frictionloss,0.0
+collisions.xml,dof,38,bodyid,9.0
+collisions.xml,dof,38,jntid,6.0
+collisions.xml,dof,38,parentid,37.0
+collisions.xml,dof,38,armature,0.0
+collisions.xml,dof,38,damping,0.0
+collisions.xml,dof,38,frictionloss,0.0
+collisions.xml,dof,39,bodyid,9.0
+collisions.xml,dof,39,jntid,6.0
+collisions.xml,dof,39,parentid,38.0
+collisions.xml,dof,39,armature,0.0
+collisions.xml,dof,39,damping,0.0
+collisions.xml,dof,39,frictionloss,0.0
+collisions.xml,dof,40,bodyid,9.0
+collisions.xml,dof,40,jntid,6.0
+collisions.xml,dof,40,parentid,39.0
+collisions.xml,dof,40,armature,0.0
+collisions.xml,dof,40,damping,0.0
+collisions.xml,dof,40,frictionloss,0.0
+collisions.xml,dof,41,bodyid,9.0
+collisions.xml,dof,41,jntid,6.0
+collisions.xml,dof,41,parentid,40.0
+collisions.xml,dof,41,armature,0.0
+collisions.xml,dof,41,damping,0.0
+collisions.xml,dof,41,frictionloss,0.0
+collisions.xml,dof,42,bodyid,10.0
+collisions.xml,dof,42,jntid,7.0
+collisions.xml,dof,42,parentid,-1.0
+collisions.xml,dof,42,armature,0.0
+collisions.xml,dof,42,damping,0.0
+collisions.xml,dof,42,frictionloss,0.0
+collisions.xml,dof,43,bodyid,10.0
+collisions.xml,dof,43,jntid,7.0
+collisions.xml,dof,43,parentid,42.0
+collisions.xml,dof,43,armature,0.0
+collisions.xml,dof,43,damping,0.0
+collisions.xml,dof,43,frictionloss,0.0
+collisions.xml,dof,44,bodyid,10.0
+collisions.xml,dof,44,jntid,7.0
+collisions.xml,dof,44,parentid,43.0
+collisions.xml,dof,44,armature,0.0
+collisions.xml,dof,44,damping,0.0
+collisions.xml,dof,44,frictionloss,0.0
+collisions.xml,dof,45,bodyid,10.0
+collisions.xml,dof,45,jntid,7.0
+collisions.xml,dof,45,parentid,44.0
+collisions.xml,dof,45,armature,0.0
+collisions.xml,dof,45,damping,0.0
+collisions.xml,dof,45,frictionloss,0.0
+collisions.xml,dof,46,bodyid,10.0
+collisions.xml,dof,46,jntid,7.0
+collisions.xml,dof,46,parentid,45.0
+collisions.xml,dof,46,armature,0.0
+collisions.xml,dof,46,damping,0.0
+collisions.xml,dof,46,frictionloss,0.0
+collisions.xml,dof,47,bodyid,10.0
+collisions.xml,dof,47,jntid,7.0
+collisions.xml,dof,47,parentid,46.0
+collisions.xml,dof,47,armature,0.0
+collisions.xml,dof,47,damping,0.0
+collisions.xml,dof,47,frictionloss,0.0
+collisions.xml,dof,48,bodyid,11.0
+collisions.xml,dof,48,jntid,8.0
+collisions.xml,dof,48,parentid,47.0
+collisions.xml,dof,48,armature,0.0
+collisions.xml,dof,48,damping,0.0
+collisions.xml,dof,48,frictionloss,0.0
+collisions.xml,dof,49,bodyid,13.0
+collisions.xml,dof,49,jntid,9.0
+collisions.xml,dof,49,parentid,48.0
+collisions.xml,dof,49,armature,0.0
+collisions.xml,dof,49,damping,0.0
+collisions.xml,dof,49,frictionloss,0.0
+collisions.xml,geom,0,type,0.0
+collisions.xml,geom,0,bodyid,0.0
+collisions.xml,geom,0,size,0.0 0.0 1.0
+collisions.xml,geom,0,pos,0.0 0.0 0.0
+collisions.xml,geom,0,quat,1.0 0.0 0.0 0.0
+collisions.xml,geom,0,friction,1.0 0.005 0.0001
+collisions.xml,geom,0,condim,3.0
+collisions.xml,geom,0,contype,3.0
+collisions.xml,geom,0,conaffinity,3.0
+collisions.xml,geom,0,solref,0.02 1.0
+collisions.xml,geom,0,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,geom,0,margin,0.0
+collisions.xml,geom,0,gap,0.0
+collisions.xml,geom,0,priority,0.0
+collisions.xml,geom,0,sameframe,1.0
+collisions.xml,geom,1,type,0.0
+collisions.xml,geom,1,bodyid,1.0
+collisions.xml,geom,1,size,1.0 1.0 1.0
+collisions.xml,geom,1,pos,0.0 0.0 0.0
+collisions.xml,geom,1,quat,1.0 0.0 0.0 0.0
+collisions.xml,geom,1,friction,0.4 0.005 0.0001
+collisions.xml,geom,1,condim,3.0
+collisions.xml,geom,1,contype,3.0
+collisions.xml,geom,1,conaffinity,3.0
+collisions.xml,geom,1,solref,0.02 1.0
+collisions.xml,geom,1,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,geom,1,margin,0.0
+collisions.xml,geom,1,gap,0.0
+collisions.xml,geom,1,priority,0.0
+collisions.xml,geom,1,sameframe,1.0
+collisions.xml,geom,2,type,6.0
+collisions.xml,geom,2,bodyid,2.0
+collisions.xml,geom,2,size,0.1 0.15 0.05
+collisions.xml,geom,2,pos,0.0 0.0 0.0
+collisions.xml,geom,2,quat,1.0 0.0 0.0 0.0
+collisions.xml,geom,2,friction,1.0 0.005 0.0001
+collisions.xml,geom,2,condim,3.0
+collisions.xml,geom,2,contype,1.0
+collisions.xml,geom,2,conaffinity,1.0
+collisions.xml,geom,2,solref,0.02 1.0
+collisions.xml,geom,2,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,geom,2,margin,0.0
+collisions.xml,geom,2,gap,0.0
+collisions.xml,geom,2,priority,0.0
+collisions.xml,geom,2,sameframe,1.0
+collisions.xml,geom,3,type,2.0
+collisions.xml,geom,3,bodyid,3.0
+collisions.xml,geom,3,size,0.1 0.0 0.0
+collisions.xml,geom,3,pos,0.0 0.0 0.0
+collisions.xml,geom,3,quat,1.0 0.0 0.0 0.0
+collisions.xml,geom,3,friction,1.0 0.005 0.0001
+collisions.xml,geom,3,condim,3.0
+collisions.xml,geom,3,contype,3.0
+collisions.xml,geom,3,conaffinity,3.0
+collisions.xml,geom,3,solref,0.02 1.0
+collisions.xml,geom,3,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,geom,3,margin,0.0
+collisions.xml,geom,3,gap,0.0
+collisions.xml,geom,3,priority,0.0
+collisions.xml,geom,3,sameframe,1.0
+collisions.xml,geom,4,type,2.0
+collisions.xml,geom,4,bodyid,4.0
+collisions.xml,geom,4,size,0.07 0.0 0.0
+collisions.xml,geom,4,pos,0.0 0.0 0.0
+collisions.xml,geom,4,quat,1.0 0.0 0.0 0.0
+collisions.xml,geom,4,friction,0.7 0.01 0.001
+collisions.xml,geom,4,condim,4.0
+collisions.xml,geom,4,contype,3.0
+collisions.xml,geom,4,conaffinity,3.0
+collisions.xml,geom,4,solref,0.03 0.8
+collisions.xml,geom,4,solimp,0.8 0.9 0.002 0.4 3.0
+collisions.xml,geom,4,margin,0.01
+collisions.xml,geom,4,gap,0.005
+collisions.xml,geom,4,priority,1.0
+collisions.xml,geom,4,sameframe,1.0
+collisions.xml,geom,5,type,3.0
+collisions.xml,geom,5,bodyid,5.0
+collisions.xml,geom,5,size,0.05 0.15 0.0
+collisions.xml,geom,5,pos,0.0 0.0 0.0
+collisions.xml,geom,5,quat,1.0 0.0 0.0 0.0
+collisions.xml,geom,5,friction,1.0 0.005 0.0001
+collisions.xml,geom,5,condim,3.0
+collisions.xml,geom,5,contype,1.0
+collisions.xml,geom,5,conaffinity,1.0
+collisions.xml,geom,5,solref,0.02 1.0
+collisions.xml,geom,5,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,geom,5,margin,0.0
+collisions.xml,geom,5,gap,0.0
+collisions.xml,geom,5,priority,0.0
+collisions.xml,geom,5,sameframe,1.0
+collisions.xml,geom,6,type,3.0
+collisions.xml,geom,6,bodyid,6.0
+collisions.xml,geom,6,size,0.04 0.1 0.0
+collisions.xml,geom,6,pos,0.0 0.0 0.0
+collisions.xml,geom,6,quat,1.0 0.0 0.0 0.0
+collisions.xml,geom,6,friction,1.0 0.005 0.0001
+collisions.xml,geom,6,condim,6.0
+collisions.xml,geom,6,contype,1.0
+collisions.xml,geom,6,conaffinity,1.0
+collisions.xml,geom,6,solref,-1000.0 -20.0
+collisions.xml,geom,6,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,geom,6,margin,0.02
+collisions.xml,geom,6,gap,0.0
+collisions.xml,geom,6,priority,0.0
+collisions.xml,geom,6,sameframe,1.0
+collisions.xml,geom,7,type,5.0
+collisions.xml,geom,7,bodyid,7.0
+collisions.xml,geom,7,size,0.08 0.1 0.0
+collisions.xml,geom,7,pos,0.0 0.0 0.0
+collisions.xml,geom,7,quat,1.0 0.0 0.0 0.0
+collisions.xml,geom,7,friction,1.0 0.005 0.0001
+collisions.xml,geom,7,condim,1.0
+collisions.xml,geom,7,contype,2.0
+collisions.xml,geom,7,conaffinity,2.0
+collisions.xml,geom,7,solref,0.02 1.0
+collisions.xml,geom,7,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,geom,7,margin,0.0
+collisions.xml,geom,7,gap,0.0
+collisions.xml,geom,7,priority,0.0
+collisions.xml,geom,7,sameframe,1.0
+collisions.xml,geom,8,type,6.0
+collisions.xml,geom,8,bodyid,8.0
+collisions.xml,geom,8,size,0.1 0.08 0.06
+collisions.xml,geom,8,pos,0.0 0.0 0.0
+collisions.xml,geom,8,quat,1.0 0.0 0.0 0.0
+collisions.xml,geom,8,friction,1.0 0.005 0.0001
+collisions.xml,geom,8,condim,3.0
+collisions.xml,geom,8,contype,1.0
+collisions.xml,geom,8,conaffinity,1.0
+collisions.xml,geom,8,solref,0.02 1.0
+collisions.xml,geom,8,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,geom,8,margin,0.0
+collisions.xml,geom,8,gap,0.0
+collisions.xml,geom,8,priority,0.0
+collisions.xml,geom,8,sameframe,1.0
+collisions.xml,geom,9,type,6.0
+collisions.xml,geom,9,bodyid,9.0
+collisions.xml,geom,9,size,0.12 0.05 0.05
+collisions.xml,geom,9,pos,0.0 0.0 0.0
+collisions.xml,geom,9,quat,1.0 0.0 0.0 0.0
+collisions.xml,geom,9,friction,1.2 0.005 0.0001
+collisions.xml,geom,9,condim,3.0
+collisions.xml,geom,9,contype,1.0
+collisions.xml,geom,9,conaffinity,1.0
+collisions.xml,geom,9,solref,0.02 1.0
+collisions.xml,geom,9,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,geom,9,margin,0.0
+collisions.xml,geom,9,gap,0.0
+collisions.xml,geom,9,priority,-1.0
+collisions.xml,geom,9,sameframe,1.0
+collisions.xml,geom,10,type,6.0
+collisions.xml,geom,10,bodyid,10.0
+collisions.xml,geom,10,size,0.08 0.08 0.04
+collisions.xml,geom,10,pos,0.0 0.0 0.0
+collisions.xml,geom,10,quat,1.0 0.0 0.0 0.0
+collisions.xml,geom,10,friction,1.0 0.005 0.0001
+collisions.xml,geom,10,condim,3.0
+collisions.xml,geom,10,contype,1.0
+collisions.xml,geom,10,conaffinity,1.0
+collisions.xml,geom,10,solref,0.02 1.0
+collisions.xml,geom,10,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,geom,10,margin,0.0
+collisions.xml,geom,10,gap,0.0
+collisions.xml,geom,10,priority,0.0
+collisions.xml,geom,10,sameframe,1.0
+collisions.xml,geom,11,type,3.0
+collisions.xml,geom,11,bodyid,11.0
+collisions.xml,geom,11,size,0.03 0.1 0.0
+collisions.xml,geom,11,pos,0.1 0.0 0.0
+collisions.xml,geom,11,quat,0.7071067811865476 0.0 -0.7071067811865475 0.0
+collisions.xml,geom,11,friction,1.0 0.005 0.0001
+collisions.xml,geom,11,condim,3.0
+collisions.xml,geom,11,contype,1.0
+collisions.xml,geom,11,conaffinity,1.0
+collisions.xml,geom,11,solref,0.02 1.0
+collisions.xml,geom,11,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,geom,11,margin,0.0
+collisions.xml,geom,11,gap,0.0
+collisions.xml,geom,11,priority,0.0
+collisions.xml,geom,11,sameframe,2.0
+collisions.xml,geom,12,type,6.0
+collisions.xml,geom,12,bodyid,12.0
+collisions.xml,geom,12,size,0.04 0.05 0.05
+collisions.xml,geom,12,pos,0.0 0.0 0.0
+collisions.xml,geom,12,quat,1.0 0.0 0.0 0.0
+collisions.xml,geom,12,friction,1.0 0.005 0.0001
+collisions.xml,geom,12,condim,3.0
+collisions.xml,geom,12,contype,1.0
+collisions.xml,geom,12,conaffinity,1.0
+collisions.xml,geom,12,solref,0.02 1.0
+collisions.xml,geom,12,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,geom,12,margin,0.0
+collisions.xml,geom,12,gap,0.0
+collisions.xml,geom,12,priority,0.0
+collisions.xml,geom,12,sameframe,1.0
+collisions.xml,geom,13,type,2.0
+collisions.xml,geom,13,bodyid,13.0
+collisions.xml,geom,13,size,0.05 0.0 0.0
+collisions.xml,geom,13,pos,0.0 0.0 0.0
+collisions.xml,geom,13,quat,1.0 0.0 0.0 0.0
+collisions.xml,geom,13,friction,1.0 0.005 0.0001
+collisions.xml,geom,13,condim,3.0
+collisions.xml,geom,13,contype,3.0
+collisions.xml,geom,13,conaffinity,3.0
+collisions.xml,geom,13,solref,0.02 1.0
+collisions.xml,geom,13,solimp,0.9 0.95 0.001 0.5 2.0
+collisions.xml,geom,13,margin,0.0
+collisions.xml,geom,13,gap,0.0
+collisions.xml,geom,13,priority,0.0
+collisions.xml,geom,13,sameframe,1.0
 double_pendulum.xml,option,0,timestep,0.001
 double_pendulum.xml,option,0,gravity,0.0 0.0 -9.81
 double_pendulum.xml,option,0,integrator,0.0
@@ -840,6 +1716,7 @@ double_pendulum.xml,body,0,dofadr,-1.0
 double_pendulum.xml,body,0,dofnum,0.0
 double_pendulum.xml,body,0,geomadr,-1.0
 double_pendulum.xml,body,0,geomnum,0.0
+double_pendulum.xml,body,0,sameframe,1.0
 double_pendulum.xml,body,1,parentid,0.0
 double_pendulum.xml,body,1,rootid,1.0
 double_pendulum.xml,body,1,pos,0.0 0.0 2.0
@@ -854,6 +1731,7 @@ double_pendulum.xml,body,1,dofadr,0.0
 double_pendulum.xml,body,1,dofnum,1.0
 double_pendulum.xml,body,1,geomadr,0.0
 double_pendulum.xml,body,1,geomnum,1.0
+double_pendulum.xml,body,1,sameframe,3.0
 double_pendulum.xml,body,2,parentid,1.0
 double_pendulum.xml,body,2,rootid,1.0
 double_pendulum.xml,body,2,pos,0.0 0.0 -0.6
@@ -868,6 +1746,7 @@ double_pendulum.xml,body,2,dofadr,1.0
 double_pendulum.xml,body,2,dofnum,1.0
 double_pendulum.xml,body,2,geomadr,1.0
 double_pendulum.xml,body,2,geomnum,1.0
+double_pendulum.xml,body,2,sameframe,3.0
 double_pendulum.xml,jnt,0,type,3.0
 double_pendulum.xml,jnt,0,bodyid,1.0
 double_pendulum.xml,jnt,0,pos,0.0 0.0 0.0
@@ -918,6 +1797,7 @@ double_pendulum.xml,geom,0,solimp,0.9 0.95 0.001 0.5 2.0
 double_pendulum.xml,geom,0,margin,0.0
 double_pendulum.xml,geom,0,gap,0.0
 double_pendulum.xml,geom,0,priority,0.0
+double_pendulum.xml,geom,0,sameframe,3.0
 double_pendulum.xml,geom,1,type,3.0
 double_pendulum.xml,geom,1,bodyid,2.0
 double_pendulum.xml,geom,1,size,0.025 0.25 0.0
@@ -932,6 +1812,7 @@ double_pendulum.xml,geom,1,solimp,0.9 0.95 0.001 0.5 2.0
 double_pendulum.xml,geom,1,margin,0.0
 double_pendulum.xml,geom,1,gap,0.0
 double_pendulum.xml,geom,1,priority,0.0
+double_pendulum.xml,geom,1,sameframe,3.0
 features.xml,option,0,timestep,0.004
 features.xml,option,0,gravity,0.0 0.0 -9.8
 features.xml,option,0,integrator,0.0
@@ -955,6 +1836,7 @@ features.xml,body,0,dofadr,-1.0
 features.xml,body,0,dofnum,0.0
 features.xml,body,0,geomadr,0.0
 features.xml,body,0,geomnum,1.0
+features.xml,body,0,sameframe,1.0
 features.xml,body,1,parentid,0.0
 features.xml,body,1,rootid,1.0
 features.xml,body,1,pos,0.0 0.0 1.0
@@ -969,6 +1851,7 @@ features.xml,body,1,dofadr,0.0
 features.xml,body,1,dofnum,1.0
 features.xml,body,1,geomadr,1.0
 features.xml,body,1,geomnum,1.0
+features.xml,body,1,sameframe,3.0
 features.xml,body,2,parentid,1.0
 features.xml,body,2,rootid,1.0
 features.xml,body,2,pos,0.1 0.0 0.3
@@ -983,6 +1866,7 @@ features.xml,body,2,dofadr,1.0
 features.xml,body,2,dofnum,3.0
 features.xml,body,2,geomadr,2.0
 features.xml,body,2,geomnum,1.0
+features.xml,body,2,sameframe,0.0
 features.xml,body,3,parentid,2.0
 features.xml,body,3,rootid,1.0
 features.xml,body,3,pos,0.3 0.0 0.0
@@ -997,6 +1881,7 @@ features.xml,body,3,dofadr,4.0
 features.xml,body,3,dofnum,1.0
 features.xml,body,3,geomadr,3.0
 features.xml,body,3,geomnum,1.0
+features.xml,body,3,sameframe,0.0
 features.xml,body,4,parentid,1.0
 features.xml,body,4,rootid,1.0
 features.xml,body,4,pos,0.0 0.0 0.0
@@ -1011,6 +1896,7 @@ features.xml,body,4,dofadr,5.0
 features.xml,body,4,dofnum,1.0
 features.xml,body,4,geomadr,4.0
 features.xml,body,4,geomnum,1.0
+features.xml,body,4,sameframe,0.0
 features.xml,jnt,0,type,2.0
 features.xml,jnt,0,bodyid,1.0
 features.xml,jnt,0,pos,0.0 0.0 0.0
@@ -1109,6 +1995,7 @@ features.xml,geom,0,solimp,0.9 0.95 0.001 0.5 2.0
 features.xml,geom,0,margin,0.0
 features.xml,geom,0,gap,0.0
 features.xml,geom,0,priority,0.0
+features.xml,geom,0,sameframe,1.0
 features.xml,geom,1,type,3.0
 features.xml,geom,1,bodyid,1.0
 features.xml,geom,1,size,0.03 0.15 0.0
@@ -1123,6 +2010,7 @@ features.xml,geom,1,solimp,0.8 0.9 0.001 0.5 2.0
 features.xml,geom,1,margin,0.0
 features.xml,geom,1,gap,0.0
 features.xml,geom,1,priority,0.0
+features.xml,geom,1,sameframe,0.0
 features.xml,geom,2,type,3.0
 features.xml,geom,2,bodyid,2.0
 features.xml,geom,2,size,0.03 0.15 0.0
@@ -1137,6 +2025,7 @@ features.xml,geom,2,solimp,0.8 0.9 0.001 0.5 2.0
 features.xml,geom,2,margin,0.0
 features.xml,geom,2,gap,0.0
 features.xml,geom,2,priority,0.0
+features.xml,geom,2,sameframe,2.0
 features.xml,geom,3,type,2.0
 features.xml,geom,3,bodyid,3.0
 features.xml,geom,3,size,0.05 0.0 0.0
@@ -1151,6 +2040,7 @@ features.xml,geom,3,solimp,0.9 0.95 0.001 0.5 2.0
 features.xml,geom,3,margin,0.0
 features.xml,geom,3,gap,0.0
 features.xml,geom,3,priority,0.0
+features.xml,geom,3,sameframe,3.0
 features.xml,geom,4,type,6.0
 features.xml,geom,4,bodyid,4.0
 features.xml,geom,4,size,0.04 0.04 0.2
@@ -1165,6 +2055,7 @@ features.xml,geom,4,solimp,0.8 0.9 0.001 0.5 2.0
 features.xml,geom,4,margin,0.0
 features.xml,geom,4,gap,0.0
 features.xml,geom,4,priority,0.0
+features.xml,geom,4,sameframe,2.0
 free_body.xml,option,0,timestep,0.002
 free_body.xml,option,0,gravity,0.0 0.0 0.0
 free_body.xml,option,0,integrator,0.0
@@ -1188,6 +2079,7 @@ free_body.xml,body,0,dofadr,-1.0
 free_body.xml,body,0,dofnum,0.0
 free_body.xml,body,0,geomadr,-1.0
 free_body.xml,body,0,geomnum,0.0
+free_body.xml,body,0,sameframe,1.0
 free_body.xml,body,1,parentid,0.0
 free_body.xml,body,1,rootid,1.0
 free_body.xml,body,1,pos,0.1 -0.2 1.5
@@ -1202,6 +2094,7 @@ free_body.xml,body,1,dofadr,0.0
 free_body.xml,body,1,dofnum,6.0
 free_body.xml,body,1,geomadr,0.0
 free_body.xml,body,1,geomnum,3.0
+free_body.xml,body,1,sameframe,0.0
 free_body.xml,jnt,0,type,0.0
 free_body.xml,jnt,0,bodyid,1.0
 free_body.xml,jnt,0,pos,0.0 0.0 0.0
@@ -1264,6 +2157,7 @@ free_body.xml,geom,0,solimp,0.9 0.95 0.001 0.5 2.0
 free_body.xml,geom,0,margin,0.0
 free_body.xml,geom,0,gap,0.0
 free_body.xml,geom,0,priority,0.0
+free_body.xml,geom,0,sameframe,0.0
 free_body.xml,geom,1,type,5.0
 free_body.xml,geom,1,bodyid,1.0
 free_body.xml,geom,1,size,0.04 0.2 0.0
@@ -1278,6 +2172,7 @@ free_body.xml,geom,1,solimp,0.9 0.95 0.001 0.5 2.0
 free_body.xml,geom,1,margin,0.0
 free_body.xml,geom,1,gap,0.0
 free_body.xml,geom,1,priority,0.0
+free_body.xml,geom,1,sameframe,0.0
 free_body.xml,geom,2,type,4.0
 free_body.xml,geom,2,bodyid,1.0
 free_body.xml,geom,2,size,0.08 0.05 0.03
@@ -1292,6 +2187,7 @@ free_body.xml,geom,2,solimp,0.9 0.95 0.001 0.5 2.0
 free_body.xml,geom,2,margin,0.0
 free_body.xml,geom,2,gap,0.0
 free_body.xml,geom,2,priority,0.0
+free_body.xml,geom,2,sameframe,0.0
 pendulum.xml,option,0,timestep,0.002
 pendulum.xml,option,0,gravity,0.0 0.0 -9.81
 pendulum.xml,option,0,integrator,0.0
@@ -1315,6 +2211,7 @@ pendulum.xml,body,0,dofadr,-1.0
 pendulum.xml,body,0,dofnum,0.0
 pendulum.xml,body,0,geomadr,-1.0
 pendulum.xml,body,0,geomnum,0.0
+pendulum.xml,body,0,sameframe,1.0
 pendulum.xml,body,1,parentid,0.0
 pendulum.xml,body,1,rootid,1.0
 pendulum.xml,body,1,pos,0.0 0.0 1.0
@@ -1329,6 +2226,7 @@ pendulum.xml,body,1,dofadr,0.0
 pendulum.xml,body,1,dofnum,1.0
 pendulum.xml,body,1,geomadr,0.0
 pendulum.xml,body,1,geomnum,2.0
+pendulum.xml,body,1,sameframe,0.0
 pendulum.xml,jnt,0,type,3.0
 pendulum.xml,jnt,0,bodyid,1.0
 pendulum.xml,jnt,0,pos,0.0 0.0 0.0
@@ -1361,6 +2259,7 @@ pendulum.xml,geom,0,solimp,0.9 0.95 0.001 0.5 2.0
 pendulum.xml,geom,0,margin,0.0
 pendulum.xml,geom,0,gap,0.0
 pendulum.xml,geom,0,priority,0.0
+pendulum.xml,geom,0,sameframe,0.0
 pendulum.xml,geom,1,type,2.0
 pendulum.xml,geom,1,bodyid,1.0
 pendulum.xml,geom,1,size,0.05 0.0 0.0
@@ -1375,3 +2274,4 @@ pendulum.xml,geom,1,solimp,0.9 0.95 0.001 0.5 2.0
 pendulum.xml,geom,1,margin,0.0
 pendulum.xml,geom,1,gap,0.0
 pendulum.xml,geom,1,priority,0.0
+pendulum.xml,geom,1,sameframe,3.0

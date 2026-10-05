@@ -101,6 +101,9 @@ auto find_value(const ArticulatedModel& m, const Row& row)
     if (f == "dofnum") return number(b.dofs);
     if (f == "geomadr") return number(b.geoms ? b.first_geom : -1.0);
     if (f == "geomnum") return number(b.geoms);
+    if (f == "sameframe") {
+      return number(static_cast<double>(b.inertial_frame));
+    }
   } else if (row.element == "jnt") {
     const model::Joint& j = m.joints.at(i);
     if (f == "type") return number(static_cast<double>(j.type));
@@ -141,6 +144,7 @@ auto find_value(const ArticulatedModel& m, const Row& row)
     if (f == "margin") return number(g.margin);
     if (f == "gap") return number(g.gap);
     if (f == "priority") return number(g.priority);
+    if (f == "sameframe") return number(static_cast<double>(g.frame));
   } else if (row.element == "actuator") {
     const model::Actuator& a = m.actuators.at(i);
     if (f == "trntype") return number(0);  // A joint.
@@ -199,7 +203,7 @@ TEST_CASE("ModelAgainstMuJoCo") {
     }
     CAPTURE(compared, worst, where);
     CHECK(compared > 1000);
-    CHECK(worst < 1e-14);
+    CHECK(worst == 0.0);
   }
 }
 

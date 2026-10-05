@@ -432,7 +432,22 @@ cc_library(
     name = "articulated_dynamics",
     hdrs = ["articulated_dynamics.hpp"],
     copts = COPTS,
-    deps = [":articulated"],
+    deps = [
+        ":articulated",
+        "//framework:vocabulary",
+    ],
+)
+
+cc_library(
+    name = "articulated_collision",
+    srcs = ["articulated_collision.cpp"],
+    hdrs = ["articulated_collision.hpp"],
+    copts = COPTS,
+    deps = [
+        ":articulated",
+        ":articulated_dynamics",
+        "//framework:vocabulary",
+    ],
 )
 
 cc_library(

@@ -2,15 +2,18 @@
 
 #pragma once
 
+#include <algorithm>
 #include <span>
+#include <vector>
 
 #include "application/robotic/simulation_components.hpp"
 #include "framework/system.hpp"
 #include "framework/vocabulary.hpp"
 
-// The robotic simulation's systems, each once per capacity: Control sets
-// each tree's controls, Forward computes its poses, mass matrix and smooth
-// accelerations, Bound its sphere, and Integrate steps its state.
+// The robotic simulation's systems, each once per capacity but Collide:
+// Control sets each tree's controls, Forward computes its poses, mass matrix
+// and smooth accelerations, Bound its sphere, Collide finds every contact,
+// and Integrate steps its state.
 namespace simon::robotic {
 
 using framework::Entity;
@@ -62,7 +65,7 @@ struct Forward final                       //
                   const Mechanism* mechanism) const -> void {
     if (state && control && mechanism) {
       mechanics_->kernel<Capacity>(mechanism->tree)
-          .forward(*state, *control, dynamics);
+          .forward(*state, *control, Out(dynamics));
     }
   }
 
@@ -91,14 +94,55 @@ struct Bound final                          //
   const Mechanics* mechanics_ = nullptr;
 };
 
-// After Bound, a step of semi-implicit Euler.
+// After Bound, every tree's geom poses, then the contacts of the geoms that
+// may touch: the world's and the planes' with every body, a tree's own
+// bodies' with each other, and those of trees whose spheres overlap, found
+// in the world's spatial index. Each tree's count of them.
+struct Collide final    //
+    : System<Touching,  //
+             const Mechanism> {
+  using SystemWorld = ProjectedWorld<Collide>;
+  using AllowComponentList =
+      framework::TypeList<TreeBound, Mechanism, TreeDynamics<SmallCapacity>,
+                          TreeDynamics<LargeCapacity>>;
+  using SequenceAfterSystemList =
+      SystemList<Bound<SmallCapacity>, Bound<LargeCapacity>>;
+
+  Collide(const Mechanics& mechanics, Depend<ContactSet> contacts)
+      : mechanics_{&mechanics}, contacts_{contacts.get()} {}
+
+  auto prepare(SystemWorld& world) -> bool;
+
+  auto operator()(SystemWorld&, Entity,  //
+                  Touching& touching,    //
+                  const Mechanism* mechanism) const -> void {
+    touching.contacts = mechanism ? touching_[mechanism->tree] : 0;
+  }
+
+ private:
+  template <typename Capacity>
+  auto place_geoms(SystemWorld& world) -> void;
+  auto collide_bodies(std::uint32_t first, std::uint32_t second) -> void;
+  auto collide_trees(std::uint32_t first, std::uint32_t second) -> void;
+
+  static constexpr std::uint32_t NO_TREE = ~std::uint32_t{0};
+
+  const Mechanics* mechanics_ = nullptr;
+  ContactSet* contacts_ = nullptr;
+  std::vector<model::GeomFrame> frames_;  // By geom.
+  std::vector<std::uint8_t> unbounded_;   // By geom.
+  std::vector<std::uint32_t> tree_of_;    // By body, none for the world.
+  std::vector<std::uint32_t> touching_;   // By tree.
+};
+
+// After Collide, a step of semi-implicit Euler.
 template <typename Capacity>
 struct Integrate final                      //
     : System<TreeState<Capacity>,           //
              const TreeDynamics<Capacity>,  //
              const Mechanism> {
   using SystemWorld = ProjectedWorld<Integrate>;
-  using SequenceAfterSystemList = SystemList<Bound<Capacity>>;
+  using SequenceAfterSystemList = SystemList<Collide>;
 
   explicit Integrate(const Mechanics& mechanics) : mechanics_{&mechanics} {}
 
@@ -108,7 +152,8 @@ struct Integrate final                      //
                   const Mechanism* mechanism) const -> void {
     if (dynamics && mechanism) {
       mechanics_->kernel<Capacity>(mechanism->tree)
-          .advance(*dynamics, dynamics->smooth, dynamics->acceleration, state);
+          .advance(*dynamics, dynamics->smooth, dynamics->acceleration,
+                   InOut(state));
     }
   }
 
@@ -118,17 +163,18 @@ struct Integrate final                      //
 
 using Schedule = SystemList<Control<SmallCapacity>, Control<LargeCapacity>,
                             Forward<SmallCapacity>, Forward<LargeCapacity>,
-                            Bound<SmallCapacity>, Bound<LargeCapacity>,
+                            Bound<SmallCapacity>, Bound<LargeCapacity>, Collide,
                             Integrate<SmallCapacity>, Integrate<LargeCapacity>>;
 
-inline auto make_schedule(const Mechanics& mechanics, const Feedback& feedback)
-    -> Schedule {
+inline auto make_schedule(const Mechanics& mechanics, const Feedback& feedback,
+                          Depend<ContactSet> contacts) -> Schedule {
   return Schedule{Control<SmallCapacity>{mechanics, feedback},
                   Control<LargeCapacity>{mechanics, feedback},
                   Forward<SmallCapacity>{mechanics},
                   Forward<LargeCapacity>{mechanics},
                   Bound<SmallCapacity>{mechanics},
                   Bound<LargeCapacity>{mechanics},
+                  Collide{mechanics, contacts},
                   Integrate<SmallCapacity>{mechanics},
                   Integrate<LargeCapacity>{mechanics}};
 }
@@ -179,30 +225,47 @@ auto Bound<Capacity>::operator()(SystemWorld&, Entity,                    //
   for (std::uint32_t g = tree.first_geom; g < tree.first_geom + tree.geoms;
        ++g) {
     const model::Geom& geom = m.geoms[g];
-    std::uint32_t b = geom.body - tree.first_body;
-    model::Array3 at =
-        model::articulated::multiply(dynamics->xmat[b], geom.pos);
-    double reach = 0.0;
-    const model::Array3& s = geom.size;
-    switch (geom.type) {
-      case model::GeomType::SPHERE:
-        reach = s[0];
-        break;
-      case model::GeomType::CAPSULE:
-        reach = s[0] + s[1];
-        break;
-      case model::GeomType::CYLINDER:
-        reach = std::hypot(s[0], s[1]);
-        break;
-      default:
-        reach = std::hypot(s[0], s[1], s[2]);
-        break;
+    if (geom.type == model::GeomType::PLANE) {
+      continue;
     }
-    double apart = std::hypot(dynamics->xpos[b][0] + at[0] - bound.center[0],
-                              dynamics->xpos[b][1] + at[1] - bound.center[1],
-                              dynamics->xpos[b][2] + at[2] - bound.center[2]);
+    std::uint32_t b = geom.body - tree.first_body;
+    model::Array3 at = dynamics->xipos[b];
+    if (geom.frame != model::SameFrame::INERTIA) {
+      at = model::articulated::multiply(dynamics->xmat[b], geom.pos);
+      for (int k = 0; k < 3; ++k) {
+        at[k] += dynamics->xpos[b][k];
+      }
+    }
+    double reach = mechanics_->radii()[g] + geom.margin + geom.gap;
+    double apart = std::hypot(at[0] - bound.center[0], at[1] - bound.center[1],
+                              at[2] - bound.center[2]);
     bound.radius = std::max(bound.radius, apart + reach);
   }
+}
+
+template <typename Capacity>
+auto Collide::place_geoms(SystemWorld& world) -> void {
+  const model::ArticulatedModel& m = mechanics_->model();
+  const auto& mechanisms = world.template store_of<Mechanism>();
+  world.template store_of<TreeDynamics<Capacity>>().for_each(
+      [&](Entity owner, const TreeDynamics<Capacity>& dynamics) {
+        const model::Tree& tree =
+            mechanics_->trees()[mechanisms.component_of(owner).tree];
+        for (std::uint32_t b = 0; b < tree.bodies; ++b) {
+          const model::ArticulatedBody& body = m.bodies[tree.first_body + b];
+          model::BodyFrame frame{
+              .xpos = dynamics.xpos[b],
+              .xquat = dynamics.xquat[b],
+              .xmat = dynamics.xmat[b],
+              .xipos = dynamics.xipos[b],
+              .ximat = dynamics.ximat[b],
+          };
+          for (std::uint32_t g = body.first_geom;
+               g < body.first_geom + body.geoms; ++g) {
+            frames_[g] = model::compute_geom_frame(m.geoms[g], frame);
+          }
+        }
+      });
 }
 
 }  // namespace simon::robotic

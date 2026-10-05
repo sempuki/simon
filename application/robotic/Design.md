@@ -8,7 +8,7 @@ solves them at once. MuJoCo (Todorov, Erez and Tassa, "MuJoCo: A physics
 engine for model-based control", IROS 2012; Apache-2.0) is the reference.
 It is being built in eight steps (see the [Roadmap](#roadmap)); models read
 and compiled as MuJoCo compiles them, their dynamics without constraints,
-and their actuators and control, are done.
+their actuators and control, and their contacts are done.
 
 ## Choices
 
@@ -43,8 +43,10 @@ Each choice says what it is, why, and where it comes from.
    2014): solref and solimp, the pyramidal friction cone, and the Newton and
    PGS solvers; the elliptic cone and CG later, opt in.
 6. **Collision from primitives first:** plane, sphere, capsule, box and
-   cylinder, analytic where MuJoCo's are, the broad phase on simon's spatial
-   index over bounding spheres; convex meshes by GJK and EPA later, opt in.
+   cylinder, by MuJoCo's analytic colliders, the broad phase on simon's
+   spatial index over bounding spheres; the pairs MuJoCo sends to its general
+   convex collider (ellipsoids, a cylinder with a capsule, a box or a
+   cylinder) and convex meshes, by GJK and EPA, later, opt in.
 7. **Semi-implicit Euler at 2 ms first,** MuJoCo's default; implicitfast and
    Runge–Kutta 4 later, opt in.
 8. **MJCF first,** MuJoCo's format, its example models Apache-2.0; URDF
@@ -71,12 +73,17 @@ axes first; joints' limits from their ranges, positions at rest and spring
 references; and each degree of freedom's place in the tree. Anything that
 would change how a model moves and that simon does not yet run is refused:
 tendons, equalities, meshes, contact pairs and exclusions, and actuators
-other than motors. What only shows a model is left out.
+other than motors, position and velocity servos and general actuators with
+fixed gains. What only shows a model is left out. A body's inertial frame
+and a geom's frame within 1e-6 of the body's frame, or of the inertial
+frame, are snapped to it, as MuJoCo snaps them; poses in the world then
+come from the same arithmetic.
 
-`model_test` compiles six test models with every compiler feature (a
+`model_test` compiles eight test models with every compiler feature (a
 pendulum, a double pendulum, a cart-pole, a tumbling free body of three
-offset geoms, a model of default classes and every orientation, and a stack
-of boxes) and checks all 1,114 compiled values against MuJoCo's
+offset geoms, a model of default classes and every orientation, a stack of
+boxes, an actuated arm, and a model of every primitive pair) and checks all
+3,954 compiled values of 2,276 fields against MuJoCo's
 (`reference/mujoco_models.py`): every one is equal, to the last bit.
 MuJoCo's humanoid is refused, for its contact exclusions and tendons, until
 step 6.
@@ -105,8 +112,8 @@ at most 16 and 32. Each archetype's state and work are sized at compile
 time, inline in its components. `Forward` computes each tree's poses, its
 factored mass matrix and its accelerations into its `TreeDynamics`;
 `Bound` its sphere, the world's spatial component; and `Integrate` steps
-its `TreeState`. Collision and the constraint solver will come between
-them.
+its `TreeState`. `Collide` finds the contacts between them, and the
+constraint solver will come after it.
 
 `dynamics_test` steps six cases with constraints off, and checks every
 position and velocity at every step against MuJoCo
@@ -153,6 +160,39 @@ quadratic regulator of MuJoCo's own linearization, for 15 s, the pole
 upright within a microradian at the end. Both are equal to MuJoCo's to the
 last bit.
 
+## Contacts
+
+`model/articulated_collision` finds contacts as MuJoCo 3.14.0 does. Two
+bodies may touch unless they are on one rigid assembly (a body without
+joints is welded to its parent), neither can move, or one's assembly is the
+other's parent's; two geoms, if one's contact type meets the other's
+affinity and their bounding spheres overlap within their margins and gaps.
+MuJoCo's analytic colliders then run in its order of operations, the geom
+of lower type first: a plane with a sphere, a capsule, a cylinder or a box;
+a sphere with a sphere, a capsule, a cylinder or a box; a capsule with a
+capsule or a box; and a box with a box, by the separating axis test, faces
+preferred on near-ties, then either the nearest points of two edges or the
+other box's face clipped to the reference face. Each contact takes its
+parameters from the geom of higher priority, or else the larger condim,
+the larger frictions and an even mix of solref and solimp, and its frame
+from its normal. A model with a pair only MuJoCo's general convex collider
+handles is refused.
+
+`Collide` runs once a step, after `Bound`, on the whole world: it places
+every geom from its tree's poses, then collides the world's geoms and the
+planes with every body, each tree's bodies with each other, and the trees
+whose spheres overlap, found in the world's spatial index; the contacts,
+ordered by their bodies as MuJoCo orders its body pairs, are shared with
+the systems after it, and each tree's `Touching` counts its own.
+
+`collision_test` poses `models/collisions.xml`, two planes (one tilted on a
+body that cannot move), two spheres, two capsules, a cylinder, two boxes,
+a box that cannot move and an arm whose links overlap their parents with a
+body welded to one, at 400 random poses, and checks every contact against
+MuJoCo's (`reference/mujoco_contacts.py`): all 5,465 contacts are there,
+between the same geoms, and every distance, position, frame, dimension,
+friction and soft parameter is equal to MuJoCo's to the last bit.
+
 ## Roadmap
 
 1. Done: MJCF read and compiled, against MuJoCo's compiled model.
@@ -163,7 +203,8 @@ last bit.
    5, since MuJoCo solves them with contacts.
 3. Done: position, velocity and general actuators, actuator damping, and
    a linear state feedback balancing a cart-pole, against MuJoCo.
-4. Collision: primitives and the broad phase, against MuJoCo's contacts.
+4. Done: collision of primitives and the broad phase, against MuJoCo's
+   contacts.
 5. The constraint solver: soft contacts and joint limits, friction, Newton
    and PGS, by island; a sphere rolling, a box sliding, a stack.
 6. Whole robots: MuJoCo's humanoid, with its tendons and contact

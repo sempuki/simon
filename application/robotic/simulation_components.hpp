@@ -11,6 +11,7 @@
 #include "framework/spatial.hpp"
 #include "framework/world.hpp"
 #include "model/articulated.hpp"
+#include "model/articulated_collision.hpp"
 #include "model/articulated_dynamics.hpp"
 #include "model/kinematics.hpp"
 #include "model/units.hpp"
@@ -46,6 +47,14 @@ class Mechanics final {
            t.qpos <= Capacity::qpos;
   }
 
+  // Which bodies may touch, each geom's bounding radius, and the geoms no
+  // sphere bounds: planes, on the world or on bodies that cannot move.
+  auto filter() const -> const model::BodyFilter& { return filter_; }
+  auto radii() const -> const std::vector<double>& { return radii_; }
+  auto unbounded() const -> const std::vector<std::uint32_t>& {
+    return unbounded_;
+  }
+
   template <typename Capacity>
   auto kernel(std::uint32_t tree) const -> const model::TreeKernel<Capacity>& {
     if constexpr (std::is_same_v<Capacity, SmallCapacity>) {
@@ -58,6 +67,9 @@ class Mechanics final {
  private:
   model::ArticulatedModel model_;
   std::vector<model::Tree> trees_;
+  model::BodyFilter filter_;
+  std::vector<double> radii_;
+  std::vector<std::uint32_t> unbounded_;
   // Each tree's kernel at each capacity it fits, else none.
   std::vector<std::unique_ptr<model::TreeKernel<SmallCapacity>>> small_;
   std::vector<std::unique_ptr<model::TreeKernel<LargeCapacity>>> large_;
@@ -73,13 +85,24 @@ struct Feedback final {
   std::vector<double> offset;     // u0, by actuator.
 };
 
+// The contacts a step finds, ordered by their bodies, shared by the systems
+// that find and resolve them. It outlives the world and never moves.
+struct ContactSet final {
+  std::vector<model::Contact> contacts;
+};
+
 // Which of the model's trees an entity is.
 struct Mechanism final {
   std::uint32_t tree = 0;
 };
 
+// How many contacts a tree is in.
+struct Touching final {
+  std::uint32_t contacts = 0;
+};
+
 // Where a tree is, the world's spatial component: the sphere about its
-// center of mass that holds every geom.
+// center of mass that holds every geom but planes, with its margin and gap.
 struct TreeBound final {
   model::Array3 center{};
   double radius = 0.0;  // m.
@@ -109,7 +132,7 @@ using framework::Requires;
 // pendulum, a cart-pole.
 struct SmallTree final                                      //
     : Archetype<"small tree",                               //
-                Requires<TreeBound, Mechanism,              //
+                Requires<TreeBound, Mechanism, Touching,    //
                          TreeState<SmallCapacity>,          //
                          TreeControl<SmallCapacity>,        //
                          TreeDynamics<SmallCapacity>>> {};  //
@@ -118,7 +141,7 @@ struct SmallTree final                                      //
 // humanoid.
 struct LargeTree final                                      //
     : Archetype<"large tree",                               //
-                Requires<TreeBound, Mechanism,              //
+                Requires<TreeBound, Mechanism, Touching,    //
                          TreeState<LargeCapacity>,          //
                          TreeControl<LargeCapacity>,        //
                          TreeDynamics<LargeCapacity>>> {};  //
@@ -127,7 +150,7 @@ struct LargeTree final                                      //
 
 using World = framework::World<
     TreeBound,
-    framework::TypeList<Mechanism, TreeState<SmallCapacity>,
+    framework::TypeList<Mechanism, Touching, TreeState<SmallCapacity>,
                         TreeControl<SmallCapacity>, TreeDynamics<SmallCapacity>,
                         TreeState<LargeCapacity>, TreeControl<LargeCapacity>,
                         TreeDynamics<LargeCapacity>>,

@@ -52,7 +52,7 @@ auto load_rows(std::string_view name) -> std::vector<std::vector<std::string>> {
 }
 
 // The largest differences from MuJoCo over every step of `case_name`.
-auto compare(Simulation& simulation, std::string_view case_name)
+auto compare(InOut<Simulation> simulation, std::string_view case_name)
     -> std::pair<double, double> {
   std::vector<std::vector<double>> qpos;
   std::vector<std::vector<double>> qvel;
@@ -63,16 +63,16 @@ auto compare(Simulation& simulation, std::string_view case_name)
     }
   }
   auto dt = std::chrono::nanoseconds{
-      std::llround(simulation.mechanics().model().physics.timestep * 1e9)};
+      std::llround(simulation->mechanics().model().physics.timestep * 1e9)};
   double position = 0.0;
   double velocity = 0.0;
   for (std::size_t k = 0; k < qpos.size(); ++k) {
     if (k > 0) {
-      REQUIRE(simulation.step(framework::Step{
+      REQUIRE(simulation->step(framework::Step{
           .time = framework::TimePoint{} + (k - 1) * dt, .dt = dt}));
     }
-    std::vector<double> q = simulation.read_qpos();
-    std::vector<double> v = simulation.read_qvel();
+    std::vector<double> q = simulation->read_qpos();
+    std::vector<double> v = simulation->read_qvel();
     for (std::size_t i = 0; i < q.size(); ++i) {
       position = std::max(position, std::abs(q[i] - qpos[k][i]));
     }
@@ -94,7 +94,7 @@ TEST_CASE("ControlAgainstMuJoCo") {
                                    .qpos = {{0, 0.3}, {1, -0.5}},
                                    .control = {0.8, -1.2, 2.0, 0.5}}};
     REQUIRE(simulation.configure());
-    auto [position, velocity] = compare(simulation, "arm");
+    auto [position, velocity] = compare(InOut(simulation), "arm");
     CAPTURE(position, velocity);
     CHECK(position < 1e-15);
     CHECK(velocity < 1e-15);
@@ -112,7 +112,7 @@ TEST_CASE("ControlAgainstMuJoCo") {
                               .reference = parse_numbers(law[2]),
                               .offset = parse_numbers(law[3])}}};
     REQUIRE(simulation.configure());
-    auto [position, velocity] = compare(simulation, "balance");
+    auto [position, velocity] = compare(InOut(simulation), "balance");
     CAPTURE(position, velocity);
     CHECK(position < 1e-15);
     CHECK(velocity < 1e-15);

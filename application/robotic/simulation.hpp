@@ -36,6 +36,9 @@ class Simulation final {
 
   auto world() const -> const World& { return world_; }
   auto mechanics() const -> const Mechanics& { return *mechanics_; }
+  auto contacts() const -> const std::vector<model::Contact>& {
+    return contacts_->contacts;
+  }
 
   // The model's positions and velocities, gathered from every tree.
   auto read_qpos() const -> std::vector<double>;
@@ -44,6 +47,7 @@ class Simulation final {
  private:
   Scenario scenario_;
   std::unique_ptr<Mechanics> mechanics_;
+  std::unique_ptr<ContactSet> contacts_ = std::make_unique<ContactSet>();
   World world_;
   std::unique_ptr<Scheduler> scheduler_;
 };

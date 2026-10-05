@@ -10,6 +10,7 @@
 #include <numbers>
 #include <span>
 
+#include "framework/vocabulary.hpp"
 #include "model/articulated.hpp"
 
 // The smooth dynamics of one kinematic tree, as MuJoCo computes a model's
@@ -326,29 +327,29 @@ class TreeKernel final {
   }
 
   // Everything to the accelerations without constraints.
-  auto forward(const State& state, const Control& control, Dynamics& out) const
-      -> void {
+  auto forward(const State& state, const Control& control,
+               Out<Dynamics> out) const -> void {
     compute_kinematics(state, out);
     compute_com(out);
     compute_mass(out);
-    factor(out.mass, out.factor, out.inverse_diagonal);
+    factor(out->mass, Out(out->factor), Out(out->inverse_diagonal));
     compute_velocities(state, out);
     compute_bias(state, out);
     compute_passive(state, out);
     compute_actuation(state, control, out);
     for (std::uint32_t i = 0; i < tree_->dofs; ++i) {
-      out.smooth[i] = out.passive[i] - out.bias[i];
-      out.smooth[i] += out.actuator[i];
-      out.acceleration[i] = out.smooth[i];
+      out->smooth[i] = out->passive[i] - out->bias[i];
+      out->smooth[i] += out->actuator[i];
+      out->acceleration[i] = out->smooth[i];
     }
-    solve(out.factor, out.inverse_diagonal, out.acceleration);
+    solve(out->factor, out->inverse_diagonal, out->acceleration);
   }
 
   // A step of semi-implicit Euler from `state` at `acceleration`, with the
   // dampers implicit when any dof is damped or actuated (mj_Euler,
   // mj_advance).
   auto advance(const Dynamics& dynamics, std::span<const double> force,
-               std::span<const double> acceleration, State& state) const
+               std::span<const double> acceleration, InOut<State> state) const
       -> void {
     const ArticulatedModel& m = *model_;
     double h = m.physics.timestep;
@@ -368,20 +369,20 @@ class TreeKernel final {
       }
       std::array<double, V * V> h_factor{};
       std::array<double, V> h_inverse{};
-      factor(h_mass, h_factor, h_inverse);
+      factor(h_mass, Out(h_factor), Out(h_inverse));
       for (std::uint32_t i = 0; i < tree_->dofs; ++i) {
         qacc[i] = force[i];
       }
       solve(h_factor, h_inverse, qacc);
     }
     for (std::uint32_t i = 0; i < tree_->dofs; ++i) {
-      state.qvel[i] += qacc[i] * h;
+      state->qvel[i] += qacc[i] * h;
     }
     integrate_positions(state, h);
   }
 
   // Positions moved by the velocities for `dt` (mj_integratePos).
-  auto integrate_positions(State& state, double dt) const -> void {
+  auto integrate_positions(InOut<State> state, double dt) const -> void {
     const ArticulatedModel& m = *model_;
     for (std::uint32_t j = 0; j < tree_->joints; ++j) {
       const Joint& joint = m.joints[tree_->first_joint + j];
@@ -390,23 +391,23 @@ class TreeKernel final {
       switch (joint.type) {
         case JointType::FREE:
           for (std::uint32_t k = 0; k < 3; ++k) {
-            state.qpos[p + k] += dt * state.qvel[v + k];
+            state->qpos[p + k] += dt * state->qvel[v + k];
           }
           p += 3;
           v += 3;
           [[fallthrough]];
         case JointType::BALL: {
-          Quaternion4 q{state.qpos[p], state.qpos[p + 1], state.qpos[p + 2],
-                        state.qpos[p + 3]};
+          Quaternion4 q{state->qpos[p], state->qpos[p + 1], state->qpos[p + 2],
+                        state->qpos[p + 3]};
           q = articulated::integrate_quaternion(
-              q, {state.qvel[v], state.qvel[v + 1], state.qvel[v + 2]}, dt);
+              q, {state->qvel[v], state->qvel[v + 1], state->qvel[v + 2]}, dt);
           for (std::uint32_t k = 0; k < 4; ++k) {
-            state.qpos[p + k] = q[k];
+            state->qpos[p + k] = q[k];
           }
           break;
         }
         default:
-          state.qpos[p] += dt * state.qvel[v];
+          state->qpos[p] += dt * state->qvel[v];
           break;
       }
     }
@@ -454,7 +455,7 @@ class TreeKernel final {
   }
 
   // mj_kinematics1 and the inertial frames of mj_kinematics2.
-  auto compute_kinematics(const State& state, Dynamics& out) const -> void {
+  auto compute_kinematics(const State& state, Out<Dynamics> out) const -> void {
     using namespace articulated;
     const ArticulatedModel& m = *model_;
     for (std::uint32_t b = 0; b < tree_->bodies; ++b) {
@@ -470,16 +471,16 @@ class TreeKernel final {
         xquat = {state.qpos[q + 3], state.qpos[q + 4], state.qpos[q + 5],
                  state.qpos[q + 6]};
         normalize4(xquat);
-        out.xanchor[j] = xpos;
-        out.xaxis[j] = joint.axis;
+        out->xanchor[j] = xpos;
+        out->xaxis[j] = joint.axis;
       } else {
         std::uint32_t p = parent_[b];
         if (p != NONE) {
-          xpos = multiply(out.xmat[p], body.pos);
+          xpos = multiply(out->xmat[p], body.pos);
           for (int k = 0; k < 3; ++k) {
-            xpos[k] += out.xpos[p][k];
+            xpos[k] += out->xpos[p][k];
           }
-          xquat = multiply(out.xquat[p], body.quat);
+          xquat = multiply(out->xquat[p], body.quat);
         } else {
           xpos = body.pos;
           xquat = body.quat;
@@ -514,32 +515,39 @@ class TreeKernel final {
               xpos[k] = xanchor[k] - v[k];
             }
           }
-          out.xanchor[j] = xanchor;
-          out.xaxis[j] = xaxis;
+          out->xanchor[j] = xanchor;
+          out->xaxis[j] = xaxis;
         }
       }
       normalize4(xquat);
-      out.xquat[b] = xquat;
-      out.xpos[b] = xpos;
-      out.xmat[b] = convert_to_matrix(xquat);
-      Array3 xipos = multiply(out.xmat[b], body.inertial_pos);
-      for (int k = 0; k < 3; ++k) {
-        xipos[k] += xpos[k];
+      out->xquat[b] = xquat;
+      out->xpos[b] = xpos;
+      out->xmat[b] = convert_to_matrix(xquat);
+      if (body.inertial_frame == SameFrame::BODY) {
+        out->xipos[b] = xpos;
+      } else {
+        Array3 xipos = multiply(out->xmat[b], body.inertial_pos);
+        for (int k = 0; k < 3; ++k) {
+          xipos[k] += xpos[k];
+        }
+        out->xipos[b] = xipos;
       }
-      out.xipos[b] = xipos;
-      out.ximat[b] = convert_to_matrix(multiply(xquat, body.inertial_quat));
+      out->ximat[b] =
+          body.inertial_frame == SameFrame::NONE
+              ? convert_to_matrix(multiply(xquat, body.inertial_quat))
+              : out->xmat[b];
     }
   }
 
   // mj_comPos.
-  auto compute_com(Dynamics& out) const -> void {
+  auto compute_com(Out<Dynamics> out) const -> void {
     using namespace articulated;
     const ArticulatedModel& m = *model_;
     std::array<Array3, Capacity::bodies> subtree{};
     for (std::uint32_t b = 0; b < tree_->bodies; ++b) {
       double mass = m.bodies[tree_->first_body + b].mass;
       for (int k = 0; k < 3; ++k) {
-        subtree[b][k] = out.xipos[b][k] * mass;
+        subtree[b][k] = out->xipos[b][k] * mass;
       }
     }
     for (std::uint32_t b = tree_->bodies; b-- > 0;) {
@@ -550,19 +558,20 @@ class TreeKernel final {
       }
     }
     if (subtree_mass_[0] < MINVAL) {
-      out.com = out.xipos[0];
+      out->com = out->xipos[0];
     } else {
       double inverse = 1.0 / subtree_mass_[0];
       for (int k = 0; k < 3; ++k) {
-        out.com[k] = subtree[0][k] * inverse;
+        out->com[k] = subtree[0][k] * inverse;
       }
     }
     for (std::uint32_t b = 0; b < tree_->bodies; ++b) {
       const ArticulatedBody& body = m.bodies[tree_->first_body + b];
-      Array3 offset{out.xipos[b][0] - out.com[0], out.xipos[b][1] - out.com[1],
-                    out.xipos[b][2] - out.com[2]};
-      out.cinert[b] =
-          shift_inertia(body.inertia, out.ximat[b], offset, body.mass);
+      Array3 offset{out->xipos[b][0] - out->com[0],
+                    out->xipos[b][1] - out->com[1],
+                    out->xipos[b][2] - out->com[2]};
+      out->cinert[b] =
+          shift_inertia(body.inertia, out->ximat[b], offset, body.mass);
     }
     for (std::uint32_t b = 0; b < tree_->bodies; ++b) {
       const ArticulatedBody& body = m.bodies[tree_->first_body + b];
@@ -570,30 +579,30 @@ class TreeKernel final {
         const Joint& joint = m.joints[body.first_joint + jj];
         std::uint32_t j = body.first_joint + jj - tree_->first_joint;
         std::uint32_t da = joint.dof - tree_->first_dof;
-        Array3 offset{out.com[0] - out.xanchor[j][0],
-                      out.com[1] - out.xanchor[j][1],
-                      out.com[2] - out.xanchor[j][2]};
+        Array3 offset{out->com[0] - out->xanchor[j][0],
+                      out->com[1] - out->xanchor[j][1],
+                      out->com[2] - out->xanchor[j][2]};
         std::uint32_t skip = 0;
         switch (joint.type) {
           case JointType::FREE:
             for (std::uint32_t k = 0; k < 3; ++k) {
-              out.cdof[da + k] = {};
-              out.cdof[da + k][3 + k] = 1;
+              out->cdof[da + k] = {};
+              out->cdof[da + k][3 + k] = 1;
             }
             skip = 3;
             [[fallthrough]];
           case JointType::BALL:
             for (std::uint32_t k = 0; k < 3; ++k) {
-              const Matrix3& x = out.xmat[b];
-              out.cdof[da + skip + k] =
+              const Matrix3& x = out->xmat[b];
+              out->cdof[da + skip + k] =
                   turn_about({x[k], x[k + 3], x[k + 6]}, offset);
             }
             break;
           case JointType::SLIDE:
-            out.cdof[da] = slide_along(out.xaxis[j]);
+            out->cdof[da] = slide_along(out->xaxis[j]);
             break;
           case JointType::HINGE:
-            out.cdof[da] = turn_about(out.xaxis[j], offset);
+            out->cdof[da] = turn_about(out->xaxis[j], offset);
             break;
         }
       }
@@ -601,10 +610,10 @@ class TreeKernel final {
   }
 
   // mj_crb, without the fixed inertia MuJoCo keeps for simple dofs.
-  auto compute_mass(Dynamics& out) const -> void {
+  auto compute_mass(Out<Dynamics> out) const -> void {
     using namespace articulated;
     const ArticulatedModel& m = *model_;
-    std::array<Inertia10, Capacity::bodies> crb = out.cinert;
+    std::array<Inertia10, Capacity::bodies> crb = out->cinert;
     for (std::uint32_t b = tree_->bodies; b-- > 0;) {
       if (parent_[b] != NONE) {
         for (int k = 0; k < 10; ++k) {
@@ -612,21 +621,23 @@ class TreeKernel final {
         }
       }
     }
-    out.mass.fill(0.0);
+    out->mass.fill(0.0);
     for (std::uint32_t i = 0; i < tree_->dofs; ++i) {
-      out.mass[i * V + i] = m.dofs[tree_->first_dof + i].armature;
-      Spatial buffer = multiply(crb[dof_body_[i]], out.cdof[i]);
+      out->mass[i * V + i] = m.dofs[tree_->first_dof + i].armature;
+      Spatial buffer = multiply(crb[dof_body_[i]], out->cdof[i]);
       for (std::uint32_t j = i; j != NONE; j = dof_parent_[j]) {
-        out.mass[i * V + j] += dot6(out.cdof[j], buffer);
+        out->mass[i * V + j] += dot6(out->cdof[j], buffer);
       }
     }
   }
 
   // L'DL of `mass` along the tree, clamping pivots (mj_factorI).
   auto factor(const std::array<double, V * V>& mass,
-              std::array<double, V * V>& f,
-              std::array<double, V>& inverse) const -> void {
+              Out<std::array<double, V * V>> factor_out,
+              Out<std::array<double, V>> inverse_out) const -> void {
     using namespace articulated;
+    std::array<double, V * V>& f = *factor_out;
+    std::array<double, V>& inverse = *inverse_out;
     f = mass;
     for (std::uint32_t k = tree_->dofs; k-- > 0;) {
       double& pivot = f[k * V + k];
@@ -647,15 +658,15 @@ class TreeKernel final {
   }
 
   // mj_comVel.
-  auto compute_velocities(const State& state, Dynamics& out) const -> void {
+  auto compute_velocities(const State& state, Out<Dynamics> out) const -> void {
     using namespace articulated;
     const ArticulatedModel& m = *model_;
     for (std::uint32_t b = 0; b < tree_->bodies; ++b) {
       const ArticulatedBody& body = m.bodies[tree_->first_body + b];
-      Spatial cvel = parent_[b] != NONE ? out.cvel[parent_[b]] : Spatial{};
+      Spatial cvel = parent_[b] != NONE ? out->cvel[parent_[b]] : Spatial{};
       std::uint32_t bda = body.first_dof - tree_->first_dof;
       auto add = [&](std::uint32_t first, std::size_t count) {
-        Spatial t = combine(std::span{out.cdof}.subspan(first, count),
+        Spatial t = combine(std::span{out->cdof}.subspan(first, count),
                             std::span{state.qvel}.subspan(first, count));
         for (int k = 0; k < 6; ++k) {
           cvel[k] += t[k];
@@ -666,7 +677,7 @@ class TreeKernel final {
         JointType type = m.joints[dof.joint].type;
         if (type == JointType::FREE) {
           for (std::uint32_t k = 0; k < 3; ++k) {
-            out.cdof_dot[bda + j + k] = {};
+            out->cdof_dot[bda + j + k] = {};
           }
           add(bda + j, 3);
           j += 3;
@@ -674,22 +685,22 @@ class TreeKernel final {
         }
         if (type == JointType::BALL) {
           for (std::uint32_t k = 0; k < 3; ++k) {
-            out.cdof_dot[bda + j + k] =
-                cross_motion(cvel, out.cdof[bda + j + k]);
+            out->cdof_dot[bda + j + k] =
+                cross_motion(cvel, out->cdof[bda + j + k]);
           }
           add(bda + j, 3);
           j += 2;
         } else {
-          out.cdof_dot[bda + j] = cross_motion(cvel, out.cdof[bda + j]);
+          out->cdof_dot[bda + j] = cross_motion(cvel, out->cdof[bda + j]);
           add(bda + j, 1);
         }
       }
-      out.cvel[b] = cvel;
+      out->cvel[b] = cvel;
     }
   }
 
   // mj_rne without accelerations: gravity and velocity products.
-  auto compute_bias(const State& state, Dynamics& out) const -> void {
+  auto compute_bias(const State& state, Out<Dynamics> out) const -> void {
     using namespace articulated;
     const ArticulatedModel& m = *model_;
     Spatial world{0.0,
@@ -703,17 +714,18 @@ class TreeKernel final {
     for (std::uint32_t b = 0; b < tree_->bodies; ++b) {
       const ArticulatedBody& body = m.bodies[tree_->first_body + b];
       std::uint32_t bda = body.first_dof - tree_->first_dof;
-      Spatial t = body.dofs == 0
-                      ? Spatial{}
-                      : combine(std::span{out.cdof_dot}.subspan(bda, body.dofs),
-                                std::span{state.qvel}.subspan(bda, body.dofs));
+      Spatial t =
+          body.dofs == 0
+              ? Spatial{}
+              : combine(std::span{out->cdof_dot}.subspan(bda, body.dofs),
+                        std::span{state.qvel}.subspan(bda, body.dofs));
       const Spatial& before = parent_[b] != NONE ? cacc[parent_[b]] : world;
       for (int k = 0; k < 6; ++k) {
         cacc[b][k] = before[k] + t[k];
       }
-      force[b] = multiply(out.cinert[b], cacc[b]);
-      Spatial momentum = multiply(out.cinert[b], out.cvel[b]);
-      Spatial c = cross_force(out.cvel[b], momentum);
+      force[b] = multiply(out->cinert[b], cacc[b]);
+      Spatial momentum = multiply(out->cinert[b], out->cvel[b]);
+      Spatial c = cross_force(out->cvel[b], momentum);
       for (int k = 0; k < 6; ++k) {
         force[b][k] += c[k];
       }
@@ -726,15 +738,15 @@ class TreeKernel final {
       }
     }
     for (std::uint32_t i = 0; i < tree_->dofs; ++i) {
-      out.bias[i] = dot6(out.cdof[i], force[dof_body_[i]]);
+      out->bias[i] = dot6(out->cdof[i], force[dof_body_[i]]);
     }
   }
 
   // Joint springs and dof dampers (mj_springdamper).
-  auto compute_passive(const State& state, Dynamics& out) const -> void {
+  auto compute_passive(const State& state, Out<Dynamics> out) const -> void {
     using namespace articulated;
     const ArticulatedModel& m = *model_;
-    out.passive.fill(0.0);
+    out->passive.fill(0.0);
     for (std::uint32_t j = 0; j < tree_->joints; ++j) {
       const Joint& joint = m.joints[tree_->first_joint + j];
       if (joint.stiffness == 0) {
@@ -752,7 +764,7 @@ class TreeKernel final {
                        state.qpos[q + 1] - m.qpos_spring[qs + 1],
                        state.qpos[q + 2] - m.qpos_spring[qs + 2]};
             for (int k = 0; k < 3; ++k) {
-              out.passive[v + k] += dif[k] * -joint.stiffness;
+              out->passive[v + k] += dif[k] * -joint.stiffness;
             }
           }
           Quaternion4 quat{state.qpos[q + skip], state.qpos[q + skip + 1],
@@ -769,13 +781,13 @@ class TreeKernel final {
             speed -= 2 * std::numbers::pi;
           }
           for (int k = 0; k < 3; ++k) {
-            out.passive[v + skip + k] += axis[k] * speed * -joint.stiffness;
+            out->passive[v + skip + k] += axis[k] * speed * -joint.stiffness;
           }
           break;
         }
         default: {
           double x = state.qpos[q] - m.qpos_spring[joint.qpos];
-          out.passive[v] = -x * joint.stiffness;
+          out->passive[v] = -x * joint.stiffness;
           break;
         }
       }
@@ -784,7 +796,7 @@ class TreeKernel final {
       double damping = damping_[i];
       if (damping != 0) {
         double damper = -state.qvel[i] * damping;
-        out.passive[i] = out.passive[i] + damper;
+        out->passive[i] = out->passive[i] + damper;
       }
     }
   }
@@ -793,9 +805,9 @@ class TreeKernel final {
   // bias in the joint's length and velocity, clamped to its force range,
   // times its gear on the joint (mj_transmission, mj_fwdActuation).
   auto compute_actuation(const State& state, const Control& control,
-                         Dynamics& out) const -> void {
+                         Out<Dynamics> out) const -> void {
     const ArticulatedModel& m = *model_;
-    out.actuator.fill(0.0);
+    out->actuator.fill(0.0);
     for (std::size_t a = 0; a < tree_->actuators.size(); ++a) {
       const Actuator& actuator = m.actuators[tree_->actuators[a]];
       const Joint& joint = m.joints[actuator.joint];
@@ -818,7 +830,7 @@ class TreeKernel final {
         force =
             std::clamp(force, actuator.force_range[0], actuator.force_range[1]);
       }
-      out.actuator[v] += gear * force;
+      out->actuator[v] += gear * force;
     }
   }
 

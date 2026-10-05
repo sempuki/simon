@@ -32,6 +32,16 @@ enum class GeomType : std::uint8_t {
   MESH,
 };
 
+// Where a body's inertial frame or a geom lies, as MuJoCo snaps it when
+// within 1e-6 of its body's frame or inertial frame, numbered as mjtSameFrame.
+enum class SameFrame : std::uint8_t {
+  NONE,
+  BODY,
+  INERTIA,
+  BODY_ROTATION,
+  INERTIA_ROTATION,
+};
+
 // How a contact or limit softens: MuJoCo's solref (time constant and damping
 // ratio) and solimp (impedance from width, its ends, midpoint and power).
 struct SoftConstraint final {
@@ -51,13 +61,14 @@ struct ArticulatedBody final {
   Array3 inertial_pos{};
   Quaternion4 inertial_quat{1.0, 0.0, 0.0, 0.0};
   double mass = 0.0;  // kg.
-  Array3 inertia{};  // kg m^2, about the principal axes.
+  Array3 inertia{};   // kg m^2, about the principal axes.
   std::uint32_t first_joint = 0;
   std::uint32_t joints = 0;
   std::uint32_t first_dof = 0;
   std::uint32_t dofs = 0;
   std::uint32_t first_geom = 0;
   std::uint32_t geoms = 0;
+  SameFrame inertial_frame = SameFrame::BODY;
 };
 
 // A joint: where on its body and about or along which axis, its limits, and
@@ -108,6 +119,7 @@ struct Geom final {
   std::uint32_t contype = 1;
   std::uint32_t conaffinity = 1;
   std::int32_t priority = 0;
+  SameFrame frame = SameFrame::NONE;
 };
 
 // An actuator on a joint: its force a fixed gain times its control plus,
