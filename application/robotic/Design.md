@@ -7,8 +7,8 @@ solve that couples entities: contacts tie bodies together, and each step
 solves them at once. MuJoCo (Todorov, Erez and Tassa, "MuJoCo: A physics
 engine for model-based control", IROS 2012; Apache-2.0) is the reference.
 It is being built in eight steps (see the [Roadmap](#roadmap)); models read
-and compiled as MuJoCo compiles them, and their dynamics without
-constraints, are done.
+and compiled as MuJoCo compiles them, their dynamics without constraints,
+and their actuators and control, are done.
 
 ## Choices
 
@@ -125,6 +125,34 @@ Where only hinges and slides move, every step equals MuJoCo's to the last
 bit; where a quaternion is in play, its integration and normalization part
 from MuJoCo's by an ulp or two.
 
+## Control
+
+An actuator drives a hinge or slide by a fixed gain times its control,
+plus, for an affine bias, a constant and terms in its joint's length and
+velocity, each times the gear; the force is clamped to its range and acts
+on the joint times the gear. MJCF's motor has gain 1 and no bias; its
+position servo gain kp and bias 0, -kp, -kv; its velocity servo gain kv and
+bias 0, 0, -kv; its general actuator says so itself. An actuator's damping
+joins its joint's, times the gear squared, in the passive forces and in the
+implicit Euler, as MuJoCo has it; a servo's kv is explicit, as MuJoCo's is,
+so a stiff servo on a light link needs a step to suit it. Activation
+dynamics and gain types other than fixed are refused.
+
+Controls are their own component, `TreeControl`, so that `Control` writes
+them while `Integrate` writes the state. `Control` applies a linear state
+feedback, u = u0 - K (x - x0), x the model's positions and velocities, each
+tree's controls from its own state, where the scenario gives one; else the
+controls hold.
+
+`control_test` checks two cases against MuJoCo, every step
+(`reference/mujoco_control.py`): an arm of four joints under two position
+servos, one geared and one taking its gain from a default class, a
+velocity servo with damping and a general actuator against its force range,
+for 3 s; and the cart-pole balanced from 0.2 rad by the discrete linear
+quadratic regulator of MuJoCo's own linearization, for 15 s, the pole
+upright within a microradian at the end. Both are equal to MuJoCo's to the
+last bit.
+
 ## Roadmap
 
 1. Done: MJCF read and compiled, against MuJoCo's compiled model.
@@ -133,7 +161,8 @@ from MuJoCo's by an ulp or two.
    double pendulum, a tumbling free body, springs and dampers, a cart-pole
    and falling boxes, each step against MuJoCo. Joint limits move to step
    5, since MuJoCo solves them with contacts.
-3. Control: position actuators and a cart-pole balanced by a controller.
+3. Done: position, velocity and general actuators, actuator damping, and
+   a linear state feedback balancing a cart-pole, against MuJoCo.
 4. Collision: primitives and the broad phase, against MuJoCo's contacts.
 5. The constraint solver: soft contacts and joint limits, friction, Newton
    and PGS, by island; a sphere rolling, a box sliding, a stack.

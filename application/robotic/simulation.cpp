@@ -46,12 +46,20 @@ auto start(const Mechanics& mechanics, std::uint32_t t,
       state.qvel[address - tree.first_dof] = value;
     }
   }
+  return state;
+}
+
+template <typename Capacity>
+auto start_control(const Mechanics& mechanics, std::uint32_t t,
+                   const Scenario& scenario) -> TreeControl<Capacity> {
+  const model::Tree& tree = mechanics.trees()[t];
+  TreeControl<Capacity> control;
   for (std::size_t a = 0; a < tree.actuators.size(); ++a) {
     if (tree.actuators[a] < scenario.control.size()) {
-      state.control[a] = scenario.control[tree.actuators[a]];
+      control.control[a] = scenario.control[tree.actuators[a]];
     }
   }
-  return state;
+  return control;
 }
 
 }  // namespace
@@ -60,7 +68,8 @@ auto Simulation::configure() -> engine::PhaseResult {
   RETURN_OR_ASSIGN(model::ArticulatedModel model,
                    format::load_mjcf(scenario_.model));
   mechanics_ = std::make_unique<Mechanics>(std::move(model));
-  scheduler_ = std::make_unique<Scheduler>(make_schedule(*mechanics_));
+  scheduler_ = std::make_unique<Scheduler>(
+      make_schedule(*mechanics_, scenario_.feedback));
   std::size_t small = 0;
   std::size_t large = 0;
   for (std::uint32_t t = 0; t < mechanics_->trees().size(); ++t) {
@@ -87,6 +96,7 @@ auto Simulation::configure() -> engine::PhaseResult {
               .with(TreeBound{})
               .with(Mechanism{.tree = t})
               .with(start<SmallCapacity>(*mechanics_, t, scenario_))
+              .with(start_control<SmallCapacity>(*mechanics_, t, scenario_))
               .with(TreeDynamics<SmallCapacity>{})
               .build());
     } else {
@@ -95,6 +105,7 @@ auto Simulation::configure() -> engine::PhaseResult {
               .with(TreeBound{})
               .with(Mechanism{.tree = t})
               .with(start<LargeCapacity>(*mechanics_, t, scenario_))
+              .with(start_control<LargeCapacity>(*mechanics_, t, scenario_))
               .with(TreeDynamics<LargeCapacity>{})
               .build());
     }

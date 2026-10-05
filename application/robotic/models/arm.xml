@@ -1,0 +1,36 @@
+<!-- Copyright 2026 -- CONTRIBUTORS. See LICENSE. -->
+<!-- An arm of three links: a shoulder and an elbow under position servos,
+     one taking its gain from a default class, a wrist under a velocity
+     servo with damping, and a slider under a general actuator with an
+     affine bias and a force range. -->
+<mujoco model="arm">
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+  <default>
+    <position kp="40" ctrlrange="-2 2"/>
+  </default>
+  <worldbody>
+    <body name="upper" pos="0 0 1">
+      <joint name="shoulder" axis="0 1 0" damping="0.1"/>
+      <geom type="capsule" fromto="0 0 0 0.4 0 0" size="0.04"/>
+      <body name="fore" pos="0.4 0 0">
+        <joint name="elbow" axis="0 1 0"/>
+        <geom type="capsule" fromto="0 0 0 0.3 0 0" size="0.03"/>
+        <body name="hand" pos="0.3 0 0">
+          <joint name="wrist" axis="1 0 0"/>
+          <geom type="box" size="0.05 0.04 0.02" pos="0.05 0 0"/>
+          <body name="finger" pos="0.1 0 0">
+            <joint name="slider" type="slide" axis="1 0 0"/>
+            <geom type="box" size="0.03 0.01 0.01"/>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <position name="shoulder" joint="shoulder" kv="4"/>
+    <position name="elbow" joint="elbow" kp="25" kv="2" gear="2"/>
+    <velocity name="wrist" joint="wrist" kv="0.02" damping="0.05"/>
+    <general name="slider" joint="slider" gainprm="3" biasprm="0.1 -2 -0.4"
+             biastype="affine" forcerange="-0.8 0.8"/>
+  </actuator>
+</mujoco>

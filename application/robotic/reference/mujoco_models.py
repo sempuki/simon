@@ -35,7 +35,8 @@ FIELDS = {
              'contype', 'conaffinity', 'solref', 'solimp', 'margin', 'gap',
              'priority'],
     'actuator': ['trntype', 'trnid', 'gear', 'ctrlrange', 'ctrllimited',
-                 'dyntype', 'gaintype', 'biastype', 'gainprm', 'biasprm'],
+                 'forcerange', 'forcelimited', 'damping', 'dyntype',
+                 'gaintype', 'biastype', 'gainprm', 'biasprm'],
 }
 SIZES = {'body': 'nbody', 'jnt': 'njnt', 'dof': 'nv', 'geom': 'ngeom',
          'actuator': 'nu'}

@@ -1,4 +1,263 @@
 model,element,index,field,values
+arm.xml,option,0,timestep,0.002
+arm.xml,option,0,gravity,0.0 0.0 -9.81
+arm.xml,option,0,integrator,0.0
+arm.xml,option,0,cone,0.0
+arm.xml,option,0,solver,2.0
+arm.xml,option,0,iterations,100.0
+arm.xml,option,0,tolerance,1e-08
+arm.xml,qpos0,0,values,0.0 0.0 0.0 0.0
+arm.xml,qpos_spring,0,values,0.0 0.0 0.0 0.0
+arm.xml,body,0,parentid,0.0
+arm.xml,body,0,rootid,0.0
+arm.xml,body,0,pos,0.0 0.0 0.0
+arm.xml,body,0,quat,1.0 0.0 0.0 0.0
+arm.xml,body,0,ipos,0.0 0.0 0.0
+arm.xml,body,0,iquat,1.0 0.0 0.0 0.0
+arm.xml,body,0,mass,0.0
+arm.xml,body,0,inertia,0.0 0.0 0.0
+arm.xml,body,0,jntadr,-1.0
+arm.xml,body,0,jntnum,0.0
+arm.xml,body,0,dofadr,-1.0
+arm.xml,body,0,dofnum,0.0
+arm.xml,body,0,geomadr,-1.0
+arm.xml,body,0,geomnum,0.0
+arm.xml,body,1,parentid,0.0
+arm.xml,body,1,rootid,1.0
+arm.xml,body,1,pos,0.0 0.0 1.0
+arm.xml,body,1,quat,1.0 0.0 0.0 0.0
+arm.xml,body,1,ipos,0.2 0.0 0.0
+arm.xml,body,1,iquat,0.7071067811865476 0.0 -0.7071067811865475 0.0
+arm.xml,body,1,mass,2.2787018714037965
+arm.xml,body,1,inertia,0.04011587623963109 0.04011587623963109 0.001780068285426025
+arm.xml,body,1,jntadr,0.0
+arm.xml,body,1,jntnum,1.0
+arm.xml,body,1,dofadr,0.0
+arm.xml,body,1,dofnum,1.0
+arm.xml,body,1,geomadr,0.0
+arm.xml,body,1,geomnum,1.0
+arm.xml,body,2,parentid,1.0
+arm.xml,body,2,rootid,1.0
+arm.xml,body,2,pos,0.4 0.0 0.0
+arm.xml,body,2,quat,1.0 0.0 0.0 0.0
+arm.xml,body,2,ipos,0.15 0.0 0.0
+arm.xml,body,2,iquat,0.7071067811865476 0.0 -0.7071067811865475 0.0
+arm.xml,body,2,mass,0.9613273519984767
+arm.xml,body,2,inertia,0.009519685474834328 0.009519685474834328 0.00042241854820168357
+arm.xml,body,2,jntadr,1.0
+arm.xml,body,2,jntnum,1.0
+arm.xml,body,2,dofadr,1.0
+arm.xml,body,2,dofnum,1.0
+arm.xml,body,2,geomadr,1.0
+arm.xml,body,2,geomnum,1.0
+arm.xml,body,3,parentid,2.0
+arm.xml,body,3,rootid,1.0
+arm.xml,body,3,pos,0.3 0.0 0.0
+arm.xml,body,3,quat,1.0 0.0 0.0 0.0
+arm.xml,body,3,ipos,0.05 0.0 0.0
+arm.xml,body,3,iquat,1.0 0.0 0.0 0.0
+arm.xml,body,3,mass,0.32
+arm.xml,body,3,inertia,0.00021333333333333336 0.0003093333333333334 0.0004373333333333334
+arm.xml,body,3,jntadr,2.0
+arm.xml,body,3,jntnum,1.0
+arm.xml,body,3,dofadr,2.0
+arm.xml,body,3,dofnum,1.0
+arm.xml,body,3,geomadr,2.0
+arm.xml,body,3,geomnum,1.0
+arm.xml,body,4,parentid,3.0
+arm.xml,body,4,rootid,1.0
+arm.xml,body,4,pos,0.1 0.0 0.0
+arm.xml,body,4,quat,1.0 0.0 0.0 0.0
+arm.xml,body,4,ipos,0.0 0.0 0.0
+arm.xml,body,4,iquat,1.0 0.0 0.0 0.0
+arm.xml,body,4,mass,0.023999999999999997
+arm.xml,body,4,inertia,1.6e-06 8e-06 8e-06
+arm.xml,body,4,jntadr,3.0
+arm.xml,body,4,jntnum,1.0
+arm.xml,body,4,dofadr,3.0
+arm.xml,body,4,dofnum,1.0
+arm.xml,body,4,geomadr,3.0
+arm.xml,body,4,geomnum,1.0
+arm.xml,jnt,0,type,3.0
+arm.xml,jnt,0,bodyid,1.0
+arm.xml,jnt,0,pos,0.0 0.0 0.0
+arm.xml,jnt,0,axis,0.0 1.0 0.0
+arm.xml,jnt,0,limited,0.0
+arm.xml,jnt,0,range,0.0 0.0
+arm.xml,jnt,0,stiffness,0.0
+arm.xml,jnt,0,qposadr,0.0
+arm.xml,jnt,0,dofadr,0.0
+arm.xml,jnt,0,solref,0.02 1.0
+arm.xml,jnt,0,solimp,0.9 0.95 0.001 0.5 2.0
+arm.xml,jnt,0,margin,0.0
+arm.xml,jnt,1,type,3.0
+arm.xml,jnt,1,bodyid,2.0
+arm.xml,jnt,1,pos,0.0 0.0 0.0
+arm.xml,jnt,1,axis,0.0 1.0 0.0
+arm.xml,jnt,1,limited,0.0
+arm.xml,jnt,1,range,0.0 0.0
+arm.xml,jnt,1,stiffness,0.0
+arm.xml,jnt,1,qposadr,1.0
+arm.xml,jnt,1,dofadr,1.0
+arm.xml,jnt,1,solref,0.02 1.0
+arm.xml,jnt,1,solimp,0.9 0.95 0.001 0.5 2.0
+arm.xml,jnt,1,margin,0.0
+arm.xml,jnt,2,type,3.0
+arm.xml,jnt,2,bodyid,3.0
+arm.xml,jnt,2,pos,0.0 0.0 0.0
+arm.xml,jnt,2,axis,1.0 0.0 0.0
+arm.xml,jnt,2,limited,0.0
+arm.xml,jnt,2,range,0.0 0.0
+arm.xml,jnt,2,stiffness,0.0
+arm.xml,jnt,2,qposadr,2.0
+arm.xml,jnt,2,dofadr,2.0
+arm.xml,jnt,2,solref,0.02 1.0
+arm.xml,jnt,2,solimp,0.9 0.95 0.001 0.5 2.0
+arm.xml,jnt,2,margin,0.0
+arm.xml,jnt,3,type,2.0
+arm.xml,jnt,3,bodyid,4.0
+arm.xml,jnt,3,pos,0.0 0.0 0.0
+arm.xml,jnt,3,axis,1.0 0.0 0.0
+arm.xml,jnt,3,limited,0.0
+arm.xml,jnt,3,range,0.0 0.0
+arm.xml,jnt,3,stiffness,0.0
+arm.xml,jnt,3,qposadr,3.0
+arm.xml,jnt,3,dofadr,3.0
+arm.xml,jnt,3,solref,0.02 1.0
+arm.xml,jnt,3,solimp,0.9 0.95 0.001 0.5 2.0
+arm.xml,jnt,3,margin,0.0
+arm.xml,dof,0,bodyid,1.0
+arm.xml,dof,0,jntid,0.0
+arm.xml,dof,0,parentid,-1.0
+arm.xml,dof,0,armature,0.0
+arm.xml,dof,0,damping,0.1
+arm.xml,dof,0,frictionloss,0.0
+arm.xml,dof,1,bodyid,2.0
+arm.xml,dof,1,jntid,1.0
+arm.xml,dof,1,parentid,0.0
+arm.xml,dof,1,armature,0.0
+arm.xml,dof,1,damping,0.0
+arm.xml,dof,1,frictionloss,0.0
+arm.xml,dof,2,bodyid,3.0
+arm.xml,dof,2,jntid,2.0
+arm.xml,dof,2,parentid,1.0
+arm.xml,dof,2,armature,0.0
+arm.xml,dof,2,damping,0.0
+arm.xml,dof,2,frictionloss,0.0
+arm.xml,dof,3,bodyid,4.0
+arm.xml,dof,3,jntid,3.0
+arm.xml,dof,3,parentid,2.0
+arm.xml,dof,3,armature,0.0
+arm.xml,dof,3,damping,0.0
+arm.xml,dof,3,frictionloss,0.0
+arm.xml,geom,0,type,3.0
+arm.xml,geom,0,bodyid,1.0
+arm.xml,geom,0,size,0.04 0.2 0.0
+arm.xml,geom,0,pos,0.2 0.0 0.0
+arm.xml,geom,0,quat,0.7071067811865476 0.0 -0.7071067811865475 0.0
+arm.xml,geom,0,friction,1.0 0.005 0.0001
+arm.xml,geom,0,condim,3.0
+arm.xml,geom,0,contype,1.0
+arm.xml,geom,0,conaffinity,1.0
+arm.xml,geom,0,solref,0.02 1.0
+arm.xml,geom,0,solimp,0.9 0.95 0.001 0.5 2.0
+arm.xml,geom,0,margin,0.0
+arm.xml,geom,0,gap,0.0
+arm.xml,geom,0,priority,0.0
+arm.xml,geom,1,type,3.0
+arm.xml,geom,1,bodyid,2.0
+arm.xml,geom,1,size,0.03 0.15 0.0
+arm.xml,geom,1,pos,0.15 0.0 0.0
+arm.xml,geom,1,quat,0.7071067811865476 0.0 -0.7071067811865475 0.0
+arm.xml,geom,1,friction,1.0 0.005 0.0001
+arm.xml,geom,1,condim,3.0
+arm.xml,geom,1,contype,1.0
+arm.xml,geom,1,conaffinity,1.0
+arm.xml,geom,1,solref,0.02 1.0
+arm.xml,geom,1,solimp,0.9 0.95 0.001 0.5 2.0
+arm.xml,geom,1,margin,0.0
+arm.xml,geom,1,gap,0.0
+arm.xml,geom,1,priority,0.0
+arm.xml,geom,2,type,6.0
+arm.xml,geom,2,bodyid,3.0
+arm.xml,geom,2,size,0.05 0.04 0.02
+arm.xml,geom,2,pos,0.05 0.0 0.0
+arm.xml,geom,2,quat,1.0 0.0 0.0 0.0
+arm.xml,geom,2,friction,1.0 0.005 0.0001
+arm.xml,geom,2,condim,3.0
+arm.xml,geom,2,contype,1.0
+arm.xml,geom,2,conaffinity,1.0
+arm.xml,geom,2,solref,0.02 1.0
+arm.xml,geom,2,solimp,0.9 0.95 0.001 0.5 2.0
+arm.xml,geom,2,margin,0.0
+arm.xml,geom,2,gap,0.0
+arm.xml,geom,2,priority,0.0
+arm.xml,geom,3,type,6.0
+arm.xml,geom,3,bodyid,4.0
+arm.xml,geom,3,size,0.03 0.01 0.01
+arm.xml,geom,3,pos,0.0 0.0 0.0
+arm.xml,geom,3,quat,1.0 0.0 0.0 0.0
+arm.xml,geom,3,friction,1.0 0.005 0.0001
+arm.xml,geom,3,condim,3.0
+arm.xml,geom,3,contype,1.0
+arm.xml,geom,3,conaffinity,1.0
+arm.xml,geom,3,solref,0.02 1.0
+arm.xml,geom,3,solimp,0.9 0.95 0.001 0.5 2.0
+arm.xml,geom,3,margin,0.0
+arm.xml,geom,3,gap,0.0
+arm.xml,geom,3,priority,0.0
+arm.xml,actuator,0,trntype,0.0
+arm.xml,actuator,0,trnid,0.0 -1.0
+arm.xml,actuator,0,gear,1.0 0.0 0.0 0.0 0.0 0.0
+arm.xml,actuator,0,ctrlrange,-2.0 2.0
+arm.xml,actuator,0,ctrllimited,1.0
+arm.xml,actuator,0,forcerange,0.0 0.0
+arm.xml,actuator,0,forcelimited,0.0
+arm.xml,actuator,0,damping,0.0
+arm.xml,actuator,0,dyntype,0.0
+arm.xml,actuator,0,gaintype,0.0
+arm.xml,actuator,0,biastype,1.0
+arm.xml,actuator,0,gainprm,40.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+arm.xml,actuator,0,biasprm,0.0 -40.0 -4.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+arm.xml,actuator,1,trntype,0.0
+arm.xml,actuator,1,trnid,1.0 -1.0
+arm.xml,actuator,1,gear,2.0 0.0 0.0 0.0 0.0 0.0
+arm.xml,actuator,1,ctrlrange,-2.0 2.0
+arm.xml,actuator,1,ctrllimited,1.0
+arm.xml,actuator,1,forcerange,0.0 0.0
+arm.xml,actuator,1,forcelimited,0.0
+arm.xml,actuator,1,damping,0.0
+arm.xml,actuator,1,dyntype,0.0
+arm.xml,actuator,1,gaintype,0.0
+arm.xml,actuator,1,biastype,1.0
+arm.xml,actuator,1,gainprm,25.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+arm.xml,actuator,1,biasprm,0.0 -25.0 -2.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+arm.xml,actuator,2,trntype,0.0
+arm.xml,actuator,2,trnid,2.0 -1.0
+arm.xml,actuator,2,gear,1.0 0.0 0.0 0.0 0.0 0.0
+arm.xml,actuator,2,ctrlrange,-2.0 2.0
+arm.xml,actuator,2,ctrllimited,1.0
+arm.xml,actuator,2,forcerange,0.0 0.0
+arm.xml,actuator,2,forcelimited,0.0
+arm.xml,actuator,2,damping,0.05
+arm.xml,actuator,2,dyntype,0.0
+arm.xml,actuator,2,gaintype,0.0
+arm.xml,actuator,2,biastype,1.0
+arm.xml,actuator,2,gainprm,0.02 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+arm.xml,actuator,2,biasprm,0.0 0.0 -0.02 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+arm.xml,actuator,3,trntype,0.0
+arm.xml,actuator,3,trnid,3.0 -1.0
+arm.xml,actuator,3,gear,1.0 0.0 0.0 0.0 0.0 0.0
+arm.xml,actuator,3,ctrlrange,-2.0 2.0
+arm.xml,actuator,3,ctrllimited,1.0
+arm.xml,actuator,3,forcerange,-0.8 0.8
+arm.xml,actuator,3,forcelimited,1.0
+arm.xml,actuator,3,damping,0.0
+arm.xml,actuator,3,dyntype,0.0
+arm.xml,actuator,3,gaintype,0.0
+arm.xml,actuator,3,biastype,1.0
+arm.xml,actuator,3,gainprm,3.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+arm.xml,actuator,3,biasprm,0.1 -2.0 -0.4 0.0 0.0 0.0 0.0 0.0 0.0 0.0
 boxes.xml,option,0,timestep,0.002
 boxes.xml,option,0,gravity,0.0 0.0 -9.81
 boxes.xml,option,0,integrator,0.0
@@ -550,6 +809,9 @@ cartpole.xml,actuator,0,trnid,0.0 -1.0
 cartpole.xml,actuator,0,gear,10.0 0.0 0.0 0.0 0.0 0.0
 cartpole.xml,actuator,0,ctrlrange,-1.0 1.0
 cartpole.xml,actuator,0,ctrllimited,1.0
+cartpole.xml,actuator,0,forcerange,0.0 0.0
+cartpole.xml,actuator,0,forcelimited,0.0
+cartpole.xml,actuator,0,damping,0.0
 cartpole.xml,actuator,0,dyntype,0.0
 cartpole.xml,actuator,0,gaintype,0.0
 cartpole.xml,actuator,0,biastype,0.0

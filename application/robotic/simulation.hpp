@@ -22,6 +22,7 @@ struct Scenario final {
   std::vector<std::pair<std::uint32_t, double>> qpos;
   std::vector<std::pair<std::uint32_t, double>> qvel;
   std::vector<double> control;  // By the model's actuators.
+  Feedback feedback;            // Overrides the controls, if given.
 };
 
 class Simulation final {

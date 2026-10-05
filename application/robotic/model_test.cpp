@@ -148,15 +148,19 @@ auto find_value(const ArticulatedModel& m, const Row& row)
     if (f == "gear") return doubles(a.gear);
     if (f == "ctrlrange") return doubles(a.control_range);
     if (f == "ctrllimited") return number(a.control_limited ? 1 : 0);
+    if (f == "forcerange") return doubles(a.force_range);
+    if (f == "forcelimited") return number(a.force_limited ? 1 : 0);
+    if (f == "damping") return number(a.damping);
     if (f == "dyntype") return number(0);   // None.
     if (f == "gaintype") return number(0);  // Fixed.
-    if (f == "biastype") return number(0);  // None.
-    if (f == "gainprm") {
-      std::vector<double> gain(10, 0.0);
-      gain[0] = 1.0;
-      return gain;
+    if (f == "biastype") {
+      return number(a.bias_type == model::Actuator::Bias::AFFINE ? 1 : 0);
     }
-    if (f == "biasprm") return std::vector<double>(10, 0.0);
+    if (f == "gainprm" || f == "biasprm") {
+      std::vector<double> prm(10, 0.0);
+      std::ranges::copy(f == "gainprm" ? a.gain : a.bias, prm.begin());
+      return prm;
+    }
   }
   FAIL("no field " << row.element << "." << f);
   return {};
@@ -214,9 +218,9 @@ TEST_CASE("Mjcf") {
     CHECK(refused(R"(<mujoco><worldbody><body><freejoint/>
             <geom type="mesh" mesh="m"/></body></worldbody></mujoco>)")
               .find("mesh") != std::string::npos);
-    CHECK(refused(R"(<mujoco><actuator><position joint="j"/></actuator>
+    CHECK(refused(R"(<mujoco><actuator><intvelocity joint="j"/></actuator>
             </mujoco>)")
-              .find("position") != std::string::npos);
+              .find("intvelocity") != std::string::npos);
     auto humanoid = format::load_mjcf("3rd_party/mujoco/humanoid.xml");
     REQUIRE(!humanoid.has_value());
     CHECK(humanoid.error().message().find("contact") != std::string::npos);

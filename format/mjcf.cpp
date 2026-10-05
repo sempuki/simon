@@ -32,6 +32,7 @@ namespace simon::format {
 namespace {
 
 using model::Actuator;
+using model::Array3;
 using model::ArticulatedBody;
 using model::ArticulatedModel;
 using model::Dof;
@@ -42,7 +43,6 @@ using model::JointType;
 using model::Physics;
 using model::Quaternion4;
 using model::SoftConstraint;
-using model::Array3;
 
 using Failure = std::unexpected<lib::Status>;
 using lib::Out;
@@ -302,17 +302,18 @@ struct JointSpec final {
   double friction_loss = 0.0;
 };
 
-struct MotorSpec final {
+struct ActuatorSpec final {
   Actuator actuator;
   std::string joint;
-  Limited limited = Limited::AUTO;
+  Limited control_limited = Limited::AUTO;
+  Limited force_limited = Limited::AUTO;
 };
 
 // What a default class gives each element.
 struct Defaults final {
   GeomSpec geom;
   JointSpec joint;
-  MotorSpec motor;
+  ActuatorSpec actuator;
 };
 
 struct InertialSpec final {
@@ -726,8 +727,9 @@ class Reader final {
         RETURN_IF_UNEXPECTED(apply_geom(child, defaults.geom));
       } else if (kind == "joint") {
         RETURN_IF_UNEXPECTED(apply_joint(child, defaults.joint));
-      } else if (kind == "motor") {
-        RETURN_IF_UNEXPECTED(apply_motor(child, defaults.motor));
+      } else if (kind == "motor" || kind == "position" || kind == "velocity" ||
+                 kind == "general") {
+        RETURN_IF_UNEXPECTED(apply_actuator(child, defaults.actuator));
       } else if (kind == "default") {
         continue;
       } else if (kind == "site" || kind == "camera" || kind == "light" ||
@@ -897,27 +899,92 @@ class Reader final {
     return {};
   }
 
-  auto apply_motor(pugi::xml_node node, MotorSpec& spec) const
+  // An actuator's attributes, and its kind's gain and bias, as MuJoCo's
+  // mjs_setToMotor, mjs_setToPosition and mjs_setToVelocity set them.
+  auto apply_actuator(pugi::xml_node node, ActuatorSpec& spec) const
       -> std::expected<void, lib::Status> {
+    std::string_view kind = node.name();
+    Actuator& actuator = spec.actuator;
     for (pugi::xml_attribute attribute : node.attributes()) {
       std::string_view name = attribute.name();
-      static constexpr std::array<std::string_view, 7> KNOWN{
-          "name",      "class",       "joint", "gear",
-          "ctrlrange", "ctrllimited", "group"};
-      if (!std::ranges::contains(KNOWN, name)) {
+      std::string_view value = attribute.as_string();
+      static constexpr std::array<std::string_view, 10> COMMON{
+          "name",        "class",      "joint",        "gear",    "ctrlrange",
+          "ctrllimited", "forcerange", "forcelimited", "damping", "group"};
+      bool known =
+          std::ranges::contains(COMMON, name) ||
+          (kind == "position" && (name == "kp" || name == "kv")) ||
+          (kind == "velocity" && name == "kv") ||
+          (kind == "general" &&
+           (name == "gainprm" || name == "biasprm" ||
+            (name == "gaintype" && value == "fixed") ||
+            (name == "biastype" && (value == "none" || value == "affine")) ||
+            (name == "dyntype" && value == "none"))) ||
+          ((name == "timeconst" || name == "inheritrange") &&
+           attribute.as_double() == 0.0);
+      if (!known) {
         return refuse(node, name);
       }
     }
     if (node.attribute("name")) {
-      spec.actuator.name = node.attribute("name").as_string();
+      actuator.name = node.attribute("name").as_string();
     }
     if (node.attribute("joint")) {
       spec.joint = node.attribute("joint").as_string();
     }
-    RETURN_IF_UNEXPECTED(read_array(node, "gear", spec.actuator.gear));
+    RETURN_IF_UNEXPECTED(read_array(node, "gear", actuator.gear));
+    RETURN_IF_UNEXPECTED(read_array(node, "ctrlrange", actuator.control_range));
     RETURN_IF_UNEXPECTED(
-        read_array(node, "ctrlrange", spec.actuator.control_range));
-    RETURN_IF_UNEXPECTED(read_limited(node, "ctrllimited", spec.limited));
+        read_limited(node, "ctrllimited", spec.control_limited));
+    RETURN_IF_UNEXPECTED(read_array(node, "forcerange", actuator.force_range));
+    RETURN_IF_UNEXPECTED(
+        read_limited(node, "forcelimited", spec.force_limited));
+    RETURN_IF_UNEXPECTED(read_number(node, "damping", actuator.damping));
+    if (kind == "motor") {
+      actuator.gain[0] = 1;
+      actuator.bias_type = Actuator::Bias::NONE;
+    } else if (kind == "position") {
+      double kp = actuator.gain[0];
+      RETURN_IF_UNEXPECTED(read_number(node, "kp", kp));
+      actuator.gain[0] = kp;
+      actuator.bias[1] = -kp;
+      double kv = 0.0;
+      RETURN_OR_ASSIGN(bool has_kv, read_number(node, "kv", kv));
+      if (has_kv) {
+        if (kv < 0) {
+          return fail("kv cannot be negative");
+        }
+        actuator.bias[2] = -kv;
+      }
+      actuator.bias_type = Actuator::Bias::AFFINE;
+    } else if (kind == "velocity") {
+      double kv = actuator.gain[0];
+      RETURN_IF_UNEXPECTED(read_number(node, "kv", kv));
+      actuator.bias = {};
+      actuator.gain[0] = kv;
+      actuator.bias[2] = -kv;
+      actuator.bias_type = Actuator::Bias::AFFINE;
+    } else {
+      std::array<double, 10> gain{};
+      std::array<double, 10> bias{};
+      std::ranges::copy(actuator.gain, gain.begin());
+      std::ranges::copy(actuator.bias, bias.begin());
+      RETURN_IF_UNEXPECTED(read_array(node, "gainprm", gain));
+      RETURN_IF_UNEXPECTED(read_array(node, "biasprm", bias));
+      if (std::ranges::any_of(gain.begin() + 3, gain.end(),
+                              [](double x) { return x != 0.0; }) ||
+          std::ranges::any_of(bias.begin() + 3, bias.end(),
+                              [](double x) { return x != 0.0; })) {
+        return refuse(node, "parameters past the third");
+      }
+      std::copy_n(gain.begin(), 3, actuator.gain.begin());
+      std::copy_n(bias.begin(), 3, actuator.bias.begin());
+      if (pugi::xml_attribute type = node.attribute("biastype")) {
+        actuator.bias_type = std::string_view{type.as_string()} == "affine"
+                                 ? Actuator::Bias::AFFINE
+                                 : Actuator::Bias::NONE;
+      }
+    }
     return {};
   }
 
@@ -1018,18 +1085,20 @@ class Reader final {
   }
 
   auto read_actuator(pugi::xml_node node) -> std::expected<void, lib::Status> {
-    if (std::string_view{node.name()} != "motor") {
+    std::string_view kind = node.name();
+    if (kind != "motor" && kind != "position" && kind != "velocity" &&
+        kind != "general") {
       return refuse(node);
     }
     RETURN_OR_ASSIGN(const Defaults* defaults, find_defaults(node, "main"));
-    MotorSpec motor = defaults->motor;
-    motor.actuator.name.clear();
-    motor.joint.clear();
-    RETURN_IF_UNEXPECTED(apply_motor(node, motor));
-    if (motor.joint.empty()) {
-      return fail("<motor> needs a joint");
+    ActuatorSpec actuator = defaults->actuator;
+    actuator.actuator.name.clear();
+    actuator.joint.clear();
+    RETURN_IF_UNEXPECTED(apply_actuator(node, actuator));
+    if (actuator.joint.empty()) {
+      return fail("<" + std::string{kind} + "> needs a joint");
     }
-    motors_.push_back(std::move(motor));
+    actuators_.push_back(std::move(actuator));
     return {};
   }
 
@@ -1149,19 +1218,28 @@ class Reader final {
     for (const BodySpec& child : world.children) {
       RETURN_IF_UNEXPECTED(compile_body(child, 0, Out(last_dof), model));
     }
-    for (MotorSpec& motor : motors_) {
-      auto joint = std::ranges::find(model->joints, motor.joint, &Joint::name);
+    auto resolve_limited = [&](Limited limited,
+                               const std::array<double, 2>& range) {
+      bool has_range = !(range[0] == 0.0 && range[1] == 0.0);
+      return limited == Limited::YES ||
+             (limited == Limited::AUTO && compiler_.auto_limits && has_range);
+    };
+    for (ActuatorSpec& spec : actuators_) {
+      auto joint = std::ranges::find(model->joints, spec.joint, &Joint::name);
       if (joint == model->joints.end()) {
-        return fail("no joint " + motor.joint + " for motor");
+        return fail("no joint " + spec.joint + " for actuator");
       }
-      Actuator actuator = motor.actuator;
+      if (joint->type == JointType::FREE || joint->type == JointType::BALL) {
+        return Failure{lib::raise(MjcfError::UNSUPPORTED,
+                                  "actuator on a ball or free joint")};
+      }
+      Actuator actuator = spec.actuator;
       actuator.joint =
           static_cast<std::uint32_t>(joint - model->joints.begin());
-      bool has_range = !(actuator.control_range[0] == 0.0 &&
-                         actuator.control_range[1] == 0.0);
       actuator.control_limited =
-          motor.limited == Limited::YES || (motor.limited == Limited::AUTO &&
-                                            compiler_.auto_limits && has_range);
+          resolve_limited(spec.control_limited, actuator.control_range);
+      actuator.force_limited =
+          resolve_limited(spec.force_limited, actuator.force_range);
       model->actuators.push_back(actuator);
     }
     return {};
@@ -1275,8 +1353,8 @@ class Reader final {
         for (std::size_t i : massive) {
           const auto& [geom, mass] = geoms[i];
           Array3 d{geom.pos[0] - body.inertial_pos[0],
-                    geom.pos[1] - body.inertial_pos[1],
-                    geom.pos[2] - body.inertial_pos[2]};
+                   geom.pos[1] - body.inertial_pos[1],
+                   geom.pos[2] - body.inertial_pos[2]};
           std::array<double, 6> own =
               turn_inertia(compute_inertia(geom, mass), geom.quat);
           std::array<double, 6> shift = shift_inertia(mass, d);
@@ -1439,7 +1517,7 @@ class Reader final {
 
   CompilerSpec compiler_;
   std::map<std::string, Defaults> defaults_;
-  std::vector<MotorSpec> motors_;
+  std::vector<ActuatorSpec> actuators_;
 };
 
 }  // namespace

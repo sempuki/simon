@@ -54,3 +54,18 @@ cc_test(
         "@lib//base:testing",
     ],
 )
+
+cc_test(
+    name = "control_test",
+    size = "small",
+    srcs = ["control_test.cpp"],
+    copts = COPTS,
+    data = glob(["models/*.xml"]) + [
+        "reference/mujoco_control.csv",
+        "reference/mujoco_feedback.csv",
+    ],
+    deps = [
+        ":robotic_library",
+        "@lib//base:testing",
+    ],
+)

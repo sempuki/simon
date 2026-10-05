@@ -36,12 +36,17 @@ struct TreeCapacity final {
   static constexpr std::size_t qpos = DOFS + BODIES;
 };
 
-// A tree's state: its positions and velocities, and its motors' controls.
+// A tree's state: its positions and velocities.
 template <typename Capacity>
 struct TreeState final {
   std::array<double, Capacity::qpos> qpos{};
   std::array<double, Capacity::dofs> qvel{};
-  std::array<double, Capacity::dofs> control{};  // By the tree's actuators.
+};
+
+// A tree's actuators' controls, by the tree's actuators.
+template <typename Capacity>
+struct TreeControl final {
+  std::array<double, Capacity::dofs> control{};
 };
 
 // What a step computes on the way to a tree's accelerations, kept for
@@ -125,8 +130,8 @@ inline auto rotate(const Array3& v, const Quaternion4& q) -> Array3 {
     return v;
   }
   Array3 t{q[0] * v[0] + q[2] * v[2] - q[3] * v[1],
-            q[0] * v[1] + q[3] * v[0] - q[1] * v[2],
-            q[0] * v[2] + q[1] * v[1] - q[2] * v[0]};
+           q[0] * v[1] + q[3] * v[0] - q[1] * v[2],
+           q[0] * v[2] + q[1] * v[1] - q[2] * v[0]};
   return {v[0] + 2 * (q[2] * t[2] - q[3] * t[1]),
           v[1] + 2 * (q[3] * t[0] - q[1] * t[2]),
           v[2] + 2 * (q[1] * t[1] - q[2] * t[0])};
@@ -265,8 +270,8 @@ inline auto combine(std::span<const Spatial> dofs, std::span<const double> w)
 
 // The quaternion turned by angular velocity `vel` for `scale`
 // (mju_quatIntegrate).
-inline auto integrate_quaternion(Quaternion4 q, const Array3& vel,
-                                 double scale) -> Quaternion4 {
+inline auto integrate_quaternion(Quaternion4 q, const Array3& vel, double scale)
+    -> Quaternion4 {
   Array3 axis = vel;
   double angle = scale * normalize3(axis);
   Quaternion4 turn = convert_axis_angle(axis, angle);
@@ -281,6 +286,7 @@ template <typename Capacity>
 class TreeKernel final {
  public:
   using State = TreeState<Capacity>;
+  using Control = TreeControl<Capacity>;
   using Dynamics = TreeDynamics<Capacity>;
   static constexpr std::size_t V = Capacity::dofs;
 
@@ -306,10 +312,22 @@ class TreeKernel final {
         subtree_mass_[parent_[b]] += subtree_mass_[b];
       }
     }
+    // Each dof's damping, with its actuators' times the gear squared
+    // (mj_actuatorDamping).
+    for (std::uint32_t d = 0; d < tree.dofs; ++d) {
+      damping_[d] = model.dofs[tree.first_dof + d].damping;
+    }
+    for (std::uint32_t a : tree.actuators) {
+      const Actuator& actuator = model.actuators[a];
+      double gear2 = actuator.gear[0] * actuator.gear[0];
+      std::uint32_t d = model.joints[actuator.joint].dof - tree.first_dof;
+      damping_[d] = damping_[d] + actuator.damping * gear2;
+    }
   }
 
   // Everything to the accelerations without constraints.
-  auto forward(const State& state, Dynamics& out) const -> void {
+  auto forward(const State& state, const Control& control, Dynamics& out) const
+      -> void {
     compute_kinematics(state, out);
     compute_com(out);
     compute_mass(out);
@@ -317,7 +335,7 @@ class TreeKernel final {
     compute_velocities(state, out);
     compute_bias(state, out);
     compute_passive(state, out);
-    compute_actuation(state, out);
+    compute_actuation(state, control, out);
     for (std::uint32_t i = 0; i < tree_->dofs; ++i) {
       out.smooth[i] = out.passive[i] - out.bias[i];
       out.smooth[i] += out.actuator[i];
@@ -336,7 +354,7 @@ class TreeKernel final {
     double h = m.physics.timestep;
     bool damped = !tree_->actuators.empty();
     for (std::uint32_t i = 0; i < tree_->dofs; ++i) {
-      damped = damped || m.dofs[tree_->first_dof + i].damping > 0;
+      damped = damped || damping_[i] > 0;
     }
     std::array<double, V> qacc{};
     if (!damped) {
@@ -346,7 +364,7 @@ class TreeKernel final {
     } else {
       std::array<double, V * V> h_mass = dynamics.mass;
       for (std::uint32_t i = 0; i < tree_->dofs; ++i) {
-        h_mass[i * V + i] += h * m.dofs[tree_->first_dof + i].damping;
+        h_mass[i * V + i] += h * damping_[i];
       }
       std::array<double, V * V> h_factor{};
       std::array<double, V> h_inverse{};
@@ -542,7 +560,7 @@ class TreeKernel final {
     for (std::uint32_t b = 0; b < tree_->bodies; ++b) {
       const ArticulatedBody& body = m.bodies[tree_->first_body + b];
       Array3 offset{out.xipos[b][0] - out.com[0], out.xipos[b][1] - out.com[1],
-                     out.xipos[b][2] - out.com[2]};
+                    out.xipos[b][2] - out.com[2]};
       out.cinert[b] =
           shift_inertia(body.inertia, out.ximat[b], offset, body.mass);
     }
@@ -553,8 +571,8 @@ class TreeKernel final {
         std::uint32_t j = body.first_joint + jj - tree_->first_joint;
         std::uint32_t da = joint.dof - tree_->first_dof;
         Array3 offset{out.com[0] - out.xanchor[j][0],
-                       out.com[1] - out.xanchor[j][1],
-                       out.com[2] - out.xanchor[j][2]};
+                      out.com[1] - out.xanchor[j][1],
+                      out.com[2] - out.xanchor[j][2]};
         std::uint32_t skip = 0;
         switch (joint.type) {
           case JointType::FREE:
@@ -731,8 +749,8 @@ class TreeKernel final {
           std::uint32_t skip = joint.type == JointType::FREE ? 3 : 0;
           if (skip > 0) {
             Array3 dif{state.qpos[q] - m.qpos_spring[qs],
-                        state.qpos[q + 1] - m.qpos_spring[qs + 1],
-                        state.qpos[q + 2] - m.qpos_spring[qs + 2]};
+                       state.qpos[q + 1] - m.qpos_spring[qs + 1],
+                       state.qpos[q + 2] - m.qpos_spring[qs + 2]};
             for (int k = 0; k < 3; ++k) {
               out.passive[v + k] += dif[k] * -joint.stiffness;
             }
@@ -763,7 +781,7 @@ class TreeKernel final {
       }
     }
     for (std::uint32_t i = 0; i < tree_->dofs; ++i) {
-      double damping = m.dofs[tree_->first_dof + i].damping;
+      double damping = damping_[i];
       if (damping != 0) {
         double damper = -state.qvel[i] * damping;
         out.passive[i] = out.passive[i] + damper;
@@ -771,20 +789,36 @@ class TreeKernel final {
     }
   }
 
-  // Motors: each control, clamped to its range, times its gear.
-  auto compute_actuation(const State& state, Dynamics& out) const -> void {
+  // Actuators: each control clamped to its range, times its gain, plus its
+  // bias in the joint's length and velocity, clamped to its force range,
+  // times its gear on the joint (mj_transmission, mj_fwdActuation).
+  auto compute_actuation(const State& state, const Control& control,
+                         Dynamics& out) const -> void {
     const ArticulatedModel& m = *model_;
     out.actuator.fill(0.0);
     for (std::size_t a = 0; a < tree_->actuators.size(); ++a) {
       const Actuator& actuator = m.actuators[tree_->actuators[a]];
-      double control = state.control[a];
+      const Joint& joint = m.joints[actuator.joint];
+      std::uint32_t q = joint.qpos - tree_->first_qpos;
+      std::uint32_t v = joint.dof - tree_->first_dof;
+      double gear = actuator.gear[0];
+      double input = control.control[a];
       if (actuator.control_limited) {
-        control = std::clamp(control, actuator.control_range[0],
-                             actuator.control_range[1]);
+        input = std::clamp(input, actuator.control_range[0],
+                           actuator.control_range[1]);
       }
-      double force = 1 * control;
-      std::uint32_t v = m.joints[actuator.joint].dof - tree_->first_dof;
-      out.actuator[v] += actuator.gear[0] * force;
+      double force = actuator.gain[0] * input;
+      if (actuator.bias_type == Actuator::Bias::AFFINE) {
+        double length = state.qpos[q] * gear;
+        double velocity = gear * state.qvel[v];
+        force += actuator.bias[0] + actuator.bias[1] * length +
+                 actuator.bias[2] * velocity;
+      }
+      if (actuator.force_limited) {
+        force =
+            std::clamp(force, actuator.force_range[0], actuator.force_range[1]);
+      }
+      out.actuator[v] += gear * force;
     }
   }
 
@@ -794,6 +828,7 @@ class TreeKernel final {
   std::array<std::uint32_t, V> dof_parent_{};
   std::array<std::uint32_t, V> dof_body_{};
   std::array<double, Capacity::bodies> subtree_mass_{};
+  std::array<double, V> damping_{};  // By dof, with its actuators'.
 };
 
 }  // namespace simon::model

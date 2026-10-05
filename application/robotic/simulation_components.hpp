@@ -25,6 +25,8 @@ using LargeCapacity = model::TreeCapacity<16, 32>;
 template <typename Capacity>
 using TreeState = model::TreeState<Capacity>;
 template <typename Capacity>
+using TreeControl = model::TreeControl<Capacity>;
+template <typename Capacity>
 using TreeDynamics = model::TreeDynamics<Capacity>;
 
 // The model and its trees, each with its kernel, read once and shared by
@@ -59,6 +61,16 @@ class Mechanics final {
   // Each tree's kernel at each capacity it fits, else none.
   std::vector<std::unique_ptr<model::TreeKernel<SmallCapacity>>> small_;
   std::vector<std::unique_ptr<model::TreeKernel<LargeCapacity>>> large_;
+};
+
+// A linear state feedback on the model's actuators: each control
+// u = u0 - K (x - x0), x the model's positions then velocities, K by
+// actuator, row by row, each tree's controls from its own state alone. None
+// if the gains are empty.
+struct Feedback final {
+  std::vector<double> gains;
+  std::vector<double> reference;  // x0.
+  std::vector<double> offset;     // u0, by actuator.
 };
 
 // Which of the model's trees an entity is.
@@ -99,6 +111,7 @@ struct SmallTree final                                      //
     : Archetype<"small tree",                               //
                 Requires<TreeBound, Mechanism,              //
                          TreeState<SmallCapacity>,          //
+                         TreeControl<SmallCapacity>,        //
                          TreeDynamics<SmallCapacity>>> {};  //
 
 // A tree of at most 16 bodies and 32 degrees of freedom: an arm, a
@@ -107,6 +120,7 @@ struct LargeTree final                                      //
     : Archetype<"large tree",                               //
                 Requires<TreeBound, Mechanism,              //
                          TreeState<LargeCapacity>,          //
+                         TreeControl<LargeCapacity>,        //
                          TreeDynamics<LargeCapacity>>> {};  //
 
 }  // namespace archetype
@@ -114,7 +128,8 @@ struct LargeTree final                                      //
 using World = framework::World<
     TreeBound,
     framework::TypeList<Mechanism, TreeState<SmallCapacity>,
-                        TreeDynamics<SmallCapacity>, TreeState<LargeCapacity>,
+                        TreeControl<SmallCapacity>, TreeDynamics<SmallCapacity>,
+                        TreeState<LargeCapacity>, TreeControl<LargeCapacity>,
                         TreeDynamics<LargeCapacity>>,
     framework::TypeList<archetype::SmallTree, archetype::LargeTree>>;
 

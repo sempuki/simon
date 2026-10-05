@@ -8,9 +8,9 @@
 #include "framework/system.hpp"
 #include "framework/vocabulary.hpp"
 
-// The robotic simulation's systems, each once per capacity: Forward computes
-// each tree's poses, mass matrix and smooth accelerations, Bound its sphere,
-// and Integrate steps its state.
+// The robotic simulation's systems, each once per capacity: Control sets
+// each tree's controls, Forward computes its poses, mass matrix and smooth
+// accelerations, Bound its sphere, and Integrate steps its state.
 namespace simon::robotic {
 
 using framework::Entity;
@@ -21,22 +21,48 @@ using framework::SystemList;
 template <typename SystemType>
 using ProjectedWorld = framework::ProjectedWorld<SystemType, World>;
 
-// Each step, a tree's dynamics without constraints, from its state.
+// Each step, a tree's controls by the feedback, if there is one, from its
+// state as the last step left it.
 template <typename Capacity>
-struct Forward final                     //
-    : System<TreeDynamics<Capacity>,     //
+struct Control final                     //
+    : System<TreeControl<Capacity>,      //
              const TreeState<Capacity>,  //
              const Mechanism> {
+  using SystemWorld = ProjectedWorld<Control>;
+
+  Control(const Mechanics& mechanics, const Feedback& feedback)
+      : mechanics_{&mechanics}, feedback_{&feedback} {}
+
+  auto operator()(SystemWorld&, Entity,              //
+                  TreeControl<Capacity>& control,    //
+                  const TreeState<Capacity>* state,  //
+                  const Mechanism* mechanism) const -> void;
+
+ private:
+  const Mechanics* mechanics_ = nullptr;
+  const Feedback* feedback_ = nullptr;
+};
+
+// Each step, a tree's dynamics without constraints, from its state.
+template <typename Capacity>
+struct Forward final                       //
+    : System<TreeDynamics<Capacity>,       //
+             const TreeState<Capacity>,    //
+             const TreeControl<Capacity>,  //
+             const Mechanism> {
   using SystemWorld = ProjectedWorld<Forward>;
+  using SequenceAfterSystemList = SystemList<Control<Capacity>>;
 
   explicit Forward(const Mechanics& mechanics) : mechanics_{&mechanics} {}
 
-  auto operator()(SystemWorld&, Entity,              //
-                  TreeDynamics<Capacity>& dynamics,  //
-                  const TreeState<Capacity>* state,  //
+  auto operator()(SystemWorld&, Entity,                  //
+                  TreeDynamics<Capacity>& dynamics,      //
+                  const TreeState<Capacity>* state,      //
+                  const TreeControl<Capacity>* control,  //
                   const Mechanism* mechanism) const -> void {
-    if (state && mechanism) {
-      mechanics_->kernel<Capacity>(mechanism->tree).forward(*state, dynamics);
+    if (state && control && mechanism) {
+      mechanics_->kernel<Capacity>(mechanism->tree)
+          .forward(*state, *control, dynamics);
     }
   }
 
@@ -90,17 +116,53 @@ struct Integrate final                      //
   const Mechanics* mechanics_ = nullptr;
 };
 
-using Schedule = SystemList<Forward<SmallCapacity>, Forward<LargeCapacity>,
+using Schedule = SystemList<Control<SmallCapacity>, Control<LargeCapacity>,
+                            Forward<SmallCapacity>, Forward<LargeCapacity>,
                             Bound<SmallCapacity>, Bound<LargeCapacity>,
                             Integrate<SmallCapacity>, Integrate<LargeCapacity>>;
 
-inline auto make_schedule(const Mechanics& mechanics) -> Schedule {
-  return Schedule{
-      Forward<SmallCapacity>{mechanics},   Forward<LargeCapacity>{mechanics},
-      Bound<SmallCapacity>{mechanics},     Bound<LargeCapacity>{mechanics},
-      Integrate<SmallCapacity>{mechanics}, Integrate<LargeCapacity>{mechanics}};
+inline auto make_schedule(const Mechanics& mechanics, const Feedback& feedback)
+    -> Schedule {
+  return Schedule{Control<SmallCapacity>{mechanics, feedback},
+                  Control<LargeCapacity>{mechanics, feedback},
+                  Forward<SmallCapacity>{mechanics},
+                  Forward<LargeCapacity>{mechanics},
+                  Bound<SmallCapacity>{mechanics},
+                  Bound<LargeCapacity>{mechanics},
+                  Integrate<SmallCapacity>{mechanics},
+                  Integrate<LargeCapacity>{mechanics}};
 }
 using Scheduler = framework::Scheduler<World, Schedule>;
+
+template <typename Capacity>
+auto Control<Capacity>::operator()(SystemWorld&, Entity,              //
+                                   TreeControl<Capacity>& control,    //
+                                   const TreeState<Capacity>* state,  //
+                                   const Mechanism* mechanism) const -> void {
+  const Feedback& law = *feedback_;
+  if (law.gains.empty() || !state || !mechanism) {
+    return;
+  }
+  const model::ArticulatedModel& m = mechanics_->model();
+  const model::Tree& tree = mechanics_->trees()[mechanism->tree];
+  std::size_t nq = m.qpos0.size();
+  std::size_t width = nq + m.dofs.size();
+  for (std::size_t a = 0; a < tree.actuators.size(); ++a) {
+    std::uint32_t row = tree.actuators[a];
+    double u = law.offset[row];
+    for (std::uint32_t q = 0; q < tree.qpos; ++q) {
+      std::size_t column = tree.first_qpos + q;
+      u -= law.gains[row * width + column] *
+           (state->qpos[q] - law.reference[column]);
+    }
+    for (std::uint32_t v = 0; v < tree.dofs; ++v) {
+      std::size_t column = nq + tree.first_dof + v;
+      u -= law.gains[row * width + column] *
+           (state->qvel[v] - law.reference[column]);
+    }
+    control.control[a] = u;
+  }
+}
 
 template <typename Capacity>
 auto Bound<Capacity>::operator()(SystemWorld&, Entity,                    //

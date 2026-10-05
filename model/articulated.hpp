@@ -110,13 +110,26 @@ struct Geom final {
   std::int32_t priority = 0;
 };
 
-// An actuator: a motor on a joint, its force the control times its gear.
+// An actuator on a joint: its force a fixed gain times its control plus,
+// for an affine bias, a constant and terms in the joint's length and
+// velocity, both times the gear, clamped to its range, then times its gear
+// on the joint; and a damping its joint feels, taken implicitly. A motor
+// has gain 1 and no bias, a position servo gain kp and bias 0, -kp, -kv, a
+// velocity servo gain kv and bias 0, 0, -kv.
 struct Actuator final {
+  enum class Bias : std::uint8_t { NONE, AFFINE };
+
   std::string name;
   std::uint32_t joint = 0;
   std::array<double, 6> gear{1.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+  std::array<double, 3> gain{1.0, 0.0, 0.0};
+  std::array<double, 3> bias{};
   std::array<double, 2> control_range{};
+  std::array<double, 2> force_range{};
+  double damping = 0.0;
+  Bias bias_type = Bias::NONE;
   bool control_limited = false;
+  bool force_limited = false;
 };
 
 // How the model steps, as MuJoCo's option element sets it.
