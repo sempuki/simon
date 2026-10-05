@@ -1,0 +1,42 @@
+<!-- Copyright 2026 -- CONTRIBUTORS. See LICENSE. -->
+<!-- The pairs MuJoCo's analytic colliders leave to its convex collider:
+     ellipsoids with planes and everything else, and cylinders with
+     capsules, boxes and cylinders; one capsule with a margin, so a single
+     pass finds one contact and the geoms are turned to find more. -->
+<mujoco model="convex">
+  <worldbody>
+    <geom name="floor" type="plane" size="0 0 1"/>
+    <body name="egg">
+      <freejoint/>
+      <geom name="egg" type="ellipsoid" size="0.12 0.08 0.06"/>
+    </body>
+    <body name="pebble">
+      <freejoint/>
+      <geom name="pebble" type="ellipsoid" size="0.05 0.07 0.04"/>
+    </body>
+    <body name="ball">
+      <freejoint/>
+      <geom name="ball" type="sphere" size="0.08"/>
+    </body>
+    <body name="pill">
+      <freejoint/>
+      <geom name="pill" type="capsule" size="0.05 0.12"/>
+    </body>
+    <body name="rod">
+      <freejoint/>
+      <geom name="rod" type="capsule" size="0.03 0.1" margin="0.01"/>
+    </body>
+    <body name="drum">
+      <freejoint/>
+      <geom name="drum" type="cylinder" size="0.08 0.1"/>
+    </body>
+    <body name="can">
+      <freejoint/>
+      <geom name="can" type="cylinder" size="0.05 0.12"/>
+    </body>
+    <body name="crate">
+      <freejoint/>
+      <geom name="crate" type="box" size="0.1 0.08 0.06"/>
+    </body>
+  </worldbody>
+</mujoco>

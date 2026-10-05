@@ -2,6 +2,8 @@
 
 #include "model/articulated_collision.hpp"
 
+#include "model/articulated_convex.hpp"
+
 #include <algorithm>
 #include <cmath>
 
@@ -1224,7 +1226,10 @@ auto append_contacts(const ArticulatedModel& model, std::uint32_t first,
   }
   std::array<PreContact, MAX_PAIR_CONTACTS> found{};
   std::uint32_t n =
-      collide(*g1, frames[first], *g2, frames[second], bound, found);
+      has_collider(g1->type, g2->type)
+          ? collide(*g1, frames[first], *g2, frames[second], bound, found)
+          : collide_convex(*g1, frames[first], radii[first], *g2,
+                           frames[second], radii[second], bound, found);
   if (n == 0) {
     return;
   }

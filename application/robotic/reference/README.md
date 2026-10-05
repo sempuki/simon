@@ -16,6 +16,7 @@ constraints against
 | `rolling.xml` | A sphere dropped onto the floor |
 | `sliding.xml` | A box sliding on the floor, and a capsule with torsional and rolling friction |
 | `limits.xml` | Hinge, ball and slide limits, soft parameters and a margin, and dry friction |
+| `convex.xml` | The pairs MuJoCo's convex collider takes: ellipsoids, cylinders with capsules, boxes and cylinders |
 | `collisions.xml` | Every primitive pair: two planes, one tilted on a fixed body, loose spheres, capsules, a cylinder and boxes, a fixed box, and an arm with a welded body; margins, gaps, priorities, condims and soft parameters that differ |
 
 | Script | Writes | Read by |
@@ -26,6 +27,6 @@ constraints against
 | `mujoco_constraints.py` | `mujoco_constraints.csv`: positions and velocities at every step of eleven cases, contacts, limits and dry friction on, by Newton and by PGS, MuJoCo's humanoid among them | `constraint_test` |
 | `make_scenes.py` | `bodies_N.xml` and `humanoids_N.xml`: N loose bodies falling and N/10 humanoids, into a directory it is given | `robotic_benchmark` and `mujoco_benchmark.py` |
 | `mujoco_benchmark.py` | Nothing: prints MuJoCo's time a step on one thread for a scene | |
-| `mujoco_contacts.py` | `mujoco_contacts.csv`: `collisions.xml` at 400 random poses, and every contact MuJoCo finds at each | `collision_test` |
+| `mujoco_contacts.py` | `mujoco_contacts.csv` and `mujoco_convex.csv`: `collisions.xml` and `convex.xml` at 400 random poses each, and every contact MuJoCo finds at each | `collision_test` |
 
 `pip install mujoco numpy` (MuJoCo 3.14.0) runs the scripts.

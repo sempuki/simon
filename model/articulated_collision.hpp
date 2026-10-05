@@ -14,10 +14,10 @@
 // Contacts between the geoms of articulated bodies, as MuJoCo finds them
 // (see model/REFERENCES.md): which bodies may touch, which geoms by their
 // contact type and affinity, a bounding sphere test, then the primitive
-// colliders of engine_collision_primitive.c and engine_collision_box.c, and
-// each contact's parameters mixed from its two geoms. Pairs MuJoCo sends to
-// its general convex collider (ellipsoids, meshes, a cylinder with anything
-// but a plane or a sphere) are not here.
+// colliders of engine_collision_primitive.c and engine_collision_box.c, or
+// for the pairs those leave out its general convex collider
+// (model/articulated_convex), and each contact's parameters mixed from its
+// two geoms.
 namespace simon::model {
 
 // A geom's pose in the world.

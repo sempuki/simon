@@ -1,6 +1,6 @@
 # Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-"""Finds the contacts of robotic's collision model in MuJoCo, for
+"""Finds the contacts of robotic's collision models in MuJoCo, for
 collision_test.
 
 MuJoCo (https://mujoco.org, Apache-2.0) runs its collision detection on
@@ -10,7 +10,8 @@ at random, the arm's joints within a radian. This script writes
 mujoco_contacts.csv: a row of positions for each pose, then a row for each
 contact MuJoCo finds there: its geoms, distance, position, frame, dimension,
 friction, solref, solimp, margin it includes, and whether the gap excludes
-it, to 17 significant digits.
+it, to 17 significant digits. It does the same for models/convex.xml, the
+pairs MuJoCo's convex collider takes, into mujoco_convex.csv.
 
 MuJoCo 3.14.0:
 
@@ -34,10 +35,15 @@ def text(values):
 
 
 def main():
-    model = mujoco.MjModel.from_xml_path(os.path.join(MODELS, 'collisions.xml'))
+    write('collisions.xml', 'mujoco_contacts.csv')
+    write('convex.xml', 'mujoco_convex.csv')
+
+
+def write(model_file, table):
+    model = mujoco.MjModel.from_xml_path(os.path.join(MODELS, model_file))
     data = mujoco.MjData(model)
     rng = numpy.random.default_rng(1)
-    with open(os.path.join(HERE, 'mujoco_contacts.csv'), 'w', newline='') as f:
+    with open(os.path.join(HERE, table), 'w', newline='') as f:
         out = csv.writer(f, lineterminator='\n')
         out.writerow(['pose', 'kind', 'values'])
         total = 0
@@ -62,7 +68,7 @@ def main():
                           c.includemargin, c.exclude])
                 ])
             total += data.ncon
-        print(POSES, 'poses,', total, 'contacts')
+        print(model_file, POSES, 'poses,', total, 'contacts')
 
 
 if __name__ == '__main__':

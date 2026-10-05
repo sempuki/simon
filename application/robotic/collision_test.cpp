@@ -64,8 +64,9 @@ struct Pose final {
   std::vector<Row> contacts;
 };
 
-auto load_poses() -> std::vector<Pose> {
-  std::ifstream file{"application/robotic/reference/mujoco_contacts.csv"};
+auto load_poses(std::string_view table = "mujoco_contacts.csv")
+    -> std::vector<Pose> {
+  std::ifstream file{"application/robotic/reference/" + std::string{table}};
   REQUIRE(file);
   std::vector<Pose> poses;
   std::string line;
@@ -93,54 +94,80 @@ auto step_once(InOut<Simulation> simulation) -> void {
       framework::Step{.time = framework::TimePoint{}, .dt = dt}));
 }
 
+struct Comparison final {
+  std::size_t total = 0;
+  std::size_t miscounted = 0;
+  std::size_t mismatched = 0;  // Contacts between other geoms.
+  double largest = 0.0;
+};
+
+// Each pose of `table` posed in `model`, its contacts against MuJoCo's.
+auto compare_poses(std::string_view model, std::string_view table)
+    -> Comparison {
+  std::vector<Pose> poses = load_poses(table);
+  REQUIRE(poses.size() == 400);
+  Comparison result;
+  for (std::size_t p = 0; p < poses.size(); ++p) {
+    Scenario scenario{.model = std::string{MODELS} + std::string{model}};
+    for (std::uint32_t q = 0; q < poses[p].qpos.size(); ++q) {
+      scenario.qpos.emplace_back(q, poses[p].qpos[q]);
+    }
+    Simulation simulation{scenario};
+    auto configured = simulation.configure();
+    if (!configured) {
+      FAIL(configured.error().message());
+    }
+    step_once(InOut(simulation));
+    std::vector<Row> found;
+    for (const model::Contact& contact : simulation.contacts()) {
+      found.push_back(flatten(contact));
+    }
+    std::vector<Row> expected = poses[p].contacts;
+    sort_rows(InOut(found));
+    sort_rows(InOut(expected));
+    result.total += expected.size();
+    if (found.size() != expected.size()) {
+      ++result.miscounted;
+      continue;
+    }
+    for (std::size_t k = 0; k < found.size(); ++k) {
+      REQUIRE(found[k].size() == expected[k].size());
+      if (found[k][0] != expected[k][0] || found[k][1] != expected[k][1]) {
+        ++result.mismatched;
+        continue;
+      }
+      for (std::size_t i = 2; i < found[k].size(); ++i) {
+        result.largest =
+            std::max(result.largest, std::abs(found[k][i] - expected[k][i]));
+      }
+    }
+  }
+  return result;
+}
+
 }  // namespace
 
 TEST_CASE("CollisionAgainstMuJoCo") {
   SECTION("ShouldFindMuJoCosContactsGivenEveryPrimitivePair") {
     // Each pose's contacts, as many as MuJoCo's between the same geoms, and
     // every value of each equal to MuJoCo's.
-    std::vector<Pose> poses = load_poses();
-    REQUIRE(poses.size() == 400);
-    std::size_t total = 0;
-    std::size_t miscounted = 0;
-    double largest = 0.0;
-    for (std::size_t p = 0; p < poses.size(); ++p) {
-      Scenario scenario{.model = std::string{MODELS} + "collisions.xml"};
-      for (std::uint32_t q = 0; q < poses[p].qpos.size(); ++q) {
-        scenario.qpos.emplace_back(q, poses[p].qpos[q]);
-      }
-      Simulation simulation{scenario};
-      auto configured = simulation.configure();
-      if (!configured) {
-        FAIL(configured.error().message());
-      }
-      step_once(InOut(simulation));
-      std::vector<Row> found;
-      for (const model::Contact& contact : simulation.contacts()) {
-        found.push_back(flatten(contact));
-      }
-      std::vector<Row> expected = poses[p].contacts;
-      sort_rows(InOut(found));
-      sort_rows(InOut(expected));
-      total += expected.size();
-      if (found.size() != expected.size()) {
-        CAPTURE(p, found.size(), expected.size());
-        ++miscounted;
-        continue;
-      }
-      for (std::size_t k = 0; k < found.size(); ++k) {
-        REQUIRE(found[k].size() == expected[k].size());
-        CHECK(found[k][0] == expected[k][0]);
-        CHECK(found[k][1] == expected[k][1]);
-        for (std::size_t i = 2; i < found[k].size(); ++i) {
-          largest = std::max(largest, std::abs(found[k][i] - expected[k][i]));
-        }
-      }
-    }
-    CAPTURE(total, miscounted, largest);
-    CHECK(total > 5000);
-    CHECK(miscounted == 0);
-    CHECK(largest == 0.0);
+    Comparison c = compare_poses("collisions.xml", "mujoco_contacts.csv");
+    CAPTURE(c.total, c.miscounted, c.mismatched, c.largest);
+    CHECK(c.total > 5000);
+    CHECK(c.miscounted == 0);
+    CHECK(c.mismatched == 0);
+    CHECK(c.largest == 0.0);
+  }
+
+  SECTION("ShouldFindMuJoCosContactsGivenPairsOnlyItsConvexColliderTakes") {
+    // Ellipsoids and cylinders by GJK and EPA, their faces clipped or the
+    // geoms turned for more: every contact equal to MuJoCo's.
+    Comparison c = compare_poses("convex.xml", "mujoco_convex.csv");
+    CAPTURE(c.total, c.miscounted, c.mismatched, c.largest);
+    CHECK(c.total > 1500);
+    CHECK(c.miscounted == 0);
+    CHECK(c.mismatched == 0);
+    CHECK(c.largest == 0.0);
   }
 
   SECTION("ShouldCountEachTreesContacts") {
@@ -174,22 +201,6 @@ TEST_CASE("CollisionAgainstMuJoCo") {
     CAPTURE(expected, m.geoms.size());
     CHECK(expected > 0);
     CHECK(counted == expected);
-  }
-
-  SECTION("ShouldRefuseGivenPairsOnlyAConvexColliderHandles") {
-    // A capsule that may touch a cylinder needs MuJoCo's general convex
-    // collider, which robotic does not have.
-    std::filesystem::path path =
-        std::filesystem::temp_directory_path() / "convex.xml";
-    std::ofstream{path} << R"(<mujoco><worldbody>
-      <body><freejoint/><geom type="capsule" size="0.1 0.2"/></body>
-      <body><freejoint/><geom type="cylinder" size="0.1 0.2"/></body>
-      </worldbody></mujoco>)";
-    Simulation simulation{Scenario{.model = path.string()}};
-    auto configured = simulation.configure();
-    REQUIRE(!configured);
-    CHECK(configured.error().message().find("capsule with cylinder") !=
-          std::string::npos);
   }
 }
 

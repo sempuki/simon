@@ -185,11 +185,17 @@ of lower type first: a plane with a sphere, a capsule, a cylinder or a box;
 a sphere with a sphere, a capsule, a cylinder or a box; a capsule with a
 capsule or a box; and a box with a box, by the separating axis test, faces
 preferred on near-ties, then either the nearest points of two edges or the
-other box's face clipped to the reference face. Each contact takes its
-parameters from the geom of higher priority, or else the larger condim,
-the larger frictions and an even mix of solref and solimp, and its frame
-from its normal. A model with a pair only MuJoCo's general convex collider
-handles is refused.
+other box's face clipped to the reference face. The pairs those leave
+out, an ellipsoid with anything and a cylinder with a capsule, a box or a
+cylinder, go to `model/articulated_convex`, a port of MuJoCo's native
+convex collider: the Gilbert–Johnson–Keerthi distance between the two
+shapes' support functions, the expanding polytope for the depth where
+they overlap, and then, where two faces meet, the one face clipped
+against the other for up to four contacts, or else the geoms turned a
+milliradian each way about the first contact to find more. Each contact
+takes its parameters from the geom of higher priority, or else the larger
+condim, the larger frictions and an even mix of solref and solimp, and its
+frame from its normal.
 
 `Collide` runs once a step, after `Bound`, on the whole world: it places
 every geom from its tree's poses, then collides the world's geoms and the
@@ -204,7 +210,10 @@ a box that cannot move and an arm whose links overlap their parents with a
 body welded to one, at 400 random poses, and checks every contact against
 MuJoCo's (`reference/mujoco_contacts.py`): all 5,465 contacts are there,
 between the same geoms, and every distance, position, frame, dimension,
-friction and soft parameter is equal to MuJoCo's to the last bit.
+friction and soft parameter is equal to MuJoCo's to the last bit. It poses
+`models/convex.xml`, two ellipsoids, a sphere, two capsules (one with a
+margin), two cylinders and a box over the floor, at 400 random poses too:
+all 1,903 of MuJoCo's contacts, each equal to the last bit.
 
 ## Constraints
 

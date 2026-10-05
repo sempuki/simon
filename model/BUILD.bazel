@@ -451,8 +451,14 @@ cc_library(
 
 cc_library(
     name = "articulated_collision",
-    srcs = ["articulated_collision.cpp"],
-    hdrs = ["articulated_collision.hpp"],
+    srcs = [
+        "articulated_collision.cpp",
+        "articulated_convex.cpp",
+    ],
+    hdrs = [
+        "articulated_collision.hpp",
+        "articulated_convex.hpp",
+    ],
     copts = COPTS,
     deps = [
         ":articulated",

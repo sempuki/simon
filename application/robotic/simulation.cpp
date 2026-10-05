@@ -222,36 +222,6 @@ auto start_control(const Mechanics& mechanics, std::uint32_t t,
   return control;
 }
 
-// Two geoms that may touch, by their bodies, contact types and affinities,
-// and that only MuJoCo's general convex collider handles: an ellipsoid, or
-// a cylinder with anything but a plane or a sphere.
-auto find_convex_pair(const model::ArticulatedModel& m,
-                      const model::BodyFilter& filter)
-    -> std::optional<std::string> {
-  constexpr std::array<std::string_view, 8> NAMES{
-      "plane",     "hfield",   "sphere", "capsule",
-      "ellipsoid", "cylinder", "box",    "mesh"};
-  for (std::uint32_t c = 0; c < m.geoms.size(); ++c) {
-    const model::Geom& convex = m.geoms[c];
-    if (convex.type != model::GeomType::ELLIPSOID &&
-        convex.type != model::GeomType::CYLINDER) {
-      continue;
-    }
-    for (std::uint32_t g = 0; g < m.geoms.size(); ++g) {
-      const model::Geom& other = m.geoms[g];
-      auto [low, high] = std::minmax(convex.type, other.type);
-      bool touch = (convex.contype & other.conaffinity) != 0 ||
-                   (other.contype & convex.conaffinity) != 0;
-      if (g != c && touch && !model::has_collider(low, high) &&
-          !filter.discards(convex.body, other.body)) {
-        return std::string{NAMES[static_cast<std::size_t>(low)]} + " with " +
-               std::string{NAMES[static_cast<std::size_t>(high)]};
-      }
-    }
-  }
-  return std::nullopt;
-}
-
 }  // namespace
 
 auto Simulation::configure() -> engine::PhaseResult {
@@ -278,12 +248,6 @@ auto Simulation::configure() -> engine::PhaseResult {
         lib::raise(format::MjcfError::UNSUPPORTED, "the CG solver"));
   }
   mechanics_ = std::make_unique<Mechanics>(std::move(model));
-  if (std::optional<std::string> pair =
-          find_convex_pair(mechanics_->model(), mechanics_->filter())) {
-    return std::unexpected(lib::raise(
-        format::MjcfError::UNSUPPORTED,
-        "contacts of " + *pair + ", which need a general convex collider"));
-  }
   scheduler_ = std::make_unique<Scheduler>(
       make_schedule(*mechanics_, scenario_.feedback, Depend(*contacts_),
                     Depend(*solution_), scenario_.constrained));

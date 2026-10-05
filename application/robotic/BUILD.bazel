@@ -81,7 +81,10 @@ cc_test(
     size = "small",
     srcs = ["collision_test.cpp"],
     copts = COPTS,
-    data = glob(["models/*.xml"]) + ["reference/mujoco_contacts.csv"],
+    data = glob(["models/*.xml"]) + [
+        "reference/mujoco_contacts.csv",
+        "reference/mujoco_convex.csv",
+    ],
     deps = [
         ":robotic_library",
         "@lib//base:testing",
