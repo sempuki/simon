@@ -9,6 +9,7 @@
 #include "application/robotic/simulation_components.hpp"
 #include "framework/system.hpp"
 #include "framework/vocabulary.hpp"
+#include "model/articulated_constraint.hpp"
 
 // The robotic simulation's systems, each once per capacity but Collide:
 // Control sets each tree's controls, Forward computes its poses, mass matrix
@@ -135,39 +136,122 @@ struct Collide final    //
   std::vector<std::uint32_t> touching_;   // By tree.
 };
 
-// After Collide, a step of semi-implicit Euler.
+// After Collide, the constraints of every tree, as rows: its dofs' dry
+// friction, its joints' limits, and the contacts' pyramidal friction cones.
+// Trees that contacts join form an island, and each island is solved on
+// its own, by Newton's method or projected Gauss–Seidel as the model says;
+// each tree is told its island.
+struct Solve final    //
+    : System<Island,  //
+             const Mechanism> {
+  using SystemWorld = ProjectedWorld<Solve>;
+  using AllowComponentList =
+      framework::TypeList<Mechanism, TreeState<SmallCapacity>,
+                          TreeDynamics<SmallCapacity>, TreeState<LargeCapacity>,
+                          TreeDynamics<LargeCapacity>>;
+  using SequenceAfterSystemList = SystemList<Collide>;
+
+  Solve(const Mechanics& mechanics, const ContactSet& contacts,
+        Depend<ConstraintSolution> solution, bool enabled)
+      : mechanics_{&mechanics},
+        contacts_{&contacts},
+        solution_{solution.get()},
+        enabled_{enabled} {}
+
+  auto prepare(SystemWorld& world) -> bool;
+
+  auto operator()(SystemWorld&, Entity,  //
+                  Island& island,        //
+                  const Mechanism* mechanism) const -> void {
+    island = mechanism ? islands_[mechanism->tree] : Island{};
+  }
+
+ private:
+  // A tree's dynamics and state, as the island needs them.
+  struct TreeData final {
+    std::vector<double> mass;  // dofs by dofs.
+    std::vector<model::Spatial> cdof;
+    model::Array3 com{};
+    std::vector<double> qacc_smooth;
+    std::vector<double> qfrc_smooth;
+    std::vector<double> qpos;
+    std::vector<double> qvel;
+    std::vector<double> warmstart;
+  };
+
+  template <typename Capacity>
+  auto gather(SystemWorld& world) -> void;
+  auto find_root(std::uint32_t tree) -> std::uint32_t;
+  auto tree_of_geom(std::uint32_t geom) const -> std::uint32_t;
+  auto solve_island(std::span<const std::uint32_t> trees,
+                    std::span<const std::uint32_t> contacts) -> std::uint32_t;
+
+  static constexpr std::uint32_t NO_TREE = ~std::uint32_t{0};
+
+  const Mechanics* mechanics_ = nullptr;
+  const ContactSet* contacts_ = nullptr;
+  ConstraintSolution* solution_ = nullptr;
+  bool enabled_ = true;
+  std::vector<TreeData> data_;         // By tree.
+  std::vector<Island> islands_;        // By tree.
+  std::vector<std::uint32_t> parent_;  // By tree, for union and find.
+  model::ConstraintProblem problem_;
+  model::ConstraintSolution answer_;
+};
+
+// After Solve, a step of semi-implicit Euler, at the accelerations the
+// constraints leave, with the dampers taken implicitly at the forces.
 template <typename Capacity>
 struct Integrate final                      //
     : System<TreeState<Capacity>,           //
              const TreeDynamics<Capacity>,  //
              const Mechanism> {
   using SystemWorld = ProjectedWorld<Integrate>;
-  using SequenceAfterSystemList = SystemList<Collide>;
+  using SequenceAfterSystemList = SystemList<Solve>;
 
-  explicit Integrate(const Mechanics& mechanics) : mechanics_{&mechanics} {}
+  Integrate(const Mechanics& mechanics, const ConstraintSolution& solution)
+      : mechanics_{&mechanics}, solution_{&solution} {}
 
   auto operator()(SystemWorld&, Entity,                    //
                   TreeState<Capacity>& state,              //
                   const TreeDynamics<Capacity>* dynamics,  //
                   const Mechanism* mechanism) const -> void {
-    if (dynamics && mechanism) {
-      mechanics_->kernel<Capacity>(mechanism->tree)
-          .advance(*dynamics, dynamics->smooth, dynamics->acceleration,
-                   InOut(state));
+    if (!dynamics || !mechanism) {
+      return;
     }
+    const model::Tree& tree = mechanics_->trees()[mechanism->tree];
+    const auto& kernel = mechanics_->kernel<Capacity>(mechanism->tree);
+    if (solution_->constrained.empty() ||
+        solution_->constrained[mechanism->tree] == 0) {
+      state.warmstart = dynamics->acceleration;
+      kernel.advance(*dynamics, dynamics->smooth, dynamics->acceleration,
+                     InOut(state));
+      return;
+    }
+    std::array<double, Capacity::dofs> force{};
+    for (std::uint32_t i = 0; i < tree.dofs; ++i) {
+      force[i] =
+          dynamics->smooth[i] + solution_->qfrc_constraint[tree.first_dof + i];
+      state.warmstart[i] = solution_->qacc[tree.first_dof + i];
+    }
+    kernel.advance(*dynamics, force, state.warmstart, InOut(state));
   }
 
  private:
   const Mechanics* mechanics_ = nullptr;
+  const ConstraintSolution* solution_ = nullptr;
 };
 
-using Schedule = SystemList<Control<SmallCapacity>, Control<LargeCapacity>,
-                            Forward<SmallCapacity>, Forward<LargeCapacity>,
-                            Bound<SmallCapacity>, Bound<LargeCapacity>, Collide,
-                            Integrate<SmallCapacity>, Integrate<LargeCapacity>>;
+using Schedule =
+    SystemList<Control<SmallCapacity>, Control<LargeCapacity>,
+               Forward<SmallCapacity>, Forward<LargeCapacity>,
+               Bound<SmallCapacity>, Bound<LargeCapacity>, Collide, Solve,
+               Integrate<SmallCapacity>, Integrate<LargeCapacity>>;
 
 inline auto make_schedule(const Mechanics& mechanics, const Feedback& feedback,
-                          Depend<ContactSet> contacts) -> Schedule {
+                          Depend<ContactSet> contacts,
+                          Depend<ConstraintSolution> solution, bool constrained)
+    -> Schedule {
   return Schedule{Control<SmallCapacity>{mechanics, feedback},
                   Control<LargeCapacity>{mechanics, feedback},
                   Forward<SmallCapacity>{mechanics},
@@ -175,8 +259,9 @@ inline auto make_schedule(const Mechanics& mechanics, const Feedback& feedback,
                   Bound<SmallCapacity>{mechanics},
                   Bound<LargeCapacity>{mechanics},
                   Collide{mechanics, contacts},
-                  Integrate<SmallCapacity>{mechanics},
-                  Integrate<LargeCapacity>{mechanics}};
+                  Solve{mechanics, *contacts, solution, constrained},
+                  Integrate<SmallCapacity>{mechanics, *solution},
+                  Integrate<LargeCapacity>{mechanics, *solution}};
 }
 using Scheduler = framework::Scheduler<World, Schedule>;
 
@@ -241,6 +326,38 @@ auto Bound<Capacity>::operator()(SystemWorld&, Entity,                    //
                               at[2] - bound.center[2]);
     bound.radius = std::max(bound.radius, apart + reach);
   }
+}
+
+template <typename Capacity>
+auto Solve::gather(SystemWorld& world) -> void {
+  constexpr std::size_t V = Capacity::dofs;
+  const auto& mechanisms = world.template store_of<Mechanism>();
+  const auto& states = world.template store_of<TreeState<Capacity>>();
+  world.template store_of<TreeDynamics<Capacity>>().for_each(
+      [&](Entity owner, const TreeDynamics<Capacity>& dynamics) {
+        std::uint32_t t = mechanisms.component_of(owner).tree;
+        const model::Tree& tree = mechanics_->trees()[t];
+        const TreeState<Capacity>& state = states.component_of(owner);
+        std::uint32_t n = tree.dofs;
+        TreeData& data = data_[t];
+        data.mass.assign(std::size_t{n} * n, 0.0);
+        for (std::uint32_t i = 0; i < n; ++i) {
+          for (std::uint32_t j = 0; j <= i; ++j) {
+            data.mass[i * n + j] = dynamics.mass[i * V + j];
+            data.mass[j * n + i] = dynamics.mass[i * V + j];
+          }
+        }
+        data.cdof.assign(dynamics.cdof.begin(), dynamics.cdof.begin() + n);
+        data.com = dynamics.com;
+        data.qacc_smooth.assign(dynamics.acceleration.begin(),
+                                dynamics.acceleration.begin() + n);
+        data.qfrc_smooth.assign(dynamics.smooth.begin(),
+                                dynamics.smooth.begin() + n);
+        data.qpos.assign(state.qpos.begin(), state.qpos.begin() + tree.qpos);
+        data.qvel.assign(state.qvel.begin(), state.qvel.begin() + n);
+        data.warmstart.assign(state.warmstart.begin(),
+                              state.warmstart.begin() + n);
+      });
 }
 
 template <typename Capacity>

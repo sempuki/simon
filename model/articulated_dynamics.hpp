@@ -37,11 +37,13 @@ struct TreeCapacity final {
   static constexpr std::size_t qpos = DOFS + BODIES;
 };
 
-// A tree's state: its positions and velocities.
+// A tree's state: its positions and velocities, and the accelerations of
+// its last step, where the constraint solver starts.
 template <typename Capacity>
 struct TreeState final {
   std::array<double, Capacity::qpos> qpos{};
   std::array<double, Capacity::dofs> qvel{};
+  std::array<double, Capacity::dofs> warmstart{};
 };
 
 // A tree's actuators' controls, by the tree's actuators.
@@ -282,6 +284,39 @@ inline auto integrate_quaternion(Quaternion4 q, const Array3& vel, double scale)
 
 }  // namespace articulated
 
+// The Jacobian of `point` on body `body` of `tree`, its translation and
+// rotation each 3 rows by the tree's dofs, from each dof's motion at the
+// tree's center of mass `com` (mj_jac).
+inline auto compute_point_jacobian(const ArticulatedModel& model,
+                                   const Tree& tree,
+                                   std::span<const Spatial> cdof,
+                                   const Array3& com, std::uint32_t body,
+                                   const Array3& point,
+                                   std::span<double> translation,
+                                   std::span<double> rotation) -> void {
+  std::uint32_t n = tree.dofs;
+  std::fill(translation.begin(), translation.end(), 0.0);
+  std::fill(rotation.begin(), rotation.end(), 0.0);
+  while (body != 0 && model.bodies[body].dofs == 0) {
+    body = model.bodies[body].parent;
+  }
+  if (body == 0) {
+    return;
+  }
+  const ArticulatedBody& b = model.bodies[body];
+  Array3 offset{point[0] - com[0], point[1] - com[1], point[2] - com[2]};
+  for (std::uint32_t d = b.first_dof + b.dofs - 1; d != Dof::NONE;
+       d = model.dofs[d].parent) {
+    std::uint32_t c = d - tree.first_dof;
+    const Spatial& s = cdof[c];
+    Array3 turn = articulated::cross({s[0], s[1], s[2]}, offset);
+    for (std::uint32_t k = 0; k < 3; ++k) {
+      translation[k * n + c] = s[3 + k] + turn[k];
+      rotation[k * n + c] = s[k];
+    }
+  }
+}
+
 // One tree's dynamics, over a model's arrays.
 template <typename Capacity>
 class TreeKernel final {
@@ -291,8 +326,10 @@ class TreeKernel final {
   using Dynamics = TreeDynamics<Capacity>;
   static constexpr std::size_t V = Capacity::dofs;
 
-  TreeKernel(const ArticulatedModel& model, const Tree& tree)
-      : model_{&model}, tree_{&tree} {
+  // `implicit` if any dof of the model is damped or actuated, which makes
+  // MuJoCo take every dof's dampers implicitly.
+  TreeKernel(const ArticulatedModel& model, const Tree& tree, bool implicit)
+      : model_{&model}, tree_{&tree}, implicit_{implicit} {
     using articulated::NONE;
     for (std::uint32_t b = 0; b < tree.bodies; ++b) {
       std::uint32_t parent = model.bodies[tree.first_body + b].parent;
@@ -346,19 +383,15 @@ class TreeKernel final {
   }
 
   // A step of semi-implicit Euler from `state` at `acceleration`, with the
-  // dampers implicit when any dof is damped or actuated (mj_Euler,
-  // mj_advance).
+  // dampers implicit when any dof of the model is damped or actuated, the
+  // accelerations then from `force` (mj_Euler, mj_advance).
   auto advance(const Dynamics& dynamics, std::span<const double> force,
                std::span<const double> acceleration, InOut<State> state) const
       -> void {
     const ArticulatedModel& m = *model_;
     double h = m.physics.timestep;
-    bool damped = !tree_->actuators.empty();
-    for (std::uint32_t i = 0; i < tree_->dofs; ++i) {
-      damped = damped || damping_[i] > 0;
-    }
     std::array<double, V> qacc{};
-    if (!damped) {
+    if (!implicit_) {
       for (std::uint32_t i = 0; i < tree_->dofs; ++i) {
         qacc[i] = acceleration[i];
       }
@@ -836,6 +869,7 @@ class TreeKernel final {
 
   const ArticulatedModel* model_ = nullptr;
   const Tree* tree_ = nullptr;
+  bool implicit_ = false;
   std::array<std::uint32_t, Capacity::bodies> parent_{};
   std::array<std::uint32_t, V> dof_parent_{};
   std::array<std::uint32_t, V> dof_body_{};

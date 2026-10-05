@@ -12,7 +12,10 @@ too, step by step, through a chaotic double pendulum's 3,000 steps; a
 quaternion's integration parts by at most 2e-14. So do its actuators, and a
 cart-pole balanced by MuJoCo's own linear quadratic regulator. So do its
 contacts: at 400 random poses of every primitive pair, all 5,465 of MuJoCo's
-contacts, each to the last bit.
+contacts, each to the last bit. Its constraint solver, by Newton's method,
+steps a rolling sphere, a sliding box, a resting stack and joints against
+their limits within 1e-11 of MuJoCo; the box slides as far as Coulomb
+friction allows, and the sphere rolls at five sevenths of its speed.
 
 ```sh
 bazel test //application/robotic/...

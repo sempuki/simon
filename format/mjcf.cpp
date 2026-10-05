@@ -850,7 +850,7 @@ class Reader final {
     Joint& joint = spec->joint;
     for (pugi::xml_attribute attribute : node.attributes()) {
       std::string_view name = attribute.name();
-      static constexpr std::array<std::string_view, 20> KNOWN{
+      static constexpr std::array<std::string_view, 22> KNOWN{
           "name",
           "class",
           "type",
@@ -867,6 +867,8 @@ class Reader final {
           "margin",
           "solreflimit",
           "solimplimit",
+          "solreffriction",
+          "solimpfriction",
           "group",
           "user",
           "actuatorfrclimited",
@@ -914,6 +916,10 @@ class Reader final {
         read_array(node, "solreflimit", InOut(joint.limit.reference)));
     RETURN_IF_UNEXPECTED(
         read_array(node, "solimplimit", InOut(joint.limit.impedance)));
+    RETURN_IF_UNEXPECTED(
+        read_array(node, "solreffriction", InOut(joint.friction.reference)));
+    RETURN_IF_UNEXPECTED(
+        read_array(node, "solimpfriction", InOut(joint.friction.impedance)));
     return {};
   }
 

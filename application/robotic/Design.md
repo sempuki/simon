@@ -8,7 +8,8 @@ solves them at once. MuJoCo (Todorov, Erez and Tassa, "MuJoCo: A physics
 engine for model-based control", IROS 2012; Apache-2.0) is the reference.
 It is being built in eight steps (see the [Roadmap](#roadmap)); models read
 and compiled as MuJoCo compiles them, their dynamics without constraints,
-their actuators and control, and their contacts are done.
+their actuators and control, their contacts, and the constraint solver are
+done.
 
 ## Choices
 
@@ -112,8 +113,8 @@ at most 16 and 32. Each archetype's state and work are sized at compile
 time, inline in its components. `Forward` computes each tree's poses, its
 factored mass matrix and its accelerations into its `TreeDynamics`;
 `Bound` its sphere, the world's spatial component; and `Integrate` steps
-its `TreeState`. `Collide` finds the contacts between them, and the
-constraint solver will come after it.
+its `TreeState`. `Collide` finds the contacts and `Solve` the constraint
+forces between them.
 
 `dynamics_test` steps six cases with constraints off, and checks every
 position and velocity at every step against MuJoCo
@@ -193,6 +194,55 @@ MuJoCo's (`reference/mujoco_contacts.py`): all 5,465 contacts are there,
 between the same geoms, and every distance, position, frame, dimension,
 friction and soft parameter is equal to MuJoCo's to the last bit.
 
+## Constraints
+
+`model/articulated_constraint` solves an island's constraints as MuJoCo
+3.14.0 does (Todorov, ICRA 2014). Each constraint is a soft row of the
+Jacobian: a dof's dry friction, a joint's limit once within its margin (a
+hinge or slide on either side, a ball past its largest angle), and a
+contact, frictionless or a pyramidal friction cone of 2 (dim - 1) edges,
+torsional and rolling friction among them. Each row's regularization comes
+from the inverse inertia it sees, the bodies' and dofs' at rest, and its
+impedance from solimp at its distance; its reference acceleration from
+solref's stiffness and damping. The forces minimize a convex cost in the
+accelerations: Newton's method, its Hessian M + Jᵀ D J over the active rows
+by Cholesky, its line search exact on the piecewise quadratic, as MuJoCo's;
+or projected Gauss–Seidel on the dual, its rows swept in MuJoCo's shuffled
+order with Nesterov's momentum. Each step starts from the last step's
+accelerations where they cost less, as MuJoCo's warmstart does. The
+elliptic cone and the CG solver are refused until step 8.
+
+`Solve` runs after `Collide`, once a step, on the whole world, in its
+`prepare`: it gathers each tree's mass matrix and smooth accelerations,
+joins the trees that contacts touch into islands by union and find, and
+solves each island on its own, densely, since an island's rows and dofs are
+few; each tree learns its island. `Integrate` then steps each tree at its
+island's accelerations, or, where any dof of the model is damped, at its
+smooth and constraint forces through M + h B, as MuJoCo does.
+
+`constraint_test` checks eight cases against MuJoCo, every position and
+velocity at every step (`reference/mujoco_constraints.py`):
+
+| Case | Steps | Newton, position | Newton, velocity | PGS, position | PGS, velocity |
+|---|---:|---:|---:|---:|---:|
+| A sphere dropped, sliding, then rolling | 1,500 | 9.1e-13 m | 6.4e-12 m/s | 5.4e-15 | 7.5e-14 |
+| A box sliding to rest; a capsule rolling with torsional and rolling friction | 1,000 | 1.7e-14 | 9.8e-14 | 3.9e-7 | 1.1e-5 |
+| Five boxes stacked at rest | 1,000 (PGS 200) | 4.9e-16 | 3.8e-14 | 5.4e-9 | 6.9e-7 |
+| Hinge, ball and slide limits, a margin, dry friction | 1,500 | 6.7e-15 | 4.8e-14 | 6.7e-15 | 5.7e-14 |
+
+Newton's method converges, and so matches MuJoCo to rounding grown over
+the run. Projected Gauss–Seidel stops at its tolerance; where a sweep ends
+a step earlier or later than MuJoCo's, by rounding, the two part by its
+tolerance, and a stack's resting contacts then come and go apart, so the
+stack is compared over 0.4 s.
+
+It also checks physics, by both solvers: the box slides 0.5078 m from 2 m/s
+where Coulomb friction of 0.4 gives 0.5097 m; a sphere sliding at 2 m/s on
+the floor rolls at 1.4279 m/s, within 0.05% of five sevenths of 2 m/s, its
+spin matching; the stack rests within 2.1 mm of its height, still to 1e-12
+m/s by Newton's method, and within 5 mm/s by PGS, as MuJoCo's own PGS
+leaves it.
+
 ## Roadmap
 
 1. Done: MJCF read and compiled, against MuJoCo's compiled model.
@@ -205,8 +255,9 @@ friction and soft parameter is equal to MuJoCo's to the last bit.
    a linear state feedback balancing a cart-pole, against MuJoCo.
 4. Done: collision of primitives and the broad phase, against MuJoCo's
    contacts.
-5. The constraint solver: soft contacts and joint limits, friction, Newton
-   and PGS, by island; a sphere rolling, a box sliding, a stack.
+5. Done: the constraint solver: soft contacts, joint limits and dry
+   friction, Newton and PGS, by island; a sphere rolling, a box sliding, a
+   stack, against MuJoCo and physics.
 6. Whole robots: MuJoCo's humanoid, with its tendons and contact
    exclusions, and Apache-2.0 models from MuJoCo Menagerie.
 7. Scale and the viewer: ten thousand loose bodies and a thousand

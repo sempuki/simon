@@ -1,6 +1,7 @@
 # Reference data
 
-The tables here check simon's models, dynamics, control and contacts against
+The tables here check simon's models, dynamics, control, contacts and
+constraints against
 [MuJoCo](https://mujoco.org) (Apache-2.0) on the models in `../models`:
 
 | Model | Shows |
@@ -12,6 +13,9 @@ The tables here check simon's models, dynamics, control and contacts against
 | `features.xml` | Default classes nested and inherited, childclass, partial vectors, angles in radians, fixed-axes Euler angles, every orientation, explicit diagonal and full inertia, slide, ball and hinge joints, limits off and on, references |
 | `boxes.xml` | Five boxes stacked on a plane, each free |
 | `arm.xml` | Four joints under position, velocity and general actuators, a default class giving a servo's gain |
+| `rolling.xml` | A sphere dropped onto the floor |
+| `sliding.xml` | A box sliding on the floor, and a capsule with torsional and rolling friction |
+| `limits.xml` | Hinge, ball and slide limits, soft parameters and a margin, and dry friction |
 | `collisions.xml` | Every primitive pair: two planes, one tilted on a fixed body, loose spheres, capsules, a cylinder and boxes, a fixed box, and an arm with a welded body; margins, gaps, priorities, condims and soft parameters that differ |
 
 | Script | Writes | Read by |
@@ -19,6 +23,7 @@ The tables here check simon's models, dynamics, control and contacts against
 | `mujoco_models.py` | `mujoco_models.csv`: every compiled field of every model | `model_test` |
 | `mujoco_dynamics.py` | `mujoco_dynamics.csv`: positions and velocities at every step of six cases, constraints off | `dynamics_test` |
 | `mujoco_control.py` | `mujoco_control.csv`: the arm and the balanced cart-pole at every step; `mujoco_feedback.csv`: the cart-pole's regulator, from MuJoCo's linearization | `control_test` |
+| `mujoco_constraints.py` | `mujoco_constraints.csv`: positions and velocities at every step of eight cases, contacts, limits and dry friction on, by Newton and by PGS | `constraint_test` |
 | `mujoco_contacts.py` | `mujoco_contacts.csv`: `collisions.xml` at 400 random poses, and every contact MuJoCo finds at each | `collision_test` |
 
 `pip install mujoco numpy` (MuJoCo 3.14.0) runs the scripts.

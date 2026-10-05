@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -23,6 +24,8 @@ struct Scenario final {
   std::vector<std::pair<std::uint32_t, double>> qvel;
   std::vector<double> control;  // By the model's actuators.
   Feedback feedback;            // Overrides the controls, if given.
+  bool constrained = true;      // Contacts, limits and dry friction.
+  std::optional<model::Physics::Solver> solver;  // Overrides the model's.
 };
 
 class Simulation final {
@@ -48,6 +51,8 @@ class Simulation final {
   Scenario scenario_;
   std::unique_ptr<Mechanics> mechanics_;
   std::unique_ptr<ContactSet> contacts_ = std::make_unique<ContactSet>();
+  std::unique_ptr<ConstraintSolution> solution_ =
+      std::make_unique<ConstraintSolution>();
   World world_;
   std::unique_ptr<Scheduler> scheduler_;
 };

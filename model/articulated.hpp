@@ -83,8 +83,9 @@ struct Joint final {
   double stiffness = 0.0;
   double margin = 0.0;
   SoftConstraint limit;
-  std::uint32_t qpos = 0;  // Its first position's address.
-  std::uint32_t dof = 0;   // Its first degree of freedom's.
+  SoftConstraint friction;  // Its dofs' dry friction.
+  std::uint32_t qpos = 0;   // Its first position's address.
+  std::uint32_t dof = 0;    // Its first degree of freedom's.
   bool limited = false;
 };
 

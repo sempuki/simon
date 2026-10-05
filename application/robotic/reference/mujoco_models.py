@@ -30,7 +30,7 @@ FIELDS = {
     'jnt': ['type', 'bodyid', 'pos', 'axis', 'limited', 'range', 'stiffness',
             'qposadr', 'dofadr', 'solref', 'solimp', 'margin'],
     'dof': ['bodyid', 'jntid', 'parentid', 'armature', 'damping',
-            'frictionloss'],
+            'frictionloss', 'solref', 'solimp'],
     'geom': ['type', 'bodyid', 'size', 'pos', 'quat', 'friction', 'condim',
              'contype', 'conaffinity', 'solref', 'solimp', 'margin', 'gap',
              'priority', 'sameframe'],

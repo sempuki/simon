@@ -92,7 +92,8 @@ TEST_CASE("ControlAgainstMuJoCo") {
     // their controls for 3 s: every step equal to MuJoCo's.
     Simulation simulation{Scenario{.model = std::string{MODELS} + "arm.xml",
                                    .qpos = {{0, 0.3}, {1, -0.5}},
-                                   .control = {0.8, -1.2, 2.0, 0.5}}};
+                                   .control = {0.8, -1.2, 2.0, 0.5},
+                                   .constrained = false}};
     REQUIRE(simulation.configure());
     auto [position, velocity] = compare(InOut(simulation), "arm");
     CAPTURE(position, velocity);
@@ -110,7 +111,8 @@ TEST_CASE("ControlAgainstMuJoCo") {
                  .qpos = {{1, 0.2}},
                  .feedback = {.gains = parse_numbers(law[1]),
                               .reference = parse_numbers(law[2]),
-                              .offset = parse_numbers(law[3])}}};
+                              .offset = parse_numbers(law[3])},
+                 .constrained = false}};
     REQUIRE(simulation.configure());
     auto [position, velocity] = compare(InOut(simulation), "balance");
     CAPTURE(position, velocity);

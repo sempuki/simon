@@ -1,0 +1,12 @@
+<!-- Copyright 2026 -- CONTRIBUTORS. See LICENSE. -->
+<!-- A solid sphere dropped onto the floor, sliding, until friction makes it
+     roll. -->
+<mujoco model="rolling">
+  <worldbody>
+    <geom name="floor" type="plane" size="0 0 1" friction="0.5"/>
+    <body name="ball" pos="0 0 0.3">
+      <freejoint/>
+      <geom name="ball" type="sphere" size="0.1" friction="0.5"/>
+    </body>
+  </worldbody>
+</mujoco>

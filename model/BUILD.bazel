@@ -439,6 +439,17 @@ cc_library(
 )
 
 cc_library(
+    name = "articulated_constraint",
+    srcs = ["articulated_constraint.cpp"],
+    hdrs = ["articulated_constraint.hpp"],
+    copts = COPTS,
+    deps = [
+        ":articulated",
+        "//framework:vocabulary",
+    ],
+)
+
+cc_library(
     name = "articulated_collision",
     srcs = ["articulated_collision.cpp"],
     hdrs = ["articulated_collision.hpp"],

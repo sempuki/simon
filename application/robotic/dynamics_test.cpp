@@ -98,6 +98,7 @@ TEST_CASE("DynamicsAgainstMuJoCo") {
       CAPTURE(c.name);
       const Run& theirs = runs.at(c.name);
       c.scenario.model = std::string{MODELS} + c.file;
+      c.scenario.constrained = false;
       Simulation simulation{c.scenario};
       auto configured = simulation.configure();
       if (!configured) {

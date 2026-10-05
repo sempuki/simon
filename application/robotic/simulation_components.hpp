@@ -55,6 +55,15 @@ class Mechanics final {
     return unbounded_;
   }
 
+  // The inverse inertia each body sees at rest, translating then turning,
+  // and each dof; and the mean of the mass matrix's diagonal there, as
+  // MuJoCo's constraints scale by them.
+  auto body_weight() const -> const std::vector<double>& {
+    return body_weight_;
+  }
+  auto dof_weight() const -> const std::vector<double>& { return dof_weight_; }
+  auto mean_inertia() const -> double { return mean_inertia_; }
+
   template <typename Capacity>
   auto kernel(std::uint32_t tree) const -> const model::TreeKernel<Capacity>& {
     if constexpr (std::is_same_v<Capacity, SmallCapacity>) {
@@ -70,6 +79,9 @@ class Mechanics final {
   model::BodyFilter filter_;
   std::vector<double> radii_;
   std::vector<std::uint32_t> unbounded_;
+  std::vector<double> body_weight_;  // 2 by body.
+  std::vector<double> dof_weight_;
+  double mean_inertia_ = 1.0;
   // Each tree's kernel at each capacity it fits, else none.
   std::vector<std::unique_ptr<model::TreeKernel<SmallCapacity>>> small_;
   std::vector<std::unique_ptr<model::TreeKernel<LargeCapacity>>> large_;
@@ -91,6 +103,17 @@ struct ContactSet final {
   std::vector<model::Contact> contacts;
 };
 
+// The step's constraint solution, shared by Solve, which finds it, and
+// Integrate, which applies it: the accelerations and constraint forces of
+// each tree an island holds, by the model's dofs. It outlives the world and
+// never moves.
+struct ConstraintSolution final {
+  std::vector<double> qacc;
+  std::vector<double> qfrc_constraint;
+  std::vector<std::uint8_t> constrained;  // By tree.
+  std::uint32_t islands = 0;
+};
+
 // Which of the model's trees an entity is.
 struct Mechanism final {
   std::uint32_t tree = 0;
@@ -99,6 +122,15 @@ struct Mechanism final {
 // How many contacts a tree is in.
 struct Touching final {
   std::uint32_t contacts = 0;
+};
+
+// The island a tree is in, of the trees its constraints tie together, and
+// how many constraint rows that island has; none for a tree free of them.
+struct Island final {
+  static constexpr std::uint32_t NONE = ~std::uint32_t{0};
+
+  std::uint32_t index = NONE;
+  std::uint32_t rows = 0;
 };
 
 // Where a tree is, the world's spatial component: the sphere about its
@@ -133,7 +165,7 @@ using framework::Requires;
 struct SmallTree final                                      //
     : Archetype<"small tree",                               //
                 Requires<TreeBound, Mechanism, Touching,    //
-                         TreeState<SmallCapacity>,          //
+                         Island, TreeState<SmallCapacity>,  //
                          TreeControl<SmallCapacity>,        //
                          TreeDynamics<SmallCapacity>>> {};  //
 
@@ -142,7 +174,7 @@ struct SmallTree final                                      //
 struct LargeTree final                                      //
     : Archetype<"large tree",                               //
                 Requires<TreeBound, Mechanism, Touching,    //
-                         TreeState<LargeCapacity>,          //
+                         Island, TreeState<LargeCapacity>,  //
                          TreeControl<LargeCapacity>,        //
                          TreeDynamics<LargeCapacity>>> {};  //
 
@@ -150,7 +182,7 @@ struct LargeTree final                                      //
 
 using World = framework::World<
     TreeBound,
-    framework::TypeList<Mechanism, Touching, TreeState<SmallCapacity>,
+    framework::TypeList<Mechanism, Touching, Island, TreeState<SmallCapacity>,
                         TreeControl<SmallCapacity>, TreeDynamics<SmallCapacity>,
                         TreeState<LargeCapacity>, TreeControl<LargeCapacity>,
                         TreeDynamics<LargeCapacity>>,

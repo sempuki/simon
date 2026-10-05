@@ -41,6 +41,7 @@ cc_library(
         "//framework:vocabulary",
         "//model:articulated",
         "//model:articulated_collision",
+        "//model:articulated_constraint",
         "//model:articulated_dynamics",
         "//model:kinematics",
         "//model:units",
@@ -80,6 +81,18 @@ cc_test(
     srcs = ["collision_test.cpp"],
     copts = COPTS,
     data = glob(["models/*.xml"]) + ["reference/mujoco_contacts.csv"],
+    deps = [
+        ":robotic_library",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "constraint_test",
+    size = "small",
+    srcs = ["constraint_test.cpp"],
+    copts = COPTS,
+    data = glob(["models/*.xml"]) + ["reference/mujoco_constraints.csv"],
     deps = [
         ":robotic_library",
         "@lib//base:testing",

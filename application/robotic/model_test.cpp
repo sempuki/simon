@@ -128,6 +128,8 @@ auto find_value(const ArticulatedModel& m, const Row& row)
     if (f == "armature") return number(d.armature);
     if (f == "damping") return number(d.damping);
     if (f == "frictionloss") return number(d.friction_loss);
+    if (f == "solref") return doubles(m.joints.at(d.joint).friction.reference);
+    if (f == "solimp") return doubles(m.joints.at(d.joint).friction.impedance);
   } else if (row.element == "geom") {
     const model::Geom& g = m.geoms.at(i);
     if (f == "type") return number(static_cast<double>(g.type));

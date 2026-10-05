@@ -137,24 +137,32 @@ arm.xml,dof,0,parentid,-1.0
 arm.xml,dof,0,armature,0.0
 arm.xml,dof,0,damping,0.1
 arm.xml,dof,0,frictionloss,0.0
+arm.xml,dof,0,solref,0.02 1.0
+arm.xml,dof,0,solimp,0.9 0.95 0.001 0.5 2.0
 arm.xml,dof,1,bodyid,2.0
 arm.xml,dof,1,jntid,1.0
 arm.xml,dof,1,parentid,0.0
 arm.xml,dof,1,armature,0.0
 arm.xml,dof,1,damping,0.0
 arm.xml,dof,1,frictionloss,0.0
+arm.xml,dof,1,solref,0.02 1.0
+arm.xml,dof,1,solimp,0.9 0.95 0.001 0.5 2.0
 arm.xml,dof,2,bodyid,3.0
 arm.xml,dof,2,jntid,2.0
 arm.xml,dof,2,parentid,1.0
 arm.xml,dof,2,armature,0.0
 arm.xml,dof,2,damping,0.0
 arm.xml,dof,2,frictionloss,0.0
+arm.xml,dof,2,solref,0.02 1.0
+arm.xml,dof,2,solimp,0.9 0.95 0.001 0.5 2.0
 arm.xml,dof,3,bodyid,4.0
 arm.xml,dof,3,jntid,3.0
 arm.xml,dof,3,parentid,2.0
 arm.xml,dof,3,armature,0.0
 arm.xml,dof,3,damping,0.0
 arm.xml,dof,3,frictionloss,0.0
+arm.xml,dof,3,solref,0.02 1.0
+arm.xml,dof,3,solimp,0.9 0.95 0.001 0.5 2.0
 arm.xml,geom,0,type,3.0
 arm.xml,geom,0,bodyid,1.0
 arm.xml,geom,0,size,0.04 0.2 0.0
@@ -432,180 +440,240 @@ boxes.xml,dof,0,parentid,-1.0
 boxes.xml,dof,0,armature,0.0
 boxes.xml,dof,0,damping,0.0
 boxes.xml,dof,0,frictionloss,0.0
+boxes.xml,dof,0,solref,0.02 1.0
+boxes.xml,dof,0,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,1,bodyid,1.0
 boxes.xml,dof,1,jntid,0.0
 boxes.xml,dof,1,parentid,0.0
 boxes.xml,dof,1,armature,0.0
 boxes.xml,dof,1,damping,0.0
 boxes.xml,dof,1,frictionloss,0.0
+boxes.xml,dof,1,solref,0.02 1.0
+boxes.xml,dof,1,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,2,bodyid,1.0
 boxes.xml,dof,2,jntid,0.0
 boxes.xml,dof,2,parentid,1.0
 boxes.xml,dof,2,armature,0.0
 boxes.xml,dof,2,damping,0.0
 boxes.xml,dof,2,frictionloss,0.0
+boxes.xml,dof,2,solref,0.02 1.0
+boxes.xml,dof,2,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,3,bodyid,1.0
 boxes.xml,dof,3,jntid,0.0
 boxes.xml,dof,3,parentid,2.0
 boxes.xml,dof,3,armature,0.0
 boxes.xml,dof,3,damping,0.0
 boxes.xml,dof,3,frictionloss,0.0
+boxes.xml,dof,3,solref,0.02 1.0
+boxes.xml,dof,3,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,4,bodyid,1.0
 boxes.xml,dof,4,jntid,0.0
 boxes.xml,dof,4,parentid,3.0
 boxes.xml,dof,4,armature,0.0
 boxes.xml,dof,4,damping,0.0
 boxes.xml,dof,4,frictionloss,0.0
+boxes.xml,dof,4,solref,0.02 1.0
+boxes.xml,dof,4,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,5,bodyid,1.0
 boxes.xml,dof,5,jntid,0.0
 boxes.xml,dof,5,parentid,4.0
 boxes.xml,dof,5,armature,0.0
 boxes.xml,dof,5,damping,0.0
 boxes.xml,dof,5,frictionloss,0.0
+boxes.xml,dof,5,solref,0.02 1.0
+boxes.xml,dof,5,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,6,bodyid,2.0
 boxes.xml,dof,6,jntid,1.0
 boxes.xml,dof,6,parentid,-1.0
 boxes.xml,dof,6,armature,0.0
 boxes.xml,dof,6,damping,0.0
 boxes.xml,dof,6,frictionloss,0.0
+boxes.xml,dof,6,solref,0.02 1.0
+boxes.xml,dof,6,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,7,bodyid,2.0
 boxes.xml,dof,7,jntid,1.0
 boxes.xml,dof,7,parentid,6.0
 boxes.xml,dof,7,armature,0.0
 boxes.xml,dof,7,damping,0.0
 boxes.xml,dof,7,frictionloss,0.0
+boxes.xml,dof,7,solref,0.02 1.0
+boxes.xml,dof,7,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,8,bodyid,2.0
 boxes.xml,dof,8,jntid,1.0
 boxes.xml,dof,8,parentid,7.0
 boxes.xml,dof,8,armature,0.0
 boxes.xml,dof,8,damping,0.0
 boxes.xml,dof,8,frictionloss,0.0
+boxes.xml,dof,8,solref,0.02 1.0
+boxes.xml,dof,8,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,9,bodyid,2.0
 boxes.xml,dof,9,jntid,1.0
 boxes.xml,dof,9,parentid,8.0
 boxes.xml,dof,9,armature,0.0
 boxes.xml,dof,9,damping,0.0
 boxes.xml,dof,9,frictionloss,0.0
+boxes.xml,dof,9,solref,0.02 1.0
+boxes.xml,dof,9,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,10,bodyid,2.0
 boxes.xml,dof,10,jntid,1.0
 boxes.xml,dof,10,parentid,9.0
 boxes.xml,dof,10,armature,0.0
 boxes.xml,dof,10,damping,0.0
 boxes.xml,dof,10,frictionloss,0.0
+boxes.xml,dof,10,solref,0.02 1.0
+boxes.xml,dof,10,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,11,bodyid,2.0
 boxes.xml,dof,11,jntid,1.0
 boxes.xml,dof,11,parentid,10.0
 boxes.xml,dof,11,armature,0.0
 boxes.xml,dof,11,damping,0.0
 boxes.xml,dof,11,frictionloss,0.0
+boxes.xml,dof,11,solref,0.02 1.0
+boxes.xml,dof,11,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,12,bodyid,3.0
 boxes.xml,dof,12,jntid,2.0
 boxes.xml,dof,12,parentid,-1.0
 boxes.xml,dof,12,armature,0.0
 boxes.xml,dof,12,damping,0.0
 boxes.xml,dof,12,frictionloss,0.0
+boxes.xml,dof,12,solref,0.02 1.0
+boxes.xml,dof,12,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,13,bodyid,3.0
 boxes.xml,dof,13,jntid,2.0
 boxes.xml,dof,13,parentid,12.0
 boxes.xml,dof,13,armature,0.0
 boxes.xml,dof,13,damping,0.0
 boxes.xml,dof,13,frictionloss,0.0
+boxes.xml,dof,13,solref,0.02 1.0
+boxes.xml,dof,13,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,14,bodyid,3.0
 boxes.xml,dof,14,jntid,2.0
 boxes.xml,dof,14,parentid,13.0
 boxes.xml,dof,14,armature,0.0
 boxes.xml,dof,14,damping,0.0
 boxes.xml,dof,14,frictionloss,0.0
+boxes.xml,dof,14,solref,0.02 1.0
+boxes.xml,dof,14,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,15,bodyid,3.0
 boxes.xml,dof,15,jntid,2.0
 boxes.xml,dof,15,parentid,14.0
 boxes.xml,dof,15,armature,0.0
 boxes.xml,dof,15,damping,0.0
 boxes.xml,dof,15,frictionloss,0.0
+boxes.xml,dof,15,solref,0.02 1.0
+boxes.xml,dof,15,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,16,bodyid,3.0
 boxes.xml,dof,16,jntid,2.0
 boxes.xml,dof,16,parentid,15.0
 boxes.xml,dof,16,armature,0.0
 boxes.xml,dof,16,damping,0.0
 boxes.xml,dof,16,frictionloss,0.0
+boxes.xml,dof,16,solref,0.02 1.0
+boxes.xml,dof,16,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,17,bodyid,3.0
 boxes.xml,dof,17,jntid,2.0
 boxes.xml,dof,17,parentid,16.0
 boxes.xml,dof,17,armature,0.0
 boxes.xml,dof,17,damping,0.0
 boxes.xml,dof,17,frictionloss,0.0
+boxes.xml,dof,17,solref,0.02 1.0
+boxes.xml,dof,17,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,18,bodyid,4.0
 boxes.xml,dof,18,jntid,3.0
 boxes.xml,dof,18,parentid,-1.0
 boxes.xml,dof,18,armature,0.0
 boxes.xml,dof,18,damping,0.0
 boxes.xml,dof,18,frictionloss,0.0
+boxes.xml,dof,18,solref,0.02 1.0
+boxes.xml,dof,18,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,19,bodyid,4.0
 boxes.xml,dof,19,jntid,3.0
 boxes.xml,dof,19,parentid,18.0
 boxes.xml,dof,19,armature,0.0
 boxes.xml,dof,19,damping,0.0
 boxes.xml,dof,19,frictionloss,0.0
+boxes.xml,dof,19,solref,0.02 1.0
+boxes.xml,dof,19,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,20,bodyid,4.0
 boxes.xml,dof,20,jntid,3.0
 boxes.xml,dof,20,parentid,19.0
 boxes.xml,dof,20,armature,0.0
 boxes.xml,dof,20,damping,0.0
 boxes.xml,dof,20,frictionloss,0.0
+boxes.xml,dof,20,solref,0.02 1.0
+boxes.xml,dof,20,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,21,bodyid,4.0
 boxes.xml,dof,21,jntid,3.0
 boxes.xml,dof,21,parentid,20.0
 boxes.xml,dof,21,armature,0.0
 boxes.xml,dof,21,damping,0.0
 boxes.xml,dof,21,frictionloss,0.0
+boxes.xml,dof,21,solref,0.02 1.0
+boxes.xml,dof,21,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,22,bodyid,4.0
 boxes.xml,dof,22,jntid,3.0
 boxes.xml,dof,22,parentid,21.0
 boxes.xml,dof,22,armature,0.0
 boxes.xml,dof,22,damping,0.0
 boxes.xml,dof,22,frictionloss,0.0
+boxes.xml,dof,22,solref,0.02 1.0
+boxes.xml,dof,22,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,23,bodyid,4.0
 boxes.xml,dof,23,jntid,3.0
 boxes.xml,dof,23,parentid,22.0
 boxes.xml,dof,23,armature,0.0
 boxes.xml,dof,23,damping,0.0
 boxes.xml,dof,23,frictionloss,0.0
+boxes.xml,dof,23,solref,0.02 1.0
+boxes.xml,dof,23,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,24,bodyid,5.0
 boxes.xml,dof,24,jntid,4.0
 boxes.xml,dof,24,parentid,-1.0
 boxes.xml,dof,24,armature,0.0
 boxes.xml,dof,24,damping,0.0
 boxes.xml,dof,24,frictionloss,0.0
+boxes.xml,dof,24,solref,0.02 1.0
+boxes.xml,dof,24,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,25,bodyid,5.0
 boxes.xml,dof,25,jntid,4.0
 boxes.xml,dof,25,parentid,24.0
 boxes.xml,dof,25,armature,0.0
 boxes.xml,dof,25,damping,0.0
 boxes.xml,dof,25,frictionloss,0.0
+boxes.xml,dof,25,solref,0.02 1.0
+boxes.xml,dof,25,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,26,bodyid,5.0
 boxes.xml,dof,26,jntid,4.0
 boxes.xml,dof,26,parentid,25.0
 boxes.xml,dof,26,armature,0.0
 boxes.xml,dof,26,damping,0.0
 boxes.xml,dof,26,frictionloss,0.0
+boxes.xml,dof,26,solref,0.02 1.0
+boxes.xml,dof,26,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,27,bodyid,5.0
 boxes.xml,dof,27,jntid,4.0
 boxes.xml,dof,27,parentid,26.0
 boxes.xml,dof,27,armature,0.0
 boxes.xml,dof,27,damping,0.0
 boxes.xml,dof,27,frictionloss,0.0
+boxes.xml,dof,27,solref,0.02 1.0
+boxes.xml,dof,27,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,28,bodyid,5.0
 boxes.xml,dof,28,jntid,4.0
 boxes.xml,dof,28,parentid,27.0
 boxes.xml,dof,28,armature,0.0
 boxes.xml,dof,28,damping,0.0
 boxes.xml,dof,28,frictionloss,0.0
+boxes.xml,dof,28,solref,0.02 1.0
+boxes.xml,dof,28,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,dof,29,bodyid,5.0
 boxes.xml,dof,29,jntid,4.0
 boxes.xml,dof,29,parentid,28.0
 boxes.xml,dof,29,armature,0.0
 boxes.xml,dof,29,damping,0.0
 boxes.xml,dof,29,frictionloss,0.0
+boxes.xml,dof,29,solref,0.02 1.0
+boxes.xml,dof,29,solimp,0.9 0.95 0.001 0.5 2.0
 boxes.xml,geom,0,type,0.0
 boxes.xml,geom,0,bodyid,0.0
 boxes.xml,geom,0,size,0.0 0.0 0.1
@@ -780,12 +848,16 @@ cartpole.xml,dof,0,parentid,-1.0
 cartpole.xml,dof,0,armature,0.0
 cartpole.xml,dof,0,damping,0.1
 cartpole.xml,dof,0,frictionloss,0.0
+cartpole.xml,dof,0,solref,0.02 1.0
+cartpole.xml,dof,0,solimp,0.9 0.95 0.001 0.5 2.0
 cartpole.xml,dof,1,bodyid,2.0
 cartpole.xml,dof,1,jntid,1.0
 cartpole.xml,dof,1,parentid,0.0
 cartpole.xml,dof,1,armature,0.001
 cartpole.xml,dof,1,damping,0.0
 cartpole.xml,dof,1,frictionloss,0.0
+cartpole.xml,dof,1,solref,0.02 1.0
+cartpole.xml,dof,1,solimp,0.9 0.95 0.001 0.5 2.0
 cartpole.xml,geom,0,type,0.0
 cartpole.xml,geom,0,bodyid,0.0
 cartpole.xml,geom,0,size,5.0 5.0 0.1
@@ -1189,300 +1261,400 @@ collisions.xml,dof,0,parentid,-1.0
 collisions.xml,dof,0,armature,0.0
 collisions.xml,dof,0,damping,0.0
 collisions.xml,dof,0,frictionloss,0.0
+collisions.xml,dof,0,solref,0.02 1.0
+collisions.xml,dof,0,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,1,bodyid,3.0
 collisions.xml,dof,1,jntid,0.0
 collisions.xml,dof,1,parentid,0.0
 collisions.xml,dof,1,armature,0.0
 collisions.xml,dof,1,damping,0.0
 collisions.xml,dof,1,frictionloss,0.0
+collisions.xml,dof,1,solref,0.02 1.0
+collisions.xml,dof,1,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,2,bodyid,3.0
 collisions.xml,dof,2,jntid,0.0
 collisions.xml,dof,2,parentid,1.0
 collisions.xml,dof,2,armature,0.0
 collisions.xml,dof,2,damping,0.0
 collisions.xml,dof,2,frictionloss,0.0
+collisions.xml,dof,2,solref,0.02 1.0
+collisions.xml,dof,2,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,3,bodyid,3.0
 collisions.xml,dof,3,jntid,0.0
 collisions.xml,dof,3,parentid,2.0
 collisions.xml,dof,3,armature,0.0
 collisions.xml,dof,3,damping,0.0
 collisions.xml,dof,3,frictionloss,0.0
+collisions.xml,dof,3,solref,0.02 1.0
+collisions.xml,dof,3,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,4,bodyid,3.0
 collisions.xml,dof,4,jntid,0.0
 collisions.xml,dof,4,parentid,3.0
 collisions.xml,dof,4,armature,0.0
 collisions.xml,dof,4,damping,0.0
 collisions.xml,dof,4,frictionloss,0.0
+collisions.xml,dof,4,solref,0.02 1.0
+collisions.xml,dof,4,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,5,bodyid,3.0
 collisions.xml,dof,5,jntid,0.0
 collisions.xml,dof,5,parentid,4.0
 collisions.xml,dof,5,armature,0.0
 collisions.xml,dof,5,damping,0.0
 collisions.xml,dof,5,frictionloss,0.0
+collisions.xml,dof,5,solref,0.02 1.0
+collisions.xml,dof,5,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,6,bodyid,4.0
 collisions.xml,dof,6,jntid,1.0
 collisions.xml,dof,6,parentid,-1.0
 collisions.xml,dof,6,armature,0.0
 collisions.xml,dof,6,damping,0.0
 collisions.xml,dof,6,frictionloss,0.0
+collisions.xml,dof,6,solref,0.02 1.0
+collisions.xml,dof,6,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,7,bodyid,4.0
 collisions.xml,dof,7,jntid,1.0
 collisions.xml,dof,7,parentid,6.0
 collisions.xml,dof,7,armature,0.0
 collisions.xml,dof,7,damping,0.0
 collisions.xml,dof,7,frictionloss,0.0
+collisions.xml,dof,7,solref,0.02 1.0
+collisions.xml,dof,7,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,8,bodyid,4.0
 collisions.xml,dof,8,jntid,1.0
 collisions.xml,dof,8,parentid,7.0
 collisions.xml,dof,8,armature,0.0
 collisions.xml,dof,8,damping,0.0
 collisions.xml,dof,8,frictionloss,0.0
+collisions.xml,dof,8,solref,0.02 1.0
+collisions.xml,dof,8,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,9,bodyid,4.0
 collisions.xml,dof,9,jntid,1.0
 collisions.xml,dof,9,parentid,8.0
 collisions.xml,dof,9,armature,0.0
 collisions.xml,dof,9,damping,0.0
 collisions.xml,dof,9,frictionloss,0.0
+collisions.xml,dof,9,solref,0.02 1.0
+collisions.xml,dof,9,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,10,bodyid,4.0
 collisions.xml,dof,10,jntid,1.0
 collisions.xml,dof,10,parentid,9.0
 collisions.xml,dof,10,armature,0.0
 collisions.xml,dof,10,damping,0.0
 collisions.xml,dof,10,frictionloss,0.0
+collisions.xml,dof,10,solref,0.02 1.0
+collisions.xml,dof,10,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,11,bodyid,4.0
 collisions.xml,dof,11,jntid,1.0
 collisions.xml,dof,11,parentid,10.0
 collisions.xml,dof,11,armature,0.0
 collisions.xml,dof,11,damping,0.0
 collisions.xml,dof,11,frictionloss,0.0
+collisions.xml,dof,11,solref,0.02 1.0
+collisions.xml,dof,11,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,12,bodyid,5.0
 collisions.xml,dof,12,jntid,2.0
 collisions.xml,dof,12,parentid,-1.0
 collisions.xml,dof,12,armature,0.0
 collisions.xml,dof,12,damping,0.0
 collisions.xml,dof,12,frictionloss,0.0
+collisions.xml,dof,12,solref,0.02 1.0
+collisions.xml,dof,12,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,13,bodyid,5.0
 collisions.xml,dof,13,jntid,2.0
 collisions.xml,dof,13,parentid,12.0
 collisions.xml,dof,13,armature,0.0
 collisions.xml,dof,13,damping,0.0
 collisions.xml,dof,13,frictionloss,0.0
+collisions.xml,dof,13,solref,0.02 1.0
+collisions.xml,dof,13,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,14,bodyid,5.0
 collisions.xml,dof,14,jntid,2.0
 collisions.xml,dof,14,parentid,13.0
 collisions.xml,dof,14,armature,0.0
 collisions.xml,dof,14,damping,0.0
 collisions.xml,dof,14,frictionloss,0.0
+collisions.xml,dof,14,solref,0.02 1.0
+collisions.xml,dof,14,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,15,bodyid,5.0
 collisions.xml,dof,15,jntid,2.0
 collisions.xml,dof,15,parentid,14.0
 collisions.xml,dof,15,armature,0.0
 collisions.xml,dof,15,damping,0.0
 collisions.xml,dof,15,frictionloss,0.0
+collisions.xml,dof,15,solref,0.02 1.0
+collisions.xml,dof,15,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,16,bodyid,5.0
 collisions.xml,dof,16,jntid,2.0
 collisions.xml,dof,16,parentid,15.0
 collisions.xml,dof,16,armature,0.0
 collisions.xml,dof,16,damping,0.0
 collisions.xml,dof,16,frictionloss,0.0
+collisions.xml,dof,16,solref,0.02 1.0
+collisions.xml,dof,16,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,17,bodyid,5.0
 collisions.xml,dof,17,jntid,2.0
 collisions.xml,dof,17,parentid,16.0
 collisions.xml,dof,17,armature,0.0
 collisions.xml,dof,17,damping,0.0
 collisions.xml,dof,17,frictionloss,0.0
+collisions.xml,dof,17,solref,0.02 1.0
+collisions.xml,dof,17,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,18,bodyid,6.0
 collisions.xml,dof,18,jntid,3.0
 collisions.xml,dof,18,parentid,-1.0
 collisions.xml,dof,18,armature,0.0
 collisions.xml,dof,18,damping,0.0
 collisions.xml,dof,18,frictionloss,0.0
+collisions.xml,dof,18,solref,0.02 1.0
+collisions.xml,dof,18,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,19,bodyid,6.0
 collisions.xml,dof,19,jntid,3.0
 collisions.xml,dof,19,parentid,18.0
 collisions.xml,dof,19,armature,0.0
 collisions.xml,dof,19,damping,0.0
 collisions.xml,dof,19,frictionloss,0.0
+collisions.xml,dof,19,solref,0.02 1.0
+collisions.xml,dof,19,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,20,bodyid,6.0
 collisions.xml,dof,20,jntid,3.0
 collisions.xml,dof,20,parentid,19.0
 collisions.xml,dof,20,armature,0.0
 collisions.xml,dof,20,damping,0.0
 collisions.xml,dof,20,frictionloss,0.0
+collisions.xml,dof,20,solref,0.02 1.0
+collisions.xml,dof,20,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,21,bodyid,6.0
 collisions.xml,dof,21,jntid,3.0
 collisions.xml,dof,21,parentid,20.0
 collisions.xml,dof,21,armature,0.0
 collisions.xml,dof,21,damping,0.0
 collisions.xml,dof,21,frictionloss,0.0
+collisions.xml,dof,21,solref,0.02 1.0
+collisions.xml,dof,21,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,22,bodyid,6.0
 collisions.xml,dof,22,jntid,3.0
 collisions.xml,dof,22,parentid,21.0
 collisions.xml,dof,22,armature,0.0
 collisions.xml,dof,22,damping,0.0
 collisions.xml,dof,22,frictionloss,0.0
+collisions.xml,dof,22,solref,0.02 1.0
+collisions.xml,dof,22,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,23,bodyid,6.0
 collisions.xml,dof,23,jntid,3.0
 collisions.xml,dof,23,parentid,22.0
 collisions.xml,dof,23,armature,0.0
 collisions.xml,dof,23,damping,0.0
 collisions.xml,dof,23,frictionloss,0.0
+collisions.xml,dof,23,solref,0.02 1.0
+collisions.xml,dof,23,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,24,bodyid,7.0
 collisions.xml,dof,24,jntid,4.0
 collisions.xml,dof,24,parentid,-1.0
 collisions.xml,dof,24,armature,0.0
 collisions.xml,dof,24,damping,0.0
 collisions.xml,dof,24,frictionloss,0.0
+collisions.xml,dof,24,solref,0.02 1.0
+collisions.xml,dof,24,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,25,bodyid,7.0
 collisions.xml,dof,25,jntid,4.0
 collisions.xml,dof,25,parentid,24.0
 collisions.xml,dof,25,armature,0.0
 collisions.xml,dof,25,damping,0.0
 collisions.xml,dof,25,frictionloss,0.0
+collisions.xml,dof,25,solref,0.02 1.0
+collisions.xml,dof,25,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,26,bodyid,7.0
 collisions.xml,dof,26,jntid,4.0
 collisions.xml,dof,26,parentid,25.0
 collisions.xml,dof,26,armature,0.0
 collisions.xml,dof,26,damping,0.0
 collisions.xml,dof,26,frictionloss,0.0
+collisions.xml,dof,26,solref,0.02 1.0
+collisions.xml,dof,26,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,27,bodyid,7.0
 collisions.xml,dof,27,jntid,4.0
 collisions.xml,dof,27,parentid,26.0
 collisions.xml,dof,27,armature,0.0
 collisions.xml,dof,27,damping,0.0
 collisions.xml,dof,27,frictionloss,0.0
+collisions.xml,dof,27,solref,0.02 1.0
+collisions.xml,dof,27,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,28,bodyid,7.0
 collisions.xml,dof,28,jntid,4.0
 collisions.xml,dof,28,parentid,27.0
 collisions.xml,dof,28,armature,0.0
 collisions.xml,dof,28,damping,0.0
 collisions.xml,dof,28,frictionloss,0.0
+collisions.xml,dof,28,solref,0.02 1.0
+collisions.xml,dof,28,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,29,bodyid,7.0
 collisions.xml,dof,29,jntid,4.0
 collisions.xml,dof,29,parentid,28.0
 collisions.xml,dof,29,armature,0.0
 collisions.xml,dof,29,damping,0.0
 collisions.xml,dof,29,frictionloss,0.0
+collisions.xml,dof,29,solref,0.02 1.0
+collisions.xml,dof,29,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,30,bodyid,8.0
 collisions.xml,dof,30,jntid,5.0
 collisions.xml,dof,30,parentid,-1.0
 collisions.xml,dof,30,armature,0.0
 collisions.xml,dof,30,damping,0.0
 collisions.xml,dof,30,frictionloss,0.0
+collisions.xml,dof,30,solref,0.02 1.0
+collisions.xml,dof,30,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,31,bodyid,8.0
 collisions.xml,dof,31,jntid,5.0
 collisions.xml,dof,31,parentid,30.0
 collisions.xml,dof,31,armature,0.0
 collisions.xml,dof,31,damping,0.0
 collisions.xml,dof,31,frictionloss,0.0
+collisions.xml,dof,31,solref,0.02 1.0
+collisions.xml,dof,31,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,32,bodyid,8.0
 collisions.xml,dof,32,jntid,5.0
 collisions.xml,dof,32,parentid,31.0
 collisions.xml,dof,32,armature,0.0
 collisions.xml,dof,32,damping,0.0
 collisions.xml,dof,32,frictionloss,0.0
+collisions.xml,dof,32,solref,0.02 1.0
+collisions.xml,dof,32,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,33,bodyid,8.0
 collisions.xml,dof,33,jntid,5.0
 collisions.xml,dof,33,parentid,32.0
 collisions.xml,dof,33,armature,0.0
 collisions.xml,dof,33,damping,0.0
 collisions.xml,dof,33,frictionloss,0.0
+collisions.xml,dof,33,solref,0.02 1.0
+collisions.xml,dof,33,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,34,bodyid,8.0
 collisions.xml,dof,34,jntid,5.0
 collisions.xml,dof,34,parentid,33.0
 collisions.xml,dof,34,armature,0.0
 collisions.xml,dof,34,damping,0.0
 collisions.xml,dof,34,frictionloss,0.0
+collisions.xml,dof,34,solref,0.02 1.0
+collisions.xml,dof,34,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,35,bodyid,8.0
 collisions.xml,dof,35,jntid,5.0
 collisions.xml,dof,35,parentid,34.0
 collisions.xml,dof,35,armature,0.0
 collisions.xml,dof,35,damping,0.0
 collisions.xml,dof,35,frictionloss,0.0
+collisions.xml,dof,35,solref,0.02 1.0
+collisions.xml,dof,35,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,36,bodyid,9.0
 collisions.xml,dof,36,jntid,6.0
 collisions.xml,dof,36,parentid,-1.0
 collisions.xml,dof,36,armature,0.0
 collisions.xml,dof,36,damping,0.0
 collisions.xml,dof,36,frictionloss,0.0
+collisions.xml,dof,36,solref,0.02 1.0
+collisions.xml,dof,36,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,37,bodyid,9.0
 collisions.xml,dof,37,jntid,6.0
 collisions.xml,dof,37,parentid,36.0
 collisions.xml,dof,37,armature,0.0
 collisions.xml,dof,37,damping,0.0
 collisions.xml,dof,37,frictionloss,0.0
+collisions.xml,dof,37,solref,0.02 1.0
+collisions.xml,dof,37,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,38,bodyid,9.0
 collisions.xml,dof,38,jntid,6.0
 collisions.xml,dof,38,parentid,37.0
 collisions.xml,dof,38,armature,0.0
 collisions.xml,dof,38,damping,0.0
 collisions.xml,dof,38,frictionloss,0.0
+collisions.xml,dof,38,solref,0.02 1.0
+collisions.xml,dof,38,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,39,bodyid,9.0
 collisions.xml,dof,39,jntid,6.0
 collisions.xml,dof,39,parentid,38.0
 collisions.xml,dof,39,armature,0.0
 collisions.xml,dof,39,damping,0.0
 collisions.xml,dof,39,frictionloss,0.0
+collisions.xml,dof,39,solref,0.02 1.0
+collisions.xml,dof,39,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,40,bodyid,9.0
 collisions.xml,dof,40,jntid,6.0
 collisions.xml,dof,40,parentid,39.0
 collisions.xml,dof,40,armature,0.0
 collisions.xml,dof,40,damping,0.0
 collisions.xml,dof,40,frictionloss,0.0
+collisions.xml,dof,40,solref,0.02 1.0
+collisions.xml,dof,40,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,41,bodyid,9.0
 collisions.xml,dof,41,jntid,6.0
 collisions.xml,dof,41,parentid,40.0
 collisions.xml,dof,41,armature,0.0
 collisions.xml,dof,41,damping,0.0
 collisions.xml,dof,41,frictionloss,0.0
+collisions.xml,dof,41,solref,0.02 1.0
+collisions.xml,dof,41,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,42,bodyid,10.0
 collisions.xml,dof,42,jntid,7.0
 collisions.xml,dof,42,parentid,-1.0
 collisions.xml,dof,42,armature,0.0
 collisions.xml,dof,42,damping,0.0
 collisions.xml,dof,42,frictionloss,0.0
+collisions.xml,dof,42,solref,0.02 1.0
+collisions.xml,dof,42,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,43,bodyid,10.0
 collisions.xml,dof,43,jntid,7.0
 collisions.xml,dof,43,parentid,42.0
 collisions.xml,dof,43,armature,0.0
 collisions.xml,dof,43,damping,0.0
 collisions.xml,dof,43,frictionloss,0.0
+collisions.xml,dof,43,solref,0.02 1.0
+collisions.xml,dof,43,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,44,bodyid,10.0
 collisions.xml,dof,44,jntid,7.0
 collisions.xml,dof,44,parentid,43.0
 collisions.xml,dof,44,armature,0.0
 collisions.xml,dof,44,damping,0.0
 collisions.xml,dof,44,frictionloss,0.0
+collisions.xml,dof,44,solref,0.02 1.0
+collisions.xml,dof,44,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,45,bodyid,10.0
 collisions.xml,dof,45,jntid,7.0
 collisions.xml,dof,45,parentid,44.0
 collisions.xml,dof,45,armature,0.0
 collisions.xml,dof,45,damping,0.0
 collisions.xml,dof,45,frictionloss,0.0
+collisions.xml,dof,45,solref,0.02 1.0
+collisions.xml,dof,45,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,46,bodyid,10.0
 collisions.xml,dof,46,jntid,7.0
 collisions.xml,dof,46,parentid,45.0
 collisions.xml,dof,46,armature,0.0
 collisions.xml,dof,46,damping,0.0
 collisions.xml,dof,46,frictionloss,0.0
+collisions.xml,dof,46,solref,0.02 1.0
+collisions.xml,dof,46,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,47,bodyid,10.0
 collisions.xml,dof,47,jntid,7.0
 collisions.xml,dof,47,parentid,46.0
 collisions.xml,dof,47,armature,0.0
 collisions.xml,dof,47,damping,0.0
 collisions.xml,dof,47,frictionloss,0.0
+collisions.xml,dof,47,solref,0.02 1.0
+collisions.xml,dof,47,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,48,bodyid,11.0
 collisions.xml,dof,48,jntid,8.0
 collisions.xml,dof,48,parentid,47.0
 collisions.xml,dof,48,armature,0.0
 collisions.xml,dof,48,damping,0.0
 collisions.xml,dof,48,frictionloss,0.0
+collisions.xml,dof,48,solref,0.02 1.0
+collisions.xml,dof,48,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,dof,49,bodyid,13.0
 collisions.xml,dof,49,jntid,9.0
 collisions.xml,dof,49,parentid,48.0
 collisions.xml,dof,49,armature,0.0
 collisions.xml,dof,49,damping,0.0
 collisions.xml,dof,49,frictionloss,0.0
+collisions.xml,dof,49,solref,0.02 1.0
+collisions.xml,dof,49,solimp,0.9 0.95 0.001 0.5 2.0
 collisions.xml,geom,0,type,0.0
 collisions.xml,geom,0,bodyid,0.0
 collisions.xml,geom,0,size,0.0 0.0 1.0
@@ -1777,12 +1949,16 @@ double_pendulum.xml,dof,0,parentid,-1.0
 double_pendulum.xml,dof,0,armature,0.0
 double_pendulum.xml,dof,0,damping,0.0
 double_pendulum.xml,dof,0,frictionloss,0.0
+double_pendulum.xml,dof,0,solref,0.02 1.0
+double_pendulum.xml,dof,0,solimp,0.9 0.95 0.001 0.5 2.0
 double_pendulum.xml,dof,1,bodyid,2.0
 double_pendulum.xml,dof,1,jntid,1.0
 double_pendulum.xml,dof,1,parentid,0.0
 double_pendulum.xml,dof,1,armature,0.0
 double_pendulum.xml,dof,1,damping,0.0
 double_pendulum.xml,dof,1,frictionloss,0.0
+double_pendulum.xml,dof,1,solref,0.02 1.0
+double_pendulum.xml,dof,1,solimp,0.9 0.95 0.001 0.5 2.0
 double_pendulum.xml,geom,0,type,3.0
 double_pendulum.xml,geom,0,bodyid,1.0
 double_pendulum.xml,geom,0,size,0.03 0.3 0.0
@@ -1951,36 +2127,48 @@ features.xml,dof,0,parentid,-1.0
 features.xml,dof,0,armature,0.02
 features.xml,dof,0,damping,0.5
 features.xml,dof,0,frictionloss,0.0
+features.xml,dof,0,solref,0.02 1.0
+features.xml,dof,0,solimp,0.9 0.95 0.001 0.5 2.0
 features.xml,dof,1,bodyid,2.0
 features.xml,dof,1,jntid,1.0
 features.xml,dof,1,parentid,0.0
 features.xml,dof,1,armature,0.02
 features.xml,dof,1,damping,0.5
 features.xml,dof,1,frictionloss,0.0
+features.xml,dof,1,solref,0.02 1.0
+features.xml,dof,1,solimp,0.9 0.95 0.001 0.5 2.0
 features.xml,dof,2,bodyid,2.0
 features.xml,dof,2,jntid,1.0
 features.xml,dof,2,parentid,1.0
 features.xml,dof,2,armature,0.02
 features.xml,dof,2,damping,0.5
 features.xml,dof,2,frictionloss,0.0
+features.xml,dof,2,solref,0.02 1.0
+features.xml,dof,2,solimp,0.9 0.95 0.001 0.5 2.0
 features.xml,dof,3,bodyid,2.0
 features.xml,dof,3,jntid,1.0
 features.xml,dof,3,parentid,2.0
 features.xml,dof,3,armature,0.02
 features.xml,dof,3,damping,0.5
 features.xml,dof,3,frictionloss,0.0
+features.xml,dof,3,solref,0.02 1.0
+features.xml,dof,3,solimp,0.9 0.95 0.001 0.5 2.0
 features.xml,dof,4,bodyid,3.0
 features.xml,dof,4,jntid,2.0
 features.xml,dof,4,parentid,3.0
 features.xml,dof,4,armature,0.02
 features.xml,dof,4,damping,0.5
 features.xml,dof,4,frictionloss,0.0
+features.xml,dof,4,solref,0.02 1.0
+features.xml,dof,4,solimp,0.9 0.95 0.001 0.5 2.0
 features.xml,dof,5,bodyid,4.0
 features.xml,dof,5,jntid,3.0
 features.xml,dof,5,parentid,0.0
 features.xml,dof,5,armature,0.02
 features.xml,dof,5,damping,0.5
 features.xml,dof,5,frictionloss,0.0
+features.xml,dof,5,solref,0.02 1.0
+features.xml,dof,5,solimp,0.9 0.95 0.001 0.5 2.0
 features.xml,geom,0,type,0.0
 features.xml,geom,0,bodyid,0.0
 features.xml,geom,0,size,0.0 0.0 1.0
@@ -2113,36 +2301,48 @@ free_body.xml,dof,0,parentid,-1.0
 free_body.xml,dof,0,armature,0.0
 free_body.xml,dof,0,damping,0.0
 free_body.xml,dof,0,frictionloss,0.0
+free_body.xml,dof,0,solref,0.02 1.0
+free_body.xml,dof,0,solimp,0.9 0.95 0.001 0.5 2.0
 free_body.xml,dof,1,bodyid,1.0
 free_body.xml,dof,1,jntid,0.0
 free_body.xml,dof,1,parentid,0.0
 free_body.xml,dof,1,armature,0.0
 free_body.xml,dof,1,damping,0.0
 free_body.xml,dof,1,frictionloss,0.0
+free_body.xml,dof,1,solref,0.02 1.0
+free_body.xml,dof,1,solimp,0.9 0.95 0.001 0.5 2.0
 free_body.xml,dof,2,bodyid,1.0
 free_body.xml,dof,2,jntid,0.0
 free_body.xml,dof,2,parentid,1.0
 free_body.xml,dof,2,armature,0.0
 free_body.xml,dof,2,damping,0.0
 free_body.xml,dof,2,frictionloss,0.0
+free_body.xml,dof,2,solref,0.02 1.0
+free_body.xml,dof,2,solimp,0.9 0.95 0.001 0.5 2.0
 free_body.xml,dof,3,bodyid,1.0
 free_body.xml,dof,3,jntid,0.0
 free_body.xml,dof,3,parentid,2.0
 free_body.xml,dof,3,armature,0.0
 free_body.xml,dof,3,damping,0.0
 free_body.xml,dof,3,frictionloss,0.0
+free_body.xml,dof,3,solref,0.02 1.0
+free_body.xml,dof,3,solimp,0.9 0.95 0.001 0.5 2.0
 free_body.xml,dof,4,bodyid,1.0
 free_body.xml,dof,4,jntid,0.0
 free_body.xml,dof,4,parentid,3.0
 free_body.xml,dof,4,armature,0.0
 free_body.xml,dof,4,damping,0.0
 free_body.xml,dof,4,frictionloss,0.0
+free_body.xml,dof,4,solref,0.02 1.0
+free_body.xml,dof,4,solimp,0.9 0.95 0.001 0.5 2.0
 free_body.xml,dof,5,bodyid,1.0
 free_body.xml,dof,5,jntid,0.0
 free_body.xml,dof,5,parentid,4.0
 free_body.xml,dof,5,armature,0.0
 free_body.xml,dof,5,damping,0.0
 free_body.xml,dof,5,frictionloss,0.0
+free_body.xml,dof,5,solref,0.02 1.0
+free_body.xml,dof,5,solimp,0.9 0.95 0.001 0.5 2.0
 free_body.xml,geom,0,type,6.0
 free_body.xml,geom,0,bodyid,1.0
 free_body.xml,geom,0,size,0.3 0.1 0.05
@@ -2245,6 +2445,8 @@ pendulum.xml,dof,0,parentid,-1.0
 pendulum.xml,dof,0,armature,0.0
 pendulum.xml,dof,0,damping,0.0
 pendulum.xml,dof,0,frictionloss,0.0
+pendulum.xml,dof,0,solref,0.02 1.0
+pendulum.xml,dof,0,solimp,0.9 0.95 0.001 0.5 2.0
 pendulum.xml,geom,0,type,3.0
 pendulum.xml,geom,0,bodyid,1.0
 pendulum.xml,geom,0,size,0.02 0.25 0.0

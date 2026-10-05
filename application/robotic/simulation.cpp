@@ -13,6 +13,104 @@
 
 namespace simon::robotic {
 
+namespace {
+
+// Whether MuJoCo takes dampers implicitly: if any dof is damped or
+// actuated, every dof's (mj_EulerSkip).
+auto is_implicit(const model::ArticulatedModel& m) -> bool {
+  return !m.actuators.empty() ||
+         std::ranges::any_of(m.dofs,
+                             [](const model::Dof& d) { return d.damping > 0; });
+}
+
+// The inverse inertia each body and dof of a tree sees at its rest
+// positions, averaged over translation and rotation, and the sum of its
+// mass matrix's diagonal (mj_setConst).
+template <typename Capacity>
+auto weigh(const model::ArticulatedModel& m, const model::Tree& tree,
+           const model::TreeKernel<Capacity>& kernel,
+           InOut<std::vector<double>> body_weight,
+           InOut<std::vector<double>> dof_weight, InOut<double> inertia)
+    -> void {
+  constexpr std::size_t V = Capacity::dofs;
+  model::TreeState<Capacity> state;
+  for (std::uint32_t q = 0; q < tree.qpos; ++q) {
+    state.qpos[q] = m.qpos0[tree.first_qpos + q];
+  }
+  auto dynamics = std::make_unique<model::TreeDynamics<Capacity>>();
+  kernel.forward(state, model::TreeControl<Capacity>{}, Out(*dynamics));
+  std::uint32_t n = tree.dofs;
+  if (n == 0) {
+    return;  // A tree that cannot move weighs nothing.
+  }
+  for (std::uint32_t i = 0; i < n; ++i) {
+    *inertia += dynamics->mass[i * V + i];
+  }
+  // x M⁻¹ x for a row of the tree's dofs.
+  auto inverse = [&](std::span<const double> row) {
+    std::array<double, V> x{};
+    std::ranges::copy(row, x.begin());
+    kernel.solve(dynamics->factor, dynamics->inverse_diagonal, x);
+    double sum = 0.0;
+    for (std::uint32_t i = 0; i < n; ++i) {
+      sum += row[i] * x[i];
+    }
+    return sum;
+  };
+  std::vector<double> translation(3 * std::size_t{n});
+  std::vector<double> rotation(3 * std::size_t{n});
+  std::span<const model::Spatial> cdof{dynamics->cdof.data(), n};
+  for (std::uint32_t b = 0; b < tree.bodies; ++b) {
+    std::uint32_t body = tree.first_body + b;
+    model::compute_point_jacobian(m, tree, cdof, dynamics->com, body,
+                                  dynamics->xipos[b], translation, rotation);
+    double moved = 0.0;
+    double turned = 0.0;
+    for (std::uint32_t k = 0; k < 3; ++k) {
+      moved += inverse({&translation[k * n], n});
+      turned += inverse({&rotation[k * n], n});
+    }
+    (*body_weight)[2 * body] = moved / 3;
+    (*body_weight)[2 * body + 1] = turned / 3;
+  }
+  std::vector<double> unit(n);
+  auto diagonal = [&](std::uint32_t c) {
+    std::ranges::fill(unit, 0.0);
+    unit[c] = 1;
+    return inverse(unit);
+  };
+  for (std::uint32_t j = tree.first_joint; j < tree.first_joint + tree.joints;
+       ++j) {
+    const model::Joint& joint = m.joints[j];
+    std::uint32_t d = joint.dof;
+    std::uint32_t c = d - tree.first_dof;
+    switch (joint.type) {
+      case model::JointType::FREE: {
+        double moved = (diagonal(c) + diagonal(c + 1) + diagonal(c + 2)) / 3;
+        double turned =
+            (diagonal(c + 3) + diagonal(c + 4) + diagonal(c + 5)) / 3;
+        for (std::uint32_t k = 0; k < 3; ++k) {
+          (*dof_weight)[d + k] = moved;
+          (*dof_weight)[d + 3 + k] = turned;
+        }
+        break;
+      }
+      case model::JointType::BALL: {
+        double turned = (diagonal(c) + diagonal(c + 1) + diagonal(c + 2)) / 3;
+        for (std::uint32_t k = 0; k < 3; ++k) {
+          (*dof_weight)[d + k] = turned;
+        }
+        break;
+      }
+      default:
+        (*dof_weight)[d] = diagonal(c);
+        break;
+    }
+  }
+}
+
+}  // namespace
+
 Mechanics::Mechanics(model::ArticulatedModel model)
     : model_{std::move(model)},
       trees_{model::find_trees(model_)},
@@ -24,16 +122,30 @@ Mechanics::Mechanics(model::ArticulatedModel model)
       unbounded_.push_back(g);
     }
   }
+  bool implicit = is_implicit(model_);
+  body_weight_.assign(2 * model_.bodies.size(), 0.0);
+  dof_weight_.assign(model_.dofs.size(), 0.0);
+  double inertia = 0.0;
   for (std::uint32_t t = 0; t < trees_.size(); ++t) {
     small_.push_back(fits<SmallCapacity>(t)
                          ? std::make_unique<model::TreeKernel<SmallCapacity>>(
-                               model_, trees_[t])
+                               model_, trees_[t], implicit)
                          : nullptr);
     large_.push_back(fits<LargeCapacity>(t)
                          ? std::make_unique<model::TreeKernel<LargeCapacity>>(
-                               model_, trees_[t])
+                               model_, trees_[t], implicit)
                          : nullptr);
+    if (small_.back()) {
+      weigh(model_, trees_[t], *small_.back(), InOut(body_weight_),
+            InOut(dof_weight_), InOut(inertia));
+    } else if (large_.back()) {
+      weigh(model_, trees_[t], *large_.back(), InOut(body_weight_),
+            InOut(dof_weight_), InOut(inertia));
+    }
   }
+  mean_inertia_ = model_.dofs.empty()
+                      ? 1.0
+                      : inertia / static_cast<double>(model_.dofs.size());
 }
 
 Simulation::Simulation(Scenario scenario) : scenario_{std::move(scenario)} {}
@@ -111,6 +223,19 @@ auto find_convex_pair(const model::ArticulatedModel& m,
 auto Simulation::configure() -> engine::PhaseResult {
   RETURN_OR_ASSIGN(model::ArticulatedModel model,
                    format::load_mjcf(scenario_.model));
+  if (scenario_.solver) {
+    model.physics.solver = *scenario_.solver;
+  }
+  if (scenario_.constrained &&
+      model.physics.cone == model::Physics::Cone::ELLIPTIC) {
+    return std::unexpected(lib::raise(format::MjcfError::UNSUPPORTED,
+                                      "the elliptic friction cone"));
+  }
+  if (scenario_.constrained &&
+      model.physics.solver == model::Physics::Solver::CG) {
+    return std::unexpected(
+        lib::raise(format::MjcfError::UNSUPPORTED, "the CG solver"));
+  }
   mechanics_ = std::make_unique<Mechanics>(std::move(model));
   if (std::optional<std::string> pair =
           find_convex_pair(mechanics_->model(), mechanics_->filter())) {
@@ -119,7 +244,8 @@ auto Simulation::configure() -> engine::PhaseResult {
         "contacts of " + *pair + ", which need a general convex collider"));
   }
   scheduler_ = std::make_unique<Scheduler>(
-      make_schedule(*mechanics_, scenario_.feedback, Depend(*contacts_)));
+      make_schedule(*mechanics_, scenario_.feedback, Depend(*contacts_),
+                    Depend(*solution_), scenario_.constrained));
   std::size_t small = 0;
   std::size_t large = 0;
   for (std::uint32_t t = 0; t < mechanics_->trees().size(); ++t) {
@@ -146,6 +272,7 @@ auto Simulation::configure() -> engine::PhaseResult {
               .with(TreeBound{})
               .with(Mechanism{.tree = t})
               .with(Touching{})
+              .with(Island{})
               .with(start<SmallCapacity>(*mechanics_, t, scenario_))
               .with(start_control<SmallCapacity>(*mechanics_, t, scenario_))
               .with(TreeDynamics<SmallCapacity>{})
@@ -156,6 +283,7 @@ auto Simulation::configure() -> engine::PhaseResult {
               .with(TreeBound{})
               .with(Mechanism{.tree = t})
               .with(Touching{})
+              .with(Island{})
               .with(start<LargeCapacity>(*mechanics_, t, scenario_))
               .with(start_control<LargeCapacity>(*mechanics_, t, scenario_))
               .with(TreeDynamics<LargeCapacity>{})

@@ -2,6 +2,9 @@
 
 #include "application/robotic/simulation_systems.hpp"
 
+#include <cmath>
+#include <numbers>
+
 namespace simon::robotic {
 
 auto Collide::prepare(SystemWorld& world) -> bool {
@@ -129,6 +132,370 @@ auto Collide::collide_trees(std::uint32_t first, std::uint32_t second) -> void {
       collide_bodies(b1, b2);
     }
   }
+}
+
+}  // namespace simon::robotic
+
+namespace simon::robotic {
+
+namespace {
+
+// MuJoCo's quaternion as a rotation vector (mju_quat2Vel, dt 1).
+auto convert_to_rotation(model::Quaternion4 quat) -> model::Array3 {
+  model::articulated::normalize4(quat);
+  model::Array3 axis{quat[1], quat[2], quat[3]};
+  double sin_half = model::articulated::normalize3(axis);
+  double angle = 2 * std::atan2(sin_half, quat[0]);
+  if (angle > std::numbers::pi) {
+    angle -= 2 * std::numbers::pi;
+  }
+  return {axis[0] * angle, axis[1] * angle, axis[2] * angle};
+}
+
+}  // namespace
+
+auto Solve::find_root(std::uint32_t tree) -> std::uint32_t {
+  while (parent_[tree] != tree) {
+    parent_[tree] = parent_[parent_[tree]];
+    tree = parent_[tree];
+  }
+  return tree;
+}
+
+auto Solve::tree_of_geom(std::uint32_t geom) const -> std::uint32_t {
+  const model::ArticulatedModel& m = mechanics_->model();
+  std::uint32_t body = m.geoms[geom].body;
+  if (body == 0) {
+    return NO_TREE;
+  }
+  const std::vector<model::Tree>& trees = mechanics_->trees();
+  auto it = std::ranges::upper_bound(trees, body, {}, &model::Tree::first_body);
+  std::uint32_t t = static_cast<std::uint32_t>(it - trees.begin()) - 1;
+  return trees[t].dofs > 0 ? t : NO_TREE;
+}
+
+auto Solve::prepare(SystemWorld& world) -> bool {
+  const model::ArticulatedModel& m = mechanics_->model();
+  const std::vector<model::Tree>& trees = mechanics_->trees();
+  std::size_t count = trees.size();
+  data_.resize(count);
+  islands_.assign(count, Island{});
+  gather<SmallCapacity>(world);
+  gather<LargeCapacity>(world);
+  ConstraintSolution& out = *solution_;
+  out.qacc.assign(m.dofs.size(), 0.0);
+  out.qfrc_constraint.assign(m.dofs.size(), 0.0);
+  out.constrained.assign(count, 0);
+  out.islands = 0;
+  for (std::uint32_t t = 0; t < count; ++t) {
+    std::ranges::copy(data_[t].qacc_smooth,
+                      out.qacc.begin() + trees[t].first_dof);
+  }
+  if (!enabled_) {
+    return true;
+  }
+
+  // Trees with rows of their own: dry friction or a limit reached.
+  std::vector<std::uint8_t> marked(count, 0);
+  for (std::uint32_t t = 0; t < count; ++t) {
+    const model::Tree& tree = trees[t];
+    for (std::uint32_t d = tree.first_dof; d < tree.first_dof + tree.dofs;
+         ++d) {
+      marked[t] |= m.dofs[d].friction_loss != 0 ? 1 : 0;
+    }
+    for (std::uint32_t j = tree.first_joint;
+         j < tree.first_joint + tree.joints && marked[t] == 0; ++j) {
+      const model::Joint& joint = m.joints[j];
+      if (!joint.limited || joint.type == model::JointType::FREE) {
+        continue;
+      }
+      const std::vector<double>& qpos = data_[t].qpos;
+      std::uint32_t q = joint.qpos - tree.first_qpos;
+      if (joint.type == model::JointType::BALL) {
+        model::Array3 r = convert_to_rotation(
+            {qpos[q], qpos[q + 1], qpos[q + 2], qpos[q + 3]});
+        double angle = model::articulated::normalize3(r);
+        marked[t] =
+            std::max(joint.range[0], joint.range[1]) - angle < joint.margin;
+      } else {
+        marked[t] = qpos[q] - joint.range[0] < joint.margin ||
+                    joint.range[1] - qpos[q] < joint.margin;
+      }
+    }
+  }
+
+  // Islands: trees joined by contacts, by union and find.
+  parent_.resize(count);
+  for (std::uint32_t t = 0; t < count; ++t) {
+    parent_[t] = t;
+  }
+  const std::vector<model::Contact>& contacts = contacts_->contacts;
+  for (const model::Contact& contact : contacts) {
+    if (contact.exclude) {
+      continue;
+    }
+    std::uint32_t a = tree_of_geom(contact.geom[0]);
+    std::uint32_t b = tree_of_geom(contact.geom[1]);
+    if (a != NO_TREE) {
+      marked[a] = 1;
+    }
+    if (b != NO_TREE) {
+      marked[b] = 1;
+    }
+    if (a != NO_TREE && b != NO_TREE) {
+      std::uint32_t ra = find_root(a);
+      std::uint32_t rb = find_root(b);
+      parent_[std::max(ra, rb)] = std::min(ra, rb);
+    }
+  }
+  std::vector<std::uint32_t> index_of_root(count, Island::NONE);
+  std::vector<std::vector<std::uint32_t>> members;
+  for (std::uint32_t t = 0; t < count; ++t) {
+    if (marked[t] == 0) {
+      continue;
+    }
+    std::uint32_t root = find_root(t);
+    if (index_of_root[root] == Island::NONE) {
+      index_of_root[root] = static_cast<std::uint32_t>(members.size());
+      members.emplace_back();
+    }
+    members[index_of_root[root]].push_back(t);
+    islands_[t].index = index_of_root[root];
+  }
+  std::vector<std::vector<std::uint32_t>> joined(members.size());
+  for (std::uint32_t c = 0; c < contacts.size(); ++c) {
+    if (contacts[c].exclude) {
+      continue;
+    }
+    std::uint32_t a = tree_of_geom(contacts[c].geom[0]);
+    std::uint32_t t = a != NO_TREE ? a : tree_of_geom(contacts[c].geom[1]);
+    if (t != NO_TREE) {
+      joined[islands_[t].index].push_back(c);
+    }
+  }
+  for (std::uint32_t i = 0; i < members.size(); ++i) {
+    std::uint32_t rows = solve_island(members[i], joined[i]);
+    for (std::uint32_t t : members[i]) {
+      islands_[t].rows = rows;
+    }
+  }
+  out.islands = static_cast<std::uint32_t>(members.size());
+  return true;
+}
+
+auto Solve::solve_island(std::span<const std::uint32_t> members,
+                         std::span<const std::uint32_t> joined)
+    -> std::uint32_t {
+  const model::ArticulatedModel& m = mechanics_->model();
+  const std::vector<model::Tree>& trees = mechanics_->trees();
+  const std::vector<double>& body_weight = mechanics_->body_weight();
+  const std::vector<double>& dof_weight = mechanics_->dof_weight();
+  model::ConstraintProblem& p = problem_;
+
+  // The island's dofs, its trees' in order.
+  std::vector<std::uint32_t> offset(trees.size(), 0);
+  std::uint32_t n = 0;
+  for (std::uint32_t t : members) {
+    offset[t] = n;
+    n += trees[t].dofs;
+  }
+  p.dofs = n;
+  p.mass.assign(std::size_t{n} * n, 0.0);
+  p.qacc_smooth.clear();
+  p.qfrc_smooth.clear();
+  p.warmstart.clear();
+  std::vector<double> qvel;
+  for (std::uint32_t t : members) {
+    const TreeData& data = data_[t];
+    std::uint32_t k = trees[t].dofs;
+    for (std::uint32_t i = 0; i < k; ++i) {
+      for (std::uint32_t j = 0; j < k; ++j) {
+        p.mass[(offset[t] + i) * n + offset[t] + j] = data.mass[i * k + j];
+      }
+    }
+    p.qacc_smooth.insert(p.qacc_smooth.end(), data.qacc_smooth.begin(),
+                         data.qacc_smooth.end());
+    p.qfrc_smooth.insert(p.qfrc_smooth.end(), data.qfrc_smooth.begin(),
+                         data.qfrc_smooth.end());
+    p.warmstart.insert(p.warmstart.end(), data.warmstart.begin(),
+                       data.warmstart.end());
+    qvel.insert(qvel.end(), data.qvel.begin(), data.qvel.end());
+  }
+  p.jacobian.clear();
+  p.kind.clear();
+  p.group.clear();
+  p.pos.clear();
+  p.margin.clear();
+  p.friction_loss.clear();
+  p.diagonal.clear();
+  p.velocity.clear();
+  p.friction.clear();
+  p.soft.clear();
+
+  std::vector<double> row(n);
+  auto append = [&](model::ConstraintKind kind, std::uint32_t group, double pos,
+                    double margin, double loss, double diagonal,
+                    double friction, const model::SoftConstraint& soft) {
+    p.jacobian.insert(p.jacobian.end(), row.begin(), row.end());
+    p.kind.push_back(kind);
+    p.group.push_back(group);
+    p.pos.push_back(pos);
+    p.margin.push_back(margin);
+    p.friction_loss.push_back(loss);
+    p.diagonal.push_back(diagonal);
+    double v = 0.0;
+    for (std::uint32_t i = 0; i < n; ++i) {
+      v += row[i] * qvel[i];
+    }
+    p.velocity.push_back(v);
+    p.friction.push_back(friction);
+    p.soft.push_back(soft);
+  };
+
+  // Dry friction, by dof.
+  for (std::uint32_t t : members) {
+    const model::Tree& tree = trees[t];
+    for (std::uint32_t d = tree.first_dof; d < tree.first_dof + tree.dofs;
+         ++d) {
+      const model::Dof& dof = m.dofs[d];
+      if (dof.friction_loss == 0) {
+        continue;
+      }
+      std::ranges::fill(row, 0.0);
+      row[offset[t] + d - tree.first_dof] = 1;
+      append(model::ConstraintKind::FRICTION, p.rows(), 0.0, 0.0,
+             dof.friction_loss, dof_weight[d], 0.0,
+             m.joints[dof.joint].friction);
+    }
+  }
+
+  // Limits, by joint: each side a hinge or slide is within its margin of,
+  // and a ball's angle past its largest (mj_instantiateLimit).
+  for (std::uint32_t t : members) {
+    const model::Tree& tree = trees[t];
+    const std::vector<double>& qpos = data_[t].qpos;
+    for (std::uint32_t j = tree.first_joint; j < tree.first_joint + tree.joints;
+         ++j) {
+      const model::Joint& joint = m.joints[j];
+      if (!joint.limited || joint.type == model::JointType::FREE) {
+        continue;
+      }
+      std::uint32_t q = joint.qpos - tree.first_qpos;
+      std::uint32_t c = offset[t] + joint.dof - tree.first_dof;
+      if (joint.type == model::JointType::BALL) {
+        model::Array3 r = convert_to_rotation(
+            {qpos[q], qpos[q + 1], qpos[q + 2], qpos[q + 3]});
+        double angle = model::articulated::normalize3(r);
+        double dist = std::max(joint.range[0], joint.range[1]) - angle;
+        if (dist < joint.margin) {
+          std::ranges::fill(row, 0.0);
+          for (std::uint32_t k = 0; k < 3; ++k) {
+            row[c + k] = -r[k];
+          }
+          append(model::ConstraintKind::LIMIT, p.rows(), dist, joint.margin,
+                 0.0, dof_weight[joint.dof], 0.0, joint.limit);
+        }
+        continue;
+      }
+      for (int side = -1; side <= 1; side += 2) {
+        double dist = side * (joint.range[(side + 1) / 2] - qpos[q]);
+        if (dist < joint.margin) {
+          std::ranges::fill(row, 0.0);
+          row[c] = -static_cast<double>(side);
+          append(model::ConstraintKind::LIMIT, p.rows(), dist, joint.margin,
+                 0.0, dof_weight[joint.dof], 0.0, joint.limit);
+        }
+      }
+    }
+  }
+
+  // Contacts: the difference of the two bodies' point Jacobians, turned to
+  // the contact's frame, a frictionless row or a pyramid's edges in pairs
+  // (mj_instantiateContact, mj_diagApprox).
+  std::vector<double> translation(3 * std::size_t{n});
+  std::vector<double> rotation(3 * std::size_t{n});
+  for (std::uint32_t c : joined) {
+    const model::Contact& contact = contacts_->contacts[c];
+    std::ranges::fill(translation, 0.0);
+    std::ranges::fill(rotation, 0.0);
+    double moved = 0.0;
+    double turned = 0.0;
+    for (int side = 0; side < 2; ++side) {
+      std::uint32_t body = m.geoms[contact.geom[side]].body;
+      moved += body_weight[2 * body];
+      turned += body_weight[2 * body + 1];
+      std::uint32_t t = tree_of_geom(contact.geom[side]);
+      if (t == NO_TREE) {
+        continue;
+      }
+      const model::Tree& tree = trees[t];
+      std::uint32_t k = tree.dofs;
+      std::vector<double> jp(3 * std::size_t{k});
+      std::vector<double> jr(3 * std::size_t{k});
+      model::compute_point_jacobian(m, tree, data_[t].cdof, data_[t].com, body,
+                                    contact.pos, jp, jr);
+      double sign = side == 0 ? -1.0 : 1.0;
+      for (std::uint32_t r = 0; r < 3; ++r) {
+        for (std::uint32_t i = 0; i < k; ++i) {
+          translation[r * n + offset[t] + i] += sign * jp[r * k + i];
+          rotation[r * n + offset[t] + i] += sign * jr[r * k + i];
+        }
+      }
+    }
+    std::uint32_t dim = contact.dim;
+    // Rows in the contact frame: normal, tangents, then torsion and rolling.
+    std::vector<double> framed(std::size_t{dim} * n, 0.0);
+    for (std::uint32_t r = 0; r < dim; ++r) {
+      bool turning = r >= 3;
+      const std::vector<double>& source = turning ? rotation : translation;
+      std::uint32_t axis = turning ? r - 3 : r;
+      for (std::uint32_t i = 0; i < n; ++i) {
+        framed[r * n + i] = contact.frame[3 * axis] * source[i] +
+                            contact.frame[3 * axis + 1] * source[n + i] +
+                            contact.frame[3 * axis + 2] * source[2 * n + i];
+      }
+    }
+    std::uint32_t group = p.rows();
+    if (dim == 1) {
+      std::copy_n(framed.begin(), n, row.begin());
+      append(model::ConstraintKind::FRICTIONLESS, group, contact.dist,
+             contact.include_margin, 0.0, moved, 0.0, contact.soft);
+      continue;
+    }
+    for (std::uint32_t k = 1; k < dim; ++k) {
+      double mu = contact.friction[k - 1];
+      double diagonal = moved + mu * mu * (k - 1 < 2 ? moved : turned);
+      for (double sign : {1.0, -1.0}) {
+        for (std::uint32_t i = 0; i < n; ++i) {
+          row[i] = framed[i] + sign * mu * framed[k * n + i];
+        }
+        append(model::ConstraintKind::PYRAMIDAL, group, contact.dist,
+               contact.include_margin, 0.0, diagonal, contact.friction[0],
+               contact.soft);
+      }
+    }
+  }
+
+  const model::Physics& physics = m.physics;
+  model::ConstraintSettings settings{
+      .timestep = physics.timestep,
+      .solver = physics.solver,
+      .iterations = physics.iterations,
+      .tolerance = physics.tolerance,
+      .mean_inertia = mechanics_->mean_inertia(),
+      .model_dofs = static_cast<std::uint32_t>(m.dofs.size())};
+  model::solve_constraints(p, settings, Out(answer_));
+  ConstraintSolution& out = *solution_;
+  for (std::uint32_t t : members) {
+    const model::Tree& tree = trees[t];
+    for (std::uint32_t i = 0; i < tree.dofs; ++i) {
+      out.qacc[tree.first_dof + i] = answer_.qacc[offset[t] + i];
+      out.qfrc_constraint[tree.first_dof + i] =
+          answer_.qfrc_constraint[offset[t] + i];
+    }
+    out.constrained[t] = 1;
+  }
+  return p.rows();
 }
 
 }  // namespace simon::robotic
