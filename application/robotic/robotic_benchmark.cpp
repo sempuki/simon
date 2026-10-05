@@ -41,9 +41,11 @@ auto main(int argc, char** argv) -> int {
     }
   };
   step(0);
+  std::uint64_t iterations = 0;
   auto start = std::chrono::steady_clock::now();
   for (int k = 1; k <= steps; ++k) {
     step(k);
+    iterations += simulation.constraints().iterations;
   }
   double seconds =
       std::chrono::duration<double>(std::chrono::steady_clock::now() - start)
@@ -53,6 +55,9 @@ auto main(int argc, char** argv) -> int {
             << " ms/step, "
             << seconds / steps / static_cast<double>(trees) * 1e9
             << " ns/tree-step, " << simulation.contacts().size()
-            << " contacts at the end\n";
+            << " contacts, " << simulation.constraints().rows << " rows and "
+            << simulation.constraints().islands << " islands at the end, "
+            << static_cast<double>(iterations) / steps
+            << " solver iterations a step\n";
   return EXIT_SUCCESS;
 }

@@ -8,8 +8,8 @@ solves them at once. MuJoCo (Todorov, Erez and Tassa, "MuJoCo: A physics
 engine for model-based control", IROS 2012; Apache-2.0) is the reference.
 It is being built in eight steps (see the [Roadmap](#roadmap)); models read
 and compiled as MuJoCo compiles them, their dynamics without constraints,
-their actuators and control, their contacts, the constraint solver, and
-MuJoCo's humanoid are done.
+their actuators and control, their contacts, the constraint solver,
+MuJoCo's humanoid, and scale against MuJoCo with a viewer are done.
 
 ## Choices
 
@@ -108,9 +108,11 @@ MuJoCo's does, so that dampers stay stable at any step. MuJoCo also keeps a
 fixed inertia for dofs whose bodies never turn; simon recomputes it, which
 can differ in the last bit.
 
-In the ECS, an entity is a tree, of one of two archetypes by its capacity:
-a small tree, at most 4 bodies and 8 degrees of freedom, and a large tree,
-at most 16 and 32. Each archetype's state and work are sized at compile
+In the ECS, an entity is a tree, of one of three archetypes by its
+capacity: a single body of at most 6 degrees of freedom, a small tree of
+at most 4 bodies and 8, and a large tree of at most 16 and 32. Each tree
+takes the smallest that fits, so a loose body streams half the bytes it
+would as a small tree. Each archetype's state and work are sized at compile
 time, inline in its components. `Forward` computes each tree's poses, its
 factored mass matrix and its accelerations into its `TreeDynamics`;
 `Bound` its sphere, the world's spatial component; and `Integrate` steps
@@ -248,6 +250,38 @@ m/s by Newton's method, and within 5 mm/s by PGS, as MuJoCo's own PGS
 leaves it. MuJoCo's humanoid, falling for 20 s, lies on the floor 0.070 m
 high, as MuJoCo's does, its tendons and limits holding.
 
+## Scale
+
+`robotic_benchmark` times scenes `reference/make_scenes.py` writes, and
+`reference/mujoco_benchmark.py` times MuJoCo 3.14.0 on the same files, both
+on one thread, `-c opt`, 200 steps of 2 ms (5 ms for the humanoids) from
+rest, the bodies landing partway through:
+
+| Scene | simon | MuJoCo | Ratio |
+|---|---:|---:|---:|
+| 1,000 loose boxes, spheres and capsules falling onto the floor | 1.45 ms/step | 1.36 | 1.07 |
+| 10,000 of them | 17.8 | 15.1 | 1.18 |
+| 100 humanoids falling, 2 m apart | 2.49 | 2.21 | 1.13 |
+| 1,000 humanoids | 31.4 | 26.2 | 1.20 |
+
+Both end with the same contacts, 19,111 for the 10,000 bodies and 8,000 for
+the humanoids, and take about as many solver iterations an island, 1.1 to
+1.2. MuJoCo is faster by its sparse mass matrix and Jacobian; simon keeps
+each tree's mass matrix dense at its archetype's capacity, and each
+island's Hessian dense, so a large island, a pile of hundreds of bodies
+touching, would cost the cube of its size. Every island is independent, so
+they could be solved in parallel; the framework runs a system's `prepare`
+on one thread, so they are solved one after another.
+
+## Viewer
+
+`viewer` watches a model in real time, MuJoCo's humanoid unless it is given
+another: each geom in perspective, boxes and cylinders by their faces lit
+from above, capsules and spheres outlined, planes as grids, the contacts as
+dots; the view turns, pans and zooms with the mouse and follows the trees.
+Its panel shows the trees, contacts, islands, rows and solver iterations
+of the step, and pauses, restarts and speeds the run.
+
 ## Roadmap
 
 1. Done: MJCF read and compiled, against MuJoCo's compiled model.
@@ -268,8 +302,9 @@ high, as MuJoCo's does, its tendons and limits holding.
    fall. The Apache-2.0 models of MuJoCo Menagerie move to step 8: each uses
    the elliptic cone, implicitfast, cylinders that only the convex collider
    handles, or meshes.
-7. Scale and the viewer: ten thousand loose bodies and a thousand
-   humanoids against MuJoCo on one thread, islands in parallel.
+7. Done: ten thousand loose bodies and a thousand humanoids within 1.2x of
+   MuJoCo on one thread, and the viewer. Islands in parallel wait on the
+   framework running `prepare` on more than one thread.
 8. Opt-in fidelity: implicitfast and Runge–Kutta 4, the elliptic cone, convex
    meshes and the pairs MuJoCo's convex collider handles; then MuJoCo
    Menagerie's robots.

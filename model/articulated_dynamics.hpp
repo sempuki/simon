@@ -341,6 +341,18 @@ class TreeKernel final {
           dof.parent == Dof::NONE ? NONE : dof.parent - tree.first_dof;
       dof_body_[d] = dof.body - tree.first_body;
     }
+    // Each dof's ancestors, from the root down.
+    for (std::uint32_t d = 0; d < tree.dofs; ++d) {
+      std::array<std::uint32_t, V> chain{};
+      std::uint32_t count = 0;
+      for (std::uint32_t j = dof_parent_[d]; j != NONE; j = dof_parent_[j]) {
+        chain[count++] = j;
+      }
+      depth_[d] = count;
+      for (std::uint32_t i = 0; i < count; ++i) {
+        ancestors_[d * V + i] = chain[count - 1 - i];
+      }
+    }
     // Subtree masses, children added in reverse order.
     for (std::uint32_t b = 0; b < tree.bodies; ++b) {
       subtree_mass_[b] = model.bodies[tree.first_body + b].mass;
@@ -476,14 +488,8 @@ class TreeKernel final {
   // Calls `f` on each ancestor of dof `k`, from the root down.
   template <typename F>
   auto for_ancestors(std::uint32_t k, F f) const -> void {
-    std::array<std::uint32_t, V> chain{};
-    std::uint32_t count = 0;
-    for (std::uint32_t j = dof_parent_[k]; j != articulated::NONE;
-         j = dof_parent_[j]) {
-      chain[count++] = j;
-    }
-    while (count > 0) {
-      f(chain[--count]);
+    for (std::uint32_t i = 0; i < depth_[k]; ++i) {
+      f(ancestors_[k * V + i]);
     }
   }
 
@@ -873,6 +879,8 @@ class TreeKernel final {
   std::array<std::uint32_t, Capacity::bodies> parent_{};
   std::array<std::uint32_t, V> dof_parent_{};
   std::array<std::uint32_t, V> dof_body_{};
+  std::array<std::uint32_t, V> depth_{};  // By dof, its ancestors' count.
+  std::array<std::uint32_t, V * V> ancestors_{};  // By dof, root first.
   std::array<double, Capacity::bodies> subtree_mass_{};
   std::array<double, V> damping_{};  // By dof, with its actuators'.
 };

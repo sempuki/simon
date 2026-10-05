@@ -241,34 +241,81 @@ auto update_rows(const ConstraintProblem& p, const Regularized& reg,
 
 //-- Newton (engine_solver.c, mj_solPrimal) -----------------------------------
 
+// The vectors a Newton solve works in, kept from island to island.
+struct NewtonBuffers final {
+  std::vector<double> qacc;
+  std::vector<double> ma;
+  std::vector<double> jaref;
+  std::vector<double> force;
+  std::vector<RowState> state;
+  std::vector<double> qfrc;
+  std::vector<double> grad;
+  std::vector<double> mgrad;
+  std::vector<double> search;
+  std::vector<double> mv;
+  std::vector<double> jv;
+  std::vector<double> quad;
+  std::vector<double> hessian;
+  std::vector<double> mass_factor;
+  std::vector<double> jar;
+  std::vector<double> da;
+  std::vector<double> mda;
+  std::vector<std::uint32_t> columns;  // Each row's nonzero columns.
+  std::vector<std::uint32_t> starts;   // By row, into columns; one more.
+};
+
+template <typename T>
+auto sized(std::vector<T>& v, std::size_t n) -> std::vector<T>& {
+  v.resize(n);
+  return v;
+}
+
 class Newton final {
  public:
   Newton(const ConstraintProblem& p, const Regularized& reg,
-         const ConstraintSettings& settings)
+         const ConstraintSettings& settings, InOut<NewtonBuffers> buffers)
       : p_{&p},
         reg_{&reg},
         settings_{&settings},
         n_{p.dofs},
         m_{p.rows()},
-        qacc_(n_),
-        ma_(n_),
-        jaref_(m_),
-        force_(m_),
-        state_(m_),
-        qfrc_(n_),
-        grad_(n_),
-        mgrad_(n_),
-        search_(n_),
-        mv_(n_),
-        jv_(m_),
-        quad_(3 * std::size_t{m_}) {}
+        qacc_{sized(buffers->qacc, n_)},
+        ma_{sized(buffers->ma, n_)},
+        jaref_{sized(buffers->jaref, m_)},
+        force_{sized(buffers->force, m_)},
+        state_{sized(buffers->state, m_)},
+        qfrc_{sized(buffers->qfrc, n_)},
+        grad_{sized(buffers->grad, n_)},
+        mgrad_{sized(buffers->mgrad, n_)},
+        search_{sized(buffers->search, n_)},
+        mv_{sized(buffers->mv, n_)},
+        jv_{sized(buffers->jv, m_)},
+        quad_{sized(buffers->quad, 3 * std::size_t{m_})},
+        hessian_{buffers->hessian},
+        mass_factor_{buffers->mass_factor},
+        jar_{sized(buffers->jar, m_)},
+        da_{sized(buffers->da, n_)},
+        mda_{sized(buffers->mda, n_)},
+        columns_{buffers->columns},
+        starts_{sized(buffers->starts, std::size_t{m_} + 1)} {
+    columns_.clear();
+    for (std::uint32_t r = 0; r < m_; ++r) {
+      starts_[r] = static_cast<std::uint32_t>(columns_.size());
+      for (std::uint32_t c = 0; c < n_; ++c) {
+        if (p.jacobian[std::size_t{r} * n_ + c] != 0) {
+          columns_.push_back(c);
+        }
+      }
+    }
+    starts_[m_] = static_cast<std::uint32_t>(columns_.size());
+  }
 
   auto solve(Out<ConstraintSolution> solution) -> void {
     const ConstraintProblem& p = *p_;
     double tolerance = settings_->tolerance;
     choose_start();
     multiply(p.mass, n_, n_, qacc_, ma_);
-    multiply(p.jacobian, m_, n_, qacc_, jaref_);
+    multiply_jacobian(qacc_, jaref_);
     for (std::uint32_t i = 0; i < m_; ++i) {
       jaref_[i] -= reg_->aref[i];
     }
@@ -280,14 +327,17 @@ class Newton final {
     }
     scale_ = 1 / inertia;
 
-    // M⁻¹ grad bounds the cost's suboptimality.
-    std::vector<double> mass_factor = p.mass;
-    factor_cholesky(InOut(mass_factor), n_, MINVAL);
-    mgrad_ = grad_;
-    solve_cholesky(mass_factor, n_, mgrad_);
-    bool gap = std::max(0.0, 0.5 * scale_ * dot(grad_, mgrad_)) < tolerance;
+    // Done already if the gradient is small and M⁻¹ grad, which bounds the
+    // cost's suboptimality, is too; M is factored only to find out.
     bool gradient = scale_ * norm(grad_) < tolerance;
-    bool done = gap && gradient;
+    bool done = false;
+    if (gradient) {
+      mass_factor_ = p.mass;
+      factor_cholesky(InOut(mass_factor_), n_, MINVAL);
+      mgrad_ = grad_;
+      solve_cholesky(mass_factor_, n_, mgrad_);
+      done = std::max(0.0, 0.5 * scale_ * dot(grad_, mgrad_)) < tolerance;
+    }
     if (!done) {
       factor_hessian();
       mgrad_ = grad_;
@@ -349,23 +399,48 @@ class Newton final {
   auto choose_start() -> void {
     const ConstraintProblem& p = *p_;
     auto cost_at = [&](std::span<const double> qacc) {
-      std::vector<double> jar(m_);
-      multiply(p.jacobian, m_, n_, qacc, jar);
+      multiply_jacobian(qacc, jar_);
       for (std::uint32_t i = 0; i < m_; ++i) {
-        jar[i] -= reg_->aref[i];
+        jar_[i] -= reg_->aref[i];
       }
-      return update_rows(p, *reg_, jar, force_, state_);
+      return update_rows(p, *reg_, jar_, force_, state_);
     };
     double warm = cost_at(p.warmstart);
-    std::vector<double> da(n_);
-    std::vector<double> mda(n_);
     for (std::uint32_t i = 0; i < n_; ++i) {
-      da[i] = p.warmstart[i] - p.qacc_smooth[i];
+      da_[i] = p.warmstart[i] - p.qacc_smooth[i];
     }
-    multiply(p.mass, n_, n_, da, mda);
-    warm += 0.5 * dot(da, mda);
+    multiply(p.mass, n_, n_, da_, mda_);
+    warm += 0.5 * dot(da_, mda_);
     double smooth = cost_at(p.qacc_smooth);
     qacc_ = warm > smooth ? p.qacc_smooth : p.warmstart;
+  }
+
+  // y = J x, over each row's nonzero columns.
+  auto multiply_jacobian(std::span<const double> x, std::span<double> y) const
+      -> void {
+    const std::vector<double>& j = p_->jacobian;
+    for (std::uint32_t r = 0; r < m_; ++r) {
+      double sum = 0.0;
+      for (std::uint32_t k = starts_[r]; k < starts_[r + 1]; ++k) {
+        sum += j[std::size_t{r} * n_ + columns_[k]] * x[columns_[k]];
+      }
+      y[r] = sum;
+    }
+  }
+
+  // y = Jᵀ f.
+  auto multiply_jacobian_transposed(std::span<const double> f,
+                                    std::span<double> y) const -> void {
+    const std::vector<double>& j = p_->jacobian;
+    std::fill(y.begin(), y.end(), 0.0);
+    for (std::uint32_t r = 0; r < m_; ++r) {
+      if (f[r] == 0) {
+        continue;
+      }
+      for (std::uint32_t k = starts_[r]; k < starts_[r + 1]; ++k) {
+        y[columns_[k]] += j[std::size_t{r} * n_ + columns_[k]] * f[r];
+      }
+    }
   }
 
   // Forces, states and cost at the current accelerations, Gauss's term
@@ -373,7 +448,7 @@ class Newton final {
   auto update() -> void {
     const ConstraintProblem& p = *p_;
     cost_ = update_rows(p, *reg_, jaref_, force_, state_);
-    multiply_transposed(p.jacobian, m_, n_, force_, qfrc_);
+    multiply_jacobian_transposed(force_, qfrc_);
     double gauss = 0.0;
     for (std::uint32_t i = 0; i < n_; ++i) {
       gauss +=
@@ -400,11 +475,10 @@ class Newton final {
       }
       double d = reg_->d[r];
       const double* j = &p.jacobian[std::size_t{r} * n_];
-      for (std::uint32_t a = 0; a < n_; ++a) {
-        if (j[a] == 0) {
-          continue;
-        }
-        for (std::uint32_t b = 0; b <= a; ++b) {
+      for (std::uint32_t ka = starts_[r]; ka < starts_[r + 1]; ++ka) {
+        std::uint32_t a = columns_[ka];
+        for (std::uint32_t kb = starts_[r]; kb <= ka; ++kb) {
+          std::uint32_t b = columns_[kb];
           hessian_[a * n_ + b] += j[a] * d * j[b];
         }
       }
@@ -534,7 +608,7 @@ class Newton final {
     }
     double gtol = tolerance * snorm / scale_;
     multiply(p.mass, n_, n_, search_, mv_);
-    multiply(p.jacobian, m_, n_, search_, jv_);
+    multiply_jacobian(search_, jv_);
     prepare();
 
     Point p0;
@@ -603,19 +677,25 @@ class Newton final {
   const ConstraintSettings* settings_ = nullptr;
   std::uint32_t n_ = 0;
   std::uint32_t m_ = 0;
-  std::vector<double> qacc_;
-  std::vector<double> ma_;
-  std::vector<double> jaref_;
-  std::vector<double> force_;
-  std::vector<RowState> state_;
-  std::vector<double> qfrc_;
-  std::vector<double> grad_;
-  std::vector<double> mgrad_;
-  std::vector<double> search_;
-  std::vector<double> mv_;
-  std::vector<double> jv_;
-  std::vector<double> quad_;
-  std::vector<double> hessian_;
+  std::vector<double>& qacc_;
+  std::vector<double>& ma_;
+  std::vector<double>& jaref_;
+  std::vector<double>& force_;
+  std::vector<RowState>& state_;
+  std::vector<double>& qfrc_;
+  std::vector<double>& grad_;
+  std::vector<double>& mgrad_;
+  std::vector<double>& search_;
+  std::vector<double>& mv_;
+  std::vector<double>& jv_;
+  std::vector<double>& quad_;
+  std::vector<double>& hessian_;
+  std::vector<double>& mass_factor_;
+  std::vector<double>& jar_;
+  std::vector<double>& da_;
+  std::vector<double>& mda_;
+  std::vector<std::uint32_t>& columns_;
+  std::vector<std::uint32_t>& starts_;
   std::array<double, 3> quad_gauss_{};
   double cost_ = 0.0;
   double scale_ = 1.0;
@@ -781,7 +861,9 @@ auto solve_constraints(const ConstraintProblem& problem,
   if (settings.solver == Physics::Solver::PGS) {
     solve_pgs(problem, reg, settings, solution);
   } else {
-    Newton{problem, reg, settings}.solve(solution);
+    // Each thread keeps its own buffers from island to island.
+    thread_local NewtonBuffers buffers;
+    Newton{problem, reg, settings, InOut(buffers)}.solve(solution);
   }
 }
 

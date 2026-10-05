@@ -104,10 +104,12 @@ struct Collide final    //
              const Mechanism> {
   using SystemWorld = ProjectedWorld<Collide>;
   using AllowComponentList =
-      framework::TypeList<TreeBound, Mechanism, TreeDynamics<SmallCapacity>,
+      framework::TypeList<TreeBound, Mechanism, TreeDynamics<SingleCapacity>,
+                          TreeDynamics<SmallCapacity>,
                           TreeDynamics<LargeCapacity>>;
   using SequenceAfterSystemList =
-      SystemList<Bound<SmallCapacity>, Bound<LargeCapacity>>;
+      SystemList<Bound<SingleCapacity>, Bound<SmallCapacity>,
+                 Bound<LargeCapacity>>;
 
   Collide(const Mechanics& mechanics, Depend<ContactSet> contacts)
       : mechanics_{&mechanics}, contacts_{contacts.get()} {}
@@ -146,10 +148,10 @@ struct Solve final    //
     : System<Island,  //
              const Mechanism> {
   using SystemWorld = ProjectedWorld<Solve>;
-  using AllowComponentList =
-      framework::TypeList<Mechanism, TreeState<SmallCapacity>,
-                          TreeDynamics<SmallCapacity>, TreeState<LargeCapacity>,
-                          TreeDynamics<LargeCapacity>>;
+  using AllowComponentList = framework::TypeList<
+      Mechanism, TreeState<SingleCapacity>, TreeDynamics<SingleCapacity>,
+      TreeState<SmallCapacity>, TreeDynamics<SmallCapacity>,
+      TreeState<LargeCapacity>, TreeDynamics<LargeCapacity>>;
   using SequenceAfterSystemList = SystemList<Collide>;
 
   Solve(const Mechanics& mechanics, const ContactSet& contacts,
@@ -168,16 +170,17 @@ struct Solve final    //
   }
 
  private:
-  // A tree's dynamics and state, as the island needs them.
+  // Where a tree's dynamics and state lie in their stores this step.
   struct TreeData final {
-    std::vector<double> mass;  // dofs by dofs.
-    std::vector<model::Spatial> cdof;
-    model::Array3 com{};
-    std::vector<double> qacc_smooth;
-    std::vector<double> qfrc_smooth;
-    std::vector<double> qpos;
-    std::vector<double> qvel;
-    std::vector<double> warmstart;
+    const double* mass = nullptr;  // Rows `stride` long, the lower triangle.
+    std::size_t stride = 0;
+    const model::Spatial* cdof = nullptr;
+    const model::Array3* com = nullptr;
+    const double* qacc_smooth = nullptr;
+    const double* qfrc_smooth = nullptr;
+    const double* qpos = nullptr;
+    const double* qvel = nullptr;
+    const double* warmstart = nullptr;
   };
 
   template <typename Capacity>
@@ -196,11 +199,28 @@ struct Solve final    //
   const ContactSet* contacts_ = nullptr;
   ConstraintSolution* solution_ = nullptr;
   bool enabled_ = true;
-  std::vector<TreeData> data_;         // By tree.
+  std::vector<TreeData> data_;             // By tree.
+  std::vector<std::uint8_t> rubs_;         // By tree: has dry friction.
+  std::vector<std::uint8_t> limited_;      // By tree: has a limited joint.
+  std::vector<std::uint32_t> offset_;      // By tree: its first dof's column.
+  std::vector<std::uint32_t> joint_tree_;  // By joint.
+  // By tree: the tendons whose first joint is on it.
+  std::vector<std::vector<std::uint32_t>> tree_tendons_;
   std::vector<Island> islands_;        // By tree.
   std::vector<std::uint32_t> parent_;  // By tree, for union and find.
   model::ConstraintProblem problem_;
   model::ConstraintSolution answer_;
+  // Vectors an island's rows are built in, kept from island to island.
+  struct Scratch final {
+    std::vector<double> qvel;
+    std::vector<double> row;
+    std::vector<std::uint32_t> tendons;
+    std::vector<double> translation;
+    std::vector<double> rotation;
+    std::vector<double> jp;
+    std::vector<double> jr;
+    std::vector<double> framed;
+  } scratch_;
 };
 
 // After Solve, a step of semi-implicit Euler, at the accelerations the
@@ -247,23 +267,29 @@ struct Integrate final                      //
 };
 
 using Schedule =
-    SystemList<Control<SmallCapacity>, Control<LargeCapacity>,
+    SystemList<Control<SingleCapacity>, Control<SmallCapacity>,
+               Control<LargeCapacity>, Forward<SingleCapacity>,
                Forward<SmallCapacity>, Forward<LargeCapacity>,
-               Bound<SmallCapacity>, Bound<LargeCapacity>, Collide, Solve,
+               Bound<SingleCapacity>, Bound<SmallCapacity>,
+               Bound<LargeCapacity>, Collide, Solve, Integrate<SingleCapacity>,
                Integrate<SmallCapacity>, Integrate<LargeCapacity>>;
 
 inline auto make_schedule(const Mechanics& mechanics, const Feedback& feedback,
                           Depend<ContactSet> contacts,
                           Depend<ConstraintSolution> solution, bool constrained)
     -> Schedule {
-  return Schedule{Control<SmallCapacity>{mechanics, feedback},
+  return Schedule{Control<SingleCapacity>{mechanics, feedback},
+                  Control<SmallCapacity>{mechanics, feedback},
                   Control<LargeCapacity>{mechanics, feedback},
+                  Forward<SingleCapacity>{mechanics},
                   Forward<SmallCapacity>{mechanics},
                   Forward<LargeCapacity>{mechanics},
+                  Bound<SingleCapacity>{mechanics},
                   Bound<SmallCapacity>{mechanics},
                   Bound<LargeCapacity>{mechanics},
                   Collide{mechanics, contacts},
                   Solve{mechanics, *contacts, solution, constrained},
+                  Integrate<SingleCapacity>{mechanics, *solution},
                   Integrate<SmallCapacity>{mechanics, *solution},
                   Integrate<LargeCapacity>{mechanics, *solution}};
 }
@@ -342,25 +368,15 @@ auto Solve::gather(SystemWorld& world) -> void {
         std::uint32_t t = mechanisms.component_of(owner).tree;
         const model::Tree& tree = mechanics_->trees()[t];
         const TreeState<Capacity>& state = states.component_of(owner);
-        std::uint32_t n = tree.dofs;
-        TreeData& data = data_[t];
-        data.mass.assign(std::size_t{n} * n, 0.0);
-        for (std::uint32_t i = 0; i < n; ++i) {
-          for (std::uint32_t j = 0; j <= i; ++j) {
-            data.mass[i * n + j] = dynamics.mass[i * V + j];
-            data.mass[j * n + i] = dynamics.mass[i * V + j];
-          }
-        }
-        data.cdof.assign(dynamics.cdof.begin(), dynamics.cdof.begin() + n);
-        data.com = dynamics.com;
-        data.qacc_smooth.assign(dynamics.acceleration.begin(),
-                                dynamics.acceleration.begin() + n);
-        data.qfrc_smooth.assign(dynamics.smooth.begin(),
-                                dynamics.smooth.begin() + n);
-        data.qpos.assign(state.qpos.begin(), state.qpos.begin() + tree.qpos);
-        data.qvel.assign(state.qvel.begin(), state.qvel.begin() + n);
-        data.warmstart.assign(state.warmstart.begin(),
-                              state.warmstart.begin() + n);
+        data_[t] = TreeData{.mass = dynamics.mass.data(),
+                            .stride = V,
+                            .cdof = dynamics.cdof.data(),
+                            .com = &dynamics.com,
+                            .qacc_smooth = dynamics.acceleration.data(),
+                            .qfrc_smooth = dynamics.smooth.data(),
+                            .qpos = state.qpos.data(),
+                            .qvel = state.qvel.data(),
+                            .warmstart = state.warmstart.data()};
       });
 }
 

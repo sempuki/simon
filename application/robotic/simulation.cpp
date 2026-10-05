@@ -147,6 +147,10 @@ Mechanics::Mechanics(model::ArticulatedModel model)
   tendon_weight_.assign(model_.tendons.size(), 0.0);
   double inertia = 0.0;
   for (std::uint32_t t = 0; t < trees_.size(); ++t) {
+    single_.push_back(fits<SingleCapacity>(t)
+                          ? std::make_unique<model::TreeKernel<SingleCapacity>>(
+                                model_, trees_[t], implicit)
+                          : nullptr);
     small_.push_back(fits<SmallCapacity>(t)
                          ? std::make_unique<model::TreeKernel<SmallCapacity>>(
                                model_, trees_[t], implicit)
@@ -155,7 +159,10 @@ Mechanics::Mechanics(model::ArticulatedModel model)
                          ? std::make_unique<model::TreeKernel<LargeCapacity>>(
                                model_, trees_[t], implicit)
                          : nullptr);
-    if (small_.back()) {
+    if (single_.back()) {
+      weigh(model_, trees_[t], *single_.back(), InOut(body_weight_),
+            InOut(dof_weight_), InOut(tendon_weight_), InOut(inertia));
+    } else if (small_.back()) {
       weigh(model_, trees_[t], *small_.back(), InOut(body_weight_),
             InOut(dof_weight_), InOut(tendon_weight_), InOut(inertia));
     } else if (large_.back()) {
@@ -270,10 +277,13 @@ auto Simulation::configure() -> engine::PhaseResult {
   scheduler_ = std::make_unique<Scheduler>(
       make_schedule(*mechanics_, scenario_.feedback, Depend(*contacts_),
                     Depend(*solution_), scenario_.constrained));
+  std::size_t single = 0;
   std::size_t small = 0;
   std::size_t large = 0;
   for (std::uint32_t t = 0; t < mechanics_->trees().size(); ++t) {
-    if (mechanics_->fits<SmallCapacity>(t)) {
+    if (mechanics_->fits<SingleCapacity>(t)) {
+      ++single;
+    } else if (mechanics_->fits<SmallCapacity>(t)) {
       ++small;
     } else if (mechanics_->fits<LargeCapacity>(t)) {
       ++large;
@@ -285,33 +295,36 @@ auto Simulation::configure() -> engine::PhaseResult {
   }
   RETURN_IF_UNEXPECTED(World::set_up()
                            .numbered(1)
+                           .holding<archetype::SingleBody>(single)
                            .holding<archetype::SmallTree>(small)
                            .holding<archetype::LargeTree>(large)
                            .build(Out(world_)));
   auto transaction = world_.transaction();
+  // Each tree in the smallest archetype it fits.
+  auto create = [&]<typename ArchetypeType, typename Capacity>(
+                    std::uint32_t t) -> std::expected<void, lib::Status> {
+    RETURN_IF_UNEXPECTED(
+        world_.create<ArchetypeType>()
+            .with(TreeBound{})
+            .with(Mechanism{.tree = t})
+            .with(Touching{})
+            .with(Island{})
+            .with(start<Capacity>(*mechanics_, t, scenario_))
+            .with(start_control<Capacity>(*mechanics_, t, scenario_))
+            .with(TreeDynamics<Capacity>{})
+            .build());
+    return {};
+  };
   for (std::uint32_t t = 0; t < mechanics_->trees().size(); ++t) {
-    if (mechanics_->fits<SmallCapacity>(t)) {
+    if (mechanics_->fits<SingleCapacity>(t)) {
       RETURN_IF_UNEXPECTED(
-          world_.create<archetype::SmallTree>()
-              .with(TreeBound{})
-              .with(Mechanism{.tree = t})
-              .with(Touching{})
-              .with(Island{})
-              .with(start<SmallCapacity>(*mechanics_, t, scenario_))
-              .with(start_control<SmallCapacity>(*mechanics_, t, scenario_))
-              .with(TreeDynamics<SmallCapacity>{})
-              .build());
+          (create.operator()<archetype::SingleBody, SingleCapacity>(t)));
+    } else if (mechanics_->fits<SmallCapacity>(t)) {
+      RETURN_IF_UNEXPECTED(
+          (create.operator()<archetype::SmallTree, SmallCapacity>(t)));
     } else {
       RETURN_IF_UNEXPECTED(
-          world_.create<archetype::LargeTree>()
-              .with(TreeBound{})
-              .with(Mechanism{.tree = t})
-              .with(Touching{})
-              .with(Island{})
-              .with(start<LargeCapacity>(*mechanics_, t, scenario_))
-              .with(start_control<LargeCapacity>(*mechanics_, t, scenario_))
-              .with(TreeDynamics<LargeCapacity>{})
-              .build());
+          (create.operator()<archetype::LargeTree, LargeCapacity>(t)));
     }
   }
   transaction.commit();
@@ -338,7 +351,7 @@ namespace {
 
 template <typename Capacity, typename Field>
 auto gather(const World& world, const Mechanics& mechanics, Field field,
-            bool velocities, std::vector<double>& into) -> void {
+            bool velocities, InOut<std::vector<double>> into) -> void {
   const auto& mechanisms = world.store_of<Mechanism>();
   world.store_of<TreeState<Capacity>>().for_each(
       [&](Entity owner, const TreeState<Capacity>& state) {
@@ -347,28 +360,70 @@ auto gather(const World& world, const Mechanics& mechanics, Field field,
         std::uint32_t first = velocities ? tree.first_dof : tree.first_qpos;
         std::uint32_t count = velocities ? tree.dofs : tree.qpos;
         for (std::uint32_t k = 0; k < count; ++k) {
-          into[first + k] = (state.*field)[k];
+          (*into)[first + k] = (state.*field)[k];
+        }
+      });
+}
+
+template <typename Capacity>
+auto place(const World& world, const Mechanics& mechanics,
+           InOut<std::vector<model::GeomFrame>> frames) -> void {
+  const model::ArticulatedModel& m = mechanics.model();
+  const auto& mechanisms = world.store_of<Mechanism>();
+  world.store_of<TreeDynamics<Capacity>>().for_each(
+      [&](Entity owner, const TreeDynamics<Capacity>& dynamics) {
+        const model::Tree& tree =
+            mechanics.trees()[mechanisms.component_of(owner).tree];
+        for (std::uint32_t b = 0; b < tree.bodies; ++b) {
+          const model::ArticulatedBody& body = m.bodies[tree.first_body + b];
+          model::BodyFrame frame{.xpos = dynamics.xpos[b],
+                                 .xquat = dynamics.xquat[b],
+                                 .xmat = dynamics.xmat[b],
+                                 .xipos = dynamics.xipos[b],
+                                 .ximat = dynamics.ximat[b]};
+          for (std::uint32_t g = body.first_geom;
+               g < body.first_geom + body.geoms; ++g) {
+            (*frames)[g] = model::compute_geom_frame(m.geoms[g], frame);
+          }
         }
       });
 }
 
 }  // namespace
 
+auto Simulation::read_geom_frames() const -> std::vector<model::GeomFrame> {
+  const model::ArticulatedModel& m = mechanics_->model();
+  std::vector<model::GeomFrame> frames(m.geoms.size());
+  const model::ArticulatedBody& ground = m.bodies[0];
+  for (std::uint32_t g = ground.first_geom;
+       g < ground.first_geom + ground.geoms; ++g) {
+    frames[g] = model::compute_geom_frame(m.geoms[g], model::BodyFrame{});
+  }
+  place<SingleCapacity>(world_, *mechanics_, InOut(frames));
+  place<SmallCapacity>(world_, *mechanics_, InOut(frames));
+  place<LargeCapacity>(world_, *mechanics_, InOut(frames));
+  return frames;
+}
+
 auto Simulation::read_qpos() const -> std::vector<double> {
   std::vector<double> qpos(mechanics_->model().qpos0.size());
+  gather<SingleCapacity>(world_, *mechanics_, &TreeState<SingleCapacity>::qpos,
+                         false, InOut(qpos));
   gather<SmallCapacity>(world_, *mechanics_, &TreeState<SmallCapacity>::qpos,
-                        false, qpos);
+                        false, InOut(qpos));
   gather<LargeCapacity>(world_, *mechanics_, &TreeState<LargeCapacity>::qpos,
-                        false, qpos);
+                        false, InOut(qpos));
   return qpos;
 }
 
 auto Simulation::read_qvel() const -> std::vector<double> {
   std::vector<double> qvel(mechanics_->model().dofs.size());
+  gather<SingleCapacity>(world_, *mechanics_, &TreeState<SingleCapacity>::qvel,
+                         true, InOut(qvel));
   gather<SmallCapacity>(world_, *mechanics_, &TreeState<SmallCapacity>::qvel,
-                        true, qvel);
+                        true, InOut(qvel));
   gather<LargeCapacity>(world_, *mechanics_, &TreeState<LargeCapacity>::qvel,
-                        true, qvel);
+                        true, InOut(qvel));
   return qvel;
 }
 

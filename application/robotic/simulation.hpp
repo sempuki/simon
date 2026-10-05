@@ -38,11 +38,19 @@ class Simulation final {
 
   auto step(const framework::Step& step) -> engine::PhaseResult;
 
+  // Whether configure has read the model and built the world.
+  auto ready() const -> bool { return scheduler_ != nullptr; }
+
   auto world() const -> const World& { return world_; }
   auto mechanics() const -> const Mechanics& { return *mechanics_; }
   auto contacts() const -> const std::vector<model::Contact>& {
     return contacts_->contacts;
   }
+  auto constraints() const -> const ConstraintSolution& { return *solution_; }
+
+  // Every geom's pose in the world, by the model's geoms, from each tree's
+  // last poses.
+  auto read_geom_frames() const -> std::vector<model::GeomFrame>;
 
   // The model's positions and velocities, gathered from every tree.
   auto read_qpos() const -> std::vector<double>;

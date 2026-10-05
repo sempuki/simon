@@ -31,6 +31,7 @@ auto Collide::prepare(SystemWorld& world) -> bool {
   }
   touching_.assign(trees.size(), 0);
   contacts.clear();
+  place_geoms<SingleCapacity>(world);
   place_geoms<SmallCapacity>(world);
   place_geoms<LargeCapacity>(world);
 
@@ -177,10 +178,7 @@ auto Solve::tree_of_geom(std::uint32_t geom) const -> std::uint32_t {
 }
 
 auto Solve::tree_of_joint(std::uint32_t joint) const -> std::uint32_t {
-  const std::vector<model::Tree>& trees = mechanics_->trees();
-  auto it =
-      std::ranges::upper_bound(trees, joint, {}, &model::Tree::first_joint);
-  return static_cast<std::uint32_t>(it - trees.begin()) - 1;
+  return joint_tree_[joint];
 }
 
 auto Solve::tendon_length(std::uint32_t k) const -> double {
@@ -211,8 +209,39 @@ auto Solve::prepare(SystemWorld& world) -> bool {
   const model::ArticulatedModel& m = mechanics_->model();
   const std::vector<model::Tree>& trees = mechanics_->trees();
   std::size_t count = trees.size();
-  data_.resize(count);
+  if (data_.size() != count) {
+    data_.resize(count);
+    offset_.resize(count);
+    rubs_.assign(count, 0);
+    limited_.assign(count, 0);
+    joint_tree_.assign(m.joints.size(), NO_TREE);
+    tree_tendons_.assign(count, {});
+    for (std::uint32_t t = 0; t < count; ++t) {
+      for (std::uint32_t j = trees[t].first_joint;
+           j < trees[t].first_joint + trees[t].joints; ++j) {
+        joint_tree_[j] = t;
+      }
+    }
+    for (std::uint32_t k = 0; k < m.tendons.size(); ++k) {
+      tree_tendons_[joint_tree_[m.tendons[k].joints.front()]].push_back(k);
+    }
+    for (std::uint32_t t = 0; t < count; ++t) {
+      const model::Tree& tree = trees[t];
+      for (std::uint32_t d = tree.first_dof; d < tree.first_dof + tree.dofs;
+           ++d) {
+        rubs_[t] |= m.dofs[d].friction_loss != 0 ? 1 : 0;
+      }
+      for (std::uint32_t j = tree.first_joint;
+           j < tree.first_joint + tree.joints; ++j) {
+        limited_[t] |=
+            m.joints[j].limited && m.joints[j].type != model::JointType::FREE
+                ? 1
+                : 0;
+      }
+    }
+  }
   islands_.assign(count, Island{});
+  gather<SingleCapacity>(world);
   gather<SmallCapacity>(world);
   gather<LargeCapacity>(world);
   ConstraintSolution& out = *solution_;
@@ -220,29 +249,30 @@ auto Solve::prepare(SystemWorld& world) -> bool {
   out.qfrc_constraint.assign(m.dofs.size(), 0.0);
   out.constrained.assign(count, 0);
   out.islands = 0;
+  out.rows = 0;
+  out.iterations = 0;
   for (std::uint32_t t = 0; t < count; ++t) {
-    std::ranges::copy(data_[t].qacc_smooth,
-                      out.qacc.begin() + trees[t].first_dof);
+    std::copy_n(data_[t].qacc_smooth, trees[t].dofs,
+                out.qacc.begin() + trees[t].first_dof);
   }
   if (!enabled_) {
     return true;
   }
 
   // Trees with rows of their own: dry friction or a limit reached.
-  std::vector<std::uint8_t> marked(count, 0);
+  std::vector<std::uint8_t> marked(rubs_);
   for (std::uint32_t t = 0; t < count; ++t) {
-    const model::Tree& tree = trees[t];
-    for (std::uint32_t d = tree.first_dof; d < tree.first_dof + tree.dofs;
-         ++d) {
-      marked[t] |= m.dofs[d].friction_loss != 0 ? 1 : 0;
+    if (limited_[t] == 0) {
+      continue;
     }
+    const model::Tree& tree = trees[t];
     for (std::uint32_t j = tree.first_joint;
          j < tree.first_joint + tree.joints && marked[t] == 0; ++j) {
       const model::Joint& joint = m.joints[j];
       if (!joint.limited || joint.type == model::JointType::FREE) {
         continue;
       }
-      const std::vector<double>& qpos = data_[t].qpos;
+      const double* qpos = data_[t].qpos;
       std::uint32_t q = joint.qpos - tree.first_qpos;
       if (joint.type == model::JointType::BALL) {
         model::Array3 r = convert_to_rotation(
@@ -345,7 +375,7 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
   model::ConstraintProblem& p = problem_;
 
   // The island's dofs, its trees' in order.
-  std::vector<std::uint32_t> offset(trees.size(), 0);
+  std::vector<std::uint32_t>& offset = offset_;
   std::uint32_t n = 0;
   for (std::uint32_t t : members) {
     offset[t] = n;
@@ -356,22 +386,25 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
   p.qacc_smooth.clear();
   p.qfrc_smooth.clear();
   p.warmstart.clear();
-  std::vector<double> qvel;
+  std::vector<double>& qvel = scratch_.qvel;
+  qvel.clear();
   for (std::uint32_t t : members) {
     const TreeData& data = data_[t];
     std::uint32_t k = trees[t].dofs;
+    // M(i, j) for j an ancestor of i or i; the rest are zero.
     for (std::uint32_t i = 0; i < k; ++i) {
-      for (std::uint32_t j = 0; j < k; ++j) {
-        p.mass[(offset[t] + i) * n + offset[t] + j] = data.mass[i * k + j];
+      for (std::uint32_t j = 0; j <= i; ++j) {
+        double value = data.mass[i * data.stride + j];
+        p.mass[(offset[t] + i) * n + offset[t] + j] = value;
+        p.mass[(offset[t] + j) * n + offset[t] + i] = value;
       }
     }
-    p.qacc_smooth.insert(p.qacc_smooth.end(), data.qacc_smooth.begin(),
-                         data.qacc_smooth.end());
-    p.qfrc_smooth.insert(p.qfrc_smooth.end(), data.qfrc_smooth.begin(),
-                         data.qfrc_smooth.end());
-    p.warmstart.insert(p.warmstart.end(), data.warmstart.begin(),
-                       data.warmstart.end());
-    qvel.insert(qvel.end(), data.qvel.begin(), data.qvel.end());
+    p.qacc_smooth.insert(p.qacc_smooth.end(), data.qacc_smooth,
+                         data.qacc_smooth + k);
+    p.qfrc_smooth.insert(p.qfrc_smooth.end(), data.qfrc_smooth,
+                         data.qfrc_smooth + k);
+    p.warmstart.insert(p.warmstart.end(), data.warmstart, data.warmstart + k);
+    qvel.insert(qvel.end(), data.qvel, data.qvel + k);
   }
   p.jacobian.clear();
   p.kind.clear();
@@ -384,7 +417,8 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
   p.friction.clear();
   p.soft.clear();
 
-  std::vector<double> row(n);
+  std::vector<double>& row = scratch_.row;
+  row.assign(n, 0.0);
   auto append = [&](model::ConstraintKind kind, std::uint32_t group, double pos,
                     double margin, double loss, double diagonal,
                     double friction, const model::SoftConstraint& soft) {
@@ -431,13 +465,17 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
           scale * tendon.coefficients[i];
     }
   };
-  auto in_island = [&](const model::Tendon& tendon) {
-    std::uint32_t t = tree_of_joint(tendon.joints.front());
-    return std::ranges::contains(members, t);
-  };
-  for (std::uint32_t k = 0; k < m.tendons.size(); ++k) {
+  // The island's tendons, in the model's order.
+  std::vector<std::uint32_t>& tendons = scratch_.tendons;
+  tendons.clear();
+  for (std::uint32_t t : members) {
+    tendons.insert(tendons.end(), tree_tendons_[t].begin(),
+                   tree_tendons_[t].end());
+  }
+  std::ranges::sort(tendons);
+  for (std::uint32_t k : tendons) {
     const model::Tendon& tendon = m.tendons[k];
-    if (tendon.friction_loss == 0 || !in_island(tendon)) {
+    if (tendon.friction_loss == 0) {
       continue;
     }
     tendon_row(tendon, 1.0);
@@ -449,7 +487,7 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
   // and a ball's angle past its largest (mj_instantiateLimit).
   for (std::uint32_t t : members) {
     const model::Tree& tree = trees[t];
-    const std::vector<double>& qpos = data_[t].qpos;
+    const double* qpos = data_[t].qpos;
     for (std::uint32_t j = tree.first_joint; j < tree.first_joint + tree.joints;
          ++j) {
       const model::Joint& joint = m.joints[j];
@@ -486,9 +524,9 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
   }
 
   // Then by tendon, each side its length is within its margin of.
-  for (std::uint32_t k = 0; k < m.tendons.size(); ++k) {
+  for (std::uint32_t k : tendons) {
     const model::Tendon& tendon = m.tendons[k];
-    if (!tendon.limited || !in_island(tendon)) {
+    if (!tendon.limited) {
       continue;
     }
     double length = tendon_length(k);
@@ -505,8 +543,10 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
   // Contacts: the difference of the two bodies' point Jacobians, turned to
   // the contact's frame, a frictionless row or a pyramid's edges in pairs
   // (mj_instantiateContact, mj_diagApprox).
-  std::vector<double> translation(3 * std::size_t{n});
-  std::vector<double> rotation(3 * std::size_t{n});
+  std::vector<double>& translation = scratch_.translation;
+  std::vector<double>& rotation = scratch_.rotation;
+  translation.resize(3 * std::size_t{n});
+  rotation.resize(3 * std::size_t{n});
   for (std::uint32_t c : joined) {
     const model::Contact& contact = contacts_->contacts[c];
     std::ranges::fill(translation, 0.0);
@@ -523,10 +563,12 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
       }
       const model::Tree& tree = trees[t];
       std::uint32_t k = tree.dofs;
-      std::vector<double> jp(3 * std::size_t{k});
-      std::vector<double> jr(3 * std::size_t{k});
-      model::compute_point_jacobian(m, tree, data_[t].cdof, data_[t].com, body,
-                                    contact.pos, jp, jr);
+      std::vector<double>& jp = scratch_.jp;
+      std::vector<double>& jr = scratch_.jr;
+      jp.resize(3 * std::size_t{k});
+      jr.resize(3 * std::size_t{k});
+      model::compute_point_jacobian(m, tree, {data_[t].cdof, k}, *data_[t].com,
+                                    body, contact.pos, jp, jr);
       double sign = side == 0 ? -1.0 : 1.0;
       for (std::uint32_t r = 0; r < 3; ++r) {
         for (std::uint32_t i = 0; i < k; ++i) {
@@ -537,7 +579,8 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
     }
     std::uint32_t dim = contact.dim;
     // Rows in the contact frame: normal, tangents, then torsion and rolling.
-    std::vector<double> framed(std::size_t{dim} * n, 0.0);
+    std::vector<double>& framed = scratch_.framed;
+    framed.assign(std::size_t{dim} * n, 0.0);
     for (std::uint32_t r = 0; r < dim; ++r) {
       bool turning = r >= 3;
       const std::vector<double>& source = turning ? rotation : translation;
@@ -588,6 +631,8 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
     }
     out.constrained[t] = 1;
   }
+  out.rows += p.rows();
+  out.iterations += answer_.iterations;
   return p.rows();
 }
 

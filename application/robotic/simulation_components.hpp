@@ -22,6 +22,7 @@
 // a model, its state and its dynamics sized by its archetype's capacity.
 namespace simon::robotic {
 
+using SingleCapacity = model::TreeCapacity<1, 6>;
 using SmallCapacity = model::TreeCapacity<4, 8>;
 using LargeCapacity = model::TreeCapacity<16, 32>;
 
@@ -78,7 +79,9 @@ class Mechanics final {
 
   template <typename Capacity>
   auto kernel(std::uint32_t tree) const -> const model::TreeKernel<Capacity>& {
-    if constexpr (std::is_same_v<Capacity, SmallCapacity>) {
+    if constexpr (std::is_same_v<Capacity, SingleCapacity>) {
+      return *single_[tree];
+    } else if constexpr (std::is_same_v<Capacity, SmallCapacity>) {
       return *small_[tree];
     } else {
       return *large_[tree];
@@ -96,6 +99,7 @@ class Mechanics final {
   std::vector<double> tendon_weight_;
   double mean_inertia_ = 1.0;
   // Each tree's kernel at each capacity it fits, else none.
+  std::vector<std::unique_ptr<model::TreeKernel<SingleCapacity>>> single_;
   std::vector<std::unique_ptr<model::TreeKernel<SmallCapacity>>> small_;
   std::vector<std::unique_ptr<model::TreeKernel<LargeCapacity>>> large_;
 };
@@ -125,6 +129,8 @@ struct ConstraintSolution final {
   std::vector<double> qfrc_constraint;
   std::vector<std::uint8_t> constrained;  // By tree.
   std::uint32_t islands = 0;
+  std::uint32_t rows = 0;        // Over every island.
+  std::uint32_t iterations = 0;  // The solver's, over every island.
 };
 
 // Which of the model's trees an entity is.
@@ -173,8 +179,16 @@ namespace archetype {
 using framework::Archetype;
 using framework::Requires;
 
-// A tree of at most 4 bodies and 8 degrees of freedom: a loose body, a
-// pendulum, a cart-pole.
+// One body of at most 6 degrees of freedom: a loose body, a pendulum.
+struct SingleBody final                                      //
+    : Archetype<"single body",                               //
+                Requires<TreeBound, Mechanism, Touching,     //
+                         Island, TreeState<SingleCapacity>,  //
+                         TreeControl<SingleCapacity>,        //
+                         TreeDynamics<SingleCapacity>>> {};  //
+
+// A tree of at most 4 bodies and 8 degrees of freedom: a double pendulum, a
+// cart-pole.
 struct SmallTree final                                      //
     : Archetype<"small tree",                               //
                 Requires<TreeBound, Mechanism, Touching,    //
@@ -195,10 +209,13 @@ struct LargeTree final                                      //
 
 using World = framework::World<
     TreeBound,
-    framework::TypeList<Mechanism, Touching, Island, TreeState<SmallCapacity>,
+    framework::TypeList<Mechanism, Touching, Island, TreeState<SingleCapacity>,
+                        TreeControl<SingleCapacity>,
+                        TreeDynamics<SingleCapacity>, TreeState<SmallCapacity>,
                         TreeControl<SmallCapacity>, TreeDynamics<SmallCapacity>,
                         TreeState<LargeCapacity>, TreeControl<LargeCapacity>,
                         TreeDynamics<LargeCapacity>>,
-    framework::TypeList<archetype::SmallTree, archetype::LargeTree>>;
+    framework::TypeList<archetype::SingleBody, archetype::SmallTree,
+                        archetype::LargeTree>>;
 
 }  // namespace simon::robotic

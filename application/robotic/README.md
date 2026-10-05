@@ -17,7 +17,12 @@ steps a rolling sphere, a sliding box, a resting stack and joints against
 their limits within 1e-11 of MuJoCo; the box slides as far as Coulomb
 friction allows, and the sphere rolls at five sevenths of its speed.
 MuJoCo's humanoid, with its tendons, compiles to the last bit and falls
-within 1e-11 of MuJoCo's.
+within 1e-11 of MuJoCo's. Ten thousand loose bodies and a thousand
+humanoids step within 1.2x of MuJoCo's time on one thread.
+
+```sh
+bazel run //application/robotic:viewer
+```
 
 ```sh
 bazel test //application/robotic/...

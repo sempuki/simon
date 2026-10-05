@@ -112,3 +112,48 @@ cc_binary(
         "//framework:vocabulary",
     ],
 )
+
+VIEWER_DEPS = [
+    ":robotic_library",
+    "//application:viewing",
+    "//engine:driver",
+    "//framework:vocabulary",
+    "//3rd_party:imgui",
+    "//3rd_party:implot",
+    "@lib//base:core",
+]
+
+VIEWER_DATA = glob(["models/*.xml"]) + ["//3rd_party:mujoco"]
+
+cc_binary(
+    name = "viewer",
+    srcs = ["viewer.cpp"],
+    copts = COPTS,
+    data = VIEWER_DATA,
+    deps = VIEWER_DEPS,
+)
+
+cc_test(
+    name = "viewer_humanoid_test",
+    size = "small",
+    srcs = ["viewer.cpp"],
+    args = ["--frames=60"],
+    copts = COPTS,
+    data = VIEWER_DATA,
+    env = {"SDL_VIDEODRIVER": "dummy"},
+    deps = VIEWER_DEPS,
+)
+
+cc_test(
+    name = "viewer_collisions_test",
+    size = "small",
+    srcs = ["viewer.cpp"],
+    args = [
+        "application/robotic/models/sliding.xml",
+        "--frames=60",
+    ],
+    copts = COPTS,
+    data = VIEWER_DATA,
+    env = {"SDL_VIDEODRIVER": "dummy"},
+    deps = VIEWER_DEPS,
+)
