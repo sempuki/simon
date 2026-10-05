@@ -1,6 +1,7 @@
 # Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
 package(default_visibility = ["//visibility:public"])
@@ -17,6 +18,39 @@ cc_test(
     deps = [
         "//format:mjcf",
         "//model:articulated",
+        "@lib//base:testing",
+    ],
+)
+
+cc_library(
+    name = "robotic_library",
+    srcs = ["simulation.cpp"],
+    hdrs = [
+        "simulation.hpp",
+        "simulation_components.hpp",
+        "simulation_systems.hpp",
+    ],
+    copts = COPTS,
+    deps = [
+        "//engine:lifecycle",
+        "//format:mjcf",
+        "//framework",
+        "//framework:vocabulary",
+        "//model:articulated",
+        "//model:articulated_dynamics",
+        "//model:kinematics",
+        "//model:units",
+    ],
+)
+
+cc_test(
+    name = "dynamics_test",
+    size = "small",
+    srcs = ["dynamics_test.cpp"],
+    copts = COPTS,
+    data = glob(["models/*.xml"]) + ["reference/mujoco_dynamics.csv"],
+    deps = [
+        ":robotic_library",
         "@lib//base:testing",
     ],
 )

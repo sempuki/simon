@@ -15,5 +15,6 @@ The table here checks simon's compiled models against
 | Script | Writes | Read by |
 |---|---|---|
 | `mujoco_models.py` | `mujoco_models.csv`: every compiled field of every model | `model_test` |
+| `mujoco_dynamics.py` | `mujoco_dynamics.csv`: positions and velocities at every step of six cases, constraints off | `dynamics_test` |
 
 `pip install mujoco` (3.14.0) runs the script.

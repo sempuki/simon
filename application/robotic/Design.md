@@ -6,8 +6,9 @@ the framework can carry the first kind of system it has not yet carried, a
 solve that couples entities: contacts tie bodies together, and each step
 solves them at once. MuJoCo (Todorov, Erez and Tassa, "MuJoCo: A physics
 engine for model-based control", IROS 2012; Apache-2.0) is the reference.
-It is being built in eight steps (see the [Roadmap](#roadmap)); the first,
-models read and compiled as MuJoCo compiles them, is done.
+It is being built in eight steps (see the [Roadmap](#roadmap)); models read
+and compiled as MuJoCo compiles them, and their dynamics without
+constraints, are done.
 
 ## Choices
 
@@ -80,16 +81,62 @@ of boxes) and checks all 1,114 compiled values against MuJoCo's
 MuJoCo's humanoid is refused, for its contact exclusions and tendons, until
 step 6.
 
+## Dynamics
+
+`model/articulated_dynamics` steps one tree as MuJoCo steps a model, in
+MuJoCo 3.14.0's order of operations: forward kinematics, each joint turning
+or sliding its body from the parent's frame; each body's inertia and each
+degree of freedom's motion in a frame at the tree's center of mass; the
+mass matrix by the composite rigid body algorithm, armature on its
+diagonal; its LDLᵀ along the tree, each row only over its ancestors; the
+bias forces, gravity and the velocity products, by recursive Newton–Euler;
+joint springs, about their reference positions, quaternions differenced as
+angular velocities; dof dampers; and motors, each control clamped and times
+its gear. Semi-implicit Euler then advances velocities by the accelerations
+and positions by the new velocities, quaternions turned by the angular
+velocity; where a dof is damped or actuated, the step solves M + h B, as
+MuJoCo's does, so that dampers stay stable at any step. MuJoCo also keeps a
+fixed inertia for dofs whose bodies never turn; simon recomputes it, which
+can differ in the last bit.
+
+In the ECS, an entity is a tree, of one of two archetypes by its capacity:
+a small tree, at most 4 bodies and 8 degrees of freedom, and a large tree,
+at most 16 and 32. Each archetype's state and work are sized at compile
+time, inline in its components. `Forward` computes each tree's poses, its
+factored mass matrix and its accelerations into its `TreeDynamics`;
+`Bound` its sphere, the world's spatial component; and `Integrate` steps
+its `TreeState`. Collision and the constraint solver will come between
+them.
+
+`dynamics_test` steps six cases with constraints off, and checks every
+position and velocity at every step against MuJoCo
+(`reference/mujoco_dynamics.py`):
+
+| Case | Steps | Position | Velocity |
+|---|---:|---:|---:|
+| A pendulum | 2,000 | equal | equal |
+| A double pendulum, chaotic | 3,000 | equal | equal |
+| A free body of three geoms, tumbling without gravity | 2,000 | 2.0e-15 m | 3.8e-15 m/s |
+| Ball, slide and hinge joints with springs, implicit dampers and armature | 1,000 | 8.9e-16 | 1.0e-14 |
+| A cart-pole pushed by its motor | 200 | equal | equal |
+| Five boxes falling, five trees | 500 | equal | equal |
+
+Where only hinges and slides move, every step equals MuJoCo's to the last
+bit; where a quaternion is in play, its integration and normalization part
+from MuJoCo's by an ulp or two.
+
 ## Roadmap
 
 1. Done: MJCF read and compiled, against MuJoCo's compiled model.
-2. Dynamics without contact: forward kinematics, the mass matrix, bias
-   forces, LDLᵀ and Euler; a pendulum, a double pendulum and a free body
-   spinning, each step against MuJoCo.
-3. Limits, springs, damping and actuators: a cart-pole under control.
+2. Done: dynamics without contact, springs, dampers and motors: forward
+   kinematics, the mass matrix, bias forces, LDLᵀ and Euler; a pendulum, a
+   double pendulum, a tumbling free body, springs and dampers, a cart-pole
+   and falling boxes, each step against MuJoCo. Joint limits move to step
+   5, since MuJoCo solves them with contacts.
+3. Control: position actuators and a cart-pole balanced by a controller.
 4. Collision: primitives and the broad phase, against MuJoCo's contacts.
-5. The constraint solver: soft contacts, friction, Newton and PGS, by
-   island; a sphere rolling, a box sliding, a stack.
+5. The constraint solver: soft contacts and joint limits, friction, Newton
+   and PGS, by island; a sphere rolling, a box sliding, a stack.
 6. Whole robots: MuJoCo's humanoid, with its tendons and contact
    exclusions, and Apache-2.0 models from MuJoCo Menagerie.
 7. Scale and the viewer: ten thousand loose bodies and a thousand

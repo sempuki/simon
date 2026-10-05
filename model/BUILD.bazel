@@ -423,8 +423,16 @@ cc_library(
 
 cc_library(
     name = "articulated",
+    srcs = ["articulated.cpp"],
     hdrs = ["articulated.hpp"],
     copts = COPTS,
+)
+
+cc_library(
+    name = "articulated_dynamics",
+    hdrs = ["articulated_dynamics.hpp"],
+    copts = COPTS,
+    deps = [":articulated"],
 )
 
 cc_library(

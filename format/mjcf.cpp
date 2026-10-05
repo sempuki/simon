@@ -42,7 +42,7 @@ using model::JointType;
 using model::Physics;
 using model::Quaternion4;
 using model::SoftConstraint;
-using model::Vector3;
+using model::Array3;
 
 using Failure = std::unexpected<lib::Status>;
 using lib::Out;
@@ -122,14 +122,14 @@ auto transpose(const std::array<double, 9>& m) -> std::array<double, 9> {
   return {m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]};
 }
 
-auto cross(const Vector3& b, const Vector3& c) -> Vector3 {
+auto cross(const Array3& b, const Array3& c) -> Array3 {
   return {b[1] * c[2] - b[2] * c[1], b[2] * c[0] - b[0] * c[2],
           b[0] * c[1] - b[1] * c[0]};
 }
 
 // The minimal rotation from z to `v` (mjuu_z2quat).
-auto rotate_z_to(const Vector3& v) -> Quaternion4 {
-  Vector3 axis = cross({0.0, 0.0, 1.0}, v);
+auto rotate_z_to(const Array3& v) -> Quaternion4 {
+  Array3 axis = cross({0.0, 0.0, 1.0}, v);
   double s = normalize(axis);
   if (s < 1e-10) {
     axis = {1.0, 0.0, 0.0};
@@ -140,9 +140,9 @@ auto rotate_z_to(const Vector3& v) -> Quaternion4 {
 }
 
 // The rotation whose columns are `x`, `y` and `z` (mjuu_frame2quat).
-auto convert_frame(const Vector3& x, const Vector3& y, const Vector3& z)
+auto convert_frame(const Array3& x, const Array3& y, const Array3& z)
     -> Quaternion4 {
-  const Vector3* m[3] = {&x, &y, &z};  // m[column][row].
+  const Array3* m[3] = {&x, &y, &z};  // m[column][row].
   auto at = [&](int c, int r) { return (*m[c])[r]; };
   Quaternion4 q{};
   if (at(0, 0) + at(1, 1) + at(2, 2) > 0) {
@@ -172,7 +172,7 @@ auto convert_frame(const Vector3& x, const Vector3& y, const Vector3& z)
 
 // A diagonal inertia on axes turned by `q`, as the six entries xx, yy, zz,
 // xy, xz, yz of the turned tensor (mjuu_globalinertia).
-auto turn_inertia(const Vector3& local, const Quaternion4& q)
+auto turn_inertia(const Array3& local, const Quaternion4& q)
     -> std::array<double, 6> {
   std::array<double, 9> m = convert_to_matrix(q);
   std::array<double, 9> t{m[0] * local[0], m[3] * local[0], m[6] * local[0],
@@ -187,7 +187,7 @@ auto turn_inertia(const Vector3& local, const Quaternion4& q)
 }
 
 // The parallel axis term of `mass` at `d` (mjuu_offcenter).
-auto shift_inertia(double mass, const Vector3& d) -> std::array<double, 6> {
+auto shift_inertia(double mass, const Array3& d) -> std::array<double, 6> {
   return {mass * (d[1] * d[1] + d[2] * d[2]),
           mass * (d[0] * d[0] + d[2] * d[2]),
           mass * (d[0] * d[0] + d[1] * d[1]),
@@ -201,7 +201,7 @@ auto shift_inertia(double mass, const Vector3& d) -> std::array<double, 6> {
 // (mjuu_eig3; G. H. Golub and C. F. Van Loan, Matrix Computations, 4th
 // edition, 2013, section 8.5, the symmetric Schur decomposition).
 auto decompose_symmetric(const std::array<double, 9>& mat)
-    -> std::pair<Vector3, Quaternion4> {
+    -> std::pair<Array3, Quaternion4> {
   constexpr double REL_TOL = 4e-15;
   constexpr double EIG_EPS = 1e-12;
   double scale = 0.0;
@@ -210,7 +210,7 @@ auto decompose_symmetric(const std::array<double, 9>& mat)
   }
   double tol = scale * REL_TOL;
   Quaternion4 quat{1.0, 0.0, 0.0, 0.0};
-  Vector3 eigval{};
+  Array3 eigval{};
   for (int iteration = 0; iteration < 500; ++iteration) {
     std::array<double, 9> v = convert_to_matrix(quat);
     std::array<double, 9> d =
@@ -262,7 +262,7 @@ auto decompose_symmetric(const std::array<double, 9>& mat)
 // A tensor given as xx, yy, zz, xy, xz, yz on its principal axes: the
 // moments and the rotation to them (mjuu_fullInertia).
 auto find_principal_axes(const std::array<double, 6>& full)
-    -> std::pair<Vector3, Quaternion4> {
+    -> std::pair<Array3, Quaternion4> {
   return decompose_symmetric({full[0], full[3], full[4], full[3], full[1],
                               full[5], full[4], full[5], full[2]});
 }
@@ -277,8 +277,8 @@ struct Orientation final {
   Quaternion4 quat{1.0, 0.0, 0.0, 0.0};
   std::array<double, 4> axis_angle{};
   std::array<double, 6> xy_axes{};
-  Vector3 z_axis{};
-  Vector3 euler{};
+  Array3 z_axis{};
+  Array3 euler{};
 };
 
 enum class Limited : std::uint8_t { AUTO, YES, NO };
@@ -316,16 +316,16 @@ struct Defaults final {
 };
 
 struct InertialSpec final {
-  Vector3 pos{};
+  Array3 pos{};
   Orientation orientation;
   double mass = 0.0;
-  Vector3 diagonal{};
+  Array3 diagonal{};
   std::optional<std::array<double, 6>> full;
 };
 
 struct BodySpec final {
   std::string name;
-  Vector3 pos{};
+  Array3 pos{};
   Orientation orientation;
   std::optional<InertialSpec> inertial;
   std::vector<JointSpec> joints;
@@ -582,23 +582,23 @@ class Reader final {
         if (normalize(std::span{xy}.subspan(3, 3)) < EPS) {
           return fail("yaxis too small");
         }
-        Vector3 x{xy[0], xy[1], xy[2]};
-        Vector3 y{xy[3], xy[4], xy[5]};
-        Vector3 z = cross(x, y);
+        Array3 x{xy[0], xy[1], xy[2]};
+        Array3 y{xy[3], xy[4], xy[5]};
+        Array3 z = cross(x, y);
         if (normalize(z) < EPS) {
           return fail("cross(xaxis, yaxis) too small");
         }
         return convert_frame(x, y, z);
       }
       case Orientation::Kind::Z_AXIS: {
-        Vector3 z = orientation.z_axis;
+        Array3 z = orientation.z_axis;
         if (normalize(z) < EPS) {
           return fail("zaxis too small");
         }
         return rotate_z_to(z);
       }
       case Orientation::Kind::EULER: {
-        Vector3 euler = orientation.euler;
+        Array3 euler = orientation.euler;
         if (compiler_.degree) {
           for (double& angle : euler) {
             angle = angle / 180.0 * PI;
@@ -1038,7 +1038,7 @@ class Reader final {
   // A geom's mass and principal moments from its shape and density
   // (mjCGeom::GetVolume and SetInertia, solid shapes).
   static auto compute_volume(const Geom& geom) -> double {
-    const Vector3& s = geom.size;
+    const Array3& s = geom.size;
     switch (geom.type) {
       case GeomType::SPHERE:
         return 4 * PI * s[0] * s[0] * s[0] / 3;
@@ -1057,8 +1057,8 @@ class Reader final {
     }
   }
 
-  static auto compute_inertia(const Geom& geom, double mass) -> Vector3 {
-    const Vector3& s = geom.size;
+  static auto compute_inertia(const Geom& geom, double mass) -> Array3 {
+    const Array3& s = geom.size;
     switch (geom.type) {
       case GeomType::SPHERE: {
         double i = 2 * mass * s[0] * s[0] / 5;
@@ -1113,7 +1113,7 @@ class Reader final {
         return fail("both pos and fromto defined in geom");
       }
       const std::array<double, 6>& f = *spec.fromto;
-      Vector3 v{f[0] - f[3], f[1] - f[4], f[2] - f[5]};
+      Array3 v{f[0] - f[3], f[1] - f[4], f[2] - f[5]};
       geom.size[1] = normalize(v) / 2;
       if (geom.size[1] < EPS) {
         return fail("fromto points too close in geom");
@@ -1258,7 +1258,7 @@ class Reader final {
         inertial_defined = true;
       } else if (massive.size() > 1) {
         double total = 0.0;
-        Vector3 center{};
+        Array3 center{};
         for (std::size_t i : massive) {
           const auto& [geom, mass] = geoms[i];
           total += mass;
@@ -1274,7 +1274,7 @@ class Reader final {
         std::array<double, 6> tensor{};
         for (std::size_t i : massive) {
           const auto& [geom, mass] = geoms[i];
-          Vector3 d{geom.pos[0] - body.inertial_pos[0],
+          Array3 d{geom.pos[0] - body.inertial_pos[0],
                     geom.pos[1] - body.inertial_pos[1],
                     geom.pos[2] - body.inertial_pos[2]};
           std::array<double, 6> own =
@@ -1302,7 +1302,7 @@ class Reader final {
     for (double& moment : body.inertia) {
       moment = std::max(moment, compiler_.bound_inertia);
     }
-    const Vector3& i = body.inertia;
+    const Array3& i = body.inertia;
     if (body.mass < 0 || i[0] < 0 || i[1] < 0 || i[2] < 0) {
       return fail("mass and inertia cannot be negative in body " + spec.name);
     }
