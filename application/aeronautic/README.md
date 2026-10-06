@@ -271,3 +271,19 @@ regenerate a table, run its script after `pip install jsbsim numpy`.
   that drift. The model suits traffic at scale, and the rigid model suits
   handling.
 - **Ground and stall.** Routes stay between 3 and 9 km.
+
+## Credits
+
+aeronautic stands on [JSBSim](https://github.com/JSBSim-Team/jsbsim), the
+open flight dynamics model it measures itself against. Thank you to Jon S.
+Berndt and the JSBSim team for decades of careful, openly documented flight
+dynamics.
+
+| Project | What aeronautic takes from it | License |
+|---|---|---|
+| [JSBSim](https://github.com/JSBSim-Team/jsbsim) 1.3.1 | The reference every check runs against, through its Python module. The behavior of its turbine, flight control components, mass balance, propulsion, trim and auxiliary computations, which `model/` follows (see `NOTICE.md`). Its aircraft file format, which `tools/jsbsim/convert.py` reads | LGPL-2.0-or-later |
+| JSBSim's 737, by Dave Culp and Aeromatic | `3rd_party/jsbsim/737.aircraft`, converted, with Aero-Matic's CFM56 engines. Its header asks that the model be used for education and entertainment and not be sold | GPL |
+| JSBSim's F-16, by Erik Hofman | `3rd_party/jsbsim/f16.aircraft`, converted, with Aero-Matic's F100-PW-229 engine | GPL |
+
+The textbooks, standards and papers behind the physics are cited in
+[model/REFERENCES.md](../../model/REFERENCES.md).

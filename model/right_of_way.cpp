@@ -1,4 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+// Follows Eclipse SUMO 1.27.1, Copyright (C) 2001-2026 DLR and others,
+// EPL-2.0 OR GPL-2.0-or-later; translated to C++ and changed. See NOTICE.md.
 
 #include "model/right_of_way.hpp"
 

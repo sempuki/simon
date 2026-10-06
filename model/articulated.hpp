@@ -1,4 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+// Follows MuJoCo 3.14.0, Copyright 2021 DeepMind Technologies Limited,
+// Apache-2.0; translated to C++ and changed. See NOTICE.md.
 
 #pragma once
 

@@ -24,8 +24,24 @@ using FinishResult = std::expected<void, Status>;
 //
 // `step` is required. `configure`, `initialize` and `finalize` are optional;
 // a driver calls them when the simulation has them.
+//
+// A simulation counts time in nanoseconds unless it declares a coarser tick,
+// as `using Tick = ...;`, and its steps are BasicSteps of that tick.
 template <typename Type>
-concept Simulation = requires(Type simulation, const framework::Step& step) {
+struct TickOf final {
+  using type = framework::Duration;
+};
+template <typename Type>
+  requires requires { typename Type::Tick; }
+struct TickOf<Type> final {
+  using type = typename Type::Tick;
+};
+template <typename Type>
+using tick_of_t = typename TickOf<Type>::type;
+
+template <typename Type>
+concept Simulation = requires(
+    Type simulation, const framework::BasicStep<tick_of_t<Type>>& step) {
   { simulation.step(step) } -> std::same_as<PhaseResult>;
 };
 

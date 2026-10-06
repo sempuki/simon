@@ -1,4 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+// Follows the nuPlan devkit 1.2.2, Copyright 2021 Motional,
+// Apache-2.0; translated to C++ and changed. See NOTICE.md.
 
 #include "application/automotive/scenario_batch.hpp"
 

@@ -52,6 +52,44 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "gravity",
+    srcs = ["gravity.cpp"],
+    hdrs = ["gravity.hpp"],
+    copts = COPTS,
+    deps = [
+        "//framework:vocabulary",
+        ":kinematics",
+        ":units",
+        "//framework",
+    ],
+)
+
+cc_library(
+    name = "galaxy",
+    srcs = ["galaxy.cpp"],
+    hdrs = ["galaxy.hpp"],
+    copts = COPTS,
+    deps = [
+        ":gravity",
+        ":random",
+        ":units",
+        "@lib//base:core",
+    ],
+)
+
+cc_library(
+    name = "leapfrog",
+    hdrs = ["leapfrog.hpp"],
+    copts = COPTS,
+    deps = [
+        "//framework:vocabulary",
+        ":gravity",
+        ":kinematics",
+        "//framework",
+    ],
+)
+
 cc_test(
     name = "kinematics_test",
     size = "small",

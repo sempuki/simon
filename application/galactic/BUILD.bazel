@@ -1,0 +1,195 @@
+# Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+
+load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "galactic_library",
+    srcs = ["simulation.cpp"],
+    hdrs = [
+        "simulation.hpp",
+        "simulation_components.hpp",
+        "simulation_systems.hpp",
+    ],
+    copts = COPTS,
+    deps = [
+        "//engine:driver",
+        "//engine:lifecycle",
+        "//framework",
+        "//framework:vocabulary",
+        "//model:galaxy",
+        "//model:gravity",
+        "//model:kinematics",
+        "//model:leapfrog",
+        "//model:random",
+        "//model:units",
+    ],
+)
+
+cc_test(
+    name = "gravity_test",
+    size = "small",
+    srcs = ["gravity_test.cpp"],
+    copts = COPTS,
+    data = [
+        "reference/rebound_forces.csv",
+        "reference/rebound_leapfrog.csv",
+    ],
+    deps = [
+        ":galactic_library",
+        "//application:testing",
+        "//engine:driver",
+        "//framework:vocabulary",
+        "//model:gravity",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "plummer_test",
+    size = "small",
+    srcs = ["plummer_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":galactic_library",
+        "//engine:driver",
+        "//framework:vocabulary",
+        "//model:galaxy",
+        "//model:gravity",
+        "//model:random",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "tree_test",
+    size = "small",
+    srcs = ["tree_test.cpp"],
+    copts = COPTS,
+    data = ["reference/rebound_tree.csv"],
+    deps = [
+        ":galactic_library",
+        "//application:testing",
+        "//engine:driver",
+        "//framework:vocabulary",
+        "//model:galaxy",
+        "//model:gravity",
+        "//model:random",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "encounter_test",
+    size = "small",
+    srcs = ["encounter_test.cpp"],
+    copts = COPTS,
+    data = ["reference/rebound_encounter.csv"],
+    deps = [
+        ":galactic_library",
+        "//application:testing",
+        "//engine:driver",
+        "//framework:vocabulary",
+        "//model:galaxy",
+        "//model:gravity",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "galaxy_test",
+    size = "medium",
+    srcs = ["galaxy_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":galactic_library",
+        "//engine:driver",
+        "//framework:vocabulary",
+        "//model:galaxy",
+        "//model:gravity",
+        "//model:random",
+        "@lib//base:testing",
+    ],
+)
+
+cc_binary(
+    name = "galactic",
+    srcs = ["main.cpp"],
+    copts = COPTS,
+    deps = [
+        ":galactic_library",
+        "//engine:driver",
+        "//framework:vocabulary",
+        "//model:gravity",
+    ],
+)
+
+cc_binary(
+    name = "viewer",
+    srcs = ["viewer.cpp"],
+    copts = COPTS,
+    deps = [
+        ":galactic_library",
+        "//application:viewing",
+        "//engine:driver",
+        "//framework:vocabulary",
+        "//model:gravity",
+        "//3rd_party:imgui",
+        "//3rd_party:implot",
+        "@lib//base:core",
+    ],
+)
+
+cc_test(
+    name = "viewer_test",
+    size = "small",
+    srcs = ["viewer.cpp"],
+    args = [
+        "200",
+        "--frames=60",
+    ],
+    copts = COPTS,
+    env = {"SDL_VIDEODRIVER": "dummy"},
+    deps = [
+        ":galactic_library",
+        "//application:viewing",
+        "//engine:driver",
+        "//framework:vocabulary",
+        "//model:gravity",
+        "//3rd_party:imgui",
+        "//3rd_party:implot",
+        "@lib//base:core",
+    ],
+)
+
+cc_test(
+    name = "collision_test",
+    size = "small",
+    srcs = ["collision_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":galactic_library",
+        "//framework:vocabulary",
+        "//model:galaxy",
+        "//model:gravity",
+        "@lib//base:testing",
+    ],
+)
+
+cc_binary(
+    name = "galactic_benchmark",
+    srcs = ["galactic_benchmark.cpp"],
+    copts = COPTS,
+    deps = [
+        ":galactic_library",
+        "//engine:driver",
+        "//framework:vocabulary",
+        "//model:galaxy",
+        "//model:gravity",
+        "//model:random",
+    ],
+)

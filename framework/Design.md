@@ -1553,6 +1553,16 @@ using TimePoint = std::chrono::time_point<SimTime, Duration>;
 - **Integer time is exact,** which determinism needs, and it removes a class of
   substep drift bugs. simon already fixed one caused by accumulating `double`
   substeps. An `int64` of nanoseconds covers about 292 years.
+- **A simulation that runs longer chooses a coarser tick.** It declares
+  `using Tick = ...;`, an integer `std::chrono` duration, and its drivers and
+  steps count in it: `BasicStep<Tick>`, `BasicTimePoint<Tick>` and
+  `engine::BasicTiming<Tick>`. `Step`, `TimePoint` and `Timing` are the
+  nanosecond defaults, so a simulation that declares no tick is unchanged.
+  `galactic` counts Julian years, which an `int64` holds for 9 x 10^18 years.
+  The scheduler passes on whatever step it is given, and physics converts
+  `step.dt` to seconds as before, so a system that takes `auto step` runs at
+  any tick. `Continuous`, `RateGate` and the event queue still count
+  nanoseconds.
 - **`SimTime` is a tag.** It exists so that a simulation time point and a
   wall-clock time point are different types. `RealTimeDriver` handles both,
   and subtracting a `steady_clock` time point from a `TimePoint` does not
@@ -2132,6 +2142,8 @@ simon/
     defense/     Red drones against blue radars, launchers and interceptors
     aeronautic/  Aircraft flying routes, at several fidelity levels
     automotive/  Traffic, vehicle dynamics and scenarios on OpenDRIVE roads
+    robotic/     Articulated rigid bodies with contact, against MuJoCo
+    galactic/    Galaxies under each other's gravity, colliding and merging
   tools/         Offline converters, such as JSBSim aircraft to simon's data
   documents/     Images for the READMEs
   2nd_party/lib  Shared core libraries (submodule)
@@ -2159,6 +2171,8 @@ built and how they compare with other simulators of their domain:
 | defense | [application/defense/Design.md](../application/defense/Design.md) |
 | aeronautic | [application/aeronautic/Design.md](../application/aeronautic/Design.md) |
 | automotive | [application/automotive/Design.md](../application/automotive/Design.md) |
+| robotic | [application/robotic/Design.md](../application/robotic/Design.md) |
+| galactic | [application/galactic/Design.md](../application/galactic/Design.md) |
 
 ## Libraries
 

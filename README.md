@@ -35,6 +35,7 @@ The architecture, its decisions and the roadmap are in
 | [aeronautic](application/aeronautic/README.md) | Aircraft flying routes, from point masses to rigid 737s and F-16s with their flight controls, in one world | JSBSim |
 | [automotive](application/automotive/README.md) | Roads, traffic, vehicle dynamics and scenarios, at the level of objects | libOpenDRIVE, CommonRoad, Chrono::Vehicle, SUMO, esmini, nuPlan |
 | [robotic](application/robotic/README.md) | Articulated rigid bodies on joints with contact, friction, limits, tendons and actuators: MuJoCo's humanoid and Menagerie's robots | MuJoCo, MuJoCo Menagerie |
+| [galactic](application/galactic/README.md) | Galaxies as bodies under each other's gravity, from Toomre and Toomre's restricted encounters to two disk galaxies colliding and merging | REBOUND |
 | [defense](application/defense/README.md) | Red drones against blue radars, launchers and interceptors | Its own benchmarks, idle and under contention |
 | [hello](application/hello/README.md) | Balls bouncing in a box under gravity, the smallest complete use of the framework | |
 
@@ -50,6 +51,10 @@ application's README:
   CommonRoad's to rounding, the Sedan matches Chrono's handling maneuvers,
   and esmini's scenarios play out to its log's precision. One thread steps
   100,000 vehicles in 19 ms, 34 times faster than SUMO on the same network.
+- **galactic.** Direct gravity and the leapfrog match REBOUND to the last
+  bit, Toomre and Toomre's encounter included, and two disk galaxies merge
+  along REBOUND's arc. On one thread its tree steps 100,000 bodies 1.7 times
+  faster than REBOUND's, and a million test particles twice as fast.
 
 ## Build
 
@@ -68,6 +73,7 @@ bazel run -c opt //application/hello:viewer   # watch balls bounce in a box
 bazel run //application/defense:viewer   # watch a defense scenario
 bazel run -c opt //application/aeronautic:viewer   # watch the aeronautic world
 bazel run -c opt //application/automotive:viewer   # watch traffic on a ring
+bazel run -c opt //application/galactic:viewer   # watch two galaxies collide
 bazel run //application/defense -- 7    # run seed 7 headless
 bazel run //application/aeronautic -- 1000 100   # 1,000 aircraft, 100 on RK4
 bazel run -c opt //application/aeronautic:aeronautic_benchmark
@@ -93,3 +99,22 @@ python3 2nd_party/lib/bazel/lsp_mirror.py --install-hooks  # after checkout, mer
 
 `--if-stale` takes a fraction of a second when nothing changed, so it is cheap
 to run often. Restart clangd (`:LspRestart` in Neovim) after the first build.
+
+## Credits
+
+simon is built on open-source work, and thanks everyone behind it. Each
+application's README credits the projects it measures itself against or
+follows, and `NOTICE.md` keeps the copyright notices and terms of the code
+simon translates. The libraries simon builds on:
+
+| Library | Used for | License |
+|---|---|---|
+| [Eigen](https://eigen.tuxfamily.org) | Linear algebra | MPL-2.0 |
+| [mp-units](https://github.com/mpusz/mp-units) | Units of measure | MIT |
+| [pugixml](https://pugixml.org) | Reading XML: OpenDRIVE, OpenSCENARIO, MJCF | MIT |
+| [Dear ImGui](https://github.com/ocornut/imgui) and [ImPlot](https://github.com/epezent/implot) | The viewers | MIT |
+| [SDL2](https://www.libsdl.org) | The viewers' windows | Zlib |
+| [Catch2](https://github.com/catchorg/Catch2) | Tests | BSL-1.0 |
+
+Vendored data, each with its source's license, is listed in
+[3rd_party/README.md](3rd_party/README.md).
