@@ -26,6 +26,13 @@ years, so a run can last billions of years.
   at 128 steps each, keep their energy to 1.5 x 10^-4, their momentum and
   angular momentum to rounding, their virial ratio at 1.04 and their
   half-mass radius within 2.5%.
+- **Barnes and Hut's tree errs as REBOUND's does.** On 2,000 bodies of a
+  Plummer sphere at an opening angle of 0.5, its median force error is 0.29%
+  and its 99th percentile 1.6%, to REBOUND's 0.25% and 1.7%, and so on at
+  0.25, 0.75 and 1. With every cell opened it equals direct summation to
+  4 x 10^-15. Its forces are not equal and opposite, so over ten crossing
+  times momentum drifts by 9 x 10^-4 of the sphere's, and energy by
+  9 x 10^-4, where direct summation keeps them to rounding and 1.5 x 10^-4.
 
 ```sh
 bazel test //application/galactic/...
@@ -40,7 +47,7 @@ N-body code that is open, documented and easy to run beside another.
 
 | Project | What galactic takes from it | License |
 |---|---|---|
-| [REBOUND](https://github.com/hannorein/rebound) 5.2.2 | The reference every check runs against, through its Python module. Its direct summation, which `model/gravity` follows in its order of operations (see `NOTICE.md`) | GPL-3.0 |
+| [REBOUND](https://github.com/hannorein/rebound) 5.2.2 | The reference every check runs against, through its Python module. Its direct summation, which `model/gravity` follows in its order of operations (see `NOTICE.md`), and its tree's opening test, which simon's tree shares | GPL-3.0 |
 | [GADGET-2](https://wwwmpa.mpa-garching.mpg.de/gadget/) | The leapfrog's kick-drift-kick form, from its paper; no code | |
 
 The papers behind the physics are cited in

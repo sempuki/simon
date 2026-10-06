@@ -9,11 +9,13 @@
 
 namespace simon::galactic {
 
-// Computes every body's gravity before the first step.
-using StartSchedule = framework::SystemList<model::SumGravity>;
-using StartScheduler = framework::Scheduler<World, StartSchedule>;
+// Gravity by direct summation or by tree, whichever the scenario enables.
+using Gravities = framework::SystemList<model::SumGravity, model::TreeGravity>;
 
-using Schedule = model::Leapfrog<model::SumGravity>;
+// Computes every body's gravity before the first step.
+using StartScheduler = framework::Scheduler<World, Gravities>;
+
+using Schedule = model::Leapfrog<Gravities>;
 using Scheduler = framework::Scheduler<World, Schedule>;
 
 }  // namespace simon::galactic

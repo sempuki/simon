@@ -112,8 +112,17 @@ auto compute_mass_radii(const World& world, std::span<const double> fractions)
 
 auto Simulation::configure() -> engine::PhaseResult {
   RETURN_IF_UNEXPECTED(build_bodies(scenario_, Out(world_), Out(bodies_)));
-  start_scheduler_.system<model::SumGravity>().softening = scenario_.softening;
-  scheduler_.system<model::SumGravity>().softening = scenario_.softening;
+  auto set_gravity = [&](auto& scheduler) {
+    auto& direct = scheduler.template system<model::SumGravity>();
+    auto& tree = scheduler.template system<model::TreeGravity>();
+    direct.enabled = scenario_.gravity == GravityMethod::DIRECT;
+    direct.softening = scenario_.softening;
+    tree.enabled = scenario_.gravity == GravityMethod::TREE;
+    tree.softening = scenario_.softening;
+    tree.opening_angle = scenario_.opening_angle;
+  };
+  set_gravity(start_scheduler_);
+  set_gravity(scheduler_);
   return engine::Flow::CONTINUE;
 }
 

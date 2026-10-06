@@ -27,10 +27,16 @@ using Timing = engine::BasicTiming<Year>;
 
 using model::BodyStart;
 
+// How a run computes gravity: by summing every pair, exactly, or by Barnes
+// and Hut's tree, opening cells by `opening_angle`.
+enum class GravityMethod { DIRECT, TREE };
+
 // Everything a run depends on. The same scenario gives the same run.
 struct Scenario final {
   std::vector<BodyStart> bodies;
   model::Length softening = 0.0 * model::meter;
+  GravityMethod gravity = GravityMethod::DIRECT;
+  double opening_angle = 0.5;
 };
 
 // Builds in `world` the scenario's bodies, in its order, and appends each to

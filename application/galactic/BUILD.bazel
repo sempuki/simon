@@ -62,3 +62,21 @@ cc_test(
         "@lib//base:testing",
     ],
 )
+
+cc_test(
+    name = "tree_test",
+    size = "small",
+    srcs = ["tree_test.cpp"],
+    copts = COPTS,
+    data = ["reference/rebound_tree.csv"],
+    deps = [
+        ":galactic_library",
+        "//application:testing",
+        "//engine:driver",
+        "//framework:vocabulary",
+        "//model:galaxy",
+        "//model:gravity",
+        "//model:random",
+        "@lib//base:testing",
+    ],
+)
