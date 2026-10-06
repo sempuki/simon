@@ -18,6 +18,7 @@ cc_library(
         "//engine:lifecycle",
         "//model:kinematics",
         "//model:motion",
+        "//model:random",
         "//model:units",
     ],
 )
@@ -43,9 +44,38 @@ cc_binary(
         "//framework:vocabulary",
         ":hello_library",
         "//engine:driver",
+    ],
+)
+
+cc_binary(
+    name = "viewer",
+    srcs = ["viewer.cpp"],
+    copts = COPTS,
+    deps = [
+        "//framework:vocabulary",
+        ":hello_library",
+        "//application:viewing",
+        "//engine:driver",
         "//3rd_party:imgui",
-        "//3rd_party:imgui_platform_sdl2",
-        "//3rd_party:imgui_renderer_sdl2",
-        "//3rd_party:sdl2",
+        "//3rd_party:implot",
+        "@lib//base:core",
+    ],
+)
+
+cc_test(
+    name = "viewer_test",
+    size = "small",
+    srcs = ["viewer.cpp"],
+    args = ["--frames=60"],
+    copts = COPTS,
+    env = {"SDL_VIDEODRIVER": "dummy"},
+    deps = [
+        "//framework:vocabulary",
+        ":hello_library",
+        "//application:viewing",
+        "//engine:driver",
+        "//3rd_party:imgui",
+        "//3rd_party:implot",
+        "@lib//base:core",
     ],
 )

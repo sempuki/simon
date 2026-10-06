@@ -57,6 +57,9 @@ full where it first appears, and as "above" after.
 | `road.cpp` | Gauss-Legendre quadrature with 8 points: the roots of the Legendre polynomial and their weights | F. W. J. Olver et al., eds., [*NIST Digital Library of Mathematical Functions*](https://dlmf.nist.gov), section 3.5(v); the values to double precision by mpmath, and as M. Abramowitz and I. A. Stegun, *Handbook of Mathematical Functions*, NBS, 1964, table 25.4, print them to 15 digits |
 | `road_test.cpp` | The Fresnel integrals, for the clothoid | The NIST Digital Library of Mathematical Functions, above, section 7.2(iii); C(1) and S(1) to double precision by mpmath, and as Abramowitz and Stegun, above, table 7.7, print them to 7 digits |
 | `road.cpp` | Turning the road's normal about its tangent by the superelevation | Rodrigues' rotation formula, Goldstein, Poole and Safko, above, section 4.7 |
+| `application/hello/hello.cpp` | Contact between balls as a linear spring and dashpot | P. A. Cundall and O. D. L. Strack, "A discrete numerical model for granular assemblies", *Géotechnique* 29(1), 1979, pp. 47-65 |
+| `application/hello/hello.cpp` | A linear spring-dashpot contact's overlap over time, and the restitution it gives | T. Schwager and T. Pöschel, "Coefficient of restitution and linear-dashpot model revisited", *Granular Matter* 9, 2007, pp. 465-469 |
+| `application/hello/hello.hpp` | Semi-implicit Euler: contact forces taken at the positions after moving | Symplectic Euler, Hairer, Lubich and Wanner, above, section I.1.2 |
 
 ## Roads, vehicles and tires
 

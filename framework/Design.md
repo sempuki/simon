@@ -1074,7 +1074,7 @@ using Motion = framework::SystemList<Integrate>;
 
 // application/hello
 using Schedule =
-    framework::SystemList<ApplyForces, model::Motion, DetectCollisions>;
+    framework::SystemList<model::Motion, DetectContacts, ApplyContacts>;
 
 // application/defense
 using Sensing =
@@ -1718,9 +1718,9 @@ simulation's time and phase. The other drivers wrap it:
   never how long they are. A test checks that irregular wall-clock ticks take
   exactly the steps a batch run takes.
 
-`hello` runs under `RealTimeDriver` at five times real time; its test runs the
-same simulation under `BatchDriver` and checks that two runs end at the same
-time with bit-identical state.
+`hello`'s viewer runs under `RealTimeDriver`; its test runs the same
+simulation under `BatchDriver` and checks that two runs end with bit-identical
+state.
 
 The contract will carry an optional lookahead, the promise that this
 simulation will not produce events earlier than `now + lookahead`. HLA time
@@ -2128,7 +2128,7 @@ simon/
                  property files, converted aircraft
   scenario/      Scenarios and parameter distributions as OpenSCENARIO describes them, and the player that runs their storyboards
   application/   Each with a README.md of its results, and a Design.md where it has more to say
-    hello/       Two bouncing balls, the first application
+    hello/       Balls bouncing in a box, the first application
     defense/     Red drones against blue radars, launchers and interceptors
     aeronautic/  Aircraft flying routes, at several fidelity levels
     automotive/  Traffic, vehicle dynamics and scenarios on OpenDRIVE roads

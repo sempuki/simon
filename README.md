@@ -36,7 +36,7 @@ The architecture, its decisions and the roadmap are in
 | [automotive](application/automotive/README.md) | Roads, traffic, vehicle dynamics and scenarios, at the level of objects | libOpenDRIVE, CommonRoad, Chrono::Vehicle, SUMO, esmini, nuPlan |
 | [robotic](application/robotic/README.md) | Articulated rigid bodies on joints with contact, friction, limits, tendons and actuators: MuJoCo's humanoid and Menagerie's robots | MuJoCo, MuJoCo Menagerie |
 | [defense](application/defense/README.md) | Red drones against blue radars, launchers and interceptors | Its own benchmarks, idle and under contention |
-| [hello](application/hello/README.md) | Two bouncing balls, the smallest complete use of the framework | |
+| [hello](application/hello/README.md) | Balls bouncing in a box under gravity, the smallest complete use of the framework | |
 
 Some headline results, each with the command that checks it in the
 application's README:
@@ -64,7 +64,7 @@ git clone --recurse-submodules git@github.com:sempuki/simon.git
 git submodule update --init
 
 bazel test //...
-bazel run //application/hello
+bazel run -c opt //application/hello:viewer   # watch balls bounce in a box
 bazel run //application/defense:viewer   # watch a defense scenario
 bazel run -c opt //application/aeronautic:viewer   # watch the aeronautic world
 bazel run -c opt //application/automotive:viewer   # watch traffic on a ring

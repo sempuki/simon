@@ -3,7 +3,7 @@
 #include "application/hello/hello.hpp"
 
 #include <chrono>
-#include <expected>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -14,100 +14,190 @@
 namespace simon::hello {
 
 namespace {
-const framework::Duration DT = std::chrono::milliseconds{10};
+
+using namespace std::chrono_literals;
+
+// Creates a ball of `radius` and `mass` at `x`, `y` moving at `vx`, `vy`, with
+// no gravity.
+auto create_ball(double x, double y, double vx, double vy, double radius,
+                 double mass, InOut<World> world) -> Entity {
+  auto ball =
+      world->create<Ball>()
+          .with(Kinematics{.position = meters(x, y, 0.0),
+                           .velocity = meters_per_second(vx, vy, 0.0)})
+          .with(Control{})
+          .with(Body{.radius = radius * meter, .mass = mass * model::kilogram})
+          .with(Contact{})
+          .build();
+  REQUIRE(ball);
+  world->sync();
+  return *ball;
+}
+
+auto velocity_of(const World& world, Entity ball) -> model::QuantityVector {
+  return world.store_of<Kinematics>()
+      .component_of(ball)
+      .velocity.numerical_value_in(meter_per_second);
+}
+
+auto run(model::Time duration, InOut<Scheduler> scheduler, InOut<World> world)
+    -> void {
+  framework::TimePoint time{};
+  while (time < framework::TimePoint{} +
+                    std::chrono::duration_cast<framework::Duration>(
+                        std::chrono::duration<double>(
+                            duration.numerical_value_in(model::second)))) {
+    scheduler->step(framework::Step{.time = time, .dt = STEP}, world);
+    time += STEP;
+  }
+}
+
 }  // namespace
 
 TEST_CASE("Hello") {
   World world;
   REQUIRE(build_world(8, Out(world)));
   Scheduler scheduler;
-  Balls balls = build_balls(InOut(world));
 
-  SECTION("ShouldFindBallsByAliasGivenScenario") {
-    CHECK(world.find_name_of(framework::Alias{"red"}) ==
-          std::vector{world.name_of(balls.red)});
-    CHECK(world.find_name_of(framework::Alias{"blue"}) ==
-          std::vector{world.name_of(balls.blue)});
-    CHECK(world.aliases_of(world.archetype_of(balls.red)) ==
-          std::vector<framework::Alias>{"ball"});
+  SECTION("ShouldSwapVelocitiesGivenEqualBallsHeadOn") {
+    Entity left = create_ball(10.0, 10.0, 1.0, 0.0, 0.5, 1.0, InOut(world));
+    Entity right = create_ball(11.2, 10.0, -1.0, 0.0, 0.5, 1.0, InOut(world));
+
+    run(1.0 * model::second, InOut(scheduler), InOut(world));
+
+    CHECK(velocity_of(world, left)
+              .is_approximately(model::QuantityVector{-1.0, 0.0, 0.0}, 0.01));
+    CHECK(velocity_of(world, right)
+              .is_approximately(model::QuantityVector{1.0, 0.0, 0.0}, 0.01));
   }
 
-  SECTION("ShouldAccelerateByThrustGivenNoDragAndNoWind") {
-    REQUIRE(world.change(balls.red).detach<Drag>().build());
-    world.sync();
+  SECTION("ShouldConserveMomentumAndEnergyGivenGlancingBlow") {
+    create_ball(10.0, 10.0, 3.0, 0.0, 0.5, 1.0, InOut(world));
+    create_ball(13.0, 10.6, 0.0, 0.0, 0.8, 4.1, InOut(world));
+    Momentum momentum = compute_momentum(world);
+    Energy energy = compute_energy(world, 0.0 * meter_per_second_squared);
 
-    scheduler.step(framework::Step{.time = {}, .dt = DT}, InOut(world));
+    run(2.0 * model::second, InOut(scheduler), InOut(world));
 
-    const Kinematics& red =
-        world.store_of<Kinematics>().component_of(balls.red);
-    CHECK(red.velocity.numerical_value_in(model::meter_per_second)
-              .is_approximately(
-                  model::QuantityVector{10.0, -10.0 + 9.8 * 0.01, 0.0}));
+    CHECK(compute_momentum(world)
+              .numerical_value_in(model::kilogram * meter_per_second)
+              .is_approximately(momentum.numerical_value_in(model::kilogram *
+                                                            meter_per_second)));
+    Energy after = compute_energy(world, 0.0 * meter_per_second_squared);
+    CHECK(std::abs(model::number_of(after / energy) - 1.0) < 0.01);
   }
 
-  SECTION("ShouldNotCollideGivenBallsFarApart") {
-    scheduler.step(framework::Step{.time = {}, .dt = DT}, InOut(world));
-    CHECK_FALSE(any_collision(world));
+  SECTION("ShouldPartSlowerGivenRestitution") {
+    scheduler.system<DetectContacts>().springiness.restitution = 0.5;
+    Entity left = create_ball(10.0, 10.0, 1.0, 0.0, 0.5, 1.0, InOut(world));
+    Entity right = create_ball(11.2, 10.0, -1.0, 0.0, 0.5, 1.0, InOut(world));
+
+    run(1.0 * model::second, InOut(scheduler), InOut(world));
+
+    // Ten steps a contact damp a little more than the dashpot would: the
+    // balls part at 0.467 m/s.
+    CHECK(velocity_of(world, left)
+              .is_approximately(model::QuantityVector{-0.5, 0.0, 0.0}, 0.1));
+    CHECK(velocity_of(world, right)
+              .is_approximately(model::QuantityVector{0.5, 0.0, 0.0}, 0.1));
   }
 
-  SECTION("ShouldCollideBothWaysGivenRunUntilContact") {
-    framework::TimePoint time{};
-    int steps = 0;
-    while (!any_collision(world) && steps < 100'000) {
-      scheduler.step(framework::Step{.time = time, .dt = DT}, InOut(world));
-      time += DT;
-      ++steps;
-    }
+  SECTION("ShouldBounceOffWallGivenBallHeadingIntoIt") {
+    Entity ball = create_ball(78.0, 10.0, 2.0, 1.0, 0.5, 1.0, InOut(world));
 
-    REQUIRE(any_collision(world));
-    const Collision& red = world.store_of<Collision>().component_of(balls.red);
-    const Collision& blue =
-        world.store_of<Collision>().component_of(balls.blue);
-    CHECK(red.hit);
-    CHECK(red.other == balls.blue);
-    CHECK(blue.hit);
-    CHECK(blue.other == balls.red);
+    run(1.5 * model::second, InOut(scheduler), InOut(world));
+
+    CHECK(velocity_of(world, ball)
+              .is_approximately(model::QuantityVector{-2.0, 1.0, 0.0}, 0.01));
   }
 
   SECTION("ShouldListSystemsInOrderGivenSchedule") {
     std::string text = Scheduler::describe();
-    CHECK(text.find("ApplyForces") < text.find("Integrate"));
-    CHECK(text.find("Integrate") < text.find("DetectCollisions"));
+    CHECK(text.find("Integrate") < text.find("DetectContacts"));
+    CHECK(text.find("DetectContacts") < text.find("ApplyContacts"));
   }
 }
 
 TEST_CASE("HelloSimulation") {
-  using namespace std::chrono_literals;
-  const engine::Timing timing{.max_step = 10ms};
+  const engine::Timing timing{.max_step = STEP};
+  const Scenario scenario{.balls = 300};
 
-  SECTION("ShouldStopAtFirstCollisionGivenBatchRun") {
-    Simulation simulation;
+  SECTION("ShouldRefuseGivenMoreBallsThanCells") {
+    Simulation simulation{Scenario{.balls = compute_capacity(scenario) + 1}};
     engine::BatchDriver driver{timing, Depend(simulation)};
 
-    auto reached = driver.run(framework::TimePoint{60s});
-
-    REQUIRE(reached);
-    CHECK(*reached < framework::TimePoint{60s});
-    CHECK(any_collision(simulation.world()));
+    CHECK_FALSE(driver.run(framework::TimePoint{1s}));
   }
 
-  SECTION("ShouldEndAtSameTimeAndPlaceGivenTwoRuns") {
-    Simulation first;
-    Simulation second;
+  SECTION("ShouldKeepBallsInBoxGivenLongRun") {
+    Simulation simulation{scenario};
+    engine::BatchDriver driver{timing, Depend(simulation)};
+
+    REQUIRE(driver.run(framework::TimePoint{20s}));
+
+    double width = scenario.box.width.numerical_value_in(meter);
+    double height = scenario.box.height.numerical_value_in(meter);
+    std::size_t outside = 0;
+    simulation.world().store_of<Kinematics>().for_each(
+        [&](Entity, const Kinematics& ball) {
+          model::QuantityVector at = ball.position.numerical_value_in(meter);
+          if (at.x() < 0.0 || at.y() < 0.0 || at.x() > width ||
+              at.y() > height) {
+            ++outside;
+          }
+        });
+    CHECK(outside == 0);
+  }
+
+  SECTION("ShouldKeepEnergyGivenElasticRun") {
+    Simulation simulation{scenario};
+    engine::Driver driver{timing, Depend(simulation)};
+    REQUIRE(driver.start());
+    Energy start = compute_energy(simulation.world(), scenario.gravity);
+
+    REQUIRE(driver.advance_to(framework::TimePoint{20s}));
+
+    Energy end = compute_energy(simulation.world(), scenario.gravity);
+    CHECK(std::abs(model::number_of(end / start) - 1.0) < 0.03);
+    REQUIRE(driver.finish());
+  }
+
+  SECTION("ShouldLoseEnergyGivenInelasticRun") {
+    Scenario inelastic = scenario;
+    inelastic.springiness.restitution = 0.5;
+    Simulation simulation{inelastic};
+    engine::Driver driver{timing, Depend(simulation)};
+    REQUIRE(driver.start());
+    Energy start = compute_energy(simulation.world(), inelastic.gravity);
+
+    REQUIRE(driver.advance_to(framework::TimePoint{20s}));
+
+    CHECK(compute_energy(simulation.world(), inelastic.gravity) < 0.5 * start);
+    REQUIRE(driver.finish());
+  }
+
+  SECTION("ShouldEndInSameStateGivenTwoRuns") {
+    Simulation first{scenario};
+    Simulation second{scenario};
     engine::BatchDriver first_driver{timing, Depend(first)};
     engine::BatchDriver second_driver{timing, Depend(second)};
 
-    auto first_end = first_driver.run(framework::TimePoint{60s});
-    auto second_end = second_driver.run(framework::TimePoint{60s});
+    REQUIRE(first_driver.run(framework::TimePoint{5s}));
+    REQUIRE(second_driver.run(framework::TimePoint{5s}));
 
-    REQUIRE(first_end);
-    REQUIRE(second_end);
-    CHECK(*first_end == *second_end);
-    const auto& first_red =
-        first.world().store_of<Kinematics>().component_of(first.balls().red);
-    const auto& second_red =
-        second.world().store_of<Kinematics>().component_of(second.balls().red);
-    CHECK(first_red.position == second_red.position);  // Bit for bit.
+    std::vector<Kinematics> first_balls;
+    std::vector<Kinematics> second_balls;
+    first.world().store_of<Kinematics>().for_each(
+        [&](Entity, const Kinematics& ball) { first_balls.push_back(ball); });
+    second.world().store_of<Kinematics>().for_each(
+        [&](Entity, const Kinematics& ball) { second_balls.push_back(ball); });
+    REQUIRE(first_balls.size() == second_balls.size());
+    bool same = true;  // Bit for bit.
+    for (std::size_t i = 0; i < first_balls.size(); ++i) {
+      same = same && first_balls[i].position == second_balls[i].position &&
+             first_balls[i].velocity == second_balls[i].velocity;
+    }
+    CHECK(same);
   }
 }
 

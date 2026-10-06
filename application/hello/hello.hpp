@@ -2,8 +2,9 @@
 
 #pragma once
 
-#include <algorithm>
+#include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <expected>
 
 #include "base/core.hpp"
@@ -15,155 +16,209 @@
 #include "model/kinematics.hpp"
 #include "model/motion.hpp"
 
-// Two balls under thrust and wind that stop when they collide: the smallest
-// complete use of the architecture.
+// Balls bouncing off each other and the walls of a box, under gravity: the
+// smallest complete use of the architecture.
 namespace simon::hello {
 
 using framework::Entity;
-using model::Acceleration;
+using model::AccelerationMagnitude;
 using model::Control;
+using model::Density;
+using model::Displacement;
+using model::ForceVector;
 using model::Kinematics;
 using model::Length;
+using model::Mass;
 using model::meter;
+using model::meter_per_second;
+using model::meter_per_second_squared;
 using model::meters;
 using model::meters_per_second;
-using model::meters_per_second_squared;
-using model::per_second;
-using model::Rate;
+using model::Speed;
+using model::Time;
 using model::Velocity;
 
 //-- Components ----------------------------------------------------------------
 
-struct Thrust final {
-  Acceleration acceleration = meters_per_second_squared(0.0, 0.0, 0.0);
-};
-
-struct Wind final {
-  Velocity velocity = meters_per_second(0.0, 0.0, 0.0);
-};
-
-struct Drag final {
-  Rate factor = 0.0 * per_second;  // acceleration = factor * (wind - velocity)
-};
-
-struct Collider final {
+// A ball's size and mass. Collisions read both.
+struct Body final {
   Length radius = 0.0 * meter;
+  Mass mass = 0.0 * model::kilogram;
 };
 
-// Written by DetectCollisions on the entity that collided.
-struct Collision final {
-  bool hit = false;
-  Entity other;
+// The force a ball's contacts with other balls put on it this step. Written
+// by DetectContacts and applied by ApplyContacts.
+struct Contact final {
+  ForceVector force =
+      model::meters_per_second_squared(0.0, 0.0, 0.0) * model::kilogram;
 };
 
-// A ball must have a position, a size and a collision record; it may be driven.
+// A ball falls under the gravity its Control holds, which nothing changes.
 struct Ball final
-    : framework::Archetype<"ball",
-                           framework::Requires<Kinematics, Collider, Collision>,
-                           framework::Allows<Control, Thrust, Wind, Drag>> {};
+    : framework::Archetype<
+          "ball", framework::Requires<Kinematics, Control, Body, Contact>> {};
 
-using World = framework::World<
-    Kinematics,
-    framework::TypeList<Control, Thrust, Wind, Drag, Collider, Collision>,
-    framework::TypeList<Ball>>;
+using World =
+    framework::World<Kinematics, framework::TypeList<Control, Body, Contact>,
+                     framework::TypeList<Ball>>;
 
 //-- Systems ------------------------------------------------------------------
 
-// Sums thrust and wind drag into the commanded acceleration.
-struct ApplyForces final                   //
-    : framework::System<Control,           //
-                        const Kinematics,  //
-                        const Thrust,      //
-                        const Wind,        //
-                        const Drag> {
-  auto operator()(auto&, Entity,                 //
-                  Control& control,              //
-                  const Kinematics* kinematics,  //
-                  const Thrust* thrust,          //
-                  const Wind* wind,              //
-                  const Drag* drag) const -> void {
-    control.acceleration = thrust ? thrust->acceleration
-                                  : meters_per_second_squared(0.0, 0.0, 0.0);
-    if (kinematics && drag) {
-      Velocity air = wind ? wind->velocity : meters_per_second(0.0, 0.0, 0.0);
-      control.acceleration += drag->factor * (air - kinematics->velocity);
-    }
-  }
+// The box the balls bounce in, from the origin to `width` along x and to
+// `height` along y. Gravity points down y.
+struct Box final {
+  Length width = 80.0 * meter;
+  Length height = 45.0 * meter;
 };
 
-// Each collider records its own collision: it writes only its own entity and
-// finds the others through a spatial query.
-struct DetectCollisions final            //
-    : framework::System<Collision,       //
-                        const Collider,  //
+// How a ball pushes off what it touches: each contact lasts `duration`, and
+// the ball leaves it `restitution` times as fast as it met it. Restitution is
+// more than 0 and at most 1.
+struct Springiness final {
+  Time duration = 0.05 * model::second;
+  double restitution = 1.0;
+};
+
+// Adds to `contact` the force `other` puts on a ball it overlaps.
+auto append_ball_contact(const Springiness& springiness, const Body& body,
+                         const Kinematics& kinematics, const Body& other_body,
+                         const Kinematics& other, InOut<Contact> contact)
+    -> void;
+
+// Adds to `contact` the force each wall of `box` puts on a ball that
+// overlaps it.
+auto append_wall_contacts(const Springiness& springiness, const Box& box,
+                          const Body& body, const Kinematics& kinematics,
+                          InOut<Contact> contact) -> void;
+
+// Each ball finds the balls it touches through a spatial query, and sums
+// their forces and the walls' on it into its own Contact. It writes nothing
+// else, and every ball reads the same positions and velocities, so each pair's
+// two forces are equal and opposite whatever order the balls run in.
+struct DetectContacts final          //
+    : framework::System<Contact,     //
+                        const Body,  //
                         const Kinematics> {
-  using AllowComponentList = framework::TypeList<Kinematics, Collider>;
+  using AllowComponentList = framework::TypeList<Kinematics, Body>;
   using SequenceAfterSystemList = framework::SystemList<model::Integrate>;
 
   auto prepare(auto& world) -> void {
     largest_radius = 0.0 * meter;
-    store_of<Collider>(world).for_each([&](Entity, const Collider& collider) {
-      largest_radius = std::max(largest_radius, collider.radius);
+    store_of<Body>(world).for_each([&](Entity, const Body& body) {
+      largest_radius = model::max(largest_radius, body.radius);
     });
   }
 
   auto operator()(auto& world, Entity self,  //
-                  Collision& collision,      //
-                  const Collider* collider,  //
+                  Contact& contact,          //
+                  const Body* body,          //
                   const Kinematics* kinematics) const -> void {
-    if (!collider || !kinematics) return;
-    world.within(*kinematics, collider->radius + largest_radius,
-                 [&](Entity other, const Kinematics& other_kinematics) {
-                   const Collider* other_collider =
-                       maybe_component_of<Collider>(world, other);
-                   if (other == self || !other_collider) return;
-                   if (distance(*kinematics, other_kinematics) <=
-                       collider->radius + other_collider->radius) {
-                     collision = Collision{.hit = true, .other = other};
-                   }
-                 });
+    contact = Contact{};
+    if (!body || !kinematics) return;
+    world.within(
+        *kinematics, body->radius + largest_radius,
+        [&](Entity other, const Kinematics& other_kinematics) {
+          const Body* other_body = maybe_component_of<Body>(world, other);
+          if (other == self || !other_body) return;
+          append_ball_contact(springiness, *body, *kinematics, *other_body,
+                              other_kinematics, InOut(contact));
+        });
+    append_wall_contacts(springiness, box, *body, *kinematics, InOut(contact));
   }
 
+  Springiness springiness;
+  Box box;
   Length largest_radius = 0.0 * meter;
 };
 
+// Each ball takes its contacts' force over the step. Integrate has already
+// moved it, so it takes the force at its new place: semi-implicit Euler
+// (Hairer, Lubich and Wanner), which keeps an elastic contact's energy from
+// drifting as long as the step is short against the contact.
+struct ApplyContacts final              //
+    : framework::System<Kinematics,     //
+                        const Contact,  //
+                        const Body> {
+  using SequenceAfterSystemList = framework::SystemList<DetectContacts>;
+
+  auto operator()(auto&, Entity,           //
+                  Kinematics& kinematics,  //
+                  const Contact* contact,  //
+                  const Body* body,        //
+                  framework::Step step) const -> void {
+    if (!contact || !body) return;
+    kinematics.velocity +=
+        contact->force / body->mass * model::seconds(step.dt);
+  }
+};
+
 using Schedule =
-    framework::SystemList<ApplyForces, model::Motion, DetectCollisions>;
+    framework::SystemList<model::Motion, DetectContacts, ApplyContacts>;
 using Scheduler = framework::Scheduler<World, Schedule>;
 
 //-- Scenario ------------------------------------------------------------------
 
-struct Balls final {
-  Entity red;
-  Entity blue;
-};
+// The step to run the balls at: a tenth of a contact, short enough that an
+// elastic contact gives back the energy it took.
+inline constexpr framework::Duration STEP = std::chrono::milliseconds{5};
 
-// Builds the two balls. One meter is drawn as one screen pixel.
-auto build_balls(InOut<World> world) -> Balls;
+// Everything a run depends on. The same scenario gives the same run.
+struct Scenario final {
+  std::uint64_t seed = 1;
+  std::size_t balls = 1500;
+
+  Box box;
+  Length smallest = 0.35 * meter;
+  Length largest = 0.5 * meter;
+  Density density = 1000.0 * model::kilogram_per_cubic_meter;
+  Speed fastest = 8.0 * meter_per_second;  // Each ball starts slower.
+
+  AccelerationMagnitude gravity = 9.8 * meter_per_second_squared;
+  Springiness springiness;
+};
 
 // Builds in `world` a world holding `balls` balls.
 auto build_world(std::size_t balls, Out<World> world)
     -> std::expected<void, framework::Status>;
 
-// Whether any ball has collided.
-auto any_collision(const World& world) -> bool;
+// Computes the most balls the scenario's box holds: one to a cell.
+auto compute_capacity(const Scenario& scenario) -> std::size_t;
 
-// The hello simulation: builds the balls when configured, and stops at the
-// first collision. Any driver can run it.
+// Builds the scenario's balls on a grid of cells over its box, spread evenly
+// over the cells, each at a random place in its cell with a random radius and
+// velocity. Fails if the cells are fewer than the balls.
+auto build_balls(const Scenario& scenario, InOut<World> world)
+    -> std::expected<void, framework::Status>;
+
+using Momentum = model::units::quantity<model::kilogram * meter_per_second,
+                                        model::QuantityVector>;
+using Energy = model::units::quantity<model::units::si::joule, double>;
+
+// Computes the balls' total momentum.
+auto compute_momentum(const World& world) -> Momentum;
+
+// Computes the balls' total energy, kinetic and potential above y = 0.
+auto compute_energy(const World& world, AccelerationMagnitude gravity)
+    -> Energy;
+
+// The hello simulation. Any driver can run it.
 class Simulation final {
  public:
-  // Builds the world and the two balls in it.
+  explicit Simulation(Scenario scenario = {}) : scenario_{scenario} {}
+
+  // Builds the world and the balls in it.
   auto configure() -> engine::PhaseResult;
   auto step(const framework::Step& step) -> engine::PhaseResult;
 
+  auto scenario() const -> const Scenario& { return scenario_; }
+
   // The world: empty until configured.
   auto world() const -> const World& { return world_; }
-  auto balls() const -> const Balls& { return balls_; }
 
  private:
-  World world_;  // Empty until configure builds it.
+  Scenario scenario_;
+  World world_;
   Scheduler scheduler_;
-  Balls balls_{};
 };
 
 }  // namespace simon::hello
