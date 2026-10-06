@@ -239,8 +239,9 @@ template <typename SimulationType, typename ScenarioType>
 class Session final {
  public:
   using DriverType = engine::RealTimeDriver<SimulationType>;
+  using TimingType = engine::BasicTiming<engine::tick_of_t<SimulationType>>;
 
-  Session(ScenarioType scenario, engine::Timing timing, double speed)
+  Session(ScenarioType scenario, TimingType timing, double speed)
       : scenario_{std::move(scenario)},
         simulation_{std::make_unique<SimulationType>(scenario_)},
         driver_{std::make_unique<DriverType>(timing, speed,

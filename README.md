@@ -35,6 +35,7 @@ The architecture, its decisions and the roadmap are in
 | [aeronautic](application/aeronautic/README.md) | Aircraft flying routes, from point masses to rigid 737s and F-16s with their flight controls, in one world | JSBSim |
 | [automotive](application/automotive/README.md) | Roads, traffic, vehicle dynamics and scenarios, at the level of objects | libOpenDRIVE, CommonRoad, Chrono::Vehicle, SUMO, esmini, nuPlan |
 | [robotic](application/robotic/README.md) | Articulated rigid bodies on joints with contact, friction, limits, tendons and actuators: MuJoCo's humanoid and Menagerie's robots | MuJoCo, MuJoCo Menagerie |
+| [galactic](application/galactic/README.md) | Galaxies as bodies under each other's gravity, from Toomre and Toomre's restricted encounters to two disk galaxies colliding and merging | REBOUND |
 | [defense](application/defense/README.md) | Red drones against blue radars, launchers and interceptors | Its own benchmarks, idle and under contention |
 | [hello](application/hello/README.md) | Balls bouncing in a box under gravity, the smallest complete use of the framework | |
 
@@ -68,6 +69,7 @@ bazel run -c opt //application/hello:viewer   # watch balls bounce in a box
 bazel run //application/defense:viewer   # watch a defense scenario
 bazel run -c opt //application/aeronautic:viewer   # watch the aeronautic world
 bazel run -c opt //application/automotive:viewer   # watch traffic on a ring
+bazel run -c opt //application/galactic:viewer   # watch two galaxies collide
 bazel run //application/defense -- 7    # run seed 7 headless
 bazel run //application/aeronautic -- 1000 100   # 1,000 aircraft, 100 on RK4
 bazel run -c opt //application/aeronautic:aeronautic_benchmark

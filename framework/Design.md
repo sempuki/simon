@@ -2142,6 +2142,8 @@ simon/
     defense/     Red drones against blue radars, launchers and interceptors
     aeronautic/  Aircraft flying routes, at several fidelity levels
     automotive/  Traffic, vehicle dynamics and scenarios on OpenDRIVE roads
+    robotic/     Articulated rigid bodies with contact, against MuJoCo
+    galactic/    Galaxies under each other's gravity, colliding and merging
   tools/         Offline converters, such as JSBSim aircraft to simon's data
   documents/     Images for the READMEs
   2nd_party/lib  Shared core libraries (submodule)
@@ -2169,6 +2171,8 @@ built and how they compare with other simulators of their domain:
 | defense | [application/defense/Design.md](../application/defense/Design.md) |
 | aeronautic | [application/aeronautic/Design.md](../application/aeronautic/Design.md) |
 | automotive | [application/automotive/Design.md](../application/automotive/Design.md) |
+| robotic | [application/robotic/Design.md](../application/robotic/Design.md) |
+| galactic | [application/galactic/Design.md](../application/galactic/Design.md) |
 
 ## Libraries
 

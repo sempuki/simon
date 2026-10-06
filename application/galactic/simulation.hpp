@@ -7,6 +7,7 @@
 #include <expected>
 #include <ratio>
 #include <span>
+#include <string>
 #include <vector>
 
 #include "application/galactic/simulation_components.hpp"
@@ -31,6 +32,14 @@ using model::BodyStart;
 // and Hut's tree, opening cells by `opening_angle`.
 enum class GravityMethod { DIRECT, TREE };
 
+// Bodies a scenario keeps together, such as one galaxy's disk: `count` of
+// them from `first`, in its bodies.
+struct BodyGroup final {
+  std::string name;
+  std::size_t first = 0;
+  std::size_t count = 0;
+};
+
 // Everything a run depends on. The same scenario gives the same run.
 struct Scenario final {
   std::vector<BodyStart> bodies;
@@ -38,6 +47,7 @@ struct Scenario final {
   model::Length softening = 0.0 * model::meter;
   GravityMethod gravity = GravityMethod::DIRECT;
   double opening_angle = 0.5;
+  std::vector<BodyGroup> groups;
 };
 
 // Builds in `world` the scenario's bodies and test particles, in its order,
@@ -61,6 +71,55 @@ struct Encounter final {
 };
 
 auto make_encounter_scenario(const Encounter& encounter) -> Scenario;
+
+// Two disk galaxies alike, sampled from `seed`, on a parabolic orbit about
+// each other, taken as two points of their whole mass, that passes within
+// `pericenter`, starting `before` pericenter. The orbit lies in the x-y plane
+// and turns counterclockwise; each disk turns counterclockwise about its own
+// axis, tilted from z about x by its inclination, so that 0 is a direct
+// passage. The groups are each galaxy's disk and halo.
+struct Collision final {
+  model::DiskGalaxy galaxy;
+  model::Length pericenter = 0.0 * model::meter;
+  model::Time before = 0.0 * model::second;
+  model::Angle first_inclination = 0.0 * model::radian;
+  model::Angle second_inclination = 0.0 * model::radian;
+  model::Length softening = 0.0 * model::meter;
+  double opening_angle = 0.5;
+  std::uint64_t seed = 1;
+};
+
+auto make_collision_scenario(const Collision& collision) -> Scenario;
+
+// The disk galaxy galactic's tests, runner and viewer use, of `disk_bodies`
+// in its disk and four times as many in its halo: a disk of 5 x 10^10 suns,
+// 3 kpc in scale and 0.6 kpc thick, in a halo of 5 x 10^11 suns with a scale
+// of 10 kpc, cut off at 100 kpc, with Q = 1.5 at 2.5 scale lengths.
+// Hernquist's (1993) proportions of thickness to scale, and a halo that
+// outweighs the disk at every radius but its center, keep it in shape.
+auto make_standard_galaxy(std::size_t disk_bodies) -> model::DiskGalaxy;
+
+// The collision galactic's runner and viewer show: two standard galaxies of
+// `disk_bodies` each, passing within 15 kpc 600 million years after the
+// start, the first face on to the orbit and the second tilted by 45 degrees.
+// Softened by 0.24 kpc, on the tree at an opening angle of 0.6.
+auto make_standard_collision(std::size_t disk_bodies) -> Collision;
+
+// One standard galaxy of `disk_bodies`, alone, softened and on the tree as
+// the standard collision is. The groups are its disk and its halo.
+auto make_standard_disk_scenario(std::size_t disk_bodies) -> Scenario;
+
+// Toomre and Toomre's flat direct passage in their units: two masses of
+// 10^11 suns passing within 25 kpc, a billion years after the start,
+// softened by 0.1 kpc.
+auto make_toomre_encounter() -> Encounter;
+
+// Computes the center of `group`'s bodies: their center of mass, then three
+// times the center of mass of those within `reach` of it, so that bodies
+// thrown into tails do not pull it off the galaxy.
+auto compute_group_center(const World& world, std::span<const Entity> bodies,
+                          const BodyGroup& group, model::Length reach)
+    -> model::Position;
 
 // A run's conserved quantities, in SI units, and its energy's two parts.
 struct Mechanics final {

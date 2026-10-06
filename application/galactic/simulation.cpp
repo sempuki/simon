@@ -3,9 +3,13 @@
 #include "application/galactic/simulation.hpp"
 
 #include <algorithm>
+#include <cmath>
+#include <format>
+#include <numbers>
 #include <utility>
 
 #include "framework/vocabulary.hpp"
+#include "model/random.hpp"
 
 namespace simon::galactic {
 
@@ -69,6 +73,114 @@ auto make_encounter_scenario(const Encounter& encounter) -> Scenario {
       model::make_toomre_disk(encounter.pericenter, encounter.softening),
       victim, InOut(scenario.test_particles));
   return scenario;
+}
+
+auto make_collision_scenario(const Collision& collision) -> Scenario {
+  const model::DiskGalaxy& galaxy = collision.galaxy;
+  double cut = model::number_of(galaxy.halo_cutoff /
+                                (galaxy.halo_cutoff + galaxy.halo_scale));
+  model::Mass mass = galaxy.disk_mass + galaxy.halo_mass * cut * cut;
+  model::Separation separation = model::compute_parabolic_separation(
+      model::ParabolicOrbit{
+          .first = mass, .second = mass, .pericenter = collision.pericenter},
+      -collision.before);
+
+  Scenario scenario{.softening = collision.softening,
+                    .gravity = GravityMethod::TREE,
+                    .opening_angle = collision.opening_angle};
+  model::Random random{collision.seed};
+  auto append_galaxy = [&](std::string_view name, double share,
+                           model::Angle inclination) {
+    std::size_t first = scenario.bodies.size();
+    model::append_disk_galaxy(galaxy, InOut(random), InOut(scenario.bodies));
+    Matrix3 tilt =
+        Eigen::AngleAxisd(model::radians(inclination), Vector3::UnitX())
+            .toRotationMatrix();
+    model::place_bodies(first, tilt, share * separation.position,
+                        share * separation.velocity, InOut(scenario.bodies));
+    scenario.groups.push_back(BodyGroup{.name = std::format("{} disk", name),
+                                        .first = first,
+                                        .count = galaxy.disk_bodies});
+    scenario.groups.push_back(BodyGroup{.name = std::format("{} halo", name),
+                                        .first = first + galaxy.disk_bodies,
+                                        .count = galaxy.halo_bodies});
+  };
+  append_galaxy("first", -0.5, collision.first_inclination);
+  append_galaxy("second", 0.5, collision.second_inclination);
+  return scenario;
+}
+
+auto make_standard_galaxy(std::size_t disk_bodies) -> model::DiskGalaxy {
+  using model::KILOPARSEC;
+  using model::SOLAR_MASS;
+  return model::DiskGalaxy{.disk_mass = 5e10 * SOLAR_MASS,
+                           .disk_scale = 3.0 * KILOPARSEC,
+                           .disk_thickness = 0.6 * KILOPARSEC,
+                           .halo_mass = 5e11 * SOLAR_MASS,
+                           .halo_scale = 10.0 * KILOPARSEC,
+                           .halo_cutoff = 100.0 * KILOPARSEC,
+                           .stability = 1.5,
+                           .stability_radius = 7.5 * KILOPARSEC,
+                           .disk_bodies = disk_bodies,
+                           .halo_bodies = 4 * disk_bodies};
+}
+
+auto make_standard_collision(std::size_t disk_bodies) -> Collision {
+  return Collision{.galaxy = make_standard_galaxy(disk_bodies),
+                   .pericenter = 15.0 * model::KILOPARSEC,
+                   .before = 6e8 * model::JULIAN_YEAR,
+                   .first_inclination = 0.0 * model::radian,
+                   .second_inclination = std::numbers::pi / 4.0 * model::radian,
+                   .softening = 0.24 * model::KILOPARSEC,
+                   .opening_angle = 0.6};
+}
+
+auto make_standard_disk_scenario(std::size_t disk_bodies) -> Scenario {
+  model::DiskGalaxy galaxy = make_standard_galaxy(disk_bodies);
+  Scenario scenario{.softening = 0.24 * model::KILOPARSEC,
+                    .gravity = GravityMethod::TREE,
+                    .opening_angle = 0.6};
+  model::Random random{3};
+  model::append_disk_galaxy(galaxy, InOut(random), InOut(scenario.bodies));
+  scenario.groups = {
+      BodyGroup{.name = "disk", .first = 0, .count = galaxy.disk_bodies},
+      BodyGroup{.name = "halo",
+                .first = galaxy.disk_bodies,
+                .count = galaxy.halo_bodies}};
+  return scenario;
+}
+
+auto make_toomre_encounter() -> Encounter {
+  return Encounter{.victim = 1e11 * model::SOLAR_MASS,
+                   .companion = 1e11 * model::SOLAR_MASS,
+                   .pericenter = 25.0 * model::KILOPARSEC,
+                   .before = 1e9 * model::JULIAN_YEAR,
+                   .softening = 0.1 * model::KILOPARSEC};
+}
+
+auto compute_group_center(const World& world, std::span<const Entity> bodies,
+                          const BodyGroup& group, model::Length reach)
+    -> model::Position {
+  const auto& kinematics = world.store_of<Kinematics>();
+  const auto& masses = world.store_of<PointMass>();
+  double limit2 = std::pow(reach.numerical_value_in(model::meter), 2.0);
+  Vector3 center = Vector3::Zero();
+  for (int pass = 0; pass < 4; ++pass) {
+    Vector3 moment = Vector3::Zero();
+    double mass = 0.0;
+    for (std::size_t i = group.first; i < group.first + group.count; ++i) {
+      Vector3 p = kinematics.component_of(bodies[i])
+                      .position.numerical_value_in(model::meter)
+                      .eigen();
+      if (pass > 0 && (p - center).squaredNorm() > limit2) continue;
+      double m = masses.component_of(bodies[i]).mass.numerical_value_in(
+          model::kilogram);
+      moment += m * p;
+      mass += m;
+    }
+    if (mass > 0.0) center = moment / mass;
+  }
+  return model::QuantityVector{center} * model::meter;
 }
 
 namespace {

@@ -23,12 +23,7 @@ using model::SOLAR_MASS;
 constexpr std::string_view ENCOUNTER =
     "application/galactic/reference/rebound_encounter.csv";
 
-// Toomre and Toomre's units: R_min = 25 kpc, 10^11 suns, 10^8 years.
-const Encounter TOOMRE{.victim = 1e11 * SOLAR_MASS,
-                       .companion = 1e11 * SOLAR_MASS,
-                       .pericenter = 25.0 * KILOPARSEC,
-                       .before = 1e9 * model::JULIAN_YEAR,
-                       .softening = 0.1 * KILOPARSEC};
+const Encounter TOOMRE = make_toomre_encounter();
 const Year STEP{250000};
 
 auto read_state(const std::vector<std::string>& line) -> model::BodyStart {

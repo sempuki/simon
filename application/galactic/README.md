@@ -1,8 +1,9 @@
 # galactic
 
-Bodies under each other's gravity, on the way to galaxies colliding. A body
-stands for many stars or much dark matter: a galaxy of 10^11 stars is
-sampled by 10^4 to 10^6 bodies, as galaxy codes do.
+Galaxies as bodies under each other's gravity, up to two disk galaxies
+colliding and merging. A body stands for many stars or much dark matter: a
+galaxy of 10^11 stars is sampled by 10^4 to 10^6 bodies, as galaxy codes
+do. How it is built, and why, is in [Design.md](Design.md).
 
 Gravity between bodies is softened by Plummer's kernel, and the leapfrog
 steps it in kick-drift-kick form, as GADGET-2 does. Time counts whole Julian
@@ -52,10 +53,29 @@ years, so a run can last billions of years.
   and its disk is 0.2 of its scale length thick; a disk that dominates its
   inner halo, or half as thick, starts swelling within 50 million years.
 
+- **Two disk galaxies collide and merge as they do in REBOUND.** Two
+  standard galaxies, 20,000 bodies, pass within 15 kpc, swing out to 52 kpc,
+  fall back and merge within 1.3 billion years, throwing a fifth of their
+  disks into tails. REBOUND's tree, run from simon's start, follows the same
+  arc: the same pericenter to 0.4 kpc, an apocenter 3% nearer, and the same
+  merger, before the runs part as chaotic runs do. Energy drifts by 0.36%
+  over 2 billion years in steps of a million years.
+
 ```sh
 bazel test //application/galactic/...
-python application/galactic/reference/rebound_gravity.py   # regenerate the tables
+bazel run -c opt //application/galactic:viewer             # watch two galaxies collide
+bazel run -c opt //application/galactic -- collision       # run it headless
+bazel run -c opt //application/galactic -- disk 4000 500   # one galaxy alone
 ```
+
+![Two galaxies 923 million years into their collision, each trailing a tidal tail and carrying stars captured from the other](../../documents/images/galactic_viewer.png)
+
+The viewer shows the collision, a galaxy alone, or Toomre and Toomre's
+encounter, face on or edge on, here two galaxies of 1,000 disk bodies each
+near their first apocenter.
+
+The reference tables, and the scripts that regenerate them from REBOUND,
+are listed in [reference/README.md](reference/README.md).
 
 ## Credits
 

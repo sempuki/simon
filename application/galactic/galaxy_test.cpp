@@ -21,28 +21,10 @@ namespace {
 using model::KILOPARSEC;
 using model::SOLAR_MASS;
 
-// A disk of 5 x 10^10 suns, 3 kpc in scale and 0.6 kpc thick, in a halo of
-// 5 x 10^11 suns with a scale of 10 kpc, cut off at 100 kpc, with Q = 1.5 at
-// 2.5 scale lengths: Hernquist's (1993) proportions of thickness to scale,
-// and a halo that outweighs the disk at every radius but its center.
-const model::DiskGalaxy GALAXY{.disk_mass = 5e10 * SOLAR_MASS,
-                               .disk_scale = 3.0 * KILOPARSEC,
-                               .disk_thickness = 0.6 * KILOPARSEC,
-                               .halo_mass = 5e11 * SOLAR_MASS,
-                               .halo_scale = 10.0 * KILOPARSEC,
-                               .halo_cutoff = 100.0 * KILOPARSEC,
-                               .stability = 1.5,
-                               .stability_radius = 7.5 * KILOPARSEC,
-                               .disk_bodies = 2000,
-                               .halo_bodies = 8000};
+const model::DiskGalaxy GALAXY = make_standard_galaxy(2000);
 
 auto make_galaxy_scenario() -> Scenario {
-  Scenario scenario{.softening = 0.24 * KILOPARSEC,
-                    .gravity = GravityMethod::TREE,
-                    .opening_angle = 0.6};
-  model::Random random{3};
-  model::append_disk_galaxy(GALAXY, InOut(random), InOut(scenario.bodies));
-  return scenario;
+  return make_standard_disk_scenario(GALAXY.disk_bodies);
 }
 
 // The disk's bodies, the first of the scenario's.
