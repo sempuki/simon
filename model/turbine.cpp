@@ -1,4 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+// Follows JSBSim 1.3.1, Copyright (C) 2000 Jon S. Berndt and the JSBSim
+// authors, LGPL-2.0-or-later; translated to C++ and changed. See NOTICE.md.
 
 #include "model/turbine.hpp"
 

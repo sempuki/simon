@@ -1,4 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+// Follows esmini 3.8.2, Copyright (c) partners of Simulation Scenarios,
+// MPL-2.0; translated to C++ and changed. See NOTICE.md.
 
 #include "model/polyline.hpp"
 

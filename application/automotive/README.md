@@ -71,3 +71,26 @@ follows it.
 bazel run -c opt //application/automotive:viewer -- 3rd_party/carla/Town01.xodr 80
 bazel run -c opt //application/automotive:viewer -- 3rd_party/esmini/xosc/cut-in.xosc
 ```
+
+## Credits
+
+automotive measures itself against the best open tools of its field, and
+follows several of them where matching them to rounding needed their exact
+arithmetic. Thank you to all of their authors.
+
+| Project | What automotive takes from it | License |
+|---|---|---|
+| [esmini](https://github.com/esmini/esmini) 3.8.2 | The reference for OpenSCENARIO playback. Its storyboard, trajectories, parameter distributions and transitions are followed by `scenario/`, `model/polyline` and the simulation's systems (see `NOTICE.md`). Its scenarios, roads and catalogs are vendored in `3rd_party/esmini` | MPL-2.0 |
+| [CommonRoad vehicle models](https://gitlab.lrz.de/tum-cps/commonroad-vehicle-models) 3.0.2 | The reference for vehicle dynamics. Its multibody, single-track and kinematic models and its tire model are translated in `model/` (see `NOTICE.md`), with its vehicles' parameters | BSD-3-Clause |
+| [Eclipse SUMO](https://eclipse.dev/sumo) 1.27.1 | The reference for traffic: its IDM platoons, signals and speed at scale. Its IDM stopping and its links' merging are followed by `model/traffic_control` and `model/right_of_way` | EPL-2.0 OR GPL-2.0-or-later, used under the GPL |
+| [MovSim](https://github.com/movsim/movsim) and [traffic-simulation.de](https://github.com/movsim/traffic-simulation-de) | The reference IDM and MOBIL tables, and its approach to yellow lights, followed by `model/traffic_control` | GPL-3.0 |
+| [nuPlan devkit](https://github.com/motional/nuplan-devkit) 1.2.2 | The reference for driving metrics. Its comfort metrics and time to collision are followed by `model/driving_metrics` | Apache-2.0 |
+| [SciPy](https://scipy.org) 1.18 | `savgol_filter`'s handling of edges and even windows, followed by `model/driving_metrics` | BSD-3-Clause |
+| [libOpenDRIVE](https://github.com/pageldev/libOpenDRIVE) | The reference for OpenDRIVE geometry, to 8e-14 m | Apache-2.0 |
+| [Project Chrono](https://projectchrono.org) 10.0.0 | The reference for the Sedan's handling maneuvers, and its PAC2002 tire file, vendored in `3rd_party/chrono` | BSD-3-Clause |
+| [CARLA's OpenDRIVE test files](https://github.com/carla-simulator/opendrive-test-files) | Town01, vendored in `3rd_party/carla` | MIT |
+| [Shapely](https://github.com/shapely/shapely) on [GEOS](https://github.com/libgeos/geos) | The reference for boxes overlapping and their gaps | BSD-3-Clause, LGPL-2.1 |
+| [mpmath](https://github.com/mpmath/mpmath) | Gauss-Legendre nodes and Fresnel integrals to double precision | BSD-3-Clause |
+
+The standards and papers behind the models are cited in
+[model/REFERENCES.md](../../model/REFERENCES.md).

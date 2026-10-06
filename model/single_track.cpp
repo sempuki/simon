@@ -1,4 +1,7 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+// Follows the CommonRoad vehicle models 3.0.2, Copyright 2020 Technical
+// University of Munich, BSD-3-Clause; translated to C++ and changed. See
+// NOTICE.md.
 
 #include "model/single_track.hpp"
 

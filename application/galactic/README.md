@@ -31,3 +31,17 @@ years, so a run can last billions of years.
 bazel test //application/galactic/...
 python application/galactic/reference/rebound_gravity.py   # regenerate the tables
 ```
+
+## Credits
+
+galactic measures itself against [REBOUND](https://rebound.readthedocs.io).
+Thank you to Hanno Rein, Shangfei Liu and REBOUND's contributors for an
+N-body code that is open, documented and easy to run beside another.
+
+| Project | What galactic takes from it | License |
+|---|---|---|
+| [REBOUND](https://github.com/hannorein/rebound) 5.2.2 | The reference every check runs against, through its Python module. Its direct summation, which `model/gravity` follows in its order of operations (see `NOTICE.md`) | GPL-3.0 |
+| [GADGET-2](https://wwwmpa.mpa-garching.mpg.de/gadget/) | The leapfrog's kick-drift-kick form, from its paper; no code | |
+
+The papers behind the physics are cited in
+[model/REFERENCES.md](../../model/REFERENCES.md).

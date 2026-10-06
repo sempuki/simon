@@ -1,4 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+// Follows REBOUND 5.2.2, Copyright (c) 2011 Hanno Rein, Shangfei Liu,
+// GPL-3.0; translated to C++ and changed. See NOTICE.md.
 
 #include "model/gravity.hpp"
 

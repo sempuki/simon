@@ -1,4 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+// Follows the nuPlan devkit 1.2.2 (Copyright 2021 Motional, Apache-2.0) and
+// SciPy 1.18 (BSD-3-Clause); translated to C++ and changed. See NOTICE.md.
 
 #pragma once
 
