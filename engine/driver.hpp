@@ -25,17 +25,25 @@ using framework::Duration;
 using framework::Step;
 using framework::TimePoint;
 
-struct Timing final {
-  TimePoint start{};
-  Duration max_step{};
+// When a run starts and its longest step, in ticks of `TickType`.
+template <typename TickType = Duration>
+struct BasicTiming final {
+  framework::BasicTimePoint<TickType> start{};
+  TickType max_step{};
 };
+
+using Timing = BasicTiming<>;
 
 // The lifecycle and `advance_to`, shared by every driver.
 template <Simulation SimulationType>
 class Driver final {
  public:
+  using Duration = tick_of_t<SimulationType>;
+  using TimePoint = framework::BasicTimePoint<Duration>;
+  using Step = framework::BasicStep<Duration>;
+
   // Keeps a reference to `simulation` for as long as the driver lives.
-  Driver(Timing timing, Depend<SimulationType> simulation)
+  Driver(BasicTiming<Duration> timing, Depend<SimulationType> simulation)
       : simulation_{simulation.get()},
         now_{timing.start},
         max_step_{timing.max_step} {
@@ -113,7 +121,10 @@ class Driver final {
 template <Simulation SimulationType>
 class BatchDriver final {
  public:
-  BatchDriver(Timing timing, Depend<SimulationType> simulation)
+  using Duration = tick_of_t<SimulationType>;
+  using TimePoint = framework::BasicTimePoint<Duration>;
+
+  BatchDriver(BasicTiming<Duration> timing, Depend<SimulationType> simulation)
       : driver_{timing, simulation} {}
 
   // Runs the whole lifecycle. Returns the time the simulation reached.
@@ -142,8 +153,12 @@ template <Simulation SimulationType,
           typename WallClockType = std::chrono::steady_clock>
 class RealTimeDriver final {
  public:
+  using Duration = tick_of_t<SimulationType>;
+  using TimePoint = framework::BasicTimePoint<Duration>;
+
   // Runs at `speed` times real time.
-  RealTimeDriver(Timing timing, double speed, Depend<SimulationType> simulation)
+  RealTimeDriver(BasicTiming<Duration> timing, double speed,
+                 Depend<SimulationType> simulation)
       : driver_{timing, simulation}, start_{timing.start}, speed_{speed} {
     CHECK_PRECONDITION(speed_ > 0.0);
   }
@@ -239,7 +254,7 @@ class RealTimeDriver final {
     auto simulated = std::chrono::round<Duration>(
         std::chrono::duration<double>(MAX_LAG) * speed_);
     Duration step = driver_.max_step();
-    return std::max<Duration::rep>(simulated / step, 1) * step;
+    return std::max<typename Duration::rep>(simulated / step, 1) * step;
   }
 
   // Anchors the wall clock to the simulation's current time, so targets are

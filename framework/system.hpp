@@ -372,8 +372,8 @@ auto create(InOut<ProjectedWorld<SystemType, WorldType>> access) {
 //-- Running systems -----------------------------------------------------------
 
 struct SystemRunner final {
-  template <typename SystemType, typename WorldType>
-  static auto run(const Step& step, InOut<SystemType> system,
+  template <typename StepType, typename SystemType, typename WorldType>
+  static auto run(const StepType& step, InOut<SystemType> system,
                   InOut<WorldType> world) -> void {
     using ComponentList = component_list_of_t<SystemType>;
     using AllowComponentList = allow_component_list_of_t<SystemType>;
@@ -439,10 +439,12 @@ struct SystemRunner final {
   // Calls an optional stage (prepare or resolve) as stage(world, step) or
   // stage(world), whichever the system declares. Returns what a stage that
   // returns bool returned, and true otherwise.
-  template <typename SystemType, typename ProjectedWorldType, typename CallType>
-  static auto stage(const Step& step, CallType call, InOut<SystemType> system,
-                    InOut<ProjectedWorldType> access) -> bool {
-    Step copy = step;
+  template <typename StepType, typename SystemType, typename ProjectedWorldType,
+            typename CallType>
+  static auto stage(const StepType& step, CallType call,
+                    InOut<SystemType> system, InOut<ProjectedWorldType> access)
+      -> bool {
+    StepType copy = step;
     auto outcome = [](auto&& invoke) {
       if constexpr (std::is_same_v<decltype(invoke()), bool>) {
         return invoke();
@@ -452,7 +454,7 @@ struct SystemRunner final {
       }
     };
     if constexpr (std::is_invocable_v<CallType, SystemType&,
-                                      ProjectedWorldType&, Step&>) {
+                                      ProjectedWorldType&, StepType&>) {
       return outcome([&] { return call(*system, *access, copy); });
     } else if constexpr (std::is_invocable_v<CallType, SystemType&,
                                              ProjectedWorldType&>) {
@@ -462,16 +464,16 @@ struct SystemRunner final {
     }
   }
 
-  template <typename SystemType, typename WorldType,
+  template <typename StepType, typename SystemType, typename WorldType,
             typename ProjectedWorldType, typename... OtherComponentTypes>
-  static auto loop(const Step& step, TypeList<OtherComponentTypes...>,
+  static auto loop(const StepType& step, TypeList<OtherComponentTypes...>,
                    InOut<SystemType> system, InOut<WorldType> world,
                    InOut<ProjectedWorldType> access) -> void {
     using DrivingComponentType = typename SystemType::DrivingComponent;
     constexpr bool TAKES_STEP =
         std::is_invocable_v<SystemType&, ProjectedWorldType&, Entity,
                             DrivingComponentType&, OtherComponentTypes*...,
-                            Step>;
+                            StepType>;
     static_assert(
         TAKES_STEP ||
             std::is_invocable_v<SystemType&, ProjectedWorldType&, Entity,
@@ -690,9 +692,9 @@ auto flatten_systems(ScheduleType&& schedule) {
 
 // A schedule element that runs itself instead of being run per entity, such
 // as Continuous. It declares what it reads and writes as a system does.
-template <typename Type, typename WorldType>
+template <typename Type, typename WorldType, typename StepType = Step>
 concept RunsItself =
-    requires(Type& element, const Step& step, InOut<WorldType> world) {
+    requires(Type& element, const StepType& step, InOut<WorldType> world) {
       element.run(step, world);
     };
 
@@ -716,7 +718,9 @@ class Scheduler final {
   explicit Scheduler(ScheduleType schedule)
       : systems_{flatten_systems(std::move(schedule))} {}
 
-  auto step(const Step& step, InOut<WorldType> world) -> void {
+  // Runs every system for `step`, a BasicStep of the simulation's tick.
+  template <typename StepType = Step>
+  auto step(const StepType& step, InOut<WorldType> world) -> void {
     std::apply(
         [&](auto&... system) {
           ((run(step, system, world), world->sync()), ...);
@@ -758,10 +762,10 @@ class Scheduler final {
 
  private:
   // A schedule element that runs itself, such as Continuous, or a system.
-  template <typename SystemType>
-  static auto run(const Step& step, SystemType& system, InOut<WorldType> world)
-      -> void {
-    if constexpr (RunsItself<SystemType, WorldType>) {
+  template <typename StepType, typename SystemType>
+  static auto run(const StepType& step, SystemType& system,
+                  InOut<WorldType> world) -> void {
+    if constexpr (RunsItself<SystemType, WorldType, StepType>) {
       system.run(step, world);
     } else {
       SystemRunner::run(step, InOut(system), world);

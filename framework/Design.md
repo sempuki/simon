@@ -1553,6 +1553,16 @@ using TimePoint = std::chrono::time_point<SimTime, Duration>;
 - **Integer time is exact,** which determinism needs, and it removes a class of
   substep drift bugs. simon already fixed one caused by accumulating `double`
   substeps. An `int64` of nanoseconds covers about 292 years.
+- **A simulation that runs longer chooses a coarser tick.** It declares
+  `using Tick = ...;`, an integer `std::chrono` duration, and its drivers and
+  steps count in it: `BasicStep<Tick>`, `BasicTimePoint<Tick>` and
+  `engine::BasicTiming<Tick>`. `Step`, `TimePoint` and `Timing` are the
+  nanosecond defaults, so a simulation that declares no tick is unchanged.
+  `galactic` counts Julian years, which an `int64` holds for 9 x 10^18 years.
+  The scheduler passes on whatever step it is given, and physics converts
+  `step.dt` to seconds as before, so a system that takes `auto step` runs at
+  any tick. `Continuous`, `RateGate` and the event queue still count
+  nanoseconds.
 - **`SimTime` is a tag.** It exists so that a simulation time point and a
   wall-clock time point are different types. `RealTimeDriver` handles both,
   and subtracting a `steady_clock` time point from a `TimePoint` does not
