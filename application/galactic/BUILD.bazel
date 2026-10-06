@@ -97,3 +97,19 @@ cc_test(
         "@lib//base:testing",
     ],
 )
+
+cc_test(
+    name = "galaxy_test",
+    size = "medium",
+    srcs = ["galaxy_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":galactic_library",
+        "//engine:driver",
+        "//framework:vocabulary",
+        "//model:galaxy",
+        "//model:gravity",
+        "//model:random",
+        "@lib//base:testing",
+    ],
+)

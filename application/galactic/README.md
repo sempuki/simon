@@ -41,6 +41,16 @@ years, so a run can last billions of years.
   pericenter, matches it bit for bit. The companion tears off a bridge and
   captures 27 of the particles, where they report 28; their rings' phase
   is not given, and turning every ring half a spacing gives 28.
+- **A disk galaxy keeps its shape.** A disk of 5 x 10^10 suns in a halo of
+  5 x 10^11, set up by Hernquist's (1993) moments of the collisionless
+  Boltzmann equation with Hernquist's (1990) halo, starts as designed: its
+  half-mass radius within 1% of the profile's, its thickness within 2.4% of
+  the sech^2 layer's, Q at 1.56 where 1.5 was asked, and rotation 97% of
+  circular, the rest asymmetric drift. On the tree, 2,000 disk and 8,000
+  halo bodies keep their half-mass radius within 0.5% and thickness within
+  0.4% for 100 million years. Like Hernquist's, the galaxy is halo-dominated
+  and its disk is 0.2 of its scale length thick; a disk that dominates its
+  inner halo, or half as thick, starts swelling within 50 million years.
 
 ```sh
 bazel test //application/galactic/...

@@ -52,6 +52,47 @@ auto append_plummer(const Plummer& plummer, std::size_t count,
                     InOut<Random> random, InOut<std::vector<BodyStart>> bodies)
     -> void;
 
+//-- Disk galaxies -------------------------------------------------------------
+
+// A disk galaxy after Hernquist (1993): an exponential disk of stars,
+// Sigma(R) = M_d / (2 pi h^2) exp(-R / h), sech^2(z / z_0) thick, inside a
+// halo of dark matter with Hernquist's (1990) profile, M(r) = M_h r^2 / (r +
+// a)^2, cut off at `halo_cutoff`. It has no bulge. The disk turns
+// counterclockwise about z.
+struct DiskGalaxy final {
+  Mass disk_mass = 0.0 * kilogram;
+  Length disk_scale = 0.0 * meter;      // h.
+  Length disk_thickness = 0.0 * meter;  // z_0.
+  Mass halo_mass = 0.0 * kilogram;      // Without the cutoff.
+  Length halo_scale = 0.0 * meter;      // a.
+  Length halo_cutoff = 0.0 * meter;
+  // Toomre's Q at `stability_radius`, which sets the disk's radial
+  // dispersion everywhere.
+  double stability = 1.5;
+  Length stability_radius = 0.0 * meter;
+  std::size_t disk_bodies = 0;
+  std::size_t halo_bodies = 0;
+};
+
+// Computes the speed of a circular orbit of radius `radius` in the galaxy's
+// plane: the halo's G M(R) / R and Freeman's thin exponential disk,
+// 4 pi G Sigma_0 h y^2 [I0 K0 - I1 K1](y) with y = R / 2h.
+auto compute_circular_speed(const DiskGalaxy& galaxy, Length radius) -> Speed;
+
+// Appends to `bodies` the galaxy's disk, then its halo, sampled with
+// Hernquist's (1993) velocities: the halo's from the Jeans equation in the
+// halo's and disk's mass, the disk's from its surface density, Toomre's Q,
+// the epicyclic approximation and asymmetric drift. The disk's center of mass
+// and the halo's are each at the origin and at rest.
+auto append_disk_galaxy(const DiskGalaxy& galaxy, InOut<Random> random,
+                        InOut<std::vector<BodyStart>> bodies) -> void;
+
+// Turns `bodies` from `first` on by `rotation`, then moves them by `position`
+// and `velocity`: a galaxy placed in an encounter.
+auto place_bodies(std::size_t first, const Matrix3& rotation,
+                  const Position& position, const Velocity& velocity,
+                  InOut<std::vector<BodyStart>> bodies) -> void;
+
 //-- Encounters ----------------------------------------------------------------
 
 // Two masses on a parabolic orbit about each other that passes within
