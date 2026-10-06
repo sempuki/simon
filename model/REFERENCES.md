@@ -124,6 +124,19 @@ full where it first appears, and as "above" after.
 The aeronautic application's references, which compare simon with JSBSim, are
 described in `application/aeronautic/reference/README.md`.
 
+## Gravity
+
+| Where | What | Source |
+|---|---|---|
+| `gravity.hpp` | The Newtonian constant of gravitation, G = 6.67430 x 10^-11 m^3 kg^-1 s^-2 | E. Tiesinga, P. J. Mohr, D. B. Newell and B. N. Taylor, "CODATA recommended values of the fundamental physical constants: 2018", *Reviews of Modern Physics* 93, 025010, 2021 |
+| `gravity.hpp` | The astronomical unit, exactly 149,597,870,700 m | IAU 2012 Resolution B2 |
+| `gravity.hpp` | The parsec, exactly 648000 / pi astronomical units | IAU 2015 Resolution B2 |
+| `gravity.hpp` | The nominal solar mass parameter, GM = 1.3271244 x 10^20 m^3 s^-2 | A. Prša et al., "Nominal values for selected solar and planetary quantities: IAU 2015 Resolution B3", *The Astronomical Journal* 152(2), 41, 2016 |
+| `gravity.hpp` | Plummer softening of gravity between bodies, and the force error it trades for | W. Dehnen, "Towards optimal softening in three-dimensional N-body codes – I. Minimizing the force error", *MNRAS* 324, 2001, pp. 273-291 |
+| `gravity.cpp` | Direct summation, in REBOUND's order of operations | H. Rein and S.-F. Liu, "REBOUND: an open-source multi-purpose N-body code for collisional dynamics", *Astronomy & Astrophysics* 537, A128, 2012; REBOUND 5.2.2, src/gravity.c (reb_gravity_basic_calculate_acceleration) |
+| `leapfrog.hpp` | The leapfrog in kick-drift-kick form | V. Springel, "The cosmological simulation code GADGET-2", *MNRAS* 364, 2005, pp. 1105-1134; Hairer, Lubich and Wanner, above |
+| `application/galactic/gravity_test.cpp` | Kepler's equation, and the position and velocity on an orbit from the eccentric anomaly | C. D. Murray and S. F. Dermott, *Solar System Dynamics*, Cambridge University Press, 1999, chapter 2 |
+
 ## Articulated bodies
 
 | Where | What | Source |
