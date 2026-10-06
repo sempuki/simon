@@ -135,6 +135,9 @@ described in `application/aeronautic/reference/README.md`.
 | `gravity.hpp` | Plummer softening of gravity between bodies, and the force error it trades for | W. Dehnen, "Towards optimal softening in three-dimensional N-body codes – I. Minimizing the force error", *MNRAS* 324, 2001, pp. 273-291 |
 | `gravity.cpp` | Direct summation, in REBOUND's order of operations | H. Rein and S.-F. Liu, "REBOUND: an open-source multi-purpose N-body code for collisional dynamics", *Astronomy & Astrophysics* 537, A128, 2012; REBOUND 5.2.2, src/gravity.c (reb_gravity_basic_calculate_acceleration) |
 | `leapfrog.hpp` | The leapfrog in kick-drift-kick form | V. Springel, "The cosmological simulation code GADGET-2", *MNRAS* 364, 2005, pp. 1105-1134; Hairer, Lubich and Wanner, above |
+| `galaxy.hpp` | Plummer's sphere: its density, mass profile and energy | H. C. Plummer, "On the problem of distribution in globular star clusters", *MNRAS* 71(5), 1911, pp. 460-470 |
+| `galaxy.cpp` | Sampling Plummer's sphere: radii from the mass profile, speeds by von Neumann's rejection from q^2 (1 - q^2)^(7/2), directions uniform on the sphere | S. J. Aarseth, M. Hénon and R. Wielen, "A comparison of numerical methods for the study of star cluster dynamics", *Astronomy & Astrophysics* 37, 1974, pp. 183-187, appendix, equations A1 to A6 |
+| `galaxy.hpp` | The crossing time G M^(5/2) / (-2 E)^(3/2) | D. C. Heggie and R. D. Mathieu, "Standardised units and time scales", in *The Use of Supercomputers in Stellar Dynamics*, Lecture Notes in Physics 267, Springer, 1986, p. 233 |
 | `application/galactic/gravity_test.cpp` | Kepler's equation, and the position and velocity on an orbit from the eccentric anomaly | C. D. Murray and S. F. Dermott, *Solar System Dynamics*, Cambridge University Press, 1999, chapter 2 |
 
 ## Articulated bodies

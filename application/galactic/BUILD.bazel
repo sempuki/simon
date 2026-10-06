@@ -20,6 +20,7 @@ cc_library(
         "//engine:lifecycle",
         "//framework",
         "//framework:vocabulary",
+        "//model:galaxy",
         "//model:gravity",
         "//model:kinematics",
         "//model:leapfrog",
@@ -42,6 +43,22 @@ cc_test(
         "//engine:driver",
         "//framework:vocabulary",
         "//model:gravity",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "plummer_test",
+    size = "small",
+    srcs = ["plummer_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":galactic_library",
+        "//engine:driver",
+        "//framework:vocabulary",
+        "//model:galaxy",
+        "//model:gravity",
+        "//model:random",
         "@lib//base:testing",
     ],
 )

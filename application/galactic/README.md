@@ -19,6 +19,14 @@ years, so a run can last billions of years.
   around 10^11 solar masses returns to pericenter within 1.1 pc after one
   orbit of 4,000 steps, and the error falls fourfold when the steps double.
 
+- **A Plummer sphere stays in equilibrium.** 4,000 bodies sampled by
+  Aarseth, Hénon and Wielen's method fall within 5% of Plummer's mass
+  profile at five radii and start within 5% of virial equilibrium. 256 of
+  them, softened by 0.05 of the scale radius and run for ten crossing times
+  at 128 steps each, keep their energy to 1.5 x 10^-4, their momentum and
+  angular momentum to rounding, their virial ratio at 1.04 and their
+  half-mass radius within 2.5%.
+
 ```sh
 bazel test //application/galactic/...
 python application/galactic/reference/rebound_gravity.py   # regenerate the tables

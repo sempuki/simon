@@ -24,4 +24,18 @@ auto sum_gravity(std::span<const GravitySource> sources, framework::Entity self,
   return acceleration;
 }
 
+auto compute_potential_energy(std::span<const GravitySource> sources,
+                              double softening) -> double {
+  double softening2 = softening * softening;
+  double energy = 0.0;
+  for (std::size_t i = 0; i < sources.size(); ++i) {
+    for (std::size_t j = 0; j < i; ++j) {
+      Vector3 d = sources[i].position - sources[j].position;
+      energy -= GRAVITATIONAL_CONSTANT * sources[i].mass * sources[j].mass /
+                std::sqrt(d.squaredNorm() + softening2);
+    }
+  }
+  return energy;
+}
+
 }  // namespace simon::model

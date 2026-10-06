@@ -67,6 +67,11 @@ struct GravitySource final {
 auto sum_gravity(std::span<const GravitySource> sources, framework::Entity self,
                  const Vector3& position, double softening) -> Vector3;
 
+// Computes the potential energy of `sources`, each pair once, softened as
+// sum_gravity softens them: -G m_i m_j / (|d|^2 + softening^2)^(1/2). Joules.
+auto compute_potential_energy(std::span<const GravitySource> sources,
+                              double softening) -> double;
+
 // Sums every source's pull on each body directly. It costs N^2 and is exact
 // to rounding: the reference for faster methods. Each body writes only its
 // own Gravity, from sources gathered once a step, so bodies run in any order.

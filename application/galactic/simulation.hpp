@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <expected>
 #include <ratio>
+#include <span>
 #include <vector>
 
 #include "application/galactic/simulation_components.hpp"
@@ -13,6 +14,7 @@
 #include "engine/driver.hpp"
 #include "engine/lifecycle.hpp"
 #include "framework/vocabulary.hpp"
+#include "model/galaxy.hpp"
 #include "model/units.hpp"
 
 namespace simon::galactic {
@@ -23,12 +25,7 @@ using Year = std::chrono::duration<std::int64_t, std::ratio<31557600>>;
 using Step = framework::BasicStep<Year>;
 using Timing = engine::BasicTiming<Year>;
 
-// A body as a run starts it.
-struct BodyStart final {
-  model::Position position = model::meters(0.0, 0.0, 0.0);
-  model::Velocity velocity = model::meters_per_second(0.0, 0.0, 0.0);
-  model::Mass mass = 0.0 * model::kilogram;
-};
+using model::BodyStart;
 
 // Everything a run depends on. The same scenario gives the same run.
 struct Scenario final {
@@ -41,6 +38,29 @@ struct Scenario final {
 auto build_bodies(const Scenario& scenario, Out<World> world,
                   Out<std::vector<Entity>> bodies)
     -> std::expected<void, framework::Status>;
+
+// A run's conserved quantities, in SI units, and its energy's two parts.
+struct Mechanics final {
+  auto energy() const -> double { return kinetic + potential; }
+  // 2 T / |W|, which is 1 for a system in equilibrium.
+  auto virial_ratio() const -> double { return 2.0 * kinetic / -potential; }
+
+  double kinetic = 0.0;    // Joules.
+  double potential = 0.0;  // Joules, softened as the run's gravity is.
+  Vector3 momentum = Vector3::Zero();          // kg m/s.
+  Vector3 angular_momentum = Vector3::Zero();  // kg m^2/s, about the origin.
+  Vector3 center = Vector3::Zero();            // Of mass, meters.
+};
+
+// Measures every body in `world`, its potential energy softened by
+// `softening`. It sums each pair once, so it costs N^2.
+auto measure_mechanics(const World& world, model::Length softening)
+    -> Mechanics;
+
+// Computes the radii about the center of mass inside which each of
+// `fractions` of the mass lies.
+auto compute_mass_radii(const World& world, std::span<const double> fractions)
+    -> std::vector<model::Length>;
 
 // The galactic simulation. Any driver can run it.
 class Simulation final {

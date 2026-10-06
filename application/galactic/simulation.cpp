@@ -2,6 +2,9 @@
 
 #include "application/galactic/simulation.hpp"
 
+#include <algorithm>
+#include <utility>
+
 #include "framework/vocabulary.hpp"
 
 namespace simon::galactic {
@@ -26,6 +29,85 @@ auto build_bodies(const Scenario& scenario, Out<World> world,
   }
   world->sync();
   return {};
+}
+
+namespace {
+
+// Every body's position, velocity and mass, in store order. SI.
+struct Sample final {
+  std::vector<model::GravitySource> sources;
+  std::vector<Vector3> velocities;
+};
+
+auto collect_sample(const World& world) -> Sample {
+  Sample sample;
+  world.store_of<PointMass>().for_each(
+      [&](Entity entity, const PointMass& point) {
+        const Kinematics& kinematics =
+            world.store_of<Kinematics>().component_of(entity);
+        sample.sources.push_back(model::GravitySource{
+            .position =
+                kinematics.position.numerical_value_in(model::meter).eigen(),
+            .mass = point.mass.numerical_value_in(model::kilogram),
+            .entity = entity});
+        sample.velocities.push_back(
+            kinematics.velocity.numerical_value_in(model::meter_per_second)
+                .eigen());
+      });
+  return sample;
+}
+
+}  // namespace
+
+auto measure_mechanics(const World& world, model::Length softening)
+    -> Mechanics {
+  Sample sample = collect_sample(world);
+  Mechanics mechanics;
+  double mass = 0.0;
+  for (std::size_t i = 0; i < sample.sources.size(); ++i) {
+    const model::GravitySource& body = sample.sources[i];
+    const Vector3& velocity = sample.velocities[i];
+    mechanics.kinetic += 0.5 * body.mass * velocity.squaredNorm();
+    mechanics.momentum += body.mass * velocity;
+    mechanics.angular_momentum += body.mass * body.position.cross(velocity);
+    mechanics.center += body.mass * body.position;
+    mass += body.mass;
+  }
+  mechanics.center /= mass;
+  mechanics.potential = model::compute_potential_energy(
+      sample.sources, softening.numerical_value_in(model::meter));
+  return mechanics;
+}
+
+auto compute_mass_radii(const World& world, std::span<const double> fractions)
+    -> std::vector<model::Length> {
+  Sample sample = collect_sample(world);
+  Vector3 center = Vector3::Zero();
+  double mass = 0.0;
+  for (const model::GravitySource& body : sample.sources) {
+    center += body.mass * body.position;
+    mass += body.mass;
+  }
+  center /= mass;
+
+  std::vector<std::pair<double, double>> radii;  // Radius, mass.
+  for (const model::GravitySource& body : sample.sources) {
+    radii.emplace_back((body.position - center).norm(), body.mass);
+  }
+  std::ranges::sort(radii);
+
+  std::vector<model::Length> found;
+  for (double fraction : fractions) {
+    double inside = 0.0;
+    double radius = 0.0;
+    for (const auto& [r, m] : radii) {
+      inside += m;
+      radius = r;
+      if (inside >= fraction * mass) break;
+    }
+    found.push_back(radius * model::meter);
+  }
+  return found;
 }
 
 auto Simulation::configure() -> engine::PhaseResult {
