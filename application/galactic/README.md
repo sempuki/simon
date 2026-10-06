@@ -60,12 +60,18 @@ years, so a run can last billions of years.
   arc: the same pericenter to 0.4 kpc, an apocenter 3% nearer, and the same
   merger, before the runs part as chaotic runs do. Energy drifts by 0.36%
   over 2 billion years in steps of a million years.
+- **It scales past REBOUND.** On one thread, the tree steps 100,000 bodies
+  in 1.37 s to REBOUND's 2.27, and a million test particles in 17.6 ms to
+  its 35.2. Direct summation is 1.3x slower, since each body computes each
+  pair for itself so that bodies run in any order; per pair it is 1.5x
+  faster.
 
 ```sh
 bazel test //application/galactic/...
 bazel run -c opt //application/galactic:viewer             # watch two galaxies collide
 bazel run -c opt //application/galactic -- collision       # run it headless
 bazel run -c opt //application/galactic -- disk 4000 500   # one galaxy alone
+bazel run -c opt //application/galactic:galactic_benchmark -- tree 100000 5
 ```
 
 ![Two galaxies 923 million years into their collision, each trailing a tidal tail and carrying stars captured from the other](../../documents/images/galactic_viewer.png)

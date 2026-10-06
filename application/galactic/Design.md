@@ -6,7 +6,7 @@ entity exerts on every other, at any distance: the other applications'
 entities meet only their neighbors or the bodies of their own tree.
 [REBOUND](https://rebound.readthedocs.io) (Rein and Liu, *Astronomy &
 Astrophysics* 537, A128, 2012; GPL-3.0) is the reference. It was built in
-seven steps (see the [Roadmap](#roadmap)): direct gravity and the leapfrog,
+seven steps (see the [Roadmap](#roadmap)), all done: direct gravity and the leapfrog,
 Plummer's sphere, Barnes and Hut's tree, Toomre and Toomre's restricted
 encounters, disk galaxies, the collision with its runner and viewer, and
 scale against REBOUND.
@@ -140,6 +140,28 @@ After the second passage the two runs part, as chaotic runs do; simon's own
 runs at a million and half a million years part as much from each other,
 9.5 kpc apart against 13.5 at 1,200 million years.
 
+## Scale
+
+On one thread, against REBOUND's pip build, which has no OpenMP and so runs
+on one thread too, each stepping the same three cases by the leapfrog with
+one force evaluation a step:
+
+| Case | simon | REBOUND | |
+|---|---|---|---|
+| Direct summation, 2,000 bodies | 12.7 ms a step | 9.6 ms | 1.3x slower |
+| Direct summation, 10,000 bodies | 311 ms | 240 ms | 1.3x slower |
+| Tree at an opening angle of 0.5, 10,000 bodies | 81.5 ms | 113 ms | 1.4x faster |
+| Tree, 100,000 bodies | 1.37 s | 2.27 s | 1.7x faster |
+| Two masses and 100,000 test particles | 1.12 ms | 1.12 ms | the same |
+| Two masses and 1,000,000 test particles | 17.6 ms | 35.2 ms | 2.0x faster |
+
+Direct summation is slower because each body writes only its own
+acceleration, so each pair is computed twice, once for each body, where
+REBOUND computes it once and applies it to both. Per pair, simon is 1.5x
+faster. Writing only its own entity is what lets bodies run in any order and
+in parallel. The tree and the test particles cost each body one walk or one
+pass, and there simon is faster outright, more so as N grows.
+
 ## Viewer
 
 `bazel run -c opt //application/galactic:viewer` shows the collision, a
@@ -158,9 +180,10 @@ number of million years a second.
 5. Disk galaxies after Hernquist. Done.
 6. The collision, its runner and viewer. Done.
 7. Scale: 10^6 test particles and 10^5 bodies on the tree, against
-   single-thread REBOUND.
+   single-thread REBOUND. Done.
 
-Later, each an opt-in: the fast multipole method, for exact momentum and
+Later, each an opt-in: direct summation over each pair once, written to
+both bodies through a resolve stage; threads; the fast multipole method, for exact momentum and
 O(N); quadrupole moments in the tree's cells; block time steps; softening
 by kernels of finite extent; bulges; and `Continuous`, `RateGate` and the
 event queue counting in a simulation's own tick.

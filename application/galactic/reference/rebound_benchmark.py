@@ -90,7 +90,7 @@ def main():
         add_restricted(simulation, count)
     bodies = simulation.N
 
-    simulation.step()
+    simulation.steps(1)
     start = time.perf_counter()
     simulation.steps(steps)
     seconds = time.perf_counter() - start
