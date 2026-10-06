@@ -48,6 +48,7 @@ using model::SameFrame;
 using model::SoftConstraint;
 using model::Tendon;
 using model::articulated::cross;
+using model::articulated::transpose;
 
 using Failure = std::unexpected<lib::Status>;
 using lib::InOut;
@@ -122,10 +123,6 @@ auto multiply_matrices(const std::array<double, 9>& a,
     }
   }
   return r;
-}
-
-auto transpose(const std::array<double, 9>& m) -> std::array<double, 9> {
-  return {m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]};
 }
 
 // The minimal rotation from z to `v` (mjuu_z2quat).

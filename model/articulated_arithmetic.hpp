@@ -117,6 +117,8 @@ inline auto dot(const Array3& a, const Array3& b) -> double {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
+inline auto norm(const Array3& v) -> double { return std::sqrt(dot(v, v)); }
+
 inline auto add(const Array3& a, const Array3& b) -> Array3 {
   return {a[0] + b[0], a[1] + b[1], a[2] + b[2]};
 }
@@ -149,6 +151,10 @@ inline auto multiply_transposed(const Matrix3& m, const Array3& v) -> Array3 {
 
 inline auto column(const Matrix3& m, int c) -> Array3 {
   return {m[c], m[c + 3], m[c + 6]};
+}
+
+inline auto transpose(const Matrix3& m) -> Matrix3 {
+  return {m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]};
 }
 
 }  // namespace articulated
