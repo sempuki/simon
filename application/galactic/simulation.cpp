@@ -10,12 +10,15 @@
 namespace simon::galactic {
 
 auto build_bodies(const Scenario& scenario, Out<World> world,
-                  Out<std::vector<Entity>> bodies)
+                  Out<std::vector<Entity>> bodies,
+                  Out<std::vector<Entity>> test_particles)
     -> std::expected<void, framework::Status> {
-  RETURN_IF_UNEXPECTED(World::set_up()
-                           .numbered(1)
-                           .holding<Body>(scenario.bodies.size())
-                           .build(world));
+  RETURN_IF_UNEXPECTED(
+      World::set_up()
+          .numbered(1)
+          .holding<Body>(scenario.bodies.size())
+          .holding<TestParticle>(scenario.test_particles.size())
+          .build(world));
   bodies->clear();
   for (const BodyStart& start : scenario.bodies) {
     RETURN_OR_ASSIGN(Entity body,
@@ -27,8 +30,45 @@ auto build_bodies(const Scenario& scenario, Out<World> world,
                          .build());
     bodies->push_back(body);
   }
+  test_particles->clear();
+  for (const BodyStart& start : scenario.test_particles) {
+    RETURN_OR_ASSIGN(Entity particle,
+                     world->create<TestParticle>()
+                         .with(Kinematics{.position = start.position,
+                                          .velocity = start.velocity})
+                         .with(Gravity{})
+                         .build());
+    test_particles->push_back(particle);
+  }
   world->sync();
   return {};
+}
+
+auto make_encounter_scenario(const Encounter& encounter) -> Scenario {
+  model::Separation separation = model::compute_parabolic_separation(
+      model::ParabolicOrbit{.first = encounter.victim,
+                            .second = encounter.companion,
+                            .pericenter = encounter.pericenter},
+      -encounter.before);
+  double total = (encounter.victim + encounter.companion)
+                     .numerical_value_in(model::kilogram);
+  double victim_share =
+      -encounter.companion.numerical_value_in(model::kilogram) / total;
+  double companion_share =
+      encounter.victim.numerical_value_in(model::kilogram) / total;
+
+  BodyStart victim{.position = victim_share * separation.position,
+                   .velocity = victim_share * separation.velocity,
+                   .mass = encounter.victim};
+  BodyStart companion{.position = companion_share * separation.position,
+                      .velocity = companion_share * separation.velocity,
+                      .mass = encounter.companion};
+  Scenario scenario{.bodies = {victim, companion},
+                    .softening = encounter.softening};
+  model::append_ring_disk(
+      model::make_toomre_disk(encounter.pericenter, encounter.softening),
+      victim, InOut(scenario.test_particles));
+  return scenario;
 }
 
 namespace {
@@ -111,7 +151,8 @@ auto compute_mass_radii(const World& world, std::span<const double> fractions)
 }
 
 auto Simulation::configure() -> engine::PhaseResult {
-  RETURN_IF_UNEXPECTED(build_bodies(scenario_, Out(world_), Out(bodies_)));
+  RETURN_IF_UNEXPECTED(
+      build_bodies(scenario_, Out(world_), Out(bodies_), Out(test_particles_)));
   auto set_gravity = [&](auto& scheduler) {
     auto& direct = scheduler.template system<model::SumGravity>();
     auto& tree = scheduler.template system<model::TreeGravity>();

@@ -80,3 +80,20 @@ cc_test(
         "@lib//base:testing",
     ],
 )
+
+cc_test(
+    name = "encounter_test",
+    size = "small",
+    srcs = ["encounter_test.cpp"],
+    copts = COPTS,
+    data = ["reference/rebound_encounter.csv"],
+    deps = [
+        ":galactic_library",
+        "//application:testing",
+        "//engine:driver",
+        "//framework:vocabulary",
+        "//model:galaxy",
+        "//model:gravity",
+        "@lib//base:testing",
+    ],
+)

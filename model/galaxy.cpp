@@ -94,4 +94,55 @@ auto append_plummer(const Plummer& plummer, std::size_t count,
   }
 }
 
+// Barker's equation, D + D^3 / 3 = sqrt(mu / 2 q^3) t with D = tan(f / 2),
+// has the one real root D = B - 1 / B, B = (A + sqrt(A^2 + 1))^(1/3), A =
+// 3/2 sqrt(mu / 2 q^3) t. Then the separation is q (1 - D^2, 2 D), and D
+// changes at sqrt(mu / 2 q^3) / (1 + D^2) (derived here from Barker's).
+auto compute_parabolic_separation(const ParabolicOrbit& orbit, Time time)
+    -> Separation {
+  double mu = GRAVITATIONAL_CONSTANT *
+              (orbit.first + orbit.second).numerical_value_in(kilogram);
+  double q = orbit.pericenter.numerical_value_in(meter);
+  double rate = std::sqrt(mu / (2.0 * q * q * q));
+  double a = 1.5 * rate * time.numerical_value_in(second);
+  double b = std::cbrt(a + std::sqrt(a * a + 1.0));
+  double d = b - 1.0 / b;
+  double d_rate = rate / (1.0 + d * d);
+  return Separation{.position = meters(q * (1.0 - d * d), 2.0 * q * d, 0.0),
+                    .velocity = meters_per_second(-2.0 * q * d * d_rate,
+                                                  2.0 * q * d_rate, 0.0)};
+}
+
+auto make_toomre_disk(Length pericenter, Length softening) -> RingDisk {
+  RingDisk disk{.softening = softening};
+  for (int ring = 0; ring < 5; ++ring) {
+    disk.radii.push_back((0.2 + 0.1 * ring) * pericenter);
+    disk.counts.push_back(12 + 6 * ring);
+  }
+  return disk;
+}
+
+// A circular orbit of radius r about a mass M softened by e has speed
+// sqrt(G M r^2 / (r^2 + e^2)^(3/2)), where the softened pull balances the
+// centripetal acceleration (derived here).
+auto append_ring_disk(const RingDisk& disk, const BodyStart& center,
+                      InOut<std::vector<BodyStart>> bodies) -> void {
+  double gm = GRAVITATIONAL_CONSTANT * center.mass.numerical_value_in(kilogram);
+  double e = disk.softening.numerical_value_in(meter);
+  for (std::size_t ring = 0; ring < disk.radii.size(); ++ring) {
+    double r = disk.radii[ring].numerical_value_in(meter);
+    double speed = std::sqrt(gm * r * r / std::pow(r * r + e * e, 1.5));
+    for (int i = 0; i < disk.counts[ring]; ++i) {
+      double angle = 2.0 * std::numbers::pi * i / disk.counts[ring];
+      double c = std::cos(angle);
+      double s = std::sin(angle);
+      bodies->push_back(BodyStart{
+          .position = center.position + meters(r * c, r * s, 0.0),
+          .velocity =
+              center.velocity + meters_per_second(-speed * s, speed * c, 0.0),
+          .mass = 0.0 * kilogram});
+    }
+  }
+}
+
 }  // namespace simon::model

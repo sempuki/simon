@@ -34,16 +34,33 @@ enum class GravityMethod { DIRECT, TREE };
 // Everything a run depends on. The same scenario gives the same run.
 struct Scenario final {
   std::vector<BodyStart> bodies;
+  std::vector<BodyStart> test_particles;  // Their masses are not used.
   model::Length softening = 0.0 * model::meter;
   GravityMethod gravity = GravityMethod::DIRECT;
   double opening_angle = 0.5;
 };
 
-// Builds in `world` the scenario's bodies, in its order, and appends each to
-// `bodies`.
+// Builds in `world` the scenario's bodies and test particles, in its order,
+// and appends each to `bodies` or `test_particles`.
 auto build_bodies(const Scenario& scenario, Out<World> world,
-                  Out<std::vector<Entity>> bodies)
+                  Out<std::vector<Entity>> bodies,
+                  Out<std::vector<Entity>> test_particles)
     -> std::expected<void, framework::Status>;
+
+// Toomre and Toomre's restricted encounter: a `victim` mass with their disk
+// of test particles, and a bare `companion`, on a parabolic orbit that passes
+// within `pericenter`, starting `before` pericenter. Their disk and the orbit
+// lie in the x-y plane, both turning counterclockwise: a flat direct passage.
+// The center of mass is at the origin and at rest.
+struct Encounter final {
+  model::Mass victim = 0.0 * model::kilogram;
+  model::Mass companion = 0.0 * model::kilogram;
+  model::Length pericenter = 0.0 * model::meter;
+  model::Time before = 0.0 * model::second;
+  model::Length softening = 0.0 * model::meter;
+};
+
+auto make_encounter_scenario(const Encounter& encounter) -> Scenario;
 
 // A run's conserved quantities, in SI units, and its energy's two parts.
 struct Mechanics final {
@@ -83,13 +100,17 @@ class Simulation final {
 
   auto scenario() const -> const Scenario& { return scenario_; }
   auto world() const -> const World& { return world_; }
-  // The bodies, in the scenario's order.
+  // The bodies and test particles, in the scenario's order.
   auto bodies() const -> const std::vector<Entity>& { return bodies_; }
+  auto test_particles() const -> const std::vector<Entity>& {
+    return test_particles_;
+  }
 
  private:
   Scenario scenario_;
   World world_;
   std::vector<Entity> bodies_;
+  std::vector<Entity> test_particles_;
   StartScheduler start_scheduler_;
   Scheduler scheduler_;
 };

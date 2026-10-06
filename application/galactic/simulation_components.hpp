@@ -23,8 +23,15 @@ struct Body final
     : framework::Archetype<
           "body", framework::Requires<Kinematics, PointMass, Gravity>> {};
 
+// A test particle: pulled by every body, it pulls on nothing. A star of a
+// disk in Toomre and Toomre's restricted encounters, it costs one pass over
+// the bodies that pull and nothing to them.
+struct TestParticle final
+    : framework::Archetype<"test particle",
+                           framework::Requires<Kinematics, Gravity>> {};
+
 using World = framework::World<Kinematics,                               //
                                framework::TypeList<PointMass, Gravity>,  //
-                               framework::TypeList<Body>>;
+                               framework::TypeList<Body, TestParticle>>;
 
 }  // namespace simon::galactic

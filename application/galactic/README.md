@@ -33,6 +33,14 @@ years, so a run can last billions of years.
   4 x 10^-15. Its forces are not equal and opposite, so over ten crossing
   times momentum drifts by 9 x 10^-4 of the sphere's, and energy by
   9 x 10^-4, where direct summation keeps them to rounding and 1.5 x 10^-4.
+- **Toomre and Toomre's encounter plays out as they found it.** Two masses
+  of 10^11 suns pass within 25 kpc on a parabolic orbit, the first carrying
+  their disk of 120 test particles, which feel gravity and exert none. Its
+  outer ring turns in their 544.2 million years. Stepped by REBOUND's
+  accelerations, the whole encounter, a billion years either side of
+  pericenter, matches it bit for bit. The companion tears off a bridge and
+  captures 27 of the particles, where they report 28; their rings' phase
+  is not given, and turning every ring half a spacing gives 28.
 
 ```sh
 bazel test //application/galactic/...

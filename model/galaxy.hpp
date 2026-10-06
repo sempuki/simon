@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstddef>
+#include <span>
 #include <vector>
 
 #include "base/core.hpp"
@@ -50,5 +51,47 @@ auto compute_crossing_time(Mass mass,
 auto append_plummer(const Plummer& plummer, std::size_t count,
                     InOut<Random> random, InOut<std::vector<BodyStart>> bodies)
     -> void;
+
+//-- Encounters ----------------------------------------------------------------
+
+// Two masses on a parabolic orbit about each other that passes within
+// `pericenter`, as Toomre and Toomre's encounters do.
+struct ParabolicOrbit final {
+  Mass first = 0.0 * kilogram;
+  Mass second = 0.0 * kilogram;
+  Length pericenter = 0.0 * meter;
+};
+
+// The second mass's position and velocity relative to the first's.
+struct Separation final {
+  Position position = meters(0.0, 0.0, 0.0);
+  Velocity velocity = meters_per_second(0.0, 0.0, 0.0);
+};
+
+// Computes where the second mass of `orbit` is, relative to the first,
+// `time` after pericenter (before it if negative), from Barker's equation
+// solved in closed form (Vallado). The orbit lies in the x-y plane, turning
+// counterclockwise about z, with pericenter on the x axis.
+auto compute_parabolic_separation(const ParabolicOrbit& orbit, Time time)
+    -> Separation;
+
+// Rings of test particles about a mass: `counts[i]` particles evenly spaced
+// on a ring of radius `radii[i]`, the first at angle 0, each on a circular
+// orbit counterclockwise about z under the mass's gravity softened by
+// `softening`.
+struct RingDisk final {
+  std::vector<Length> radii;
+  std::vector<int> counts;
+  Length softening = 0.0 * meter;
+};
+
+// Toomre and Toomre's disk: 120 particles in rings of 12, 18, 24, 30 and 36
+// at 0.2, 0.3, 0.4, 0.5 and 0.6 of `pericenter`.
+auto make_toomre_disk(Length pericenter, Length softening) -> RingDisk;
+
+// Appends to `bodies` the particles of `disk` about `center`, a body of
+// `mass` whose position and velocity they start from.
+auto append_ring_disk(const RingDisk& disk, const BodyStart& center,
+                      InOut<std::vector<BodyStart>> bodies) -> void;
 
 }  // namespace simon::model

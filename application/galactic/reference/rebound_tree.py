@@ -32,7 +32,8 @@ import rebound
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 G = 6.67430e-11  # CODATA 2018.
-KILOPARSEC = 1000.0 * 149597870700.0 * (648000.0 / math.pi)
+PARSEC = 149597870700.0 * (648000.0 / math.pi)  # In simon's order.
+KILOPARSEC = 1000.0 * PARSEC
 SOLAR_MASS = 1.3271244e20 / G
 
 BODIES = 2000
