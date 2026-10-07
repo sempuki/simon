@@ -13,7 +13,8 @@ cc_library(
     deps = [
         "//core:coordinates",
         "//core:units",
-        "//core:vocabulary",
+        "//core:argument",
+        "//core:math",
         "//3rd_party:eigen",
         "@lib//base:core",
     ],
@@ -28,7 +29,7 @@ cc_test(
     srcs = ["kinematics_test.cpp"],
     copts = COPTS,
     deps = [
-        "//core:vocabulary",
+        "//core:argument",
         ":kinematics",
         "@lib//base:testing",
     ],
@@ -51,7 +52,7 @@ cc_library(
     hdrs = ["control.hpp"],
     copts = COPTS,
     deps = [
-        "//core:vocabulary",
+        "//core:argument",
         "//core:units",
         "@lib//base:core",
     ],

@@ -12,7 +12,7 @@
 #include "application/automotive/simulation_components.hpp"
 #include "application/automotive/simulation_systems.hpp"
 #include "base/core.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "engine/lifecycle.hpp"
 #include "model/traffic/traffic.hpp"
 

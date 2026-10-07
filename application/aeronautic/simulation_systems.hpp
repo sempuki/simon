@@ -8,7 +8,8 @@
 #include <optional>
 
 #include "application/aeronautic/simulation_components.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
+#include "core/math.hpp"
 #include "engine/rate_gate.hpp"
 #include "framework/continuous.hpp"
 #include "framework/system.hpp"

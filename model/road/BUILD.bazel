@@ -61,6 +61,7 @@ cc_library(
     deps = [
         ":lane_graph",
         ":road",
+        "//core:argument",
         "//core:units",
         "@lib//base:core",
     ],

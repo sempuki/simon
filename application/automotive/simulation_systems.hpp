@@ -16,7 +16,6 @@
 
 #include "application/automotive/simulation_components.hpp"
 #include "core/random.hpp"
-#include "core/vocabulary.hpp"
 #include "engine/rate_gate.hpp"
 #include "framework/system.hpp"
 #include "model/road/lane_graph.hpp"

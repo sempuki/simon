@@ -15,7 +15,7 @@
 #include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "format/aircraft_file.hpp"
 #include "model/aircraft/trim.hpp"
 

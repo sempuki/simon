@@ -3,7 +3,6 @@
 #pragma once
 
 #include "core/units.hpp"
-#include "core/vocabulary.hpp"
 #include "framework/archetype.hpp"
 #include "framework/world.hpp"
 #include "model/gravity/gravity.hpp"

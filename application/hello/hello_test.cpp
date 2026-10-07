@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "base/testing.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "engine/driver.hpp"
 
 namespace simon::hello {

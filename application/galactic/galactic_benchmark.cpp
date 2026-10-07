@@ -18,8 +18,8 @@
 #include <string_view>
 
 #include "application/galactic/simulation.hpp"
+#include "core/argument.hpp"
 #include "core/random.hpp"
-#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
 #include "model/gravity/galaxy.hpp"
 #include "model/gravity/gravity.hpp"

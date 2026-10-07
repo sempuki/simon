@@ -10,7 +10,7 @@
 #include <print>
 
 #include "application/hello/hello.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "engine/driver.hpp"
 
 auto main(int argc, char** argv) -> int {

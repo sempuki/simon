@@ -1,7 +1,7 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "framework/world.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 
 #include <expected>
 #include <limits>

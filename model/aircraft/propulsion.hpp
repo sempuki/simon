@@ -6,6 +6,7 @@
 
 #include <array>
 
+#include "core/argument.hpp"
 #include "core/units.hpp"
 #include "model/aircraft/aircraft_data.hpp"
 #include "model/aircraft/frames.hpp"

@@ -11,8 +11,8 @@
 #include <vector>
 
 #include "base/core.hpp"
+#include "core/argument.hpp"
 #include "core/units.hpp"
-#include "core/vocabulary.hpp"
 
 // Control blocks: the pieces flight control laws are built from, as free
 // functions and small value types. Each is exact or stable at any step, so a

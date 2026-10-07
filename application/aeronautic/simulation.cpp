@@ -10,8 +10,8 @@
 #include <type_traits>
 #include <utility>
 
+#include "core/argument.hpp"
 #include "core/random.hpp"
-#include "core/vocabulary.hpp"
 
 namespace simon::aeronautic {
 

@@ -34,7 +34,7 @@
 
 #include "application/defense/simulation.hpp"
 #include "base/core.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "framework/benchmarking.hpp"
 #include "framework/type_list.hpp"
 

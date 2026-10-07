@@ -8,7 +8,7 @@
 #include <expected>
 
 #include "base/core.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "engine/lifecycle.hpp"
 #include "framework/archetype.hpp"
 #include "framework/system.hpp"

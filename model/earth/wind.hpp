@@ -5,8 +5,9 @@
 #include <array>
 #include <cstdint>
 
+#include "core/argument.hpp"
+#include "core/math.hpp"
 #include "core/units.hpp"
-#include "core/vocabulary.hpp"
 
 // Wind and turbulence: the air's motion relative to the Earth, which aircraft
 // fly through. A steady wind is the same everywhere. Turbulence has the Dryden

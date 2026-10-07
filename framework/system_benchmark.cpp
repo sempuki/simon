@@ -42,7 +42,7 @@
 #include <vector>
 
 #include "base/core.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "framework/archetype.hpp"
 #include "framework/benchmarking.hpp"
 #include "framework/system.hpp"

@@ -15,7 +15,8 @@
 #include "application/automotive/simulation_systems.hpp"
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
+#include "core/math.hpp"
 #include "model/collision.hpp"
 
 // Pedestrians crossing: how long they wait at a light, and at a crosswalk

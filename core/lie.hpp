@@ -5,7 +5,7 @@
 #include <cmath>
 
 #include "Eigen/Geometry"
-#include "core/vocabulary.hpp"
+#include "core/math.hpp"
 
 // The rotation group SO(3) and the rigid motion group SE(3), each with its
 // Lie algebra: the exponential and logarithm between them, the adjoint, and

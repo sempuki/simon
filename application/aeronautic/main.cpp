@@ -15,7 +15,7 @@
 #include <print>
 
 #include "application/aeronautic/simulation.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "engine/driver.hpp"
 
 auto main(int argc, char** argv) -> int {

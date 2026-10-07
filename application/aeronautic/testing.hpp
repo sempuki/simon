@@ -14,8 +14,8 @@
 
 #include "application/testing.hpp"
 #include "base/testing.hpp"
+#include "core/math.hpp"
 #include "core/units.hpp"
-#include "core/vocabulary.hpp"
 #include "model/rigid_body.hpp"
 
 // Shared by the aeronautic tests.

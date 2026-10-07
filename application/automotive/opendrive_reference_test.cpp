@@ -13,7 +13,7 @@
 
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
-#include "core/vocabulary.hpp"
+#include "core/math.hpp"
 #include "format/opendrive.hpp"
 #include "model/road/lane_graph.hpp"
 #include "model/road/road.hpp"

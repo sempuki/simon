@@ -18,7 +18,7 @@
 #include "application/robotic/simulation.hpp"
 #include "application/testing.hpp"
 #include "base/testing.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 
 // Shared by the robotic tests: where the models and MuJoCo's tables lie,
 // MuJoCo's runs read from them, and simon stepped against them.

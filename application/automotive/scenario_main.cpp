@@ -11,7 +11,8 @@
 #include <string>
 
 #include "application/automotive/scenario_simulation.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
+#include "core/math.hpp"
 #include "engine/driver.hpp"
 
 auto main(int argc, char** argv) -> int {

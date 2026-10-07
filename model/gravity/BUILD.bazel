@@ -13,7 +13,7 @@ cc_library(
     copts = COPTS,
     deps = [
         "//core:units",
-        "//core:vocabulary",
+        "//core:math",
     ],
 )
 
@@ -25,6 +25,7 @@ cc_library(
     copts = COPTS,
     deps = [
         ":gravity",
+        "//core:argument",
         "//core:random",
         "//core:units",
         "@lib//base:core",

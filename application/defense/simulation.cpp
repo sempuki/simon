@@ -1,7 +1,7 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "application/defense/simulation.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 
 #include <algorithm>
 #include <cmath>

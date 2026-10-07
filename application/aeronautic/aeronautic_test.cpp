@@ -11,7 +11,7 @@
 #include "application/aeronautic/simulation.hpp"
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "engine/driver.hpp"
 #include "format/aircraft_file.hpp"
 

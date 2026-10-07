@@ -7,7 +7,7 @@
 
 #include "application/galactic/simulation.hpp"
 #include "base/testing.hpp"
-#include "core/vocabulary.hpp"
+#include "core/math.hpp"
 #include "model/gravity/galaxy.hpp"
 #include "model/gravity/gravity.hpp"
 

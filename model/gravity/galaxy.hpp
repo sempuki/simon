@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "base/core.hpp"
+#include "core/argument.hpp"
 #include "core/random.hpp"
 #include "core/units.hpp"
 

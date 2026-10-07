@@ -25,6 +25,7 @@ cc_library(
     copts = COPTS,
     deps = [
         "//model:control",
+        "//core:argument",
         "//core:units",
     ],
 )
@@ -97,6 +98,7 @@ cc_library(
         ":mass_balance",
         "//model:rigid_body",
         ":turbine",
+        "//core:argument",
         "//core:units",
         "//model/earth:wind",
     ],
@@ -114,6 +116,7 @@ cc_library(
         ":frames",
         ":mass_balance",
         "//model:rigid_body",
+        "//core:argument",
         "//core:units",
         "//model/earth:wind",
     ],
@@ -134,6 +137,7 @@ cc_library(
         ":propulsion",
         "//model:rigid_body",
         ":sensing",
+        "//core:argument",
         "//core:units",
         "//model/earth:wind",
         "//3rd_party:eigen",

@@ -14,7 +14,7 @@
 #include "application/aeronautic/simulation_systems.hpp"
 #include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 
 // Measures the drift of simon's point-mass model from JSBSim's 737 flying the
 // same maneuvers. reference/jsbsim_737.py flew them and recorded the controls a

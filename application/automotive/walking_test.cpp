@@ -12,7 +12,7 @@
 #include "application/automotive/simulation_systems.hpp"
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 
 // Pedestrians: the walking graph of each test network, routes against every
 // shortest distance, walkers that keep their distance, and walking speeds

@@ -9,7 +9,8 @@
 #include <string>
 #include <vector>
 
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
+#include "core/math.hpp"
 
 // Articulated rigid bodies: kinematic trees of bodies on joints, the shapes
 // they collide with and the actuators that drive them, as MuJoCo compiles a

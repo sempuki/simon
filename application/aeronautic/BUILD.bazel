@@ -19,7 +19,8 @@ cc_library(
     deps = [
         "//format:aircraft_file",
         "//model/aircraft:trim",
-        "//core:vocabulary",
+        "//core:argument",
+        "//core:math",
         "//engine:lifecycle",
         "//engine:rate_gate",
         "//framework",
@@ -43,7 +44,7 @@ cc_library(
     copts = COPTS,
     deps = [
         "//application:testing",
-        "//core:vocabulary",
+        "//core:math",
         "//model:rigid_body",
         "//core:units",
         "@lib//base:testing",
@@ -60,7 +61,7 @@ cc_test(
     ],
     deps = [
         "//format:aircraft_file",
-        "//core:vocabulary",
+        "//core:argument",
         ":aeronautic_library",
         "//engine:driver",
         "@lib//base:testing",
@@ -75,7 +76,7 @@ cc_test(
     data = ["reference/jsbsim_737.csv"],
     deps = [
         ":testing",
-        "//core:vocabulary",
+        "//core:argument",
         ":aeronautic_library",
         "@lib//base:testing",
     ],
@@ -178,7 +179,7 @@ cc_test(
     deps = [
         "//format:aircraft_file",
         ":testing",
-        "//core:vocabulary",
+        "//core:argument",
         ":aeronautic_library",
         "//model/aircraft:trim",
         "@lib//base:testing",
@@ -193,7 +194,8 @@ cc_binary(
         "//3rd_party:jsbsim",
     ],
     deps = [
-        "//core:vocabulary",
+        "//core:argument",
+        "//core:math",
         ":aeronautic_library",
         "//application:viewing",
         "//engine:driver",
@@ -220,7 +222,8 @@ cc_test(
     ],
     env = {"SDL_VIDEODRIVER": "dummy"},
     deps = [
-        "//core:vocabulary",
+        "//core:argument",
+        "//core:math",
         ":aeronautic_library",
         "//application:viewing",
         "//engine:driver",
@@ -238,7 +241,7 @@ cc_binary(
         "//3rd_party:jsbsim",
     ],
     deps = [
-        "//core:vocabulary",
+        "//core:argument",
         ":aeronautic_library",
         "//engine:driver",
     ],
@@ -251,7 +254,7 @@ cc_binary(
     data = ["//3rd_party:jsbsim"],
     deps = [
         "//format:aircraft_file",
-        "//core:vocabulary",
+        "//core:argument",
         ":aeronautic_library",
         "//framework",
         "//framework:benchmarking",
@@ -266,7 +269,7 @@ cc_binary(
     data = ["//3rd_party:jsbsim"],
     deps = [
         "//format:aircraft_file",
-        "//core:vocabulary",
+        "//core:argument",
         ":aeronautic_library",
         "//framework:benchmarking",
         "@lib//base:core",

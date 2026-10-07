@@ -12,7 +12,7 @@
 #include "application/automotive/simulation_systems.hpp"
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 
 // Traffic lights against SUMO: a queue at a red light and away on green,
 // every vehicle's position and speed compared with sumo_signal.csv.

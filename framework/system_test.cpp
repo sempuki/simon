@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "base/testing.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "framework/test_world.hpp"
 
 namespace simon::framework {

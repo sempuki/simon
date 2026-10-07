@@ -18,7 +18,7 @@
 #include "application/hello/hello.hpp"
 #include "application/viewing.hpp"
 #include "base/core.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "engine/driver.hpp"
 #include "imgui/imgui.h"
 #include "implot/implot.h"

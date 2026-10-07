@@ -8,7 +8,7 @@
 #include <numbers>
 
 #include "Eigen/Dense"
-#include "core/vocabulary.hpp"
+#include "core/math.hpp"
 #include "mp-units/framework.h"
 #include "mp-units/systems/si.h"
 

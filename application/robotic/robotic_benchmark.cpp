@@ -16,7 +16,6 @@
 #include <string>
 
 #include "application/robotic/simulation.hpp"
-#include "core/vocabulary.hpp"
 
 auto main(int argc, char** argv) -> int {
   using namespace simon;

@@ -12,7 +12,7 @@
 #include <string>
 
 #include "application/automotive/simulation.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "engine/driver.hpp"
 
 auto main(int argc, char** argv) -> int {

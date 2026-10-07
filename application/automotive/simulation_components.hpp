@@ -6,9 +6,9 @@
 #include <optional>
 #include <vector>
 
+#include "core/math.hpp"
 #include "core/time.hpp"
 #include "core/units.hpp"
-#include "core/vocabulary.hpp"
 #include "framework/archetype.hpp"
 #include "framework/entity.hpp"
 #include "framework/world.hpp"

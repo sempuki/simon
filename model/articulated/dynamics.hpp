@@ -11,8 +11,9 @@
 #include <span>
 
 #include "Eigen/LU"
+#include "core/argument.hpp"
 #include "core/lie.hpp"
-#include "core/vocabulary.hpp"
+#include "core/math.hpp"
 #include "model/articulated/articulated.hpp"
 
 // The smooth dynamics of one kinematic tree, as MuJoCo computes a model's

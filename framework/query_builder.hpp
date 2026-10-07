@@ -14,7 +14,7 @@
 
 #include "base/core.hpp"
 #include "base/status.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "framework/archetype.hpp"
 #include "framework/entity.hpp"
 #include "framework/entity_builder.hpp"

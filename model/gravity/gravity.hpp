@@ -8,8 +8,8 @@
 #include <span>
 #include <vector>
 
+#include "core/math.hpp"
 #include "core/units.hpp"
-#include "core/vocabulary.hpp"
 
 // Newtonian gravity between point masses, softened so that close passes stay
 // finite, and the astronomical scales it works at (see model/REFERENCES.md).

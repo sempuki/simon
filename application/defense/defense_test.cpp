@@ -6,7 +6,7 @@
 
 #include "application/defense/simulation.hpp"
 #include "base/testing.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "engine/driver.hpp"
 
 namespace simon::defense {

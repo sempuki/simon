@@ -12,8 +12,8 @@
 #include <vector>
 
 #include "base/core.hpp"
+#include "core/argument.hpp"
 #include "core/time.hpp"
-#include "core/vocabulary.hpp"
 #include "framework/system.hpp"
 #include "framework/type_list.hpp"
 

@@ -33,7 +33,8 @@ cc_library(
     copts = COPTS,
     deps = [
         "//core:units",
-        "//core:vocabulary",
+        "//core:argument",
+        "//core:math",
         "//3rd_party:eigen",
     ],
 )

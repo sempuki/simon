@@ -17,7 +17,7 @@
 #include <string_view>
 #include <vector>
 
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "engine/driver.hpp"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_sdl2.h"

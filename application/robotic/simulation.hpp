@@ -11,7 +11,6 @@
 
 #include "application/robotic/simulation_components.hpp"
 #include "application/robotic/simulation_systems.hpp"
-#include "core/vocabulary.hpp"
 #include "engine/lifecycle.hpp"
 
 namespace simon::robotic {

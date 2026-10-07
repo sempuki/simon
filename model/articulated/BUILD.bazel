@@ -12,7 +12,8 @@ cc_library(
     hdrs = ["articulated.hpp"],
     copts = COPTS,
     deps = [
-        "//core:vocabulary",
+        "//core:argument",
+        "//core:math",
     ],
 )
 
@@ -27,7 +28,8 @@ cc_library(
         ":articulated",
         "//3rd_party:eigen",
         "//core:lie",
-        "//core:vocabulary",
+        "//core:argument",
+        "//core:math",
     ],
 )
 
@@ -39,7 +41,7 @@ cc_library(
     copts = COPTS,
     deps = [
         ":articulated",
-        "//core:vocabulary",
+        "//core:argument",
     ],
 )
 
@@ -58,7 +60,8 @@ cc_library(
     deps = [
         ":articulated",
         ":dynamics",
-        "//core:vocabulary",
+        "//core:argument",
+        "//core:math",
     ],
 )
 

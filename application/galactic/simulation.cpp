@@ -8,8 +8,9 @@
 #include <numbers>
 #include <utility>
 
+#include "core/argument.hpp"
+#include "core/math.hpp"
 #include "core/random.hpp"
-#include "core/vocabulary.hpp"
 
 namespace simon::galactic {
 

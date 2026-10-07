@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "core/argument.hpp"
 #include "core/units.hpp"
 #include "model/aircraft/aerodynamics.hpp"
 #include "model/aircraft/aircraft_data.hpp"

@@ -6,8 +6,8 @@
 #include <format>
 #include <numbers>
 
+#include "core/argument.hpp"
 #include "core/random.hpp"
-#include "core/vocabulary.hpp"
 
 namespace simon::hello {
 

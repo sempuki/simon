@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "base/core.hpp"
+#include "core/argument.hpp"
 #include "model/road/lane_graph.hpp"
 #include "model/road/road.hpp"
 

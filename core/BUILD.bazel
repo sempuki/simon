@@ -7,13 +7,17 @@ load("@rules_cc//cc:cc_test.bzl", "cc_test")
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "vocabulary",
-    hdrs = ["vocabulary.hpp"],
+    name = "argument",
+    hdrs = ["argument.hpp"],
     copts = COPTS,
-    deps = [
-        "//3rd_party:eigen",
-        "@lib//base:core",
-    ],
+    deps = ["@lib//base:core"],
+)
+
+cc_library(
+    name = "math",
+    hdrs = ["math.hpp"],
+    copts = COPTS,
+    deps = ["//3rd_party:eigen"],
 )
 
 cc_library(
@@ -33,7 +37,7 @@ cc_library(
     hdrs = ["units.hpp"],
     copts = COPTS,
     deps = [
-        ":vocabulary",
+        ":math",
         "//3rd_party:eigen",
         "//3rd_party:mp-units",
     ],
@@ -50,7 +54,7 @@ cc_library(
     hdrs = ["lie.hpp"],
     copts = COPTS,
     deps = [
-        ":vocabulary",
+        ":math",
         "//3rd_party:eigen",
     ],
 )

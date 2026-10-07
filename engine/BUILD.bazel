@@ -21,7 +21,7 @@ cc_library(
     hdrs = ["driver.hpp"],
     copts = COPTS,
     deps = [
-        "//core:vocabulary",
+        "//core:argument",
         ":lifecycle",
         "//framework",
         "@lib//base:core",

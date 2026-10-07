@@ -4,9 +4,10 @@
 
 #include "Eigen/Geometry"
 #include "base/core.hpp"
+#include "core/argument.hpp"
 #include "core/coordinates.hpp"
+#include "core/math.hpp"
 #include "core/units.hpp"
-#include "core/vocabulary.hpp"
 
 namespace simon::model {
 

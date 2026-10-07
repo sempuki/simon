@@ -29,7 +29,7 @@
 
 #include "application/automotive/simulation.hpp"
 #include "base/core.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "framework/benchmarking.hpp"
 
 namespace simon::automotive {

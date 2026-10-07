@@ -14,7 +14,8 @@
 #include <utility>
 #include <vector>
 
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
+#include "core/math.hpp"
 
 // A port of MuJoCo 3.14.0's native convex collision, engine_collision_gjk.c
 // and engine_collision_convex.c (Apache-2.0), for primitives, in its order

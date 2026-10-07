@@ -12,8 +12,9 @@
 
 #include "application/galactic/simulation_components.hpp"
 #include "application/galactic/simulation_systems.hpp"
+#include "core/argument.hpp"
+#include "core/math.hpp"
 #include "core/units.hpp"
-#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
 #include "engine/lifecycle.hpp"
 #include "model/gravity/galaxy.hpp"

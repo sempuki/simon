@@ -8,7 +8,6 @@
 
 #include "application/automotive/simulation_components.hpp"
 #include "application/automotive/simulation_systems.hpp"
-#include "core/vocabulary.hpp"
 #include "engine/lifecycle.hpp"
 #include "scenario/openscenario.hpp"
 #include "scenario/parameter_distribution.hpp"

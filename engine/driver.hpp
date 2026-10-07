@@ -8,8 +8,8 @@
 #include <thread>
 
 #include "base/core.hpp"
+#include "core/argument.hpp"
 #include "core/time.hpp"
-#include "core/vocabulary.hpp"
 #include "engine/lifecycle.hpp"
 
 // A driver owns time and makes a simulation go. Every driver uses one

@@ -5,7 +5,7 @@
 #include <cmath>
 #include <expected>
 
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "framework/archetype.hpp"
 #include "framework/world.hpp"
 

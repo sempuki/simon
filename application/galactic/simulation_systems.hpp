@@ -5,8 +5,8 @@
 #include <vector>
 
 #include "application/galactic/simulation_components.hpp"
+#include "core/argument.hpp"
 #include "core/units.hpp"
-#include "core/vocabulary.hpp"
 #include "framework/entity.hpp"
 #include "framework/system.hpp"
 #include "model/gravity/gravity.hpp"

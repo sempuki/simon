@@ -12,8 +12,8 @@
 #include "application/defense/simulation_components.hpp"
 #include "application/defense/simulation_systems.hpp"
 #include "base/core.hpp"
+#include "core/argument.hpp"
 #include "core/random.hpp"
-#include "core/vocabulary.hpp"
 #include "engine/event_queue.hpp"
 #include "engine/lifecycle.hpp"
 

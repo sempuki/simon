@@ -14,6 +14,7 @@
 #include <utility>
 #include <vector>
 
+#include "core/argument.hpp"
 #include "core/units.hpp"
 #include "model/control.hpp"
 

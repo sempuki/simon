@@ -12,6 +12,7 @@
 
 #include "application/defense/simulation_components.hpp"
 #include "base/core.hpp"
+#include "core/argument.hpp"
 #include "framework/system.hpp"
 #include "model/guidance.hpp"
 

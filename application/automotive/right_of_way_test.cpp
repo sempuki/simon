@@ -14,7 +14,7 @@
 #include "application/automotive/simulation_systems.hpp"
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "model/collision.hpp"
 
 // Right of way in junctions: who gives way to whom on the test networks,

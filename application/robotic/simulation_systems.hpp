@@ -9,7 +9,8 @@
 #include <vector>
 
 #include "application/robotic/simulation_components.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
+#include "core/math.hpp"
 #include "framework/system.hpp"
 #include "model/articulated/constraint.hpp"
 

@@ -10,7 +10,7 @@
 #include "application/aeronautic/simulation_components.hpp"
 #include "application/aeronautic/simulation_systems.hpp"
 #include "base/core.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "engine/lifecycle.hpp"
 #include "model/aircraft/trim.hpp"
 

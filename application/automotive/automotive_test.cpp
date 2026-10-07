@@ -8,7 +8,6 @@
 
 #include "application/automotive/simulation.hpp"
 #include "base/testing.hpp"
-#include "core/vocabulary.hpp"
 
 namespace simon::automotive {
 

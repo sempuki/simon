@@ -27,7 +27,7 @@
 #include "application/aeronautic/simulation_components.hpp"
 #include "application/aeronautic/simulation_systems.hpp"
 #include "base/core.hpp"
-#include "core/vocabulary.hpp"
+#include "core/argument.hpp"
 #include "format/aircraft_file.hpp"
 #include "framework/benchmarking.hpp"
 
