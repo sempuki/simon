@@ -126,23 +126,13 @@ class Query final {
     }
   }
 
-  // Visits every chosen entity: an archetype's segment of the EntityArchetype
-  // store, or every owner in the component's store.
+  // Visits every chosen entity: every entity of the archetype, or every owner
+  // in the component's store.
   template <typename VisitorType>
   static auto for_each_chosen(const WorldType& world, VisitorType&& visit)
       -> void {
     if constexpr (Archetypal<ChosenType>) {
-      const auto& archetypes = world.template store_of<EntityArchetype>();
-      constexpr std::size_t SEGMENT =
-          WorldType::template segment_of<EntityArchetype>(
-              index_of_v<typename WorldType::ArchetypeList, ChosenType>);
-      for (std::size_t ordinal = 0; ordinal < archetypes.chunks_in(SEGMENT);
-           ++ordinal) {
-        auto chunk = archetypes.chunk(SEGMENT, ordinal);
-        for (std::size_t i = 0; i < chunk.size; ++i) {
-          visit(chunk.owners[i]);
-        }
-      }
+      world.template for_each_entity_of<ChosenType>(visit);
     } else {
       world.template store_of<ChosenType>().for_each(
           [&](Entity owner, const ChosenType&) { visit(owner); });

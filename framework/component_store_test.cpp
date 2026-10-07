@@ -9,6 +9,19 @@
 
 namespace simon::framework {
 
+struct ComponentStoreInternals final {
+  template <typename ComponentType>
+  static auto segment_size(const ComponentStore<ComponentType>& store,
+                           std::size_t segment) -> std::size_t {
+    return store.segment_size(segment);
+  }
+  template <typename ComponentType>
+  static auto chunks_in(const ComponentStore<ComponentType>& store,
+                        std::size_t segment) -> std::size_t {
+    return store.chunks_in(segment);
+  }
+};
+
 namespace {
 struct Mass final {
   double kilograms = 0.0;
@@ -110,8 +123,8 @@ TEST_CASE("ComponentStore") {
     segmented.append(c, Mass{3.0}, 1);
 
     CHECK(collect_owners(segmented) == std::vector<Entity>{b, a, c});
-    CHECK(segmented.segment_size(0) == 1u);
-    CHECK(segmented.segment_size(1) == 2u);
+    CHECK(ComponentStoreInternals::segment_size(segmented, 0) == 1u);
+    CHECK(ComponentStoreInternals::segment_size(segmented, 1) == 2u);
     CHECK(segmented.component_of(c).kilograms == 3.0);
   }
 
@@ -121,13 +134,13 @@ TEST_CASE("ComponentStore") {
     for (std::size_t i = 0; i < more.size(); ++i) {
       chunked.append(more[i], Mass{static_cast<double>(i)});
     }
-    REQUIRE(chunked.chunks_in(0) == 3u);
+    REQUIRE(ComponentStoreInternals::chunks_in(chunked, 0) == 3u);
 
     chunked.erase(more[0]);
     chunked.erase(more[1]);
     chunked.erase(more[2]);
 
-    CHECK(chunked.chunks_in(0) == 1u);
+    CHECK(ComponentStoreInternals::chunks_in(chunked, 0) == 1u);
     CHECK(chunked.component_of(more[3]).kilograms == 3.0);
     CHECK(chunked.component_of(more[4]).kilograms == 4.0);
   }

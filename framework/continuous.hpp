@@ -22,7 +22,8 @@
 //
 //   using Rigid = Continuous<RungeKutta4, TypeList<RigidBody>,
 //                            SystemList<RigidAircraftRates>>;
-//   using Schedule = SystemList<RunFlightControls, RunEngines, Rigid, BurnFuel>;
+//   using Schedule = SystemList<RunFlightControls, RunEngines, Rigid,
+//   BurnFuel>;
 //
 // The derivative systems are ordinary systems that write rate components. For
 // each stage of the method, the integrator sets every entity's state to the
@@ -87,72 +88,35 @@ struct RungeKutta4 final {
 //-- The integrator ------------------------------------------------------------
 
 // Walks continuous state in place. The only code besides the scheduler that
-// may write a store directly.
+// may write a store.
 struct ContinuousRunner final {
   // Calls `visit(n, state, rate)` for each entity with `StateType`, where `n`
-  // counts entities in walk order and `rate` is null if the entity has none.
-  // The order is the same on every call until the next sync.
+  // counts entities in walk order and `rate` is null if the entity has none:
+  // an archetype that cannot have the rate is not integrated here, and
+  // advances its state some other way, such as a cheaper single pass. The
+  // order is the same on every call until the next sync.
   template <typename StateType, typename WorldType, typename VisitorType>
   static auto walk(InOut<WorldType> world, VisitorType&& visit) -> void {
     using RateType = rate_of_t<StateType>;
-    auto& states = world->template mutable_store_of<StateType>(SchedulerKey{});
-    const auto& rates = std::as_const(*world).template store_of<RateType>();
-
-    // Archetypes that require the state, segment by segment.
     std::size_t n = 0;
-    [&]<std::size_t... ARCHETYPES>(std::index_sequence<ARCHETYPES...>) {
-      (walk_archetype<StateType, WorldType, ARCHETYPES>(states, rates, n,
-                                                        visit),
-       ...);
-    }(std::make_index_sequence<WorldType::ArchetypeList::size>{});
-
-    // Entities whose archetype only allows the state look up their rate.
-    std::size_t allowed = states.segments() - 1;
-    for (std::size_t ordinal = 0; ordinal < states.chunks_in(allowed);
-         ++ordinal) {
-      auto chunk = states.chunk(allowed, ordinal);
-      for (std::size_t i = 0; i < chunk.size; ++i) {
-        visit(n++, chunk.components[i],
-              rates.maybe_component_of(chunk.owners[i]));
-      }
-    }
+    world->template for_each_with<StateType, const RateType>(
+        SchedulerKey{}, TypeList<>{},
+        [&](Entity, StateType& state, const RateType* rate) {
+          visit(n++, state, rate);
+        });
   }
 
- private:
-  template <typename StateType, typename WorldType, std::size_t ARCHETYPE,
-            typename StateStoreType, typename RateStoreType,
-            typename VisitorType>
-  static auto walk_archetype(StateStoreType& states, const RateStoreType& rates,
-                             std::size_t& n, VisitorType& visit) -> void {
+  // Whether every archetype of `WorldType` that requires `StateType` and
+  // allows its rate requires the rate, so that the two sit at the same slot.
+  template <typename StateType, typename WorldType>
+  static constexpr auto rates_required() -> bool {
     using RateType = rate_of_t<StateType>;
-
-    // An archetype that cannot have the rate is not integrated here: it
-    // advances its state some other way, such as a cheaper single pass.
-    if constexpr (WorldType::template archetype_requires<StateType>(
-                      ARCHETYPE) &&
-                  WorldType::template archetype_permits<RateType>(ARCHETYPE)) {
-      static_assert(
-          WorldType::template archetype_requires<RateType>(ARCHETYPE),
-          "An archetype that requires a continuous state and allows its rate "
-          "must require the rate.");
-
-      // The state and its rate sit at the same slot of matching chunks.
-      constexpr std::size_t STATE_SEGMENT =
-          WorldType::template segment_of<StateType>(ARCHETYPE);
-      constexpr std::size_t RATE_SEGMENT =
-          WorldType::template segment_of<RateType>(ARCHETYPE);
-      CHECK_INVARIANT(states.segment_size(STATE_SEGMENT) ==
-                      rates.segment_size(RATE_SEGMENT));
-
-      for (std::size_t ordinal = 0; ordinal < states.chunks_in(STATE_SEGMENT);
-           ++ordinal) {
-        auto state_chunk = states.chunk(STATE_SEGMENT, ordinal);
-        auto rate_chunk = rates.chunk(RATE_SEGMENT, ordinal);
-        for (std::size_t i = 0; i < state_chunk.size; ++i) {
-          visit(n++, state_chunk.components[i], &rate_chunk.components[i]);
-        }
-      }
-    }
+    return []<std::size_t... ARCHETYPES>(std::index_sequence<ARCHETYPES...>) {
+      return ((!WorldType::template archetype_requires<StateType>(ARCHETYPES) ||
+               !WorldType::template archetype_permits<RateType>(ARCHETYPES) ||
+               WorldType::template archetype_requires<RateType>(ARCHETYPES)) &&
+              ...);
+    }(std::make_index_sequence<WorldType::ArchetypeList::size>{});
   }
 };
 
@@ -265,6 +229,10 @@ class Continuous<MethodType, TypeList<StateTypes...>, DerivativeScheduleType>
         (contains_v<typename WorldType::ComponentList, rate_of_t<StateTypes>> &&
          ...),
         "A continuous state's rate component is not in the world.");
+    static_assert(
+        (ContinuousRunner::rates_required<StateTypes, WorldType>() && ...),
+        "An archetype that requires a continuous state and allows its rate "
+        "must require the rate.");
 
     if constexpr (STAGES == 1) {
       // One stage evaluates at the step's start state, so nothing is copied.

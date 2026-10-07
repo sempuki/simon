@@ -426,16 +426,6 @@ struct SystemRunner final {
   }
 
  private:
-  template <typename ComponentType, typename WorldType>
-  static auto store_for(InOut<WorldType> world) -> decltype(auto) {
-    if constexpr (std::is_const_v<ComponentType>) {
-      return std::as_const(*world)
-          .template store_of<std::remove_const_t<ComponentType>>();
-    } else {
-      return world->template mutable_store_of<ComponentType>(SchedulerKey{});
-    }
-  }
-
   // Calls an optional stage (prepare or resolve) as stage(world, step) or
   // stage(world), whichever the system declares. Returns what a stage that
   // returns bool returned, and true otherwise.
@@ -482,179 +472,19 @@ struct SystemRunner final {
         "DrivingComponentType&, OtherComponentTypes*...[, Step]), with const "
         "exactly where the System declares it.");
 
-    auto&& drive = store_for<DrivingComponentType>(world);
-    auto optional =
-        std::forward_as_tuple(store_for<OtherComponentTypes>(world)...);
-
-    // Owners of an excluded component are skipped: a whole segment when its
-    // archetype requires one, by lookup when it only allows one.
-    using ExcludeList = exclude_component_list_of_t<SystemType>;
-    auto excluded = excluded_stores(ExcludeList{}, world);
-    auto is_excluded = [&](Entity entity) {
-      return std::apply(
-          [&](const auto&... store) {
-            return (store.contains(entity) || ... || false);
-          },
-          excluded);
-    };
-
     // Unwrapped once, outside the loop, so the hot path has no pointer checks.
     SystemType& call = *system;
     ProjectedWorldType& shared = *access;
-    auto invoke = [&](Entity entity, DrivingComponentType& driving,
-                      OtherComponentTypes*... others) {
-      if constexpr (TAKES_STEP) {
-        call(shared, entity, driving, others..., step);
-      } else {
-        call(shared, entity, driving, others...);
-      }
-    };
-    std::apply(
-        [&](auto&... optional_store) {
-          using Driving = std::remove_const_t<DrivingComponentType>;
-          // Each archetype that requires the driving component has a segment
-          // of its own, where each other component is known, at compile time,
-          // to be at the same slot of the matching chunk, absent, or allowed.
-          auto walk_archetype = [&]<std::size_t ARCHETYPE>() {
-            if constexpr (WorldType::template archetype_requires<Driving>(
-                              ARCHETYPE) &&
-                          !excludes_all<WorldType, ARCHETYPE>(ExcludeList{})) {
-              constexpr bool MAY_EXCLUDE =
-                  excludes_some<WorldType, ARCHETYPE>(ExcludeList{});
-              constexpr std::size_t SEGMENT =
-                  WorldType::template segment_of<Driving>(ARCHETYPE);
-              CHECK_INVARIANT(
-                  ((access_of<WorldType, OtherComponentTypes, ARCHETYPE>() !=
-                        Access::REQUIRED ||
-                    optional_store.segment_size(
-                        segment_of<WorldType, OtherComponentTypes,
-                                   ARCHETYPE>()) ==
-                        drive.segment_size(SEGMENT)) &&
-                   ...));
-              for (std::size_t ordinal = 0; ordinal < drive.chunks_in(SEGMENT);
-                   ++ordinal) {
-                auto chunk = drive.chunk(SEGMENT, ordinal);
-                auto bases = std::make_tuple(
-                    base_of<WorldType, OtherComponentTypes, ARCHETYPE>(
-                        optional_store, ordinal)...);
-                for (std::size_t i = 0; i < chunk.size; ++i) {
-                  if constexpr (MAY_EXCLUDE) {
-                    if (is_excluded(chunk.owners[i])) {
-                      continue;
-                    }
-                  }
-                  std::apply(
-                      [&](auto... base) {
-                        invoke(chunk.owners[i], chunk.components[i],
-                               sibling_of<WorldType, OtherComponentTypes,
-                                          ARCHETYPE>(optional_store, base,
-                                                     chunk.owners[i], i)...);
-                      },
-                      bases);
-                }
-              }
-            }
-          };
-          [&]<std::size_t... ARCHETYPES>(std::index_sequence<ARCHETYPES...>) {
-            (walk_archetype.template operator()<ARCHETYPES>(), ...);
-          }(std::make_index_sequence<WorldType::ArchetypeList::size>{});
-
-          // The last segment holds entities whose archetype only allows the
-          // driving component, so every other component is looked up.
-          std::size_t allowed = drive.segments() - 1;
-          for (std::size_t ordinal = 0; ordinal < drive.chunks_in(allowed);
-               ++ordinal) {
-            auto chunk = drive.chunk(allowed, ordinal);
-            for (std::size_t i = 0; i < chunk.size; ++i) {
-              if constexpr (ExcludeList::size > 0) {
-                if (is_excluded(chunk.owners[i])) {
-                  continue;
-                }
-              }
-              invoke(chunk.owners[i], chunk.components[i],
-                     optional_store.maybe_component_of(chunk.owners[i])...);
-            }
+    world->template for_each_with<DrivingComponentType, OtherComponentTypes...>(
+        SchedulerKey{}, exclude_component_list_of_t<SystemType>{},
+        [&](Entity entity, DrivingComponentType& driving,
+            OtherComponentTypes*... others) {
+          if constexpr (TAKES_STEP) {
+            call(shared, entity, driving, others..., step);
+          } else {
+            call(shared, entity, driving, others...);
           }
-        },
-        optional);
-  }
-
-  // The stores of the excluded components, read-only. A system that excludes
-  // nothing reads none of the world.
-  template <typename WorldType, typename... ExcludedTypes>
-  static auto excluded_stores(TypeList<ExcludedTypes...>,
-                              [[maybe_unused]] InOut<WorldType> world) {
-    return std::forward_as_tuple(
-        std::as_const(*world).template store_of<ExcludedTypes>()...);
-  }
-
-  // Whether every entity of an archetype has an excluded component, because
-  // the archetype requires one.
-  template <typename WorldType, std::size_t ARCHETYPE,
-            typename... ExcludedTypes>
-  static constexpr auto excludes_all(TypeList<ExcludedTypes...>) -> bool {
-    return (WorldType::template archetype_requires<ExcludedTypes>(ARCHETYPE) ||
-            ... || false);
-  }
-
-  // Whether some entities of an archetype may have an excluded component,
-  // because the archetype allows one.
-  template <typename WorldType, std::size_t ARCHETYPE,
-            typename... ExcludedTypes>
-  static constexpr auto excludes_some(TypeList<ExcludedTypes...>) -> bool {
-    return (WorldType::template archetype_permits<ExcludedTypes>(ARCHETYPE) ||
-            ... || false);
-  }
-
-  // The ways a system reaches another component of an entity whose archetype
-  // requires the driving component.
-  enum class Access { REQUIRED, ABSENT, ALLOWED };
-
-  template <typename WorldType, typename OtherType, std::size_t ARCHETYPE>
-  static constexpr auto access_of() -> Access {
-    using Other = std::remove_const_t<OtherType>;
-    if constexpr (WorldType::template archetype_requires<Other>(ARCHETYPE)) {
-      return Access::REQUIRED;
-    } else if constexpr (!WorldType::template archetype_permits<Other>(
-                             ARCHETYPE)) {
-      return Access::ABSENT;
-    } else {
-      return Access::ALLOWED;
-    }
-  }
-
-  template <typename WorldType, typename OtherType, std::size_t ARCHETYPE>
-  static constexpr auto segment_of() -> std::size_t {
-    return WorldType::template segment_of<std::remove_const_t<OtherType>>(
-        ARCHETYPE);
-  }
-
-  // The start of the matching chunk of a required component's segment, or
-  // null.
-  template <typename WorldType, typename OtherType, std::size_t ARCHETYPE,
-            typename StoreType>
-  static auto base_of(StoreType& store, std::size_t ordinal) -> OtherType* {
-    if constexpr (access_of<WorldType, OtherType, ARCHETYPE>() ==
-                  Access::REQUIRED) {
-      return store.chunk(segment_of<WorldType, OtherType, ARCHETYPE>(), ordinal)
-          .components;
-    } else {
-      return nullptr;
-    }
-  }
-
-  template <typename WorldType, typename OtherType, std::size_t ARCHETYPE,
-            typename StoreType>
-  static auto sibling_of(StoreType& store, OtherType* base, Entity entity,
-                         std::size_t i) -> OtherType* {
-    constexpr Access ACCESS = access_of<WorldType, OtherType, ARCHETYPE>();
-    if constexpr (ACCESS == Access::REQUIRED) {
-      return base + i;
-    } else if constexpr (ACCESS == Access::ABSENT) {
-      return nullptr;
-    } else {
-      return store.maybe_component_of(entity);
-    }
+        });
   }
 };
 

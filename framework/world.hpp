@@ -180,18 +180,10 @@ class World<SpatialType,                  //
     CHECK_PRECONDITION(commands_.empty() && transaction_depth_ == 0);
     constexpr std::size_t ARCHETYPE = index_of_v<ArchetypeList, ArchetypeType>;
     using Key = std::invoke_result_t<KeyType&, Entity>;
-    const auto& archetypes = std::get<ComponentStore<EntityArchetype>>(stores_);
-    std::size_t segment = segment_of<EntityArchetype>(ARCHETYPE);
     std::vector<std::pair<Key, std::uint32_t>> keyed;
-    keyed.reserve(archetypes.segment_size(segment));
-    for (std::size_t ordinal = 0; ordinal < archetypes.chunks_in(segment);
-         ++ordinal) {
-      auto chunk = archetypes.chunk(segment, ordinal);
-      for (std::size_t i = 0; i < chunk.size; ++i) {
-        keyed.emplace_back(key(chunk.owners[i]),
-                           static_cast<std::uint32_t>(keyed.size()));
-      }
-    }
+    for_each_entity_of<ArchetypeType>([&](Entity entity) {
+      keyed.emplace_back(key(entity), static_cast<std::uint32_t>(keyed.size()));
+    });
     std::ranges::stable_sort(keyed, {}, &std::pair<Key, std::uint32_t>::first);
     std::vector<std::uint32_t> order;
     order.reserve(keyed.size());
@@ -330,6 +322,49 @@ class World<SpatialType,                  //
     return slot ? std::optional{spatial.owner_at(*slot)} : std::nullopt;
   }
 
+  //-- Read: walking entities --------------------------------------------------
+
+  // Visits every entity of `ArchetypeType`, in store order, as
+  // `visit(Entity)`.
+  template <Archetypal ArchetypeType, typename VisitorType>
+  auto for_each_entity_of(VisitorType&& visit) const -> void {
+    static_assert(contains_v<ArchetypeList, ArchetypeType>,
+                  "This archetype is not in the world's archetype list.");
+    constexpr std::size_t SEGMENT =
+        segment_of<EntityArchetype>(index_of_v<ArchetypeList, ArchetypeType>);
+    const auto& archetypes = store_of<EntityArchetype>();
+    for (std::size_t ordinal = 0; ordinal < archetypes.chunks_in(SEGMENT);
+         ++ordinal) {
+      auto chunk = archetypes.chunk(SEGMENT, ordinal);
+      for (std::size_t i = 0; i < chunk.size; ++i) {
+        visit(chunk.owners[i]);
+      }
+    }
+  }
+
+  // Visits every entity that has `DrivingType`, as
+  // `visit(Entity, const DrivingType&, const OtherTypes*...)`: each other
+  // component is the entity's own, or null if it has none. Entities of an
+  // archetype that requires the driving component come first, archetype by
+  // archetype, then those whose archetype only allows it; the order holds
+  // until the next sync.
+  template <typename DrivingType, typename... OtherTypes, typename VisitorType>
+  auto for_each_with(VisitorType&& visit) const -> void {
+    walk_with<DrivingType, OtherTypes...>(*this, TypeList<>{},
+                                          std::forward<VisitorType>(visit));
+  }
+
+  // The same walk for the scheduler, which may write: a component declared
+  // without `const` comes by reference or pointer to the store. Owners of a
+  // component in `ExcludeListType` are skipped.
+  template <typename DrivingType, typename... OtherTypes,
+            typename ExcludeListType, typename VisitorType>
+  auto for_each_with(SchedulerKey, ExcludeListType, VisitorType&& visit)
+      -> void {
+    walk_with<DrivingType, OtherTypes...>(*this, ExcludeListType{},
+                                          std::forward<VisitorType>(visit));
+  }
+
   //-- Read: names, identities and aliases -----------------------------------
 
   auto number() const -> std::uint32_t { return number_; }
@@ -420,7 +455,7 @@ class World<SpatialType,                  //
     return text;
   }
 
-  //-- Archetypes and segments, for the framework -----------------------------
+  //-- Archetypes -------------------------------------------------------------
 
   // Whether archetype number `archetype` (its position in ArchetypeList)
   // requires, or requires or allows, `ComponentType`. Every archetype
@@ -442,8 +477,13 @@ class World<SpatialType,                  //
     return TABLE[archetype];
   }
 
+ private:
+  friend class SetUpBuilder<World>;
+
   // Each store has a segment per archetype that requires its component, in
   // archetype order, then one for entities whose archetype only allows it.
+  // Segments and their chunks are the store's layout, which the walks above
+  // hide.
 
   template <typename ComponentType>
   static constexpr auto segments_of() -> std::size_t {
@@ -469,12 +509,10 @@ class World<SpatialType,                  //
     return segment;
   }
 
-  //-- Systems ----------------------------------------------------------------
-
-  // A store a system writes. Handing out the spatial store marks the spatial
-  // index stale, since the system may move things.
+  // A store the scheduler writes. Handing out the spatial store marks the
+  // spatial index stale, since a system may move things.
   template <typename ComponentType>
-  auto mutable_store_of(SchedulerKey) -> ComponentStore<ComponentType>& {
+  auto writable_store_of() -> ComponentStore<ComponentType>& {
     static_assert(contains_v<ComponentList, ComponentType>,
                   "This component is not in the world's component list.");
     if constexpr (std::is_same_v<ComponentType, SpatialType>) {
@@ -483,8 +521,159 @@ class World<SpatialType,                  //
     return std::get<ComponentStore<ComponentType>>(stores_);
   }
 
- private:
-  friend class SetUpBuilder<World>;
+  //-- Walking ----------------------------------------------------------------
+
+  // The store of `ComponentType` as `self` may touch it: read-only when the
+  // component is declared const, or the world is.
+  template <typename ComponentType, typename SelfType>
+  static auto store_for(SelfType& self) -> decltype(auto) {
+    using Plain = std::remove_const_t<ComponentType>;
+    if constexpr (std::is_const_v<ComponentType> || std::is_const_v<SelfType>) {
+      return std::as_const(self).template store_of<Plain>();
+    } else {
+      return self.template writable_store_of<Plain>();
+    }
+  }
+
+  // The ways a walk reaches another component of an entity whose archetype
+  // requires the driving component.
+  enum class Access { REQUIRED, ABSENT, ALLOWED };
+
+  template <typename OtherType, std::size_t ARCHETYPE>
+  static constexpr auto access_of() -> Access {
+    using Other = std::remove_const_t<OtherType>;
+    if constexpr (archetype_requires<Other>(ARCHETYPE)) {
+      return Access::REQUIRED;
+    } else if constexpr (!archetype_permits<Other>(ARCHETYPE)) {
+      return Access::ABSENT;
+    } else {
+      return Access::ALLOWED;
+    }
+  }
+
+  // The start of the matching chunk of a required component's segment, or
+  // null.
+  template <typename OtherType, std::size_t ARCHETYPE, typename StoreType>
+  static auto base_of(StoreType& store, std::size_t ordinal) {
+    using Pointer = decltype(store.chunk(0, 0).components);
+    if constexpr (access_of<OtherType, ARCHETYPE>() == Access::REQUIRED) {
+      return Pointer{
+          store
+              .chunk(segment_of<std::remove_const_t<OtherType>>(ARCHETYPE),
+                     ordinal)
+              .components};
+    } else {
+      return Pointer{nullptr};
+    }
+  }
+
+  template <typename OtherType, std::size_t ARCHETYPE, typename StoreType,
+            typename PointerType>
+  static auto sibling_of(StoreType& store, PointerType base, Entity entity,
+                         std::size_t i) -> PointerType {
+    constexpr Access ACCESS = access_of<OtherType, ARCHETYPE>();
+    if constexpr (ACCESS == Access::REQUIRED) {
+      return base + i;
+    } else if constexpr (ACCESS == Access::ABSENT) {
+      return nullptr;
+    } else {
+      return store.maybe_component_of(entity);
+    }
+  }
+
+  // Walks every entity with `DrivingType` and its `OtherTypes`. Each
+  // archetype that requires the driving component has a segment of its own,
+  // where each other component is known, at compile time, to be at the same
+  // slot of the matching chunk, absent, or allowed and looked up. The last
+  // segment holds entities whose archetype only allows the driving component,
+  // so every other component is looked up. Owners of an excluded component
+  // are skipped: a whole segment when its archetype requires one, by lookup
+  // when it only allows one.
+  template <typename DrivingType, typename... OtherTypes,
+            typename... ExcludedTypes, typename SelfType, typename VisitorType>
+  static auto walk_with(SelfType& self, TypeList<ExcludedTypes...>,
+                        VisitorType&& visit) -> void {
+    using Driving = std::remove_const_t<DrivingType>;
+    using Named = TypeList<Driving, std::remove_const_t<OtherTypes>...>;
+    static_assert(is_unique_v<Named>, "A walk may name each component once.");
+    static_assert(is_subset_v<Named, ComponentList>,
+                  "A walk names a component that is not in the world.");
+    static_assert(is_subset_v<TypeList<ExcludedTypes...>, ComponentList>,
+                  "A walk excludes a component that is not in the world.");
+    static_assert(!intersects_v<Named, TypeList<ExcludedTypes...>>,
+                  "A walk cannot both name a component and exclude its "
+                  "owners; the component would never be there.");
+
+    auto&& drive = store_for<DrivingType>(self);
+    auto others = std::forward_as_tuple(store_for<OtherTypes>(self)...);
+    auto excluded = std::forward_as_tuple(
+        std::as_const(self).template store_of<ExcludedTypes>()...);
+    auto is_excluded = [&](Entity entity) {
+      return std::apply(
+          [&](const auto&... store) {
+            return (store.contains(entity) || ... || false);
+          },
+          excluded);
+    };
+
+    std::apply(
+        [&](auto&... other) {
+          auto walk_archetype = [&]<std::size_t ARCHETYPE>() {
+            constexpr bool EXCLUDED =
+                (archetype_requires<ExcludedTypes>(ARCHETYPE) || ... || false);
+            if constexpr (archetype_requires<Driving>(ARCHETYPE) && !EXCLUDED) {
+              constexpr bool MAY_EXCLUDE =
+                  (archetype_permits<ExcludedTypes>(ARCHETYPE) || ... || false);
+              constexpr std::size_t SEGMENT = segment_of<Driving>(ARCHETYPE);
+              CHECK_INVARIANT(
+                  ((access_of<OtherTypes, ARCHETYPE>() != Access::REQUIRED ||
+                    other.segment_size(
+                        segment_of<std::remove_const_t<OtherTypes>>(
+                            ARCHETYPE)) == drive.segment_size(SEGMENT)) &&
+                   ...));
+              for (std::size_t ordinal = 0; ordinal < drive.chunks_in(SEGMENT);
+                   ++ordinal) {
+                auto chunk = drive.chunk(SEGMENT, ordinal);
+                auto bases = std::make_tuple(
+                    base_of<OtherTypes, ARCHETYPE>(other, ordinal)...);
+                for (std::size_t i = 0; i < chunk.size; ++i) {
+                  if constexpr (MAY_EXCLUDE) {
+                    if (is_excluded(chunk.owners[i])) {
+                      continue;
+                    }
+                  }
+                  std::apply(
+                      [&](auto... base) {
+                        visit(chunk.owners[i], chunk.components[i],
+                              sibling_of<OtherTypes, ARCHETYPE>(
+                                  other, base, chunk.owners[i], i)...);
+                      },
+                      bases);
+                }
+              }
+            }
+          };
+          [&]<std::size_t... ARCHETYPES>(std::index_sequence<ARCHETYPES...>) {
+            (walk_archetype.template operator()<ARCHETYPES>(), ...);
+          }(std::make_index_sequence<ArchetypeList::size>{});
+
+          std::size_t allowed = drive.segments() - 1;
+          for (std::size_t ordinal = 0; ordinal < drive.chunks_in(allowed);
+               ++ordinal) {
+            auto chunk = drive.chunk(allowed, ordinal);
+            for (std::size_t i = 0; i < chunk.size; ++i) {
+              if constexpr (sizeof...(ExcludedTypes) > 0) {
+                if (is_excluded(chunk.owners[i])) {
+                  continue;
+                }
+              }
+              visit(chunk.owners[i], chunk.components[i],
+                    other.maybe_component_of(chunk.owners[i])...);
+            }
+          }
+        },
+        others);
+  }
 
   // A world's size, worked out by SetUpBuilder from its count of each
   // archetype.

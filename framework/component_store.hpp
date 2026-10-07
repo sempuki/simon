@@ -14,8 +14,16 @@
 
 #include "base/core.hpp"
 #include "framework/entity.hpp"
+#include "framework/spatial.hpp"
 
 namespace simon::framework {
+
+template <Spatial SpatialType, typename ComponentListType,
+          typename ArchetypeListType>
+class World;
+
+// The store's segments and chunks, for its own tests.
+struct ComponentStoreInternals;
 
 // Memory for `size` objects of `Type`, allocated once. The owner constructs
 // objects in it and must destroy what it constructed.
@@ -183,24 +191,6 @@ class ComponentStore final {
     walk(*this, std::forward<VisitorType>(visit));
   }
 
-  //-- For the framework ------------------------------------------------------
-
-  // Segments and their chunks, for the scheduler's loops.
-  auto segments() const -> std::size_t { return segments_.size(); }
-  auto segment_size(std::size_t segment) const -> std::size_t {
-    return segments_[segment].size;
-  }
-  auto chunks_in(std::size_t segment) const -> std::size_t {
-    return segments_[segment].chunks.size();
-  }
-  auto chunk(std::size_t segment, std::size_t ordinal) -> Chunk<ComponentType> {
-    return chunk_of<ComponentType>(*this, segment, ordinal);
-  }
-  auto chunk(std::size_t segment, std::size_t ordinal) const
-      -> Chunk<const ComponentType> {
-    return chunk_of<const ComponentType>(*this, segment, ordinal);
-  }
-
   // Slots, for indexes such as the spatial index. A slot names the same
   // entity-component until the next append or erase.
   template <typename VisitorType>
@@ -250,31 +240,6 @@ class ComponentStore final {
     ++size_;
   }
 
-  // Reorders `segment`: the entity-component at local index `order[i]`
-  // moves to local index i. `order` holds each of the segment's local
-  // indices once.
-  auto permute(std::size_t segment, std::span<const std::uint32_t> order)
-      -> void {
-    const Segment& in = segments_[segment];
-    CHECK_PRECONDITION(order.size() == in.size);
-    ComponentType* data = data_.data();
-    std::vector<ComponentType> components;
-    std::vector<Entity> owners;
-    components.reserve(order.size());
-    owners.reserve(order.size());
-    for (std::uint32_t local : order) {
-      Slot from = slot_at(in, local);
-      components.push_back(std::move(data[from]));
-      owners.push_back(owner_[from]);
-    }
-    for (std::size_t local = 0; local < order.size(); ++local) {
-      Slot to = slot_at(in, local);
-      data[to] = std::move(components[local]);
-      owner_[to] = owners[local];
-      index_[owners[local].index].slot = to;
-    }
-  }
-
   // Erases, moving the segment's last entity-component into the gap.
   auto erase(Entity entity) -> void {
     Slot slot = slot_of(entity);
@@ -301,7 +266,53 @@ class ComponentStore final {
   }
 
  private:
+  // Segments and their chunks are how the store lays entity-components out,
+  // which only the world, which walks and reorders them, sees.
+  template <Spatial, typename, typename>
+  friend class World;
+  friend struct ComponentStoreInternals;
+
   static constexpr Slot ABSENT = std::numeric_limits<Slot>::max();
+
+  auto segments() const -> std::size_t { return segments_.size(); }
+  auto segment_size(std::size_t segment) const -> std::size_t {
+    return segments_[segment].size;
+  }
+  auto chunks_in(std::size_t segment) const -> std::size_t {
+    return segments_[segment].chunks.size();
+  }
+  auto chunk(std::size_t segment, std::size_t ordinal) -> Chunk<ComponentType> {
+    return chunk_of<ComponentType>(*this, segment, ordinal);
+  }
+  auto chunk(std::size_t segment, std::size_t ordinal) const
+      -> Chunk<const ComponentType> {
+    return chunk_of<const ComponentType>(*this, segment, ordinal);
+  }
+
+  // Reorders `segment`: the entity-component at local index `order[i]`
+  // moves to local index i. `order` holds each of the segment's local
+  // indices once.
+  auto permute(std::size_t segment, std::span<const std::uint32_t> order)
+      -> void {
+    const Segment& in = segments_[segment];
+    CHECK_PRECONDITION(order.size() == in.size);
+    ComponentType* data = data_.data();
+    std::vector<ComponentType> components;
+    std::vector<Entity> owners;
+    components.reserve(order.size());
+    owners.reserve(order.size());
+    for (std::uint32_t local : order) {
+      Slot from = slot_at(in, local);
+      components.push_back(std::move(data[from]));
+      owners.push_back(owner_[from]);
+    }
+    for (std::size_t local = 0; local < order.size(); ++local) {
+      Slot to = slot_at(in, local);
+      data[to] = std::move(components[local]);
+      owner_[to] = owners[local];
+      index_[owners[local].index].slot = to;
+    }
+  }
 
   auto destroy_all() -> void {
     for_each(

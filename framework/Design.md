@@ -274,7 +274,10 @@ ComponentStore<Kinematics>
 ```
 
 - **Iterate.** Walk each segment's chunks from start to end. The index is
-  never touched. Code outside systems walks a store with
+  never touched. Segments and chunks are the store's own: the world walks them
+  for the scheduler, the integrator, queries and `reorder` through
+  `for_each_entity_of<Archetype>` and `for_each_with<Driving, Others...>`, and
+  code outside systems walks a store with
   `store.for_each([](Entity owner, const T& component) { ... })`.
 - **Append.** Write at the end of the entity's segment, taking a chunk from
   the pool when the last one is full, and write the index entry.
@@ -346,14 +349,15 @@ ComponentStore<Health>:     [ drone 0..n      | asset ]
 - **Creation appends to the archetype's segment; destruction moves the
   segment's last entity into the gap in each of its stores.** Structural cost
   matches swap-erase.
-- **The runner walks segment by segment,** and knows at compile time, per
+- **The world's walk goes segment by segment,** and knows at compile time, per
   archetype, whether each other component is required (a pointer to the same
   slot of the matching chunk), absent (a null pointer, so that branch compiles
   away), or allowed (a lookup). In the last segment every other component is
   looked up. A contract check confirms, once per segment, that each required
-  sibling's segment has the same size. This needs the world to list its
-  archetypes (see [Configuration](#configuration)). Archetypes name only
-  components, so there is no cycle with systems.
+  sibling's segment has the same size. The runner and the integrator call the
+  walk and see entities and components, never segments. This needs the world
+  to list its archetypes (see [Configuration](#configuration)). Archetypes
+  name only components, so there is no cycle with systems.
 - **The builder protects the alignment.** A `change` that detaches a component
   the entity's archetype requires fails with `BuildError::COMPONENT_REQUIRED`,
   and one that attaches a component the archetype neither requires nor allows
