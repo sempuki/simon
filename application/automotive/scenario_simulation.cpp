@@ -51,8 +51,7 @@ auto ScenarioSimulation::configure() -> engine::PhaseResult {
   return engine::Flow::CONTINUE;
 }
 
-auto ScenarioSimulation::step(const framework::Step& step)
-    -> engine::PhaseResult {
+auto ScenarioSimulation::step(const Step& step) -> engine::PhaseResult {
   if (context_->started && !player_->running()) {
     return engine::Flow::STOP;
   }

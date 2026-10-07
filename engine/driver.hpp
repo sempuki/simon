@@ -8,9 +8,9 @@
 #include <thread>
 
 #include "base/core.hpp"
+#include "core/time.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/lifecycle.hpp"
-#include "framework/step.hpp"
-#include "framework/vocabulary.hpp"
 
 // A driver owns time and makes a simulation go. Every driver uses one
 // contract, `advance_to(target)`: step toward `target` at no more than the
@@ -21,14 +21,10 @@
 //   RealTimeDriver  the wall clock, paced
 namespace simon::engine {
 
-using framework::Duration;
-using framework::Step;
-using framework::TimePoint;
-
 // When a run starts and its longest step, in ticks of `TickType`.
 template <typename TickType = Duration>
 struct BasicTiming final {
-  framework::BasicTimePoint<TickType> start{};
+  BasicTimePoint<TickType> start{};
   TickType max_step{};
 };
 
@@ -39,8 +35,8 @@ template <Simulation SimulationType>
 class Driver final {
  public:
   using Duration = tick_of_t<SimulationType>;
-  using TimePoint = framework::BasicTimePoint<Duration>;
-  using Step = framework::BasicStep<Duration>;
+  using TimePoint = BasicTimePoint<Duration>;
+  using Step = BasicStep<Duration>;
 
   // Keeps a reference to `simulation` for as long as the driver lives.
   Driver(BasicTiming<Duration> timing, Depend<SimulationType> simulation)
@@ -122,7 +118,7 @@ template <Simulation SimulationType>
 class BatchDriver final {
  public:
   using Duration = tick_of_t<SimulationType>;
-  using TimePoint = framework::BasicTimePoint<Duration>;
+  using TimePoint = BasicTimePoint<Duration>;
 
   BatchDriver(BasicTiming<Duration> timing, Depend<SimulationType> simulation)
       : driver_{timing, simulation} {}
@@ -154,7 +150,7 @@ template <Simulation SimulationType,
 class RealTimeDriver final {
  public:
   using Duration = tick_of_t<SimulationType>;
-  using TimePoint = framework::BasicTimePoint<Duration>;
+  using TimePoint = BasicTimePoint<Duration>;
 
   // Runs at `speed` times real time.
   RealTimeDriver(BasicTiming<Duration> timing, double speed,

@@ -16,7 +16,7 @@
 #include "application/robotic/simulation.hpp"
 #include "application/testing.hpp"
 #include "base/testing.hpp"
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 
 // Shared by the robotic tests: where the models and MuJoCo's tables lie,
 // MuJoCo's runs read from them, and simon stepped against them.
@@ -65,8 +65,7 @@ inline auto load_runs(std::string_view name)
 inline auto step_once(InOut<Simulation> simulation, std::size_t k) -> void {
   auto dt = std::chrono::nanoseconds{
       std::llround(simulation->mechanics().model().physics.timestep * 1e9)};
-  REQUIRE(simulation->step(
-      framework::Step{.time = framework::TimePoint{} + k * dt, .dt = dt}));
+  REQUIRE(simulation->step(Step{.time = TimePoint{} + k * dt, .dt = dt}));
 }
 
 // Steps `simulation` for `seconds` of model steps from the start.

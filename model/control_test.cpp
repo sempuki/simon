@@ -1,7 +1,7 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "model/control.hpp"
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 
 #include <cmath>
 #include <limits>

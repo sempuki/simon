@@ -10,8 +10,6 @@ namespace simon::automotive {
 
 namespace {
 
-using model::meter;
-
 auto convert_to_point(const model::Road& road, const model::PlanPoint& plan,
                       double s, double t) -> model::Point2 {
   Vector3 at = model::compute_road_position(road, plan, s * meter, t * meter)

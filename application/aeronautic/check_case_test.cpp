@@ -15,8 +15,8 @@
 #include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
+#include "core/vocabulary.hpp"
 #include "format/aircraft_file.hpp"
-#include "framework/vocabulary.hpp"
 #include "model/trim.hpp"
 
 // The whole 737, and the whole F-16, against JSBSim's, open loop: from the
@@ -150,9 +150,8 @@ struct Blow final  //
                   Wind& wind,            //
                   Step step) const -> void {
     bool blowing = flown_ == Case::WIND && step.time >= TimePoint{1004ms};
-    wind = Wind{.north_east_down =
-                    blowing ? model::meters_per_second(8.0, -12.0, 2.0)
-                            : model::meters_per_second(0.0, 0.0, 0.0)};
+    wind = Wind{.north_east_down = blowing ? meters_per_second(8.0, -12.0, 2.0)
+                                           : meters_per_second(0.0, 0.0, 0.0)};
   }
 
  private:
@@ -167,15 +166,15 @@ struct Apart final {
   auto widen(const RigidBody& a, const RigidBody& b) -> void {
     position = std::max(
         position,
-        magnitude((a.position - b.position).numerical_value_in(model::meter)));
+        magnitude((a.position - b.position).numerical_value_in(meter)));
     velocity = std::max(
-        velocity, magnitude((a.velocity - b.velocity)
-                                .numerical_value_in(model::meter_per_second)));
+        velocity,
+        magnitude(
+            (a.velocity - b.velocity).numerical_value_in(meter_per_second)));
     attitude = std::max(attitude, a.attitude.angularDistance(b.attitude));
     rate = std::max(
         rate,
-        magnitude(
-            (a.rate - b.rate).numerical_value_in(model::radian_per_second)));
+        magnitude((a.rate - b.rate).numerical_value_in(radian_per_second)));
   }
 
   double position = 0.0;  // m.
@@ -229,7 +228,7 @@ auto trimmed_tanks(const model::AircraftData& data, const Row& trim)
     -> FuelTanks {
   FuelTanks tanks;
   for (std::size_t i = 0; i < data.tanks.size(); ++i) {
-    tanks.contents[i] = trim.at("fuel_" + std::to_string(i)) * model::kilogram;
+    tanks.contents[i] = trim.at("fuel_" + std::to_string(i)) * kilogram;
   }
   return tanks;
 }
@@ -251,15 +250,14 @@ auto fly(const Checked& checked, Case flown, Duration dt,
   FlightSignals signals = trimmed_flight_controls(data, trim, recorded);
   Engines engines = model::compute_settled_engines(
       data, signals,
-      model::compute_engine_air(body, earth, air, Wind{}, 0.0 * model::second));
+      model::compute_engine_air(body, earth, air, Wind{}, 0.0 * second));
   FuelTanks tanks = trimmed_tanks(data, trim);
   MassBalance mass = model::compute_mass_balance(data, tanks);
   BodyAcceleration felt;
   model::compute_rigid_aircraft_rate(body, signals, engines, mass, data, earth,
-                                     air, Wind{}, 0.0 * model::second,
-                                     Out(felt));
+                                     air, Wind{}, 0.0 * second, Out(felt));
   auto aircraft = world.create<archetype::RigidAircraftInWind>()
-                      .with(earth.air_state(body, 0.0 * model::second))
+                      .with(earth.air_state(body, 0.0 * second))
                       .with(body)
                       .with(RigidBodyRate{})
                       .with(felt)
@@ -401,10 +399,9 @@ TEST_CASE("CheckCasesF16") {
     MassBalance mass =
         model::compute_mass_balance(*data, trimmed_tanks(*data, trim));
     // JSBSim turns pounds into slugs by a rounded factor, 1.4e-8 off.
-    CHECK_THAT(mass.properties.mass.numerical_value_in(model::kilogram),
+    CHECK_THAT(mass.properties.mass.numerical_value_in(kilogram),
                Catch::Matchers::WithinRel(trim.at("mass"), 2e-8));
-    model::QuantityVector center =
-        mass.center_of_mass.numerical_value_in(model::meter);
+    QuantityVector center = mass.center_of_mass.numerical_value_in(meter);
     CHECK(magnitude(center - read_vector(trim, "cg_x", "cg_y", "cg_z")) <
           1e-12);
   }
@@ -452,16 +449,16 @@ TEST_CASE("CheckCasesF16InWind") {
 struct Wander final {
   // Widens by `body` at `time`, against `start` at time zero, over `earth`.
   auto widen(const model::Earth& earth, const RigidBody& start,
-             const RigidBody& body, model::Time time) -> void {
-    auto height = [&](const RigidBody& b, model::Time t) {
-      return earth.altitude(b, t).numerical_value_in(model::meter);
+             const RigidBody& body, Time time) -> void {
+    auto height = [&](const RigidBody& b, Time t) {
+      return earth.altitude(b, t).numerical_value_in(meter);
     };
     auto airspeed = [&](const RigidBody& b) {
       return magnitude(
-          earth.air_velocity(b).numerical_value_in(model::meter_per_second));
+          earth.air_velocity(b).numerical_value_in(meter_per_second));
     };
-    altitude = std::max(altitude, std::abs(height(body, time) -
-                                           height(start, 0.0 * model::second)));
+    altitude = std::max(
+        altitude, std::abs(height(body, time) - height(start, 0.0 * second)));
     speed = std::max(speed, std::abs(airspeed(body) - airspeed(start)));
   }
 
@@ -486,7 +483,7 @@ auto hold(const Checked& checked) -> std::pair<Wander, Wander> {
   REQUIRE(initial.size() == 1);
   model::Earth earth = model::Earth::round(model::wgs84::Geodetic{});
   model::StandardAirTable air;
-  AirState start = earth.air_state(read_body(initial[0]), 0.0 * model::second);
+  AirState start = earth.air_state(read_body(initial[0]), 0.0 * second);
 
   model::FlightCondition condition{
       .position = start.position,
@@ -503,7 +500,7 @@ auto hold(const Checked& checked) -> std::pair<Wander, Wander> {
       World::set_up().numbered(1).holding<archetype::RigidAircraft>(1).build(
           Out(world)));
   auto aircraft = world.create<archetype::RigidAircraft>()
-                      .with(earth.air_state(trim->body, 0.0 * model::second))
+                      .with(earth.air_state(trim->body, 0.0 * second))
                       .with(trim->body)
                       .with(RigidBodyRate{})
                       .with(trim->felt)
@@ -538,7 +535,7 @@ auto hold(const Checked& checked) -> std::pair<Wander, Wander> {
     scheduler.step(Step{.time = time, .dt = 8ms}, InOut(world));
     simon.widen(earth, trim->body,
                 world.store_of<RigidBody>().component_of(*aircraft),
-                model::seconds((time + 8ms).time_since_epoch()));
+                seconds((time + 8ms).time_since_epoch()));
   }
 
   // JSBSim's from its own trim, every 0.2 s.
@@ -548,7 +545,7 @@ auto hold(const Checked& checked) -> std::pair<Wander, Wander> {
              static_cast<int>(checked.reference.count()));
   for (std::size_t i = 0; i < bodies.size(); ++i) {
     theirs.widen(earth, bodies.front(), bodies[i],
-                 0.2 * static_cast<double>(i) * model::second);
+                 0.2 * static_cast<double>(i) * second);
   }
   return {simon, theirs};
 }

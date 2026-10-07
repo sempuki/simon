@@ -4,9 +4,9 @@
 
 #include "Eigen/Geometry"
 #include "base/core.hpp"
-#include "framework/spatial_index.hpp"
-#include "framework/vocabulary.hpp"
-#include "model/units.hpp"
+#include "core/coordinates.hpp"
+#include "core/units.hpp"
+#include "core/vocabulary.hpp"
 
 namespace simon::model {
 
@@ -42,12 +42,11 @@ inline auto within_distance(const Kinematics& a, const Kinematics& b,
 }
 
 // Coordinates for a spatial index, in meters.
-inline auto coordinates(const Position& position) -> framework::Coordinates {
+inline auto coordinates(const Position& position) -> Coordinates {
   const QuantityVector& meters = position.numerical_value_ref_in(meter);
   return {meters.x(), meters.y(), meters.z()};
 }
-inline auto coordinates(const Kinematics& kinematics)
-    -> framework::Coordinates {
+inline auto coordinates(const Kinematics& kinematics) -> Coordinates {
   return coordinates(kinematics.position);
 }
 inline auto coordinate_length(const Kinematics&, Length length) -> double {

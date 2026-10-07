@@ -23,8 +23,8 @@
 #include "application/galactic/simulation.hpp"
 #include "application/viewing.hpp"
 #include "base/core.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 #include "imgui/imgui.h"
 #include "implot/implot.h"
 #include "model/gravity.hpp"
@@ -88,7 +88,7 @@ class Viewer final {
   }
 
   static auto million_years() -> double {
-    return model::MEGAYEAR.numerical_value_in(model::second);
+    return model::MEGAYEAR.numerical_value_in(second);
   }
 
   auto draw_controls() -> void {
@@ -140,8 +140,8 @@ class Viewer final {
   }
 
   auto project(const Kinematics& kinematics) const -> ImPlotPoint {
-    Vector3 p = kinematics.position.numerical_value_in(model::meter).eigen() /
-                model::KILOPARSEC.numerical_value_in(model::meter);
+    Vector3 p = kinematics.position.numerical_value_in(meter).eigen() /
+                model::KILOPARSEC.numerical_value_in(meter);
     return view_ == View::FACE_ON ? ImPlotPoint{p.x(), p.y()}
                                   : ImPlotPoint{p.x(), p.z()};
   }

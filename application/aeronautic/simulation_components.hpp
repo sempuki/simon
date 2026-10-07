@@ -5,15 +5,15 @@
 #include <array>
 #include <cstdint>
 
+#include "core/time.hpp"
+#include "core/units.hpp"
 #include "framework/archetype.hpp"
 #include "framework/entity.hpp"
-#include "framework/step.hpp"
 #include "framework/world.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/flight_path.hpp"
 #include "model/rigid_aircraft.hpp"
 #include "model/rigid_body.hpp"
-#include "model/units.hpp"
 #include "model/wind.hpp"
 
 // Aircraft fly routes of waypoints under an autopilot. Most fly a cheap,
@@ -24,35 +24,26 @@
 // turbulence.
 namespace simon::aeronautic {
 
-using framework::Duration;
 using framework::Entity;
-using framework::Step;
-using framework::TimePoint;
 using model::Airframe;
 using model::AirState;
 using model::AirStateRate;
-using model::Angle;
 using model::BodyAcceleration;
 using model::Engines;
 using model::FlightControls;
 using model::FlightSignals;
 using model::FuelTanks;
 using model::Gusts;
-using model::Length;
 using model::MassBalance;
-using model::Position;
-using model::Rate;
 using model::RigidBody;
 using model::RigidBodyRate;
-using model::Speed;
-using model::Time;
 using model::Wind;
 
 // The autopilot's commands, which the airframe follows with lags and limits
 // (see Handling).
 struct Commands final {
   double load_factor = 1.0;
-  Angle bank = 0.0 * model::radian;
+  Angle bank = 0.0 * radian;
   double throttle = 0.0;
 };
 
@@ -61,18 +52,18 @@ struct Commands final {
 struct Handling final {
   double max_load_factor = 3.0;
   double min_load_factor = 0.0;
-  Angle max_bank = 1.0 * model::radian;
-  model::AngularRate roll_rate = 1.0 * model::radian_per_second;
-  Time load_factor_lag = 0.5 * model::second;
-  Time throttle_lag = 2.0 * model::second;
+  Angle max_bank = 1.0 * radian;
+  AngularRate roll_rate = 1.0 * radian_per_second;
+  Time load_factor_lag = 0.5 * second;
+  Time throttle_lag = 2.0 * second;
 };
 
 // The altitude, heading and speed the autopilot holds, which the route sets.
 // Its throttle integral is the speed loop's state.
 struct Autopilot final {
-  Length altitude = 0.0 * model::meter;
-  Angle heading = 0.0 * model::radian;
-  Speed speed = 0.0 * model::meter_per_second;
+  Length altitude = 0.0 * meter;
+  Angle heading = 0.0 * radian;
+  Speed speed = 0.0 * meter_per_second;
   double throttle_integral = 0.0;
 };
 
@@ -81,7 +72,7 @@ struct Autopilot final {
 struct Route final {
   static constexpr std::size_t SIZE = 4;
   std::array<Position, SIZE> waypoints{};
-  Speed speed = 0.0 * model::meter_per_second;
+  Speed speed = 0.0 * meter_per_second;
   std::uint32_t next = 0;     // The waypoint flown to.
   std::uint32_t reached = 0;  // Waypoints reached so far.
 };
@@ -100,7 +91,7 @@ struct SurfaceGains final {
   // Up to 45 degrees of bank by default: a 737 turns on a radius of about 4 km
   // at 200 m/s, near the 3 km FollowRoute captures a waypoint at, so it
   // seldom circles one.
-  Angle max_bank = 0.79 * model::radian;
+  Angle max_bank = 0.79 * radian;
 };
 
 // A rigid aircraft's autopilot: its gains, the trim it flies about, and the

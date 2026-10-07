@@ -1,7 +1,7 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "model/kinematics.hpp"
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 
 #include "base/testing.hpp"
 

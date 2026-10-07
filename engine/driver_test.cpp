@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "base/testing.hpp"
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 
 namespace simon::engine {
 

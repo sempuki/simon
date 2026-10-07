@@ -8,10 +8,10 @@
 #include <optional>
 
 #include "application/aeronautic/simulation_components.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/rate_gate.hpp"
 #include "framework/continuous.hpp"
 #include "framework/system.hpp"
-#include "framework/vocabulary.hpp"
 #include "model/atmosphere.hpp"
 #include "model/control.hpp"
 #include "model/flight_path.hpp"
@@ -53,8 +53,8 @@ struct MoveAir final          //
       return;
     }
     model::advance_gusts(field_.turbulence, model::altitude_of(*state),
-                         state->speed, type->data->wing_span,
-                         model::seconds(step.dt), InOut(*gusts));
+                         state->speed, type->data->wing_span, seconds(step.dt),
+                         InOut(*gusts));
     wind = model::compute_wind(field_, *gusts, state->heading);
   }
 
@@ -72,7 +72,7 @@ struct FollowRoute final      //
              Autopilot> {
   using SystemWorld = ProjectedWorld<FollowRoute>;
 
-  static constexpr Length CAPTURE = 3000.0 * model::meter;
+  static constexpr Length CAPTURE = 3000.0 * meter;
 
   auto prepare(SystemWorld&, Step step) -> bool {
     return gate_.fire(step).has_value();
@@ -102,20 +102,19 @@ struct FollowRoute final      //
 
 // The autopilot's gains, shared by every aircraft.
 struct AutopilotGains final {
-  Rate altitude = 0.2 * model::per_second;  // Climb rate per meter of error.
-  Angle steepest_climb = 0.25 * model::radian;
+  Rate altitude = 0.2 * per_second;  // Climb rate per meter of error.
+  Angle steepest_climb = 0.25 * radian;
   // The speed deficit at which an aircraft stops climbing: the steepest climb
   // shrinks to nothing as the speed falls this far below its target, so a
   // climb never trades away more speed than that.
-  Speed speed_margin = 20.0 * model::meter_per_second;
-  Rate climb = 1.0 * model::per_second;  // Of the flight-path angle error.
-  Rate heading = 0.5 * model::per_second;
+  Speed speed_margin = 20.0 * meter_per_second;
+  Rate climb = 1.0 * per_second;  // Of the flight-path angle error.
+  Rate heading = 0.5 * per_second;
   // Throttle, from none to full, for the speed error.
-  model::PiGains<Speed> speed{
-      .proportional = 0.05 * model::second / model::meter,
-      .integral = 0.02 / model::meter,
-      .low = 0.0,
-      .high = 1.0};
+  model::PiGains<Speed> speed{.proportional = 0.05 * second / meter,
+                              .integral = 0.02 / meter,
+                              .low = 0.0,
+                              .high = 1.0};
 };
 
 // Ten times a second, each aircraft's autopilot turns its targets into
@@ -132,7 +131,7 @@ struct FlyAutopilot final           //
 
   auto prepare(SystemWorld&, Step step) -> bool {
     auto firing = gate_.fire(step);
-    elapsed_ = firing ? model::seconds(firing->elapsed) : 0.0 * model::second;
+    elapsed_ = firing ? seconds(firing->elapsed) : 0.0 * second;
     return firing.has_value();
   }
 
@@ -152,9 +151,9 @@ struct FlyAutopilot final           //
     // Speed comes first: a slow aircraft climbs less steeply, or not at all.
     Angle climb = model::compute_climb_command(
         *state, autopilot->altitude, gains_.altitude, gains_.steepest_climb);
-    double slow = std::clamp(
-        1.0 - model::number_of(speed_error / gains_.speed_margin), 0.0, 1.0);
-    climb = model::min(climb, gains_.steepest_climb * slow);
+    double slow = std::clamp(1.0 - number_of(speed_error / gains_.speed_margin),
+                             0.0, 1.0);
+    climb = min(climb, gains_.steepest_climb * slow);
 
     commands.load_factor =
         std::clamp(model::compute_load_factor_command(
@@ -166,7 +165,7 @@ struct FlyAutopilot final           //
 
  private:
   engine::RateGate gate_{100ms};
-  Time elapsed_ = 0.0 * model::second;  // Since the gate last fired.
+  Time elapsed_ = 0.0 * second;  // Since the gate last fired.
   AutopilotGains gains_;
 };
 
@@ -187,7 +186,7 @@ struct Actuate final          //
     if (!commands || !handling) {
       return;
     }
-    Time dt = model::seconds(step.dt);
+    Time dt = seconds(step.dt);
     controls.load_factor =
         model::lag(controls.load_factor, commands->load_factor,
                    handling->load_factor_lag, dt);
@@ -284,10 +283,9 @@ struct DriftWithWind final  //
     }
     // North, east and down to the local frame's east, north and up.
     Vector3 ned =
-        wind.north_east_down.numerical_value_in(model::meter_per_second)
-            .eigen();
-    state->position += model::meters_per_second(ned.y(), ned.x(), -ned.z()) *
-                       model::seconds(step.dt);
+        wind.north_east_down.numerical_value_in(meter_per_second).eigen();
+    state->position +=
+        meters_per_second(ned.y(), ned.x(), -ned.z()) * seconds(step.dt);
   }
 };
 
@@ -320,38 +318,36 @@ struct FlySurfaces final       //
     }
     const SurfaceGains& gains = trim->gains;
     Matrix3 attitude = earth_.convert_body_to_north_east_down(
-        *body, model::seconds(step.time.time_since_epoch()));
+        *body, seconds(step.time.time_since_epoch()));
     double bank = std::atan2(attitude(2, 1), attitude(2, 2));
-    Vector3 rates = earth_.air_rate(*body)
-                        .numerical_value_in(model::radian_per_second)
-                        .eigen();
+    Vector3 rates =
+        earth_.air_rate(*body).numerical_value_in(radian_per_second).eigen();
 
-    double bank_error = model::radians(model::compute_bank_command(
-                            *state, autopilot->heading, 0.5 * model::per_second,
-                            gains.max_bank)) -
-                        bank;
+    double bank_error =
+        radians(model::compute_bank_command(*state, autopilot->heading,
+                                            0.5 * per_second, gains.max_bank)) -
+        bank;
     // Speed comes first, as it does for point-mass aircraft: a slow
     // aircraft climbs less steeply, or not at all.
-    double speed_error = (autopilot->speed - state->speed)
-                             .numerical_value_in(model::meter_per_second);
+    double speed_error =
+        (autopilot->speed - state->speed).numerical_value_in(meter_per_second);
     double steepest = 0.08 * std::clamp(1.0 - speed_error / 20.0, 0.0, 1.0);
     double climb_error =
-        std::min(model::radians(model::compute_climb_command(
-                     *state, autopilot->altitude, 0.05 * model::per_second,
-                     0.08 * model::radian)),
-                 steepest) -
-        model::radians(state->flight_path_angle);
+        std::min(
+            radians(model::compute_climb_command(
+                *state, autopilot->altitude, 0.05 * per_second, 0.08 * radian)),
+            steepest) -
+        radians(state->flight_path_angle);
     trim->climb_integral = std::clamp(
         trim->climb_integral +
-            climb_error *
-                model::seconds(step.dt).numerical_value_in(model::second),
+            climb_error * seconds(step.dt).numerical_value_in(second),
         -0.1, 0.1);
     // A turn needs a pitch rate of g/V sin(bank) tan(bank) to hold its
     // flight path.
-    double turn = model::STANDARD_GRAVITY.numerical_value_in(
-                      model::meter_per_second_squared) /
-                  state->speed.numerical_value_in(model::meter_per_second) *
-                  std::sin(bank) * std::tan(bank);
+    double turn =
+        model::STANDARD_GRAVITY.numerical_value_in(meter_per_second_squared) /
+        state->speed.numerical_value_in(meter_per_second) * std::sin(bank) *
+        std::tan(bank);
 
     using enum model::FlightSignal;
     // The 737's elevator command is positive nose down.
@@ -397,10 +393,10 @@ struct RunFlightControls final        //
 
   auto prepare(SystemWorld&, Step step) -> bool {
     if (!gate_) {
-      dt_ = model::seconds(step.dt);
+      dt_ = seconds(step.dt);
       return true;
     }
-    dt_ = model::seconds(gate_->period());
+    dt_ = seconds(gate_->period());
     return gate_->fire(step).has_value();
   }
 
@@ -417,7 +413,7 @@ struct RunFlightControls final        //
     }
     model::sense_flight_state(
         *body, *felt, *mass, *type->data, earth_, air_, wind ? *wind : still_,
-        model::seconds(step.time.time_since_epoch()), InOut(signals));
+        seconds(step.time.time_since_epoch()), InOut(signals));
     model::run_flight_controls(type->data->flight_controls, InOut(signals),
                                dt_);
   }
@@ -427,7 +423,7 @@ struct RunFlightControls final        //
   model::StandardAirTable air_;
   Wind still_;
   std::optional<engine::RateGate> gate_;
-  Time dt_ = 0.0 * model::second;  // The blocks' step.
+  Time dt_ = 0.0 * second;  // The blocks' step.
 };
 
 // Each step, each rigid aircraft's engines run at their throttles in the air
@@ -458,9 +454,9 @@ struct RunEngines final            //
     }
     model::EngineAir air =
         model::compute_engine_air(*body, earth_, air_, wind ? *wind : still_,
-                                  model::seconds(step.time.time_since_epoch()));
+                                  seconds(step.time.time_since_epoch()));
     model::run_engines(*type->data, InOut(engines), *signals, *tanks, air,
-                       model::seconds(step.dt));
+                       seconds(step.dt));
   }
 
  private:
@@ -503,7 +499,7 @@ struct RigidAircraftRates final    //
     }
     rate = model::compute_rigid_aircraft_rate(
         *body, *signals, *engines, *mass, *type->data, earth_, air_,
-        wind ? *wind : still_, model::seconds(step.time.time_since_epoch()),
+        wind ? *wind : still_, seconds(step.time.time_since_epoch()),
         Out(*felt));
   }
 
@@ -535,8 +531,7 @@ struct BurnFuel final             //
     if (!engines || !type || !type->data || !mass) {
       return;
     }
-    model::burn_fuel(*type->data, *engines, InOut(tanks),
-                     model::seconds(step.dt));
+    model::burn_fuel(*type->data, *engines, InOut(tanks), seconds(step.dt));
     *mass = model::compute_mass_balance(*type->data, tanks);
   }
 };
@@ -565,9 +560,9 @@ struct FollowRigidBody final   //
       return;
     }
     // The body has moved on by the step.
-    state = earth_.air_state(
-        *body, model::seconds((step.time + step.dt).time_since_epoch()),
-        wind ? *wind : still_);
+    state = earth_.air_state(*body,
+                             seconds((step.time + step.dt).time_since_epoch()),
+                             wind ? *wind : still_);
   }
 
  private:

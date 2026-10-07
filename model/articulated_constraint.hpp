@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 #include "model/articulated.hpp"
 
 // The constraints of one island of trees and the accelerations they leave,

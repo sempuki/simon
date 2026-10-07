@@ -1,12 +1,12 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-#include "model/units.hpp"
+#include "core/units.hpp"
 
 #include <chrono>
 
 #include "base/testing.hpp"
 
-namespace simon::model {
+namespace simon {
 
 template <typename FirstType, typename SecondType>
 concept Addable = requires(FirstType a, SecondType b) { a + b; };
@@ -57,4 +57,4 @@ TEST_CASE("Units") {
   }
 }
 
-}  // namespace simon::model
+}  // namespace simon

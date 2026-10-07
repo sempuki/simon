@@ -12,8 +12,8 @@
 #include "application/automotive/simulation_components.hpp"
 #include "application/automotive/simulation_systems.hpp"
 #include "base/core.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/lifecycle.hpp"
-#include "framework/vocabulary.hpp"
 #include "model/traffic.hpp"
 
 namespace simon::automotive {
@@ -37,21 +37,20 @@ struct Scenario final {
   std::uint64_t seed = 1;
   std::string roads = "application/automotive/roads/ring.xodr";
   int vehicles = 40;
-  Speed starting_speed = 10.0 * model::meter_per_second;
-  model::IntelligentDriver following{.desired_speed =
-                                         20.0 * model::meter_per_second};
+  Speed starting_speed = 10.0 * meter_per_second;
+  model::IntelligentDriver following{.desired_speed = 20.0 * meter_per_second};
   model::LaneChanger changing;
   model::LightBraking braking;
-  model::Time critical_gap = 6.0 * model::second;
-  Length length = 4.5 * model::meter;
+  Time critical_gap = 6.0 * second;
+  Length length = 4.5 * meter;
   int pedestrians = 0;
   // Free walking speeds, normal, clipped to 0.5 to 2.5 m/s: Weidmann's.
-  Speed walking_speed = 1.34 * model::meter_per_second;
-  Speed walking_spread = 0.26 * model::meter_per_second;
+  Speed walking_speed = 1.34 * meter_per_second;
+  Speed walking_spread = 0.26 * meter_per_second;
   // The share of pedestrians that wait for a light, and the start-up time
   // that with the time to walk across makes the gap a pedestrian needs.
   double compliance = 1.0;
-  model::Time start_up = 2.0 * model::second;
+  Time start_up = 2.0 * second;
   bool vehicles_yield = true;  // At crosswalks without a light.
   double speed_spread = 0.1;
   Duration green = std::chrono::seconds{30};
@@ -100,7 +99,7 @@ class Simulation final {
   // Reads the network and builds the world and the scenario in it.
   auto configure() -> engine::PhaseResult;
 
-  auto step(const framework::Step& step) -> engine::PhaseResult;
+  auto step(const Step& step) -> engine::PhaseResult;
 
   // The world: empty until configured.
   auto world() const -> const World& { return world_; }

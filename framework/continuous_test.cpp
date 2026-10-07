@@ -11,9 +11,9 @@
 
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
+#include "core/vocabulary.hpp"
 #include "framework/archetype.hpp"
 #include "framework/system.hpp"
-#include "framework/vocabulary.hpp"
 #include "framework/world.hpp"
 
 namespace simon::framework {

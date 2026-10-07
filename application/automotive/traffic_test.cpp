@@ -23,10 +23,6 @@ using model::IntelligentDriver;
 using model::LaneChangeAccelerations;
 using model::LaneChanger;
 using model::Leader;
-using model::meter;
-using model::meter_per_second;
-using model::meter_per_second_squared;
-using model::second;
 
 constexpr double LENGTH = 5.0;  // Each vehicle's, in m.
 constexpr int FOLLOWERS = 5;

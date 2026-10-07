@@ -5,8 +5,8 @@
 
 #pragma once
 
+#include "core/units.hpp"
 #include "model/tire.hpp"
-#include "model/units.hpp"
 
 // A road vehicle's parameters, as CommonRoad's vehicle models define them
 // (Althoff and Wuersching, "CommonRoad: Vehicle Models"; see

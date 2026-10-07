@@ -4,8 +4,8 @@
 
 #include <algorithm>
 
+#include "core/units.hpp"
 #include "model/kinematics.hpp"
-#include "model/units.hpp"
 
 // Guidance and steering laws, as free functions of kinematic state. Each
 // returns a commanded acceleration for Control.

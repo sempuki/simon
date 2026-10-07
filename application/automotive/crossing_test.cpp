@@ -15,7 +15,7 @@
 #include "application/automotive/simulation_systems.hpp"
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 #include "model/collision.hpp"
 
 // Pedestrians crossing: how long they wait at a light, and at a crosswalk
@@ -27,8 +27,6 @@ namespace {
 
 using namespace std::chrono_literals;
 using namespace testing;
-using model::meter;
-using model::meter_per_second;
 
 constexpr double WALK = 1.34;  // m/s, every pedestrian's here.
 

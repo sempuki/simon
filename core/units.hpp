@@ -8,19 +8,19 @@
 #include <numbers>
 
 #include "Eigen/Dense"
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 #include "mp-units/framework.h"
 #include "mp-units/systems/si.h"
 
 // Physical quantities carry their units in their types. Time uses std::chrono
-// (framework::Duration); everything else uses mp-units, in plain SI units.
+// (Duration); everything else uses mp-units, in plain SI units.
 //
 // Plain units check that meters are not added to meters per second. mp-units'
 // ISQ quantity kinds would also tell a position from a displacement or an
 // altitude from a range, but Clang 22 cannot compile them (a Clang regression,
 // llvm/llvm-project#175831). Every quantity type is an alias here, so moving to
 // quantity kinds later changes this file, not the code that uses it.
-namespace simon::model {
+namespace simon {
 
 namespace units = mp_units;
 
@@ -288,4 +288,4 @@ auto norm(const units::quantity<A, QuantityVector>& a) {
   return magnitude(a.numerical_value_ref_in(a.unit)) * A;
 }
 
-}  // namespace simon::model
+}  // namespace simon

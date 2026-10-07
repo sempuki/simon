@@ -27,8 +27,8 @@
 #include <vector>
 
 #include "application/galactic/simulation.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 #include "model/gravity.hpp"
 
 namespace simon::galactic {
@@ -36,13 +36,13 @@ namespace {
 
 using model::KILOPARSEC;
 
-const double KPC = KILOPARSEC.numerical_value_in(model::meter);
+const double KPC = KILOPARSEC.numerical_value_in(meter);
 
 auto read_position(const Simulation& simulation, std::size_t body) -> Vector3 {
   return simulation.world()
       .store_of<Kinematics>()
       .component_of(simulation.bodies()[body])
-      .position.numerical_value_in(model::meter)
+      .position.numerical_value_in(meter)
       .eigen();
 }
 
@@ -54,13 +54,12 @@ auto write_start(const Scenario& scenario, const std::string& path) -> bool {
     const BodyGroup& group = scenario.groups[g];
     for (std::size_t i = group.first; i < group.first + group.count; ++i) {
       const BodyStart& body = scenario.bodies[i];
-      Vector3 p = body.position.numerical_value_in(model::meter).eigen();
-      Vector3 v =
-          body.velocity.numerical_value_in(model::meter_per_second).eigen();
+      Vector3 p = body.position.numerical_value_in(meter).eigen();
+      Vector3 v = body.velocity.numerical_value_in(meter_per_second).eigen();
       std::println(out,
                    "{},{:.17g},{:.17g},{:.17g},{:.17g},{:.17g},{:.17g},{:.17g}",
                    g, p.x(), p.y(), p.z(), v.x(), v.y(), v.z(),
-                   body.mass.numerical_value_in(model::kilogram));
+                   body.mass.numerical_value_in(kilogram));
     }
   }
   return true;
@@ -93,7 +92,7 @@ auto run_collision(std::size_t disk_bodies, int million_years, Year step,
 
   auto wall_start = std::chrono::steady_clock::now();
   for (int myr = 0; myr <= million_years; myr += 10) {
-    if (auto reached = driver.advance_to(framework::BasicTimePoint<Year>{} +
+    if (auto reached = driver.advance_to(BasicTimePoint<Year>{} +
                                          Year{std::int64_t{myr} * 1000000});
         !reached) {
       std::println(stderr, "Error: {}", reached.error().message());
@@ -105,7 +104,7 @@ auto run_collision(std::size_t disk_bodies, int million_years, Year step,
       centers[galaxy] =
           compute_group_center(world, simulation.bodies(),
                                scenario.groups[2 * galaxy], 10.0 * KILOPARSEC)
-              .numerical_value_in(model::meter)
+              .numerical_value_in(meter)
               .eigen();
     }
     double separation = (centers[0] - centers[1]).norm() / KPC;
@@ -145,7 +144,7 @@ auto run_disk(std::size_t disk_bodies, int million_years) -> int {
   }
   std::println("{:>6} {:>16} {:>14}", "Myr", "half-mass kpc", "thickness kpc");
   for (int myr = 0; myr <= million_years; myr += 50) {
-    if (auto reached = driver.advance_to(framework::BasicTimePoint<Year>{} +
+    if (auto reached = driver.advance_to(BasicTimePoint<Year>{} +
                                          Year{std::int64_t{myr} * 1000000});
         !reached) {
       std::println(stderr, "Error: {}", reached.error().message());

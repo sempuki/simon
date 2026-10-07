@@ -7,7 +7,7 @@
 #include <numbers>
 #include <random>
 
-namespace simon::model {
+namespace simon {
 
 // Random numbers that are the same on every platform for the same seed.
 // std::mt19937_64's output is fixed by the standard; the standard library's
@@ -39,4 +39,4 @@ class Random final {
   std::mt19937_64 engine_;
 };
 
-}  // namespace simon::model
+}  // namespace simon

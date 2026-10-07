@@ -42,10 +42,10 @@
 #include <vector>
 
 #include "base/core.hpp"
+#include "core/vocabulary.hpp"
 #include "framework/archetype.hpp"
 #include "framework/benchmarking.hpp"
 #include "framework/system.hpp"
-#include "framework/vocabulary.hpp"
 #include "framework/world.hpp"
 
 namespace simon::framework {

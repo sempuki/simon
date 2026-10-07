@@ -10,8 +10,8 @@
 #include <print>
 
 #include "application/hello/hello.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 
 auto main(int argc, char** argv) -> int {
   using namespace simon;
@@ -35,8 +35,7 @@ auto main(int argc, char** argv) -> int {
 
   for (int second = 0; second <= seconds; ++second) {
     WallClock::time_point start = WallClock::now();
-    if (auto reached = driver.advance_to(framework::TimePoint{1s * second});
-        !reached) {
+    if (auto reached = driver.advance_to(TimePoint{1s * second}); !reached) {
       std::println(stderr, "Error: {}", reached.error().message());
       return EXIT_FAILURE;
     }
@@ -45,7 +44,7 @@ auto main(int argc, char** argv) -> int {
             .count();
     std::println("{:4} s  energy {:12.1f} J  ({:.1f} ms)", second,
                  hello::compute_energy(simulation.world(), scenario.gravity)
-                     .numerical_value_in(model::units::si::joule),
+                     .numerical_value_in(units::si::joule),
                  wall);
   }
 

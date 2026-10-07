@@ -8,9 +8,9 @@
 #include <string>
 #include <vector>
 
+#include "core/units.hpp"
 #include "model/aerodynamics.hpp"
 #include "model/flight_control.hpp"
-#include "model/units.hpp"
 
 // An aircraft as data: what tools/jsbsim/convert.py writes from a JSBSim
 // aircraft, read back by format/aircraft_file. Locations are in JSBSim's

@@ -12,10 +12,10 @@
 #include <vector>
 
 #include "base/core.hpp"
-#include "framework/step.hpp"
+#include "core/time.hpp"
+#include "core/vocabulary.hpp"
 #include "framework/system.hpp"
 #include "framework/type_list.hpp"
-#include "framework/vocabulary.hpp"
 
 // Continuous state, integrated by an explicit Runge-Kutta method. Opt in by
 // scheduling a Continuous element; a simulation that does not pays nothing.

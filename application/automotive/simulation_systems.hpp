@@ -15,11 +15,11 @@
 #include <vector>
 
 #include "application/automotive/simulation_components.hpp"
+#include "core/random.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/rate_gate.hpp"
 #include "framework/system.hpp"
-#include "framework/vocabulary.hpp"
 #include "model/lane_graph.hpp"
-#include "model/random.hpp"
 #include "model/road.hpp"
 #include "model/traffic.hpp"
 #include "model/traffic_control.hpp"
@@ -46,7 +46,7 @@ inline auto find_lane_length(const Network& network, const LaneKey& lane)
 // How far along its lane, in the direction of travel, `s` is.
 inline auto along_lane(const Network& network, const LaneKey& lane, Length s)
     -> double {
-  double at = s.numerical_value_in(model::meter);
+  double at = s.numerical_value_in(meter);
   return model::runs_with_s(lane)
              ? at -
                    network.roads.roads[lane.road].lane_sections[lane.section].s0
@@ -56,7 +56,7 @@ inline auto along_lane(const Network& network, const LaneKey& lane, Length s)
 // The s of `along` meters along `lane`, in the direction of travel.
 inline auto find_s_along(const Network& network, const LaneKey& lane,
                          double along) -> Length {
-  return model::find_s_along(network.roads, lane, along) * model::meter;
+  return model::find_s_along(network.roads, lane, along) * meter;
 }
 
 // The driving lane a vehicle enters from `lane`, its `turns`th: at a fork,
@@ -133,14 +133,14 @@ class LaneOccupancy final {
       if (!driver) {
         return;
       }
-      occupants_.push_back(Occupant{
-          .lane = state.lane,
-          .along = along_lane(network, state.lane, state.s),
-          .speed = state.speed.numerical_value_in(model::meter_per_second),
-          .length = driver->length.numerical_value_in(model::meter),
-          .turns = state.turns,
-          .driver = driver,
-          .entity = owner});
+      occupants_.push_back(
+          Occupant{.lane = state.lane,
+                   .along = along_lane(network, state.lane, state.s),
+                   .speed = state.speed.numerical_value_in(meter_per_second),
+                   .length = driver->length.numerical_value_in(meter),
+                   .turns = state.turns,
+                   .driver = driver,
+                   .entity = owner});
       if constexpr (STOPPED) {
         if (const Stopped* since =
                 world.template store_of<Stopped>().maybe_component_of(owner)) {
@@ -326,8 +326,7 @@ struct Decide final            //
           [&](Entity, const WalkCommand& walking) {
             if (walking.crossing < crosswalks) {
               double& until = (walking.on ? on_ : coming_)[walking.crossing];
-              until = std::max(until,
-                               walking.clear.numerical_value_in(model::second));
+              until = std::max(until, walking.clear.numerical_value_in(second));
             }
           });
     }
@@ -383,7 +382,7 @@ struct Decide final            //
     auto now = model::compute_idm_acceleration(driver->following, state->speed,
                                                leader);
     command = DriveCommand{.acceleration = obey(now)};
-    if (!changing_ || state->speed < 1.0 * model::meter_per_second) {
+    if (!changing_ || state->speed < 1.0 * meter_per_second) {
       return;
     }
     for (bool right : {true, false}) {
@@ -439,24 +438,23 @@ struct Decide final            //
       if (const LaneOccupancy::Occupant* last = occupancy_.find_first(*exit)) {
         room = last->along - last->length >=
                (driver.length + driver.following.minimum_gap)
-                   .numerical_value_in(model::meter);
+                   .numerical_value_in(meter);
       }
     }
-    double v = state.speed.numerical_value_in(model::meter_per_second);
+    double v = state.speed.numerical_value_in(meter_per_second);
     double to_wait = std::max(
-        before - tactical.braking.line_gap.numerical_value_in(model::meter),
-        0.0);
+        before - tactical.braking.line_gap.numerical_value_in(meter), 0.0);
     // s, at the soonest, to where it waits.
     double arriving =
-        model::compute_soonest_arrival(to_wait * model::meter, state.speed,
+        model::compute_soonest_arrival(to_wait * meter, state.speed,
                                        driver.following.acceleration,
                                        driver.following.desired_speed)
-            .numerical_value_in(model::second);
+            .numerical_value_in(second);
     const LaneOccupancy::Occupant* me = occupancy_.find(self, state.lane);
     LaneOccupancy::Stop my_stop =
         me ? occupancy_.stop_of(*me) : LaneOccupancy::Stop{};
     bool waiting = me && my_stop.since != TimePoint::max() && to_wait < 0.5;
-    double gap = tactical.critical_gap.numerical_value_in(model::second);
+    double gap = tactical.critical_gap.numerical_value_in(second);
     bool clear = room;
     // Nor does it enter while one that gives way to it is in the junction
     // and has not cleared where their ways meet, or waits to enter it,
@@ -485,8 +483,7 @@ struct Decide final            //
             other_stop.since != TimePoint::max() && !other_stop.committed &&
             other.along >=
                 find_lane_length(*network_, before_lane) -
-                    tactical.braking.line_gap.numerical_value_in(model::meter) -
-                    0.5;
+                    tactical.braking.line_gap.numerical_value_in(meter) - 0.5;
         bool heading =
             choose_next_lane(*network_, before_lane, other.driver->seed,
                              other.turns) == conflict.lane;
@@ -510,19 +507,19 @@ struct Decide final            //
             continue;  // It stopped first.
           }
           double time = model::compute_soonest_arrival(
-                            (approach.to_conflict - foe->along) * model::meter,
-                            foe->speed * model::meter_per_second,
+                            (approach.to_conflict - foe->along) * meter,
+                            foe->speed * meter_per_second,
                             foe->driver->following.acceleration,
                             foe->driver->following.desired_speed)
-                            .numerical_value_in(model::second);
+                            .numerical_value_in(second);
           clear = clear && time - arriving >= gap;
         }
       }
     }
     double comfortable = driver.following.deceleration.numerical_value_in(
-        model::meter_per_second_squared);
-    double maximum = tactical.braking.maximum.numerical_value_in(
-        model::meter_per_second_squared);
+        meter_per_second_squared);
+    double maximum =
+        tactical.braking.maximum.numerical_value_in(meter_per_second_squared);
     if (clear) {
       if (to_wait <= v * v / (2.0 * comfortable) + 1.0) {
         tactical.entering = key;
@@ -533,7 +530,7 @@ struct Decide final            //
       tactical.entering = key;  // Too near to stop.
       return std::nullopt;
     }
-    return to_wait * model::meter;
+    return to_wait * meter;
   }
 
   // The nearest vehicle in `approach`'s lane, but `self`, whose way leads to
@@ -575,8 +572,7 @@ struct Decide final            //
   auto waits_at_entry(const model::Approach& approach,
                       const LaneOccupancy::Occupant& foe,
                       const Tactical& tactical) const -> bool {
-    double line_gap =
-        tactical.braking.line_gap.numerical_value_in(model::meter);
+    double line_gap = tactical.braking.line_gap.numerical_value_in(meter);
     LaneOccupancy::Stop stop = occupancy_.stop_of(foe);
     return approach.toward == 0 && stop.since != TimePoint::max() &&
            !stop.committed &&
@@ -595,11 +591,10 @@ struct Decide final            //
     double before = -along;  // From the vehicle to the lane's start.
     LaneKey key = state.lane;
     std::uint32_t turns = state.turns;
-    double v = state.speed.numerical_value_in(model::meter_per_second);
-    double maximum = tactical.braking.maximum.numerical_value_in(
-        model::meter_per_second_squared);
-    double line_gap =
-        tactical.braking.line_gap.numerical_value_in(model::meter);
+    double v = state.speed.numerical_value_in(meter_per_second);
+    double maximum =
+        tactical.braking.maximum.numerical_value_in(meter_per_second_squared);
+    double line_gap = tactical.braking.line_gap.numerical_value_in(meter);
     while (before < LOOKAHEAD) {
       for (const model::CrosswalkZone& zone : network_->walking.zones_on(key)) {
         double distance = before + zone.near;
@@ -620,7 +615,7 @@ struct Decide final            //
         if (v * v / (2.0 * maximum) >= to_stop && to_stop > 0.0) {
           continue;  // Too near to stop.
         }
-        return to_stop * model::meter;
+        return to_stop * meter;
       }
       before += find_lane_length(*network_, key);
       std::optional<LaneKey> next =
@@ -664,8 +659,7 @@ struct Decide final            //
         }
         // Where it stops, its line gap short of the line.
         Length to_stop =
-            std::max(distance * model::meter - tactical.braking.line_gap,
-                     0.0 * model::meter);
+            std::max(distance * meter - tactical.braking.line_gap, 0.0 * meter);
         if (model::stops_at_light(driver.following, tactical.braking, aspect,
                                   state.speed, to_stop)) {
           light = to_stop;
@@ -707,8 +701,8 @@ struct Decide final            //
       std::optional<LaneKey> next =
           choose_next_lane(*network_, key, seed, turns++);
       if (!next) {
-        return model::Leader{.gap = distance * model::meter,
-                             .speed = 0.0 * model::meter_per_second};
+        return model::Leader{.gap = distance * meter,
+                             .speed = 0.0 * meter_per_second};
       }
       key = *next;
       if (const LaneOccupancy::Occupant* first = occupancy_.find_first(key)) {
@@ -749,9 +743,8 @@ struct Decide final            //
       std::optional<LaneKey> next =
           choose_next_lane(*network_, key, seed, turns++);
       if (!next) {
-        return nearer(parting,
-                      model::Leader{.gap = distance * model::meter,
-                                    .speed = 0.0 * model::meter_per_second});
+        return nearer(parting, model::Leader{.gap = distance * meter,
+                                             .speed = 0.0 * meter_per_second});
       }
       LaneKey from = key;
       key = *next;
@@ -839,8 +832,8 @@ struct Decide final            //
   // A leader `apart` meters ahead, front bumper to front bumper.
   static auto gap_to(const LaneOccupancy::Occupant& leader, double apart)
       -> model::Leader {
-    return model::Leader{.gap = (apart - leader.length) * model::meter,
-                         .speed = leader.speed * model::meter_per_second};
+    return model::Leader{.gap = (apart - leader.length) * meter,
+                         .speed = leader.speed * meter_per_second};
   }
 
   // MOBIL's accelerations for changing from `state`'s lane to `target`: this
@@ -850,11 +843,11 @@ struct Decide final            //
                       double along, AccelerationMagnitude now,
                       const std::optional<model::Leader>& leader,
                       const LaneKey& target, bool right) const -> bool {
-    double length = driver.length.numerical_value_in(model::meter);
+    double length = driver.length.numerical_value_in(meter);
     model::LaneChangeAccelerations accelerations{.self_now = now};
     std::optional<model::Leader> new_leader =
         find_leader(target, along, state.turns, driver.seed, self);
-    if (new_leader && new_leader->gap <= 0.0 * model::meter) {
+    if (new_leader && new_leader->gap <= 0.0 * meter) {
       return false;
     }
     accelerations.self_after = model::compute_idm_acceleration(
@@ -866,7 +859,7 @@ struct Decide final            //
       if (gap <= 0.0) {
         return false;
       }
-      Speed speed = follower->speed * model::meter_per_second;
+      Speed speed = follower->speed * meter_per_second;
       const model::IntelligentDriver& following = follower->driver->following;
       accelerations.new_follower_now = model::compute_idm_acceleration(
           following, speed,
@@ -874,20 +867,19 @@ struct Decide final            //
                       follower->driver->seed, follower->entity));
       accelerations.new_follower_after = model::compute_idm_acceleration(
           following, speed,
-          model::Leader{.gap = gap * model::meter, .speed = state.speed});
+          model::Leader{.gap = gap * meter, .speed = state.speed});
     }
     if (const LaneOccupancy::Occupant* follower =
             occupancy_.find_behind(state.lane, along, self)) {
-      Speed speed = follower->speed * model::meter_per_second;
+      Speed speed = follower->speed * meter_per_second;
       const model::IntelligentDriver& following = follower->driver->following;
       accelerations.old_follower_now = model::compute_idm_acceleration(
           following, speed,
-          model::Leader{
-              .gap = (along - length - follower->along) * model::meter,
-              .speed = state.speed});
+          model::Leader{.gap = (along - length - follower->along) * meter,
+                        .speed = state.speed});
       std::optional<model::Leader> after = leader;
       if (after) {
-        after->gap += (along - follower->along) * model::meter;
+        after->gap += (along - follower->along) * meter;
       }
       accelerations.old_follower_after =
           model::compute_idm_acceleration(following, speed, after);
@@ -938,9 +930,9 @@ struct Drive final                //
       state.lane = *command->change;
     }
     double dt = std::chrono::duration<double>(step.dt).count();
-    double v = state.speed.numerical_value_in(model::meter_per_second);
-    double a = command->acceleration.numerical_value_in(
-        model::meter_per_second_squared);
+    double v = state.speed.numerical_value_in(meter_per_second);
+    double a =
+        command->acceleration.numerical_value_in(meter_per_second_squared);
     double travel = 0.0;
     if (v + a * dt < 0.0) {  // Stops within the step.
       travel = v * v / (2.0 * -a);
@@ -965,7 +957,7 @@ struct Drive final                //
       length = find_lane_length(*network_, state.lane);
     }
     state.s = find_s_along(*network_, state.lane, along);
-    state.speed = v * model::meter_per_second;
+    state.speed = v * meter_per_second;
     if (stopped) {
       stopped->committed = tactical && tactical->entering;
       if (v > 0.0) {
@@ -1013,7 +1005,7 @@ struct FollowLane final  //
     }
     return RoadPose{
         .position = model::compute_road_position(road, point, state.s, middle),
-        .heading = heading * model::radian};
+        .heading = heading * radian};
   }
 
  private:
@@ -1039,7 +1031,7 @@ inline auto plan_walk(const Network& network, std::uint32_t node,
   z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
   z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
   z ^= z >> 31;
-  model::Random random{z};
+  Random random{z};
   std::span<const std::uint32_t> component = network.walking_components;
   for (int attempt = 0; attempt < 100; ++attempt) {
     auto goal = static_cast<std::uint32_t>(
@@ -1074,12 +1066,12 @@ class WalkOccupancy final {
             return;
           }
           const model::Leg& leg = route->legs[state.leg];
-          walking_.push_back(Walking{
-              .edge = leg.edge,
-              .forward = leg.forward,
-              .along = state.along.numerical_value_in(model::meter),
-              .speed = state.speed.numerical_value_in(model::meter_per_second),
-              .entity = owner});
+          walking_.push_back(
+              Walking{.edge = leg.edge,
+                      .forward = leg.forward,
+                      .along = state.along.numerical_value_in(meter),
+                      .speed = state.speed.numerical_value_in(meter_per_second),
+                      .entity = owner});
         });
     std::ranges::sort(walking_, [](const Walking& a, const Walking& b) {
       return std::tie(a.edge, a.forward, a.along, a.entity) <
@@ -1194,7 +1186,7 @@ struct Pace final              //
       return;
     }
     std::span<const model::WalkEdge> edges = network_->walking.edges();
-    double along = state->along.numerical_value_in(model::meter);
+    double along = state->along.numerical_value_in(meter);
     const model::Leg& leg = route->legs[state->leg];
     double left = edges[leg.edge].length() - along;
     std::optional<double> gap;
@@ -1208,8 +1200,7 @@ struct Pace final              //
         gap = left + ahead->along;
       }
     }
-    double desired =
-        walker->desired_speed.numerical_value_in(model::meter_per_second);
+    double desired = walker->desired_speed.numerical_value_in(meter_per_second);
     double speed =
         gap ? std::clamp((*gap - SPACE) / HEADWAY, 0.0, desired) : desired;
 
@@ -1218,7 +1209,7 @@ struct Pace final              //
     if (edges[leg.edge].kind == model::WalkEdge::Kind::CROSSING) {
       command.crossing = edges[leg.edge].crosswalk;
       command.on = true;
-      command.clear = left / desired * model::second;
+      command.clear = left / desired * second;
     } else if (crossings_ && state->leg + 1 < route->legs.size() &&
                edges[route->legs[state->leg + 1].edge].kind ==
                    model::WalkEdge::Kind::CROSSING) {
@@ -1232,22 +1223,21 @@ struct Pace final              //
       }
       if (go) {
         command.crossing = crossing.crosswalk;
-        command.clear = (left + crossing.length()) / desired * model::second;
+        command.clear = (left + crossing.length()) / desired * second;
       } else {
         // Waits at the kerb.
         speed =
             std::min(speed, std::clamp((left - WAIT) / HEADWAY, 0.0, desired));
       }
     }
-    command.speed = speed * model::meter_per_second;
+    command.speed = speed * meter_per_second;
   }
 
  private:
   // Whether a pedestrian may step onto `crossing` now.
   auto may_cross(const model::WalkEdge& crossing, const Walker& walker) const
       -> bool {
-    double speed =
-        walker.desired_speed.numerical_value_in(model::meter_per_second);
+    double speed = walker.desired_speed.numerical_value_in(meter_per_second);
     double across = crossing.length() / speed;  // s.
     const std::optional<std::uint32_t>& group =
         network_->crosswalk_groups[crossing.crosswalk];
@@ -1257,8 +1247,7 @@ struct Pace final              //
              std::chrono::duration<double>(plan->keeps_aspect(now_)).count() >=
                  across;
     }
-    double critical =
-        across + walker.start_up.numerical_value_in(model::second);
+    double critical = across + walker.start_up.numerical_value_in(second);
     auto [first, last] = std::ranges::equal_range(
         by_crosswalk_, crossing.crosswalk, {},
         &std::pair<std::uint32_t, std::uint32_t>::first);
@@ -1277,13 +1266,13 @@ struct Pace final              //
             continue;  // Past it.
           }
           const model::IntelligentDriver& driver = vehicle.driver->following;
-          double arrival = model::compute_soonest_arrival(
-                               distance * model::meter,
-                               vehicle.speed * model::meter_per_second,
-                               driver.acceleration, driver.desired_speed)
-                               .numerical_value_in(model::second);
-          double comfortable = driver.deceleration.numerical_value_in(
-              model::meter_per_second_squared);
+          double arrival =
+              model::compute_soonest_arrival(
+                  distance * meter, vehicle.speed * meter_per_second,
+                  driver.acceleration, driver.desired_speed)
+                  .numerical_value_in(second);
+          double comfortable =
+              driver.deceleration.numerical_value_in(meter_per_second_squared);
           bool stops = network_->vehicles_yield &&
                        vehicle.speed * vehicle.speed / (2.0 * comfortable) <=
                            distance - 1.0;
@@ -1331,9 +1320,8 @@ struct Walk final                //
     }
     double dt = std::chrono::duration<double>(step.dt).count();
     state.speed = command->speed;
-    double along =
-        state.along.numerical_value_in(model::meter) +
-        command->speed.numerical_value_in(model::meter_per_second) * dt;
+    double along = state.along.numerical_value_in(meter) +
+                   command->speed.numerical_value_in(meter_per_second) * dt;
     std::span<const model::WalkEdge> edges = network_->walking.edges();
     while (along >= edges[route->legs[state.leg].edge].length()) {
       along -= edges[route->legs[state.leg].edge].length();
@@ -1352,7 +1340,7 @@ struct Walk final                //
       }
       route->legs = std::move(next);
     }
-    state.along = along * model::meter;
+    state.along = along * meter;
   }
 
  private:
@@ -1383,9 +1371,9 @@ struct PlaceWalker final       //
   static auto locate_walker(const Network& network, const WalkRoute& route,
                             const WalkState& state) -> RoadPose {
     auto [point, heading] = network.walking.locate(
-        route.legs[state.leg], state.along.numerical_value_in(model::meter));
-    return RoadPose{.position = model::meters(point.x, point.y, point.z),
-                    .heading = heading * model::radian};
+        route.legs[state.leg], state.along.numerical_value_in(meter));
+    return RoadPose{.position = meters(point.x, point.y, point.z),
+                    .heading = heading * radian};
   }
 
  private:
@@ -1572,8 +1560,8 @@ struct PlaceOnRoad final  //
     }
     model::PlacementPose at = motion->pose.value_or(
         model::compute_placement_pose(*context_->roads, motion->placement));
-    pose = RoadPose{.position = model::meters(at.x, at.y, at.z),
-                    .heading = at.heading * model::radian};
+    pose = RoadPose{.position = meters(at.x, at.y, at.z),
+                    .heading = at.heading * radian};
   }
 
  private:

@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "core/units.hpp"
 #include "model/aerodynamics.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/atmosphere.hpp"
@@ -12,7 +13,6 @@
 #include "model/propulsion.hpp"
 #include "model/rigid_body.hpp"
 #include "model/sensing.hpp"
-#include "model/units.hpp"
 #include "model/wind.hpp"
 
 // An aircraft as a rigid body (see rigid_body.hpp), flown by its control

@@ -6,13 +6,9 @@
 #include <optional>
 
 #include "base/core.hpp"
-#include "framework/step.hpp"
+#include "core/time.hpp"
 
 namespace simon::engine {
-
-using framework::Duration;
-using framework::Step;
-using framework::TimePoint;
 
 // A gate's behavior when a step spans more than one of its periods.
 enum class CatchUp {

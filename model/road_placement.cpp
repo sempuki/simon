@@ -9,7 +9,7 @@
 #include <numbers>
 #include <queue>
 
-#include "model/units.hpp"
+#include "core/units.hpp"
 
 namespace simon::model {
 

@@ -11,8 +11,8 @@
 #include <string>
 
 #include "application/automotive/scenario_simulation.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 
 auto main(int argc, char** argv) -> int {
   using namespace std::chrono_literals;
@@ -25,7 +25,7 @@ auto main(int argc, char** argv) -> int {
   ScenarioSimulation simulation{argv[1]};
   engine::BatchDriver<ScenarioSimulation> driver{
       engine::Timing{.max_step = 50ms}, Depend(simulation)};
-  if (auto end = driver.run(framework::TimePoint{3600s}); !end) {
+  if (auto end = driver.run(TimePoint{3600s}); !end) {
     std::println(stderr, "{}", end.error().message());
     return 1;
   }
@@ -35,9 +35,9 @@ auto main(int argc, char** argv) -> int {
         const RoadPose& pose = world.store_of<RoadPose>().component_of(owner);
         const ScenarioSpeed& speed =
             world.store_of<ScenarioSpeed>().component_of(owner);
-        Vector3 at = model::eigen(pose.position);
+        Vector3 at = eigen(pose.position);
         std::println("{}: ({:.3f}, {:.3f}) heading {:.4f} rad, {:.3f} m/s",
                      simulation.scenario().entities[actor.entity].name, at.x(),
-                     at.y(), model::radians(pose.heading), speed.speed);
+                     at.y(), radians(pose.heading), speed.speed);
       });
 }

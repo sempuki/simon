@@ -41,13 +41,13 @@ cc_library(
         "//engine:lifecycle",
         "//format:mjcf",
         "//framework",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         "//model:articulated",
         "//model:articulated_collision",
         "//model:articulated_constraint",
         "//model:articulated_dynamics",
         "//model:kinematics",
-        "//model:units",
+        "//core:units",
     ],
 )
 
@@ -59,7 +59,7 @@ cc_library(
     deps = [
         ":robotic_library",
         "//application:testing",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         "@lib//base:testing",
     ],
 )
@@ -131,7 +131,7 @@ cc_binary(
     copts = COPTS,
     deps = [
         ":robotic_library",
-        "//framework:vocabulary",
+        "//core:vocabulary",
     ],
 )
 
@@ -139,7 +139,7 @@ VIEWER_DEPS = [
     ":robotic_library",
     "//application:viewing",
     "//engine:driver",
-    "//framework:vocabulary",
+    "//core:vocabulary",
     "//model:articulated_arithmetic",
     "//3rd_party:imgui",
     "//3rd_party:implot",

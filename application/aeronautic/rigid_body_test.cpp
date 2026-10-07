@@ -10,12 +10,12 @@
 
 #include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
+#include "core/units.hpp"
 #include "format/aircraft_file.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/earth.hpp"
 #include "model/rigid_aircraft.hpp"
 #include "model/rigid_body.hpp"
-#include "model/units.hpp"
 
 // simon's equations of motion against JSBSim's, at states that
 // reference/jsbsim_737_rigid_body.py recorded from a maneuvering 737: given

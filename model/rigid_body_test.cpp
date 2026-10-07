@@ -16,7 +16,7 @@ using namespace std::chrono_literals;
 
 namespace {
 
-constexpr framework::Duration DT = std::chrono::microseconds{8333};
+constexpr Duration DT = std::chrono::microseconds{8333};
 
 // One classic Runge-Kutta step, as framework::Continuous takes it.
 template <typename RateFunction>

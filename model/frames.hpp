@@ -3,10 +3,10 @@
 #pragma once
 
 #include "Eigen/Geometry"
+#include "core/units.hpp"
 #include "model/earth.hpp"
 #include "model/flight_path.hpp"
 #include "model/rigid_body.hpp"
-#include "model/units.hpp"
 #include "model/wind.hpp"
 
 // The frames a rigid body flies in: the Earth it flies over, flat or round,

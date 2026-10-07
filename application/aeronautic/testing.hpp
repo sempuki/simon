@@ -14,9 +14,9 @@
 
 #include "application/testing.hpp"
 #include "base/testing.hpp"
-#include "framework/vocabulary.hpp"
+#include "core/units.hpp"
+#include "core/vocabulary.hpp"
 #include "model/rigid_body.hpp"
-#include "model/units.hpp"
 
 // Shared by the aeronautic tests.
 namespace simon::aeronautic::testing {
@@ -44,18 +44,18 @@ inline auto load_rows(std::string_view path) -> std::vector<Row> {
 
 // The columns `x`, `y` and `z` of `row`.
 inline auto read_vector(const Row& row, std::string_view x, std::string_view y,
-                        std::string_view z) -> model::QuantityVector {
-  return model::QuantityVector{row.at(x), row.at(y), row.at(z)};
+                        std::string_view z) -> QuantityVector {
+  return QuantityVector{row.at(x), row.at(y), row.at(z)};
 }
 
 // The body `row` records, in SI units.
 inline auto read_body(const Row& row) -> model::RigidBody {
   return model::RigidBody{
-      .position = read_vector(row, "x", "y", "z") * model::meter,
-      .velocity = read_vector(row, "vx", "vy", "vz") * model::meter_per_second,
+      .position = read_vector(row, "x", "y", "z") * meter,
+      .velocity = read_vector(row, "vx", "vy", "vz") * meter_per_second,
       .attitude =
           Quaternion{row.at("qw"), row.at("qx"), row.at("qy"), row.at("qz")},
-      .rate = read_vector(row, "p", "q", "r") * model::radian_per_second,
+      .rate = read_vector(row, "p", "q", "r") * radian_per_second,
   };
 }
 

@@ -7,7 +7,7 @@
 #include <array>
 #include <cmath>
 
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 #include "model/articulated.hpp"
 
 // MuJoCo's engine arithmetic on three-vectors, quaternions and 3x3 matrices,

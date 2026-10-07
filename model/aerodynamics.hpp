@@ -13,8 +13,8 @@
 #include <variant>
 #include <vector>
 
+#include "core/units.hpp"
 #include "model/control.hpp"
-#include "model/units.hpp"
 
 // Aerodynamics as data: a coefficient build-up of the kind JSBSim reads from
 // an aircraft's XML. Each axis sums terms, and each term is a constant times

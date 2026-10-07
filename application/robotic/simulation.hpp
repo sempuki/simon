@@ -11,8 +11,8 @@
 
 #include "application/robotic/simulation_components.hpp"
 #include "application/robotic/simulation_systems.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/lifecycle.hpp"
-#include "framework/vocabulary.hpp"
 
 namespace simon::robotic {
 
@@ -38,7 +38,7 @@ class Simulation final {
   // Reads the model and builds the world, a tree an entity.
   auto configure() -> engine::PhaseResult;
 
-  auto step(const framework::Step& step) -> engine::PhaseResult;
+  auto step(const Step& step) -> engine::PhaseResult;
 
   // Whether configure has read the model and built the world.
   auto ready() const -> bool { return scheduler_ != nullptr; }

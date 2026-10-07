@@ -9,8 +9,8 @@
 #include "application/galactic/simulation.hpp"
 #include "application/testing.hpp"
 #include "base/testing.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 #include "model/galaxy.hpp"
 #include "model/gravity.hpp"
 
@@ -31,8 +31,8 @@ auto read_state(const std::vector<std::string>& line) -> model::BodyStart {
     return testing::parse_number(line[column]);
   };
   return model::BodyStart{
-      .position = model::meters(number(2), number(3), number(4)),
-      .velocity = model::meters_per_second(number(5), number(6), number(7))};
+      .position = meters(number(2), number(3), number(4)),
+      .velocity = meters_per_second(number(5), number(6), number(7))};
 }
 
 // Every body's state in `simulation`: the masses, then the test particles.
@@ -59,11 +59,11 @@ TEST_CASE("Encounter") {
     // Toomre and Toomre's outermost ring, 15 kpc about 10^11 suns, turns in
     // 5.442 of their units of 10^8 years.
     double gm = model::GRAVITATIONAL_CONSTANT *
-                TOOMRE.victim.numerical_value_in(model::kilogram);
-    double r = (0.6 * TOOMRE.pericenter).numerical_value_in(model::meter);
+                TOOMRE.victim.numerical_value_in(kilogram);
+    double r = (0.6 * TOOMRE.pericenter).numerical_value_in(meter);
     double period = 2.0 * std::numbers::pi * std::sqrt(r * r * r / gm);
-    CHECK(std::abs(period / (5.442e8 * model::JULIAN_YEAR.numerical_value_in(
-                                           model::second)) -
+    CHECK(std::abs(period / (5.442e8 *
+                             model::JULIAN_YEAR.numerical_value_in(second)) -
                    1.0) < 1e-4);
   }
 
@@ -95,8 +95,7 @@ TEST_CASE("Encounter") {
     for (const std::vector<std::string>& line : table.lines) {
       auto step = static_cast<int>(testing::parse_number(line[0]));
       auto body = static_cast<std::size_t>(testing::parse_number(line[1]));
-      REQUIRE(
-          driver.advance_to(framework::BasicTimePoint<Year>{} + step * STEP));
+      REQUIRE(driver.advance_to(BasicTimePoint<Year>{} + step * STEP));
       model::BodyStart ours = collect_states(simulation)[body];
       model::BodyStart theirs = read_state(line);
       if (ours.position != theirs.position ||
@@ -120,19 +119,18 @@ TEST_CASE("Encounter") {
     const Year step{15625};
     Simulation simulation{make_encounter_scenario(converged)};
     engine::BatchDriver driver{Timing{.max_step = step}, Depend(simulation)};
-    REQUIRE(driver.run(framework::BasicTimePoint<Year>{} + 128000 * step));
+    REQUIRE(driver.run(BasicTimePoint<Year>{} + 128000 * step));
 
     std::vector<model::BodyStart> states = collect_states(simulation);
     double gm = model::GRAVITATIONAL_CONSTANT *
-                converged.companion.numerical_value_in(model::kilogram);
-    double e = converged.softening.numerical_value_in(model::meter);
+                converged.companion.numerical_value_in(kilogram);
+    double e = converged.softening.numerical_value_in(meter);
     auto energy_about = [&](const model::BodyStart& particle,
                             const model::BodyStart& mass) {
-      Vector3 d = (particle.position - mass.position)
-                      .numerical_value_in(model::meter)
-                      .eigen();
+      Vector3 d =
+          (particle.position - mass.position).numerical_value_in(meter).eigen();
       Vector3 v = (particle.velocity - mass.velocity)
-                      .numerical_value_in(model::meter_per_second)
+                      .numerical_value_in(meter_per_second)
                       .eigen();
       return 0.5 * v.squaredNorm() - gm / std::sqrt(d.squaredNorm() + e * e);
     };

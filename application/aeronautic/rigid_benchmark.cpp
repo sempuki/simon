@@ -27,9 +27,9 @@
 #include "application/aeronautic/simulation_components.hpp"
 #include "application/aeronautic/simulation_systems.hpp"
 #include "base/core.hpp"
+#include "core/vocabulary.hpp"
 #include "format/aircraft_file.hpp"
 #include "framework/benchmarking.hpp"
-#include "framework/vocabulary.hpp"
 
 namespace simon::aeronautic {
 namespace {
@@ -37,8 +37,7 @@ namespace {
 using namespace std::chrono_literals;
 using WallClock = std::chrono::steady_clock;
 
-constexpr std::string_view BOEING_737 =
-    "3rd_party/jsbsim/737.aircraft";
+constexpr std::string_view BOEING_737 = "3rd_party/jsbsim/737.aircraft";
 constexpr Duration DT = 8ms;
 constexpr int DEFAULT_STEPS = 250;  // 2 s simulated.
 
@@ -50,10 +49,9 @@ auto populate(int count, const model::Earth& earth,
   CHECK_POSTCONDITION(trim.has_value());
   auto transaction = world->transaction();
   for (int i = 0; i < count; ++i) {
-    auto built = create_rigid_aircraft(data, earth, *trim, SurfaceGains{},
-                                       2000.0 * (i % side) * model::meter,
-                                       2000.0 * (i / side) * model::meter,
-                                       0.0 * model::radian, Route{}, world);
+    auto built = create_rigid_aircraft(
+        data, earth, *trim, SurfaceGains{}, 2000.0 * (i % side) * meter,
+        2000.0 * (i / side) * meter, 0.0 * radian, Route{}, world);
     CHECK_POSTCONDITION(built.has_value());
   }
   transaction.commit();
@@ -89,7 +87,7 @@ auto measure(int aircraft, bool round, int steps,
       "FollowRigidBody"};
   std::array<double, NAMES.size()> seconds{};
   for (int i = 0; i < steps; ++i) {
-    framework::Step step{.time = TimePoint{} + i * DT, .dt = DT};
+    Step step{.time = TimePoint{} + i * DT, .dt = DT};
     std::size_t index = 0;
     std::apply(
         [&](auto&... scheduler) {

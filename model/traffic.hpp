@@ -5,7 +5,7 @@
 #include <cmath>
 #include <optional>
 
-#include "model/units.hpp"
+#include "core/units.hpp"
 
 // Driver models for traffic (see model/REFERENCES.md): the Intelligent Driver
 // Model for following (Treiber, Hennecke and Helbing 2000, in the form of

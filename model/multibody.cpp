@@ -204,8 +204,8 @@ auto operator*(double weight, const MultibodyVehicleRate& rate)
 }
 
 auto advance(const MultibodyVehicle& state, const MultibodyVehicleRate& rate,
-             framework::Duration dt) -> MultibodyVehicle {
-  double seconds = model::seconds(dt).numerical_value_in(second);
+             Duration dt) -> MultibodyVehicle {
+  double seconds = simon::seconds(dt).numerical_value_in(second);
   MultibodyNumbers x = convert_multibody_to_numbers(state);
   MultibodyNumbers f = convert_multibody_rate_to_numbers(rate);
   for (std::size_t i = 0; i < x.size(); ++i) {

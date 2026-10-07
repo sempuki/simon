@@ -12,18 +12,18 @@
 
 #include "application/galactic/simulation_components.hpp"
 #include "application/galactic/simulation_systems.hpp"
+#include "core/units.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
 #include "engine/lifecycle.hpp"
-#include "framework/vocabulary.hpp"
 #include "model/galaxy.hpp"
-#include "model/units.hpp"
 
 namespace simon::galactic {
 
 // Galactic time counts Julian years, 365.25 days of 86,400 s, which in an
 // int64 cover 9 x 10^18 years: nanoseconds would cover only 292.
 using Year = std::chrono::duration<std::int64_t, std::ratio<31557600>>;
-using Step = framework::BasicStep<Year>;
+using Step = BasicStep<Year>;
 using Timing = engine::BasicTiming<Year>;
 
 using model::BodyStart;
@@ -44,7 +44,7 @@ struct BodyGroup final {
 struct Scenario final {
   std::vector<BodyStart> bodies;
   std::vector<BodyStart> test_particles;  // Their masses are not used.
-  model::Length softening = 0.0 * model::meter;
+  Length softening = 0.0 * meter;
   GravityMethod gravity = GravityMethod::DIRECT;
   double opening_angle = 0.5;
   std::vector<BodyGroup> groups;
@@ -63,11 +63,11 @@ auto build_bodies(const Scenario& scenario, Out<World> world,
 // lie in the x-y plane, both turning counterclockwise: a flat direct passage.
 // The center of mass is at the origin and at rest.
 struct Encounter final {
-  model::Mass victim = 0.0 * model::kilogram;
-  model::Mass companion = 0.0 * model::kilogram;
-  model::Length pericenter = 0.0 * model::meter;
-  model::Time before = 0.0 * model::second;
-  model::Length softening = 0.0 * model::meter;
+  Mass victim = 0.0 * kilogram;
+  Mass companion = 0.0 * kilogram;
+  Length pericenter = 0.0 * meter;
+  Time before = 0.0 * second;
+  Length softening = 0.0 * meter;
 };
 
 auto make_encounter_scenario(const Encounter& encounter) -> Scenario;
@@ -80,11 +80,11 @@ auto make_encounter_scenario(const Encounter& encounter) -> Scenario;
 // passage. The groups are each galaxy's disk and halo.
 struct Collision final {
   model::DiskGalaxy galaxy;
-  model::Length pericenter = 0.0 * model::meter;
-  model::Time before = 0.0 * model::second;
-  model::Angle first_inclination = 0.0 * model::radian;
-  model::Angle second_inclination = 0.0 * model::radian;
-  model::Length softening = 0.0 * model::meter;
+  Length pericenter = 0.0 * meter;
+  Time before = 0.0 * second;
+  Angle first_inclination = 0.0 * radian;
+  Angle second_inclination = 0.0 * radian;
+  Length softening = 0.0 * meter;
   double opening_angle = 0.5;
   std::uint64_t seed = 1;
 };
@@ -118,8 +118,7 @@ auto make_toomre_encounter() -> Encounter;
 // times the center of mass of those within `reach` of it, so that bodies
 // thrown into tails do not pull it off the galaxy.
 auto compute_group_center(const World& world, std::span<const Entity> bodies,
-                          const BodyGroup& group, model::Length reach)
-    -> model::Position;
+                          const BodyGroup& group, Length reach) -> Position;
 
 // A run's conserved quantities, in SI units, and its energy's two parts.
 struct Mechanics final {
@@ -136,13 +135,12 @@ struct Mechanics final {
 
 // Measures every body in `world`, its potential energy softened by
 // `softening`. It sums each pair once, so it costs N^2.
-auto measure_mechanics(const World& world, model::Length softening)
-    -> Mechanics;
+auto measure_mechanics(const World& world, Length softening) -> Mechanics;
 
 // Computes the radii about the center of mass inside which each of
 // `fractions` of the mass lies.
 auto compute_mass_radii(const World& world, std::span<const double> fractions)
-    -> std::vector<model::Length>;
+    -> std::vector<Length>;
 
 // The galactic simulation. Any driver can run it.
 class Simulation final {

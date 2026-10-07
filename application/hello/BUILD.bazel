@@ -13,13 +13,13 @@ cc_library(
     hdrs = ["hello.hpp"],
     copts = COPTS,
     deps = [
-        "//framework:vocabulary",
+        "//core:vocabulary",
         "//framework",
         "//engine:lifecycle",
         "//model:kinematics",
         "//model:motion",
-        "//model:random",
-        "//model:units",
+        "//core:random",
+        "//core:units",
     ],
 )
 
@@ -29,7 +29,7 @@ cc_test(
     srcs = ["hello_test.cpp"],
     copts = COPTS,
     deps = [
-        "//framework:vocabulary",
+        "//core:vocabulary",
         ":hello_library",
         "//engine:driver",
         "@lib//base:testing",
@@ -41,7 +41,7 @@ cc_binary(
     srcs = ["main.cpp"],
     copts = COPTS,
     deps = [
-        "//framework:vocabulary",
+        "//core:vocabulary",
         ":hello_library",
         "//engine:driver",
     ],
@@ -52,7 +52,7 @@ cc_binary(
     srcs = ["viewer.cpp"],
     copts = COPTS,
     deps = [
-        "//framework:vocabulary",
+        "//core:vocabulary",
         ":hello_library",
         "//application:viewing",
         "//engine:driver",
@@ -70,7 +70,7 @@ cc_test(
     copts = COPTS,
     env = {"SDL_VIDEODRIVER": "dummy"},
     deps = [
-        "//framework:vocabulary",
+        "//core:vocabulary",
         ":hello_library",
         "//application:viewing",
         "//engine:driver",

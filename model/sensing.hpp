@@ -4,12 +4,12 @@
 
 #pragma once
 
+#include "core/units.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/atmosphere.hpp"
 #include "model/frames.hpp"
 #include "model/mass_balance.hpp"
 #include "model/rigid_body.hpp"
-#include "model/units.hpp"
 #include "model/wind.hpp"
 
 // What a rigid aircraft's flight controls sense: its air data, attitude and

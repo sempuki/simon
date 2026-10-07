@@ -8,7 +8,7 @@
 
 #include "application/automotive/simulation.hpp"
 #include "base/testing.hpp"
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 
 namespace simon::automotive {
 
@@ -35,7 +35,7 @@ auto shortest_gap(const Simulation& simulation) -> double {
         const Driver& driver = world.store_of<Driver>().component_of(owner);
         by_lane[state.lane].emplace_back(
             along_lane(simulation.network(), state.lane, state.s),
-            driver.length.numerical_value_in(model::meter));
+            driver.length.numerical_value_in(meter));
       });
   double shortest = 1e9;
   for (auto& [lane, vehicles] : by_lane) {
@@ -53,7 +53,7 @@ auto mean_speed(const Simulation& simulation) -> double {
   std::size_t count = 0;
   simulation.world().store_of<LaneState>().for_each(
       [&](Entity, const LaneState& state) {
-        total += state.speed.numerical_value_in(model::meter_per_second);
+        total += state.speed.numerical_value_in(meter_per_second);
         ++count;
       });
   return total / static_cast<double>(count);
@@ -124,11 +124,11 @@ TEST_CASE("Automotive") {
 
   SECTION("ShouldFlowThroughJunctionsGivenTown") {
     // CARLA's Town01: one lane each way through twelve junctions.
-    Simulation simulation{Scenario{
-        .seed = 5,
-        .roads = "3rd_party/carla/Town01.xodr",
-        .vehicles = 60,
-        .following = {.desired_speed = 11.0 * model::meter_per_second}}};
+    Simulation simulation{
+        Scenario{.seed = 5,
+                 .roads = "3rd_party/carla/Town01.xodr",
+                 .vehicles = 60,
+                 .following = {.desired_speed = 11.0 * meter_per_second}}};
     REQUIRE(simulation.configure());
     std::uint32_t turns = 0;
     run(simulation, 120s, [](TimePoint) {});

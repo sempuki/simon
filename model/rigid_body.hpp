@@ -3,9 +3,9 @@
 #pragma once
 
 #include "Eigen/Geometry"
-#include "framework/step.hpp"
+#include "core/time.hpp"
+#include "core/units.hpp"
 #include "model/kinematics.hpp"
-#include "model/units.hpp"
 
 // A rigid body in six degrees of freedom, in an inertial frame: the Earth-
 // centered inertial frame for a round, rotating Earth (see earth.hpp), or a
@@ -64,8 +64,8 @@ inline auto operator*(double weight, const RigidBodyRate& rate)
 
 // Moves `body` along `rate` for `dt`, keeping its attitude a unit quaternion.
 inline auto advance(const RigidBody& body, const RigidBodyRate& rate,
-                    framework::Duration dt) -> RigidBody {
-  double seconds = model::seconds(dt).numerical_value_in(second);
+                    Duration dt) -> RigidBody {
+  double seconds = simon::seconds(dt).numerical_value_in(second);
   Quaternion attitude{body.attitude.coeffs() + seconds * rate.attitude};
   attitude.normalize();
   return RigidBody{

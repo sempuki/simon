@@ -95,14 +95,14 @@ auto load_sedan() -> VehicleParameters {
   }
   double com = value.at("com_x");
   VehicleParameters sedan{
-      .front = (value.at("front_left_x") - com) * model::meter,
-      .rear = (com - value.at("rear_left_x")) * model::meter,
-      .sprung_height = 0.411 * model::meter,
-      .wheel_radius = value.at("wheel_radius") * model::meter,
-      .mass = value.at("mass") * model::kilogram,
-      .yaw_inertia = value.at("inertia_zz") * model::kilogram_square_meter,
+      .front = (value.at("front_left_x") - com) * meter,
+      .rear = (com - value.at("rear_left_x")) * meter,
+      .sprung_height = 0.411 * meter,
+      .wheel_radius = value.at("wheel_radius") * meter,
+      .mass = value.at("mass") * kilogram,
+      .yaw_inertia = value.at("inertia_zz") * kilogram_square_meter,
       .wheel_inertia = 0.5 * ((0.42 + 0.679 + 0.4) + (0.42 + 0.679 + 0.166)) *
-                       model::kilogram_square_meter,
+                       kilogram_square_meter,
       .front_brake_share = 0.5,
       .front_drive_share = 1.0,
       .tire = *tire,
@@ -126,45 +126,42 @@ auto load_sedan_multibody() -> VehicleParameters {
   for (const Row& row : load_rows("chrono_sedan.csv")) {
     value[row.find("name")->second] = number(row, "value");
   }
-  sedan.front = 1.388 * model::meter;
-  sedan.rear = 1.388 * model::meter;
-  sedan.front_track = 2.0 * value.at("front_left_y") * model::meter;
-  sedan.rear_track = 2.0 * value.at("rear_left_y") * model::meter;
-  sedan.sprung_height = 0.419 * model::meter;
-  sedan.front_unsprung_mass = 2.0 * 28.0 * model::kilogram;
-  sedan.rear_unsprung_mass = 2.0 * 39.9 * model::kilogram;
+  sedan.front = 1.388 * meter;
+  sedan.rear = 1.388 * meter;
+  sedan.front_track = 2.0 * value.at("front_left_y") * meter;
+  sedan.rear_track = 2.0 * value.at("rear_left_y") * meter;
+  sedan.sprung_height = 0.419 * meter;
+  sedan.front_unsprung_mass = 2.0 * 28.0 * kilogram;
+  sedan.rear_unsprung_mass = 2.0 * 39.9 * kilogram;
   sedan.sprung_mass =
       sedan.mass - sedan.front_unsprung_mass - sedan.rear_unsprung_mass;
-  sedan.roll_inertia = 222.8 * model::kilogram_square_meter;
-  sedan.pitch_inertia = 944.1 * model::kilogram_square_meter;
-  sedan.roll_yaw_product = 0.0 * model::kilogram_square_meter;
-  sedan.front_unsprung_roll_inertia =
-      56.0 * 0.8 * 0.8 * model::kilogram_square_meter;
-  sedan.rear_unsprung_roll_inertia =
-      79.8 * 0.8 * 0.8 * model::kilogram_square_meter;
+  sedan.roll_inertia = 222.8 * kilogram_square_meter;
+  sedan.pitch_inertia = 944.1 * kilogram_square_meter;
+  sedan.roll_yaw_product = 0.0 * kilogram_square_meter;
+  sedan.front_unsprung_roll_inertia = 56.0 * 0.8 * 0.8 * kilogram_square_meter;
+  sedan.rear_unsprung_roll_inertia = 79.8 * 0.8 * 0.8 * kilogram_square_meter;
   sedan.suspension = {
-      .front_spring = 16300.0 * model::newton_per_meter,
-      .front_damping = 3336.0 * model::newton_second_per_meter,
-      .rear_spring = 61000.0 * model::newton_per_meter,
-      .rear_damping = 5477.0 * model::newton_second_per_meter,
-      .front_roll_stiffness = 5900.0 * model::newton_meter_per_radian,
-      .rear_roll_stiffness = 2200.0 * model::newton_meter_per_radian,
-      .tire_spring = 280835.2941 * model::newton_per_meter,
-      .tire_compliance = 0.0 * model::meter_per_newton,
-      .front_camber = 0.0 * model::radian_per_meter,
-      .rear_camber = 0.0 * model::radian_per_meter,
+      .front_spring = 16300.0 * newton_per_meter,
+      .front_damping = 3336.0 * newton_second_per_meter,
+      .rear_spring = 61000.0 * newton_per_meter,
+      .rear_damping = 5477.0 * newton_second_per_meter,
+      .front_roll_stiffness = 5900.0 * newton_meter_per_radian,
+      .rear_roll_stiffness = 2200.0 * newton_meter_per_radian,
+      .tire_spring = 280835.2941 * newton_per_meter,
+      .tire_compliance = 0.0 * meter_per_newton,
+      .front_camber = 0.0 * radian_per_meter,
+      .rear_camber = 0.0 * radian_per_meter,
   };
-  sedan.front_roll_axis_height = 0.124 * model::meter;
-  sedan.rear_roll_axis_height = 0.02 * model::meter;
-  sedan.steering = {.min = -1.0 * model::radian,
-                    .max = 1.0 * model::radian,
-                    .min_rate = -100.0 * model::radian_per_second,
-                    .max_rate = 100.0 * model::radian_per_second};
-  sedan.longitudinal = {
-      .max_acceleration = 100.0 * model::meter_per_second_squared,
-      .switch_speed = 100.0 * model::meter_per_second,
-      .min_speed = -100.0 * model::meter_per_second,
-      .max_speed = 100.0 * model::meter_per_second};
+  sedan.front_roll_axis_height = 0.124 * meter;
+  sedan.rear_roll_axis_height = 0.02 * meter;
+  sedan.steering = {.min = -1.0 * radian,
+                    .max = 1.0 * radian,
+                    .min_rate = -100.0 * radian_per_second,
+                    .max_rate = 100.0 * radian_per_second};
+  sedan.longitudinal = {.max_acceleration = 100.0 * meter_per_second_squared,
+                        .switch_speed = 100.0 * meter_per_second,
+                        .min_speed = -100.0 * meter_per_second,
+                        .max_speed = 100.0 * meter_per_second};
   return sedan;
 }
 
@@ -176,10 +173,10 @@ struct DriftModel final {
   static auto start(const Sample& at, const VehicleParameters& vehicle)
       -> State {
     State state = model::start_drift_single_track(
-        std::hypot(at.speed, at.lateral) * model::meter_per_second, vehicle);
-    state.steering = at.steering * model::radian;
-    state.yaw_rate = at.yaw_rate * model::radian_per_second;
-    state.slip_angle = std::atan2(at.lateral, at.speed) * model::radian;
+        std::hypot(at.speed, at.lateral) * meter_per_second, vehicle);
+    state.steering = at.steering * radian;
+    state.yaw_rate = at.yaw_rate * radian_per_second;
+    state.slip_angle = std::atan2(at.lateral, at.speed) * radian;
     return state;
   }
   static auto compute_rate(const State& state, const model::VehicleInput& input,
@@ -190,16 +187,16 @@ struct DriftModel final {
     return sample.steering;
   }
   static auto read(const State& state, double time) -> Sample {
-    double v = state.speed.numerical_value_in(model::meter_per_second);
-    double beta = model::radians(state.slip_angle);
+    double v = state.speed.numerical_value_in(meter_per_second);
+    double beta = radians(state.slip_angle);
     return Sample{
         .time = time,
-        .steering = model::radians(state.steering),
+        .steering = radians(state.steering),
         .speed = v * std::cos(beta),
         .lateral = v * std::sin(beta),
-        .yaw_rate = state.yaw_rate.numerical_value_in(model::radian_per_second),
-        .x = state.x.numerical_value_in(model::meter),
-        .y = state.y.numerical_value_in(model::meter)};
+        .yaw_rate = state.yaw_rate.numerical_value_in(radian_per_second),
+        .x = state.x.numerical_value_in(meter),
+        .y = state.y.numerical_value_in(meter)};
   }
 };
 
@@ -213,11 +210,10 @@ struct MultibodyModel final {
 
   static auto start(const Sample& at, const VehicleParameters& vehicle)
       -> State {
-    State state =
-        model::start_multibody(at.speed * model::meter_per_second, vehicle);
-    state.steering = -at.steering * model::radian;
-    state.yaw_rate = -at.yaw_rate * model::radian_per_second;
-    state.body.lateral_speed = -at.lateral * model::meter_per_second;
+    State state = model::start_multibody(at.speed * meter_per_second, vehicle);
+    state.steering = -at.steering * radian;
+    state.yaw_rate = -at.yaw_rate * radian_per_second;
+    state.body.lateral_speed = -at.lateral * meter_per_second;
     return state;
   }
   static auto compute_rate(const State& state, const model::VehicleInput& input,
@@ -225,11 +221,10 @@ struct MultibodyModel final {
                            const Sample& chrono) {
     model::WheelSteer toe;
     if (TOE) {
-      toe = {
-          .left_front = -(chrono.wheels[0] - chrono.steering) * model::radian,
-          .right_front = -(chrono.wheels[1] - chrono.steering) * model::radian,
-          .left_rear = -chrono.wheels[2] * model::radian,
-          .right_rear = -chrono.wheels[3] * model::radian};
+      toe = {.left_front = -(chrono.wheels[0] - chrono.steering) * radian,
+             .right_front = -(chrono.wheels[1] - chrono.steering) * radian,
+             .left_rear = -chrono.wheels[2] * radian,
+             .right_rear = -chrono.wheels[3] * radian};
     }
     return model::compute_multibody_rate(state, input, vehicle, toe);
   }
@@ -239,14 +234,13 @@ struct MultibodyModel final {
   static auto read(const State& state, double time) -> Sample {
     return Sample{
         .time = time,
-        .steering = -model::radians(state.steering),
-        .speed = state.speed.numerical_value_in(model::meter_per_second),
-        .lateral = -state.body.lateral_speed.numerical_value_in(
-            model::meter_per_second),
-        .yaw_rate =
-            -state.yaw_rate.numerical_value_in(model::radian_per_second),
-        .x = state.x.numerical_value_in(model::meter),
-        .y = -state.y.numerical_value_in(model::meter)};
+        .steering = -radians(state.steering),
+        .speed = state.speed.numerical_value_in(meter_per_second),
+        .lateral =
+            -state.body.lateral_speed.numerical_value_in(meter_per_second),
+        .yaw_rate = -state.yaw_rate.numerical_value_in(radian_per_second),
+        .x = state.x.numerical_value_in(meter),
+        .y = -state.y.numerical_value_in(meter)};
   }
 };
 
@@ -261,7 +255,7 @@ auto drive(const VehicleParameters& vehicle, const std::vector<Sample>& chrono,
   auto first = static_cast<std::size_t>(std::lround(start / SAMPLE));
   typename Model::State state = Model::start(chrono[first], vehicle);
   std::vector<Sample> path{Model::read(state, chrono[first].time)};
-  auto dt = framework::Duration{std::chrono::microseconds{1000}};
+  auto dt = Duration{std::chrono::microseconds{1000}};
   for (std::size_t i = first; i + 1 < chrono.size(); ++i) {
     const Sample& now = chrono[i];
     const Sample& next = chrono[i + 1];
@@ -272,9 +266,9 @@ auto drive(const VehicleParameters& vehicle, const std::vector<Sample>& chrono,
       double ours = Model::read(state, 0.0).speed;
       double target = now.speed + (next.speed - now.speed) * k / SUBSTEPS;
       model::VehicleInput input{
-          .steering_rate = steering_rate * model::radian_per_second,
-          .acceleration = (wanted + 2.0 * (target - ours)) *
-                          model::meter_per_second_squared};
+          .steering_rate = steering_rate * radian_per_second,
+          .acceleration =
+              (wanted + 2.0 * (target - ours)) * meter_per_second_squared};
       auto rate = [&](const typename Model::State& at) {
         return Model::compute_rate(at, input, vehicle, now);
       };
@@ -442,12 +436,12 @@ TEST_CASE("ManeuversAgainstChronoSedan") {
   VehicleParameters sedan = load_sedan();
   VehicleParameters multibody = load_sedan_multibody();
   Comparison theirs =
-      measure(chrono, sedan.wheelbase().numerical_value_in(model::meter));
+      measure(chrono, sedan.wheelbase().numerical_value_in(meter));
 
   SECTION("ShouldMatchGivenMultibodySteeredAsChronoSteersEachWheel") {
     Comparison ours =
         measure(drive_all<MultibodyModel<true>>(multibody, chrono),
-                multibody.wheelbase().numerical_value_in(model::meter));
+                multibody.wheelbase().numerical_value_in(meter));
     capture(theirs, ours);
     CHECK(std::abs(ours.understeer[0] - theirs.understeer[0]) < 0.02);
     CHECK(std::abs(ours.understeer[1] - theirs.understeer[1]) < 0.05);
@@ -464,7 +458,7 @@ TEST_CASE("ManeuversAgainstChronoSedan") {
   SECTION("ShouldMatchGivenMultibodySteeredByTheMean") {
     Comparison ours =
         measure(drive_all<MultibodyModel<false>>(multibody, chrono),
-                multibody.wheelbase().numerical_value_in(model::meter));
+                multibody.wheelbase().numerical_value_in(meter));
     capture(theirs, ours);
     CHECK(std::abs(ours.understeer[0] - theirs.understeer[0]) < 0.04);
     CHECK(std::abs(ours.understeer[1] - theirs.understeer[1]) < 0.06);
@@ -475,9 +469,8 @@ TEST_CASE("ManeuversAgainstChronoSedan") {
   }
 
   SECTION("ShouldMatchGivenDriftSingleTrack") {
-    Comparison ours =
-        measure(drive_all<DriftModel>(sedan, chrono),
-                sedan.wheelbase().numerical_value_in(model::meter));
+    Comparison ours = measure(drive_all<DriftModel>(sedan, chrono),
+                              sedan.wheelbase().numerical_value_in(meter));
     capture(theirs, ours);
     CHECK(std::abs(ours.understeer[0] - theirs.understeer[0]) < 0.04);
     CHECK(std::abs(ours.understeer[1] - theirs.understeer[1]) < 0.07);

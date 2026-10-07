@@ -1,7 +1,7 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "application/defense/simulation.hpp"
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -34,9 +34,8 @@ auto build_world(const Scenario& scenario, Out<World> world)
 }
 
 auto on_ring(Length radius, double bearing) -> Position {
-  double length = radius.numerical_value_in(model::meter);
-  return model::meters(length * std::cos(bearing), length * std::sin(bearing),
-                       0.0);
+  double length = radius.numerical_value_in(meter);
+  return meters(length * std::cos(bearing), length * std::sin(bearing), 0.0);
 }
 
 auto SiteBuilder::build() && -> std::expected<Entity, framework::Status> {
@@ -108,13 +107,13 @@ auto build_scenario(const Scenario& scenario, InOut<World> world)
   auto count = [](int value) {
     return static_cast<std::size_t>(std::max(value, 0));
   };
-  model::Random random{scenario.seed};
+  Random random{scenario.seed};
   int side = static_cast<int>(std::ceil(std::sqrt(scenario.sites)));
-  double spacing = scenario.site_spacing.numerical_value_in(model::meter);
+  double spacing = scenario.site_spacing.numerical_value_in(meter);
   std::optional<Entity> first;
   for (int site = 0; site < scenario.sites; ++site) {
     Position origin =
-        model::meters(spacing * (site % side), spacing * (site / side), 0.0);
+        meters(spacing * (site % side), spacing * (site / side), 0.0);
     SiteBuilder watched =
         create_site(origin, Depend(*world))
             .protecting(Health{.points = scenario.asset_health})
@@ -165,7 +164,7 @@ auto Simulation::configure() -> engine::PhaseResult {
   return engine::Flow::CONTINUE;
 }
 
-auto Simulation::step(const framework::Step& step) -> engine::PhaseResult {
+auto Simulation::step(const Step& step) -> engine::PhaseResult {
   events_.process_until(step.time);
   scheduler_.step(step, InOut(world_));
   if (!world_.alive(asset_)) {

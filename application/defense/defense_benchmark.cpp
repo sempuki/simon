@@ -34,9 +34,9 @@
 
 #include "application/defense/simulation.hpp"
 #include "base/core.hpp"
+#include "core/vocabulary.hpp"
 #include "framework/benchmarking.hpp"
 #include "framework/type_list.hpp"
-#include "framework/vocabulary.hpp"
 
 namespace simon::defense {
 namespace {
@@ -60,8 +60,8 @@ auto make_scenario(int drones) -> Scenario {
                   .radars = std::max(3, per_site / 100),
                   .launchers = std::max(3, per_site / 20),
                   .drones = per_site,
-                  .spawn_distance = 3500.0 * model::meter,
-                  .spawn_spread = 1000.0 * model::meter,
+                  .spawn_distance = 3500.0 * meter,
+                  .spawn_spread = 1000.0 * meter,
                   .sites = sites};
 }
 
@@ -91,7 +91,7 @@ auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
          (!budgeted || WallClock::now() - wall_start < WALL_BUDGET) &&
          world.alive(asset) && world.store_of<RedDrone>().size() > 0;
        ++steps) {
-    framework::Step step{.time = TimePoint{} + steps * DT, .dt = DT};
+    Step step{.time = TimePoint{} + steps * DT, .dt = DT};
     entity_steps += world.size();
     std::size_t index = 0;
     double this_step = 0.0;

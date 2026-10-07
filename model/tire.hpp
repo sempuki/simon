@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <variant>
 
-#include "model/units.hpp"
+#include "core/units.hpp"
 
 // A tire's forces by Pacejka's Magic Formula 5.2, as PAC2002 (Pacejka, Tyre
 // and Vehicle Dynamics, 2002, chapter 4; Kuiper and van Oosten; see

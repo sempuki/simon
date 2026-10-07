@@ -15,8 +15,8 @@
 #include <print>
 
 #include "application/aeronautic/simulation.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 
 auto main(int argc, char** argv) -> int {
   using namespace simon;
@@ -43,7 +43,7 @@ auto main(int argc, char** argv) -> int {
                              Depend(simulation)};
 
   auto wall_start = std::chrono::steady_clock::now();
-  auto reached = driver.run(framework::TimePoint{10min});
+  auto reached = driver.run(TimePoint{10min});
   if (!reached) {
     std::println(stderr, "Error: {}", reached.error().message());
     return EXIT_FAILURE;

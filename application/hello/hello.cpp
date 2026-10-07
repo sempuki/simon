@@ -6,8 +6,8 @@
 #include <format>
 #include <numbers>
 
-#include "framework/vocabulary.hpp"
-#include "model/random.hpp"
+#include "core/random.hpp"
+#include "core/vocabulary.hpp"
 
 namespace simon::hello {
 
@@ -21,12 +21,11 @@ auto compute_cell(const Scenario& scenario) -> Length {
 // Computes the push between two bodies of reduced mass `reduced` that overlap
 // by `overlap` and close at `closing`.
 auto compute_push(const Springiness& springiness, Mass reduced, Length overlap,
-                  Speed closing) -> model::Force {
-  model::Rate frequency = std::numbers::pi / springiness.duration;
-  model::Rate decay = -std::log(springiness.restitution) / springiness.duration;
-  model::Stiffness stiffness =
-      reduced * (frequency * frequency + decay * decay);
-  model::Damping damping = 2.0 * reduced * decay;
+                  Speed closing) -> Force {
+  Rate frequency = std::numbers::pi / springiness.duration;
+  Rate decay = -std::log(springiness.restitution) / springiness.duration;
+  Stiffness stiffness = reduced * (frequency * frequency + decay * decay);
+  Damping damping = 2.0 * reduced * decay;
   return stiffness * overlap + damping * closing;
 }
 
@@ -34,14 +33,14 @@ auto compute_push(const Springiness& springiness, Mass reduced, Length overlap,
 // y), with the inside on the side `inside` (+1 or -1) points to, on a ball of
 // `mass` and `radius` at `center` moving at `velocity`.
 auto push_off_wall(const Springiness& springiness, Mass mass, double wall,
-                   int axis, double inside, const model::QuantityVector& center,
-                   const model::QuantityVector& velocity, double radius,
+                   int axis, double inside, const QuantityVector& center,
+                   const QuantityVector& velocity, double radius,
                    InOut<Contact> contact) -> void {
   double overlap = radius - inside * (center.eigen()[axis] - wall);
   if (!(overlap > 0.0)) return;
   Speed closing = -inside * velocity.eigen()[axis] * meter_per_second;
-  model::QuantityVector normal{axis == 0 ? inside : 0.0,
-                               axis == 1 ? inside : 0.0, 0.0};
+  QuantityVector normal{axis == 0 ? inside : 0.0, axis == 1 ? inside : 0.0,
+                        0.0};
   contact->force += ForceVector{
       normal * compute_push(springiness, mass, overlap * meter, closing)};
 }
@@ -83,8 +82,8 @@ auto append_ball_contact(const Springiness& springiness, const Body& body,
 auto append_wall_contacts(const Springiness& springiness, const Box& box,
                           const Body& body, const Kinematics& kinematics,
                           InOut<Contact> contact) -> void {
-  model::QuantityVector center = kinematics.position.numerical_value_in(meter);
-  model::QuantityVector velocity =
+  QuantityVector center = kinematics.position.numerical_value_in(meter);
+  QuantityVector velocity =
       kinematics.velocity.numerical_value_in(meter_per_second);
   double radius = body.radius.numerical_value_in(meter);
   double width = box.width.numerical_value_in(meter);
@@ -130,11 +129,11 @@ auto build_balls(const Scenario& scenario, InOut<World> world)
   double largest = scenario.largest.numerical_value_in(meter);
   double fastest = scenario.fastest.numerical_value_in(meter_per_second);
   Control gravity{
-      .acceleration = model::meters_per_second_squared(
+      .acceleration = meters_per_second_squared(
           0.0, -scenario.gravity.numerical_value_in(meter_per_second_squared),
           0.0)};
 
-  model::Random random{scenario.seed};
+  Random random{scenario.seed};
   for (std::size_t ball = 0; ball < scenario.balls; ++ball) {
     std::size_t at = ball * cells / scenario.balls;
     double radius = random.uniform(smallest, largest);
@@ -161,7 +160,7 @@ auto build_balls(const Scenario& scenario, InOut<World> world)
 }
 
 auto compute_momentum(const World& world) -> Momentum {
-  Momentum momentum = model::meters_per_second(0.0, 0.0, 0.0) * model::kilogram;
+  Momentum momentum = meters_per_second(0.0, 0.0, 0.0) * kilogram;
   world.store_of<Body>().for_each([&](Entity entity, const Body& body) {
     momentum +=
         body.mass * world.store_of<Kinematics>().component_of(entity).velocity;
@@ -171,7 +170,7 @@ auto compute_momentum(const World& world) -> Momentum {
 
 auto compute_energy(const World& world, AccelerationMagnitude gravity)
     -> Energy {
-  Energy energy = 0.0 * model::units::si::joule;
+  Energy energy = 0.0 * units::si::joule;
   world.store_of<Body>().for_each([&](Entity entity, const Body& body) {
     const Kinematics& kinematics =
         world.store_of<Kinematics>().component_of(entity);
@@ -190,7 +189,7 @@ auto Simulation::configure() -> engine::PhaseResult {
   return engine::Flow::CONTINUE;
 }
 
-auto Simulation::step(const framework::Step& step) -> engine::PhaseResult {
+auto Simulation::step(const Step& step) -> engine::PhaseResult {
   scheduler_.step(step, InOut(world_));
   return engine::Flow::CONTINUE;
 }

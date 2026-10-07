@@ -23,11 +23,6 @@ using namespace std::chrono_literals;
 using namespace testing;
 using model::KinematicSingleTrack;
 using model::KinematicSingleTrackRate;
-using model::meter;
-using model::meter_per_second;
-using model::meter_per_second_squared;
-using model::radian;
-using model::radian_per_second;
 using model::VehicleInput;
 using model::VehicleParameters;
 

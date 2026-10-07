@@ -9,7 +9,7 @@
 #include <span>
 #include <vector>
 
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 #include "model/articulated.hpp"
 #include "model/articulated_dynamics.hpp"
 

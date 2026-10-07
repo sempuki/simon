@@ -12,8 +12,8 @@
 #include <string>
 
 #include "application/automotive/simulation.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 
 auto main(int argc, char** argv) -> int {
   using namespace simon;
@@ -32,7 +32,7 @@ auto main(int argc, char** argv) -> int {
   automotive::Simulation simulation{scenario};
   engine::BatchDriver<automotive::Simulation> driver{
       engine::Timing{.max_step = 100ms}, Depend(simulation)};
-  auto end = driver.run(framework::TimePoint{std::chrono::seconds{seconds}});
+  auto end = driver.run(TimePoint{std::chrono::seconds{seconds}});
   if (!end) {
     std::cerr << "Error: " << end.error().message() << "\n";
     return EXIT_FAILURE;
@@ -41,7 +41,7 @@ auto main(int argc, char** argv) -> int {
   std::size_t vehicles = 0;
   simulation.world().store_of<automotive::LaneState>().for_each(
       [&](framework::Entity, const automotive::LaneState& state) {
-        speeds += state.speed.numerical_value_in(model::meter_per_second);
+        speeds += state.speed.numerical_value_in(meter_per_second);
         ++vehicles;
       });
   std::cout << vehicles << " vehicles after " << seconds

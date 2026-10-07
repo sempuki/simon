@@ -7,16 +7,6 @@ load("@rules_cc//cc:cc_test.bzl", "cc_test")
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "vocabulary",
-    hdrs = ["vocabulary.hpp"],
-    copts = COPTS,
-    deps = [
-        "//3rd_party:eigen",
-        "@lib//base:core",
-    ],
-)
-
-cc_library(
     name = "framework",
     srcs = [
         "build_error.cpp",
@@ -33,7 +23,6 @@ cc_library(
         "query_builder.hpp",
         "spatial.hpp",
         "spatial_index.hpp",
-        "step.hpp",
         "component_store.hpp",
         "system.hpp",
         "type_list.hpp",
@@ -42,7 +31,9 @@ cc_library(
     ],
     copts = COPTS,
     deps = [
-        ":vocabulary",
+        "//core:coordinates",
+        "//core:time",
+        "//core:vocabulary",
         "@lib//base:core",
         "@lib//base:status",
         "@lib//base:time",
@@ -54,7 +45,7 @@ cc_library(
     hdrs = ["continuous.hpp"],
     copts = COPTS,
     deps = [
-        ":vocabulary",
+        "//core:vocabulary",
         ":framework",
         "@lib//base:core",
     ],
@@ -66,7 +57,7 @@ cc_test(
     srcs = ["continuous_test.cpp"],
     copts = COPTS,
     deps = [
-        ":vocabulary",
+        "//core:vocabulary",
         ":continuous",
         ":framework",
         "@lib//base:testing",
@@ -82,7 +73,7 @@ cc_test(
     ],
     copts = COPTS,
     deps = [
-        ":vocabulary",
+        "//core:vocabulary",
         ":framework",
         "@lib//base:testing",
     ],
@@ -102,7 +93,7 @@ cc_binary(
     srcs = ["component_store_benchmark.cpp"],
     copts = COPTS,
     deps = [
-        ":vocabulary",":framework"],
+        "//core:vocabulary", ":framework"],
 )
 
 cc_binary(
@@ -110,7 +101,7 @@ cc_binary(
     srcs = ["system_benchmark.cpp"],
     copts = COPTS,
     deps = [
-        ":vocabulary",
+        "//core:vocabulary",
         ":benchmarking",
         ":framework",
     ],
@@ -121,7 +112,7 @@ cc_binary(
     srcs = ["churn_benchmark.cpp"],
     copts = COPTS,
     deps = [
-        ":vocabulary",
+        "//core:vocabulary",
         ":benchmarking",
         ":framework",
     ],

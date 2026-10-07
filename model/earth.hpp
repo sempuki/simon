@@ -5,7 +5,7 @@
 #include <cmath>
 
 #include "Eigen/Geometry"
-#include "model/units.hpp"
+#include "core/units.hpp"
 
 // The Earth, for vehicles whose fidelity needs it: the WGS84 ellipsoid, its
 // gravity to the J2 term, and its rotation. Defined by the WGS84 standard;

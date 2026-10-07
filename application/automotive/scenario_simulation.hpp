@@ -8,8 +8,8 @@
 
 #include "application/automotive/simulation_components.hpp"
 #include "application/automotive/simulation_systems.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/lifecycle.hpp"
-#include "framework/vocabulary.hpp"
 #include "scenario/openscenario.hpp"
 #include "scenario/parameter_distribution.hpp"
 #include "scenario/storyboard.hpp"
@@ -32,7 +32,7 @@ class ScenarioSimulation final {
 
   // One step: the storyboard, then every vehicle. Stops once the
   // storyboard's stop trigger has fired.
-  auto step(const framework::Step& step) -> engine::PhaseResult;
+  auto step(const Step& step) -> engine::PhaseResult;
 
   // The world: empty until configured.
   auto world() const -> const ScenarioWorld& { return world_; }

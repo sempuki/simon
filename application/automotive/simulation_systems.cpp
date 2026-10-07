@@ -15,8 +15,6 @@ namespace {
 
 namespace osc = scenario;
 
-using model::sign;
-
 constexpr double SMALL = 1e-10;
 
 auto convert_to_seconds(const Step& step) -> double {

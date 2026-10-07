@@ -12,11 +12,11 @@
 #include <vector>
 
 #include "base/core.hpp"
+#include "core/coordinates.hpp"
 
 namespace simon::framework {
 
 // A point in a spatial model's own coordinates, as plain numbers.
-using Coordinates = std::array<double, 3>;
 
 // A uniform grid of cubic cells over a set of points, each point known by its
 // slot (its position in the caller's array).

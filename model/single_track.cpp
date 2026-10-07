@@ -77,9 +77,9 @@ auto operator*(double weight, const DynamicSingleTrackRate& rate)
 }
 
 auto advance(const DynamicSingleTrack& state,
-             const DynamicSingleTrackRate& rate, framework::Duration dt)
+             const DynamicSingleTrackRate& rate, Duration dt)
     -> DynamicSingleTrack {
-  Time seconds = model::seconds(dt);
+  Time seconds = simon::seconds(dt);
   return {.x = state.x + rate.x * seconds,
           .y = state.y + rate.y * seconds,
           .steering = state.steering + rate.steering * seconds,
@@ -186,8 +186,8 @@ auto operator*(double weight, const DriftSingleTrackRate& rate)
 }
 
 auto advance(const DriftSingleTrack& state, const DriftSingleTrackRate& rate,
-             framework::Duration dt) -> DriftSingleTrack {
-  Time seconds = model::seconds(dt);
+             Duration dt) -> DriftSingleTrack {
+  Time seconds = simon::seconds(dt);
   return {.x = state.x + rate.x * seconds,
           .y = state.y + rate.y * seconds,
           .steering = state.steering + rate.steering * seconds,

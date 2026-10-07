@@ -41,81 +41,80 @@ using Numbers = std::vector<double>;
 // three.
 struct DynamicModel final {
   static auto numbers_of(const DynamicSingleTrack& s) -> Numbers {
-    return {s.x.numerical_value_in(model::meter),
-            s.y.numerical_value_in(model::meter),
-            model::radians(s.steering),
-            s.speed.numerical_value_in(model::meter_per_second),
-            model::radians(s.heading),
-            s.yaw_rate.numerical_value_in(model::radian_per_second),
-            model::radians(s.slip_angle)};
+    return {s.x.numerical_value_in(meter),
+            s.y.numerical_value_in(meter),
+            radians(s.steering),
+            s.speed.numerical_value_in(meter_per_second),
+            radians(s.heading),
+            s.yaw_rate.numerical_value_in(radian_per_second),
+            radians(s.slip_angle)};
   }
   static auto state_of(const Numbers& x) -> DynamicSingleTrack {
-    return {.x = x[0] * model::meter,
-            .y = x[1] * model::meter,
-            .steering = x[2] * model::radian,
-            .speed = x[3] * model::meter_per_second,
-            .heading = x[4] * model::radian,
-            .yaw_rate = x[5] * model::radian_per_second,
-            .slip_angle = x[6] * model::radian};
+    return {.x = x[0] * meter,
+            .y = x[1] * meter,
+            .steering = x[2] * radian,
+            .speed = x[3] * meter_per_second,
+            .heading = x[4] * radian,
+            .yaw_rate = x[5] * radian_per_second,
+            .slip_angle = x[6] * radian};
   }
   static auto rate_numbers(const Numbers& x, const VehicleInput& input,
                            const VehicleParameters& vehicle) -> Numbers {
     model::DynamicSingleTrackRate f =
         model::compute_dynamic_single_track_rate(state_of(x), input, vehicle);
-    return {f.x.numerical_value_in(model::meter_per_second),
-            f.y.numerical_value_in(model::meter_per_second),
-            f.steering.numerical_value_in(model::radian_per_second),
-            f.speed.numerical_value_in(model::meter_per_second_squared),
-            f.heading.numerical_value_in(model::radian_per_second),
-            f.yaw_rate.numerical_value_in(model::radian_per_second_squared),
-            f.slip_angle.numerical_value_in(model::radian_per_second)};
+    return {f.x.numerical_value_in(meter_per_second),
+            f.y.numerical_value_in(meter_per_second),
+            f.steering.numerical_value_in(radian_per_second),
+            f.speed.numerical_value_in(meter_per_second_squared),
+            f.heading.numerical_value_in(radian_per_second),
+            f.yaw_rate.numerical_value_in(radian_per_second_squared),
+            f.slip_angle.numerical_value_in(radian_per_second)};
   }
   static auto start(const VehicleParameters&) -> Numbers {
-    return numbers_of(
-        DynamicSingleTrack{.speed = 20.0 * model::meter_per_second});
+    return numbers_of(DynamicSingleTrack{.speed = 20.0 * meter_per_second});
   }
 };
 
 struct DriftModel final {
   static auto numbers_of(const DriftSingleTrack& s) -> Numbers {
-    return {s.x.numerical_value_in(model::meter),
-            s.y.numerical_value_in(model::meter),
-            model::radians(s.steering),
-            s.speed.numerical_value_in(model::meter_per_second),
-            model::radians(s.heading),
-            s.yaw_rate.numerical_value_in(model::radian_per_second),
-            model::radians(s.slip_angle),
-            s.front_wheel.numerical_value_in(model::radian_per_second),
-            s.rear_wheel.numerical_value_in(model::radian_per_second)};
+    return {s.x.numerical_value_in(meter),
+            s.y.numerical_value_in(meter),
+            radians(s.steering),
+            s.speed.numerical_value_in(meter_per_second),
+            radians(s.heading),
+            s.yaw_rate.numerical_value_in(radian_per_second),
+            radians(s.slip_angle),
+            s.front_wheel.numerical_value_in(radian_per_second),
+            s.rear_wheel.numerical_value_in(radian_per_second)};
   }
   static auto state_of(const Numbers& x) -> DriftSingleTrack {
-    return {.x = x[0] * model::meter,
-            .y = x[1] * model::meter,
-            .steering = x[2] * model::radian,
-            .speed = x[3] * model::meter_per_second,
-            .heading = x[4] * model::radian,
-            .yaw_rate = x[5] * model::radian_per_second,
-            .slip_angle = x[6] * model::radian,
-            .front_wheel = x[7] * model::radian_per_second,
-            .rear_wheel = x[8] * model::radian_per_second};
+    return {.x = x[0] * meter,
+            .y = x[1] * meter,
+            .steering = x[2] * radian,
+            .speed = x[3] * meter_per_second,
+            .heading = x[4] * radian,
+            .yaw_rate = x[5] * radian_per_second,
+            .slip_angle = x[6] * radian,
+            .front_wheel = x[7] * radian_per_second,
+            .rear_wheel = x[8] * radian_per_second};
   }
   static auto rate_numbers(const Numbers& x, const VehicleInput& input,
                            const VehicleParameters& vehicle) -> Numbers {
     model::DriftSingleTrackRate f =
         model::compute_drift_single_track_rate(state_of(x), input, vehicle);
-    return {f.x.numerical_value_in(model::meter_per_second),
-            f.y.numerical_value_in(model::meter_per_second),
-            f.steering.numerical_value_in(model::radian_per_second),
-            f.speed.numerical_value_in(model::meter_per_second_squared),
-            f.heading.numerical_value_in(model::radian_per_second),
-            f.yaw_rate.numerical_value_in(model::radian_per_second_squared),
-            f.slip_angle.numerical_value_in(model::radian_per_second),
-            f.front_wheel.numerical_value_in(model::radian_per_second_squared),
-            f.rear_wheel.numerical_value_in(model::radian_per_second_squared)};
+    return {f.x.numerical_value_in(meter_per_second),
+            f.y.numerical_value_in(meter_per_second),
+            f.steering.numerical_value_in(radian_per_second),
+            f.speed.numerical_value_in(meter_per_second_squared),
+            f.heading.numerical_value_in(radian_per_second),
+            f.yaw_rate.numerical_value_in(radian_per_second_squared),
+            f.slip_angle.numerical_value_in(radian_per_second),
+            f.front_wheel.numerical_value_in(radian_per_second_squared),
+            f.rear_wheel.numerical_value_in(radian_per_second_squared)};
   }
   static auto start(const VehicleParameters& vehicle) -> Numbers {
-    return numbers_of(model::start_drift_single_track(
-        20.0 * model::meter_per_second, vehicle));
+    return numbers_of(
+        model::start_drift_single_track(20.0 * meter_per_second, vehicle));
   }
 };
 
@@ -133,7 +132,7 @@ struct MultibodyModel final {
   }
   static auto start(const VehicleParameters& vehicle) -> Numbers {
     model::MultibodyNumbers x = model::convert_multibody_to_numbers(
-        model::start_multibody(20.0 * model::meter_per_second, vehicle));
+        model::start_multibody(20.0 * meter_per_second, vehicle));
     return {x.begin(), x.end()};
   }
 };
@@ -146,8 +145,8 @@ auto inputs(double t) -> VehicleInput {
   double steering_rate =
       t < 4.0 * std::numbers::pi / 2.5 ? 0.1 * std::cos(2.5 * t) : 0.0;
   double acceleration = 1.0 <= t && t < 2.5 ? -4.0 : t < 5.0 ? 0.0 : 2.0;
-  return {.steering_rate = steering_rate * model::radian_per_second,
-          .acceleration = acceleration * model::meter_per_second_squared};
+  return {.steering_rate = steering_rate * radian_per_second,
+          .acceleration = acceleration * meter_per_second_squared};
 }
 
 // Drives a model from the script's start for 8 s at steps of `dt` by classic
@@ -203,9 +202,8 @@ auto compare_rates(std::string_view name,
     const VehicleParameters& vehicle =
         vehicles.at(static_cast<int>(parse_number(cells[1])));
     VehicleInput input{
-        .steering_rate = parse_number(cells[2]) * model::radian_per_second,
-        .acceleration =
-            parse_number(cells[3]) * model::meter_per_second_squared};
+        .steering_rate = parse_number(cells[2]) * radian_per_second,
+        .acceleration = parse_number(cells[3]) * meter_per_second_squared};
     std::size_t n = (cells.size() - 4) / 2;
     Numbers x(n);
     Numbers theirs(n);
@@ -279,14 +277,14 @@ TEST_CASE("TireAgainstCommonRoad") {
     double original_y = 0.0;
     std::size_t rows = 0;
     for (const Row& row : load_rows("commonroad_tires.csv")) {
-      model::TireForce force = model::compute_tire_force(
-          tire,
-          {.longitudinal = number(row, "kappa"),
-           .lateral = number(row, "alpha") * model::radian,
-           .camber = number(row, "gamma") * model::radian},
-          number(row, "load") * model::newton);
-      double fx = force.longitudinal.numerical_value_in(model::newton);
-      double fy = force.lateral.numerical_value_in(model::newton);
+      model::TireForce force =
+          model::compute_tire_force(tire,
+                                    {.longitudinal = number(row, "kappa"),
+                                     .lateral = number(row, "alpha") * radian,
+                                     .camber = number(row, "gamma") * radian},
+                                    number(row, "load") * newton);
+      double fx = force.longitudinal.numerical_value_in(newton);
+      double fy = force.lateral.numerical_value_in(newton);
       largest = std::max({largest,
                           std::abs(fx - number(row, "fx")) /
                               std::max(1.0, std::abs(number(row, "fx"))),
@@ -308,10 +306,9 @@ TEST_CASE("TireAgainstCommonRoad") {
   SECTION("ShouldPushNothingGivenNoLoad") {
     for (double load : {0.0, -500.0}) {
       model::TireForce force = model::compute_tire_force(
-          tire, {.longitudinal = 0.1, .lateral = 0.05 * model::radian},
-          load * model::newton);
-      CHECK(force.longitudinal == 0.0 * model::newton);
-      CHECK(force.lateral == 0.0 * model::newton);
+          tire, {.longitudinal = 0.1, .lateral = 0.05 * radian}, load * newton);
+      CHECK(force.longitudinal == 0.0 * newton);
+      CHECK(force.lateral == 0.0 * newton);
     }
   }
 }

@@ -8,10 +8,10 @@
 #include <utility>
 #include <vector>
 
+#include "core/units.hpp"
 #include "model/lane_graph.hpp"
 #include "model/road.hpp"
 #include "model/traffic_control.hpp"
-#include "model/units.hpp"
 
 // Right of way in junctions (see model/REFERENCES.md): where two connecting
 // lanes cross or merge, which of them gives way, and the lanes that lead

@@ -24,8 +24,8 @@
 #include "application/defense/simulation.hpp"
 #include "application/viewing.hpp"
 #include "base/core.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 #include "imgui/imgui.h"
 #include "implot/implot.h"
 
@@ -51,8 +51,7 @@ struct Point final {
 };
 
 auto project_point(const Kinematics& kinematics) -> Point {
-  model::QuantityVector position =
-      kinematics.position.numerical_value_in(model::meter);
+  QuantityVector position = kinematics.position.numerical_value_in(meter);
   return Point{.x = position.x(), .y = position.y()};
 }
 
@@ -124,12 +123,10 @@ class Viewer final {
           });
     };
     look.template operator()<RedDrone>(
-        session_->scenario().drone_warhead.radius.numerical_value_in(
-            model::meter),
+        session_->scenario().drone_warhead.radius.numerical_value_in(meter),
         RED);
     look.template operator()<Interceptor>(
-        InterceptorDesign{}.warhead.radius.numerical_value_in(model::meter),
-        BLUE);
+        InterceptorDesign{}.warhead.radius.numerical_value_in(meter), BLUE);
 
     auto now = WallClock::now();
     for (const auto& [name, sighting] : last_seen_) {
@@ -217,8 +214,7 @@ class Viewer final {
       if (const Kinematics* kinematics =
               world.store_of<Kinematics>().maybe_component_of(owner)) {
         plot_circle("Radar coverage", project_point(*kinematics),
-                    radar.range.numerical_value_in(model::meter), FAINT_GREEN,
-                    scale_);
+                    radar.range.numerical_value_in(meter), FAINT_GREEN, scale_);
       }
     });
     world.store_of<Launcher>().for_each(
@@ -226,15 +222,14 @@ class Viewer final {
           if (const Kinematics* kinematics =
                   world.store_of<Kinematics>().maybe_component_of(owner)) {
             plot_circle("Launcher range", project_point(*kinematics),
-                        launcher.range.numerical_value_in(model::meter),
-                        FAINT_BLUE, scale_);
+                        launcher.range.numerical_value_in(meter), FAINT_BLUE,
+                        scale_);
           }
         });
 
     Scatter tracks;
     world.store_of<Estimate>().for_each([&](Entity, const Estimate& estimate) {
-      model::QuantityVector position =
-          estimate.position.numerical_value_in(model::meter);
+      QuantityVector position = estimate.position.numerical_value_in(meter);
       tracks.append(position.x(), position.y());
     });
 

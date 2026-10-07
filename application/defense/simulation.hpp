@@ -12,17 +12,17 @@
 #include "application/defense/simulation_components.hpp"
 #include "application/defense/simulation_systems.hpp"
 #include "base/core.hpp"
+#include "core/random.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/event_queue.hpp"
 #include "engine/lifecycle.hpp"
-#include "framework/vocabulary.hpp"
-#include "model/random.hpp"
 
 namespace simon::defense {
 
 // A circle an operator command applies to.
 struct Sector final {
-  Position center = model::meters(0.0, 0.0, 0.0);
-  Length radius = 0.0 * model::meter;
+  Position center = meters(0.0, 0.0, 0.0);
+  Length radius = 0.0 * meter;
 };
 
 // A weapons hold an operator orders ahead of time, over `sector` from `from`
@@ -50,33 +50,32 @@ struct Scenario final {
   double asset_health = 30.0;
 
   int radars = 3;
-  Length radar_ring = 500.0 * model::meter;
-  Length radar_range = 4000.0 * model::meter;
+  Length radar_ring = 500.0 * meter;
+  Length radar_range = 4000.0 * meter;
   Duration scan_period = 1s;
   // Whether each site's radars scan in turn; see SiteBuilder::scanning_in_turn.
   bool radars_in_turn = false;
 
   int launchers = 3;
-  Length launcher_ring = 300.0 * model::meter;
-  Length launcher_range = 3000.0 * model::meter;
+  Length launcher_ring = 300.0 * meter;
+  Length launcher_range = 3000.0 * meter;
   std::uint32_t inventory = 20;
   Duration reload = 2s;
 
   int drones = 30;
-  Length spawn_distance = 6000.0 * model::meter;
-  Length spawn_spread = 1000.0 * model::meter;
-  Speed drone_cruise = 40.0 * model::meter_per_second;
-  AccelerationMagnitude drone_agility = 20.0 * model::meter_per_second_squared;
-  Warhead drone_warhead{.fuse = 30.0 * model::meter,
-                        .radius = 100.0 * model::meter,
-                        .damage = 10.0};
+  Length spawn_distance = 6000.0 * meter;
+  Length spawn_spread = 1000.0 * meter;
+  Speed drone_cruise = 40.0 * meter_per_second;
+  AccelerationMagnitude drone_agility = 20.0 * meter_per_second_squared;
+  Warhead drone_warhead{
+      .fuse = 30.0 * meter, .radius = 100.0 * meter, .damage = 10.0};
 
   // Copies of the site on a square grid `site_spacing` apart, the first at the
   // origin, so a larger population covers a larger area at the same density.
   // Each site's drones fly at their own asset. Red wins when the first site's
   // asset is destroyed; blue wins when no red drones remain at any site.
   int sites = 1;
-  Length site_spacing = 20000.0 * model::meter;
+  Length site_spacing = 20000.0 * meter;
 
   // Weapons holds ordered ahead of time. Each starts on a timer, and when it
   // ends, a second timer raises WeaponsHoldExpired.
@@ -97,8 +96,8 @@ auto on_ring(Length radius, double bearing) -> Position;
 // A band around a site: things fall at `radius`, give or take half of
 // `width`.
 struct Ring final {
-  Length radius = 0.0 * model::meter;
-  Length width = 0.0 * model::meter;
+  Length radius = 0.0 * meter;
+  Length width = 0.0 * meter;
 };
 
 // Builds one defended site: an asset at its origin, the radars and launchers
@@ -147,7 +146,7 @@ class [[nodiscard]] SiteBuilder final {
   // bearings within `ring` and flying at the asset at cruise speed. Draws
   // from `random`, which it keeps until the utterance is built.
   auto attacked_by(std::size_t count, RedDrone drone, Warhead warhead,
-                   Ring ring, Depend<model::Random> random) && -> SiteBuilder {
+                   Ring ring, Depend<Random> random) && -> SiteBuilder {
     drones_ = count;
     drone_ = drone;
     warhead_ = warhead;
@@ -166,7 +165,7 @@ class [[nodiscard]] SiteBuilder final {
   struct Placement final {
     std::size_t count = 0;
     UnitType unit{};
-    Length radius = 0.0 * model::meter;
+    Length radius = 0.0 * meter;
   };
 
   Position origin_;
@@ -179,7 +178,7 @@ class [[nodiscard]] SiteBuilder final {
   RedDrone drone_;
   Warhead warhead_;
   Ring spawn_;
-  model::Random* random_ = nullptr;  // Set with any drones.
+  Random* random_ = nullptr;  // Set with any drones.
 };
 
 // Starts the utterance that builds a defended site at `origin` in `world`.
@@ -225,7 +224,7 @@ class Simulation final {
   auto configure() -> engine::PhaseResult;
 
   // Delivers the events due by the step's time, then runs the schedule.
-  auto step(const framework::Step& step) -> engine::PhaseResult;
+  auto step(const Step& step) -> engine::PhaseResult;
 
   auto outcome() const -> Outcome { return outcome_; }
   // The world: empty until configured.

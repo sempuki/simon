@@ -12,11 +12,11 @@
 #include "application/galactic/simulation.hpp"
 #include "application/testing.hpp"
 #include "base/testing.hpp"
+#include "core/random.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 #include "model/galaxy.hpp"
 #include "model/gravity.hpp"
-#include "model/random.hpp"
 
 namespace simon::galactic {
 namespace {
@@ -69,7 +69,7 @@ auto compute_accelerations(const Scenario& scenario) -> std::vector<Vector3> {
         simulation.world()
             .store_of<Gravity>()
             .component_of(body)
-            .acceleration.numerical_value_in(model::meter_per_second_squared)
+            .acceleration.numerical_value_in(meter_per_second_squared)
             .eigen());
   }
   return accelerations;
@@ -82,14 +82,13 @@ TEST_CASE("Tree") {
   Scenario scenario{
       .softening = testing::parse_number(
                        table.lines.front()[find_column(table, "softening")]) *
-                   model::meter};
+                   meter};
   std::vector<Vector3> direct;
   for (const std::vector<std::string>& line : table.lines) {
     scenario.bodies.push_back(model::BodyStart{
-        .position =
-            model::QuantityVector{read_vector(table, line, "x")} * model::meter,
-        .mass = testing::parse_number(line[find_column(table, "m")]) *
-                model::kilogram});
+        .position = QuantityVector{read_vector(table, line, "x")} * meter,
+        .mass =
+            testing::parse_number(line[find_column(table, "m")]) * kilogram});
     direct.push_back(read_vector(table, line, "ax"));
   }
 
@@ -144,12 +143,12 @@ TEST_CASE("TreeMomentum") {
   const model::Plummer plummer{.mass = 1e10 * SOLAR_MASS, .scale = KILOPARSEC};
   Scenario scenario{.softening = 0.05 * KILOPARSEC,
                     .gravity = GravityMethod::TREE};
-  model::Random random{7};
+  Random random{7};
   model::append_plummer(plummer, 256, InOut(random), InOut(scenario.bodies));
-  model::Time crossing = model::compute_crossing_time(
+  Time crossing = model::compute_crossing_time(
       plummer.mass, model::compute_plummer_energy(plummer));
   Year step = std::chrono::round<Year>(std::chrono::duration<double>(
-      crossing.numerical_value_in(model::second) / 128.0));
+      crossing.numerical_value_in(second) / 128.0));
 
   Simulation start{scenario};
   REQUIRE(start.configure());
@@ -157,14 +156,13 @@ TEST_CASE("TreeMomentum") {
   Simulation simulation{scenario};
   engine::BatchDriver driver{Timing{.max_step = step}, Depend(simulation)};
 
-  REQUIRE(driver.run(framework::BasicTimePoint<Year>{} + 1280 * step));
+  REQUIRE(driver.run(BasicTimePoint<Year>{} + 1280 * step));
 
   Mechanics after = measure_mechanics(simulation.world(), scenario.softening);
-  double scale_momentum =
-      plummer.mass.numerical_value_in(model::kilogram) *
-      std::sqrt(model::GRAVITATIONAL_CONSTANT *
-                plummer.mass.numerical_value_in(model::kilogram) /
-                plummer.scale.numerical_value_in(model::meter));
+  double scale_momentum = plummer.mass.numerical_value_in(kilogram) *
+                          std::sqrt(model::GRAVITATIONAL_CONSTANT *
+                                    plummer.mass.numerical_value_in(kilogram) /
+                                    plummer.scale.numerical_value_in(meter));
   // Measured: energy to 9.4e-4 and momentum to 9.3e-4, where direct
   // summation keeps them to 1.5e-4 and rounding.
   CHECK(std::abs(after.energy() / before.energy() - 1.0) < 2e-3);

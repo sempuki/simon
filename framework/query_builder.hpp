@@ -14,13 +14,13 @@
 
 #include "base/core.hpp"
 #include "base/status.hpp"
+#include "core/vocabulary.hpp"
 #include "framework/archetype.hpp"
 #include "framework/entity.hpp"
 #include "framework/entity_builder.hpp"
 #include "framework/name.hpp"
 #include "framework/spatial.hpp"
 #include "framework/type_list.hpp"
-#include "framework/vocabulary.hpp"
 
 namespace simon::framework {
 

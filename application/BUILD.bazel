@@ -11,7 +11,7 @@ cc_library(
     copts = COPTS,
     deps = [
         "//engine:driver",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         "//3rd_party:imgui",
         "//3rd_party:imgui_platform_sdl2",
         "//3rd_party:imgui_renderer_sdl2",

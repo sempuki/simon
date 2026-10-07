@@ -65,12 +65,11 @@ TEST_CASE("MagicFormulaTireAgainstChrono") {
   REQUIRE(rows.size() == 4 * 25 * 21 * 2);
 
   auto force_of = [&](const Row& row) {
-    return model::compute_tire_force(
-        tire,
-        {.longitudinal = number(row, "kappa"),
-         .lateral = number(row, "alpha") * model::radian,
-         .camber = number(row, "gamma") * model::radian},
-        number(row, "load") * model::newton);
+    return model::compute_tire_force(tire,
+                                     {.longitudinal = number(row, "kappa"),
+                                      .lateral = number(row, "alpha") * radian,
+                                      .camber = number(row, "gamma") * radian},
+                                     number(row, "load") * newton);
   };
   auto relative = [](double ours, double theirs, double scale) {
     return std::abs(ours - theirs) / std::max(1.0, scale);
@@ -98,21 +97,19 @@ TEST_CASE("MagicFormulaTireAgainstChrono") {
       model::TireForce force = force_of(row);
       double load = number(row, "load");
       longitudinal = std::max(
-          longitudinal,
-          relative(force.longitudinal.numerical_value_in(model::newton),
-                   number(row, "fx"), load));
-      lateral = std::max(
-          lateral, relative(force.lateral.numerical_value_in(model::newton),
-                            number(row, "fy"), load));
+          longitudinal, relative(force.longitudinal.numerical_value_in(newton),
+                                 number(row, "fx"), load));
+      lateral =
+          std::max(lateral, relative(force.lateral.numerical_value_in(newton),
+                                     number(row, "fy"), load));
       // The trail's equivalent slip angle agrees where kappa and the slip
       // angle share a sign. Chrono's moment is in its own frame, turned.
       double kappa = number(row, "kappa");
       double alpha = number(row, "alpha");
       if (kappa * alpha > 0.0) {
         aligning = std::max(
-            aligning,
-            relative(force.aligning.numerical_value_in(model::newton_meter),
-                     number(row, "mz"), load * tire.unloaded_radius));
+            aligning, relative(force.aligning.numerical_value_in(newton_meter),
+                               number(row, "mz"), load * tire.unloaded_radius));
       }
       ++compared;
     }
@@ -134,8 +131,8 @@ TEST_CASE("MagicFormulaTireAgainstChrono") {
     for (const Row& row : rows) {
       model::TireForce force = force_of(row);
       double load = number(row, "load");
-      double fx = force.longitudinal.numerical_value_in(model::newton);
-      double fy = force.lateral.numerical_value_in(model::newton);
+      double fx = force.longitudinal.numerical_value_in(newton);
+      double fy = force.lateral.numerical_value_in(newton);
       double apart = std::max(relative(fx, number(row, "fx"), load),
                               relative(fy, number(row, "fy"), load));
       if (!unclamped(tire, row)) {

@@ -14,8 +14,8 @@
 #include <utility>
 #include <vector>
 
+#include "core/units.hpp"
 #include "model/control.hpp"
-#include "model/units.hpp"
 
 // A flight control system as data: blocks that turn the pilot's commands and
 // the aircraft's state into control surface positions, run in order every

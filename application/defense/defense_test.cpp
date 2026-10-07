@@ -6,8 +6,8 @@
 
 #include "application/defense/simulation.hpp"
 #include "base/testing.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 
 namespace simon::defense {
 
@@ -58,7 +58,7 @@ auto run(Scenario scenario) -> Run {
 auto advance(TimePoint from, TimePoint until, InOut<Simulation> simulation)
     -> void {
   for (TimePoint time = from; time < until; time += DT) {
-    REQUIRE(simulation->step(framework::Step{.time = time, .dt = DT}));
+    REQUIRE(simulation->step(Step{.time = time, .dt = DT}));
   }
 }
 
@@ -72,7 +72,7 @@ template <typename ScheduleType>
 auto step(TimePoint time,
           InOut<framework::Scheduler<World, ScheduleType>> scheduler,
           InOut<World> world) -> void {
-  scheduler->step(framework::Step{.time = time, .dt = DT}, world);
+  scheduler->step(Step{.time = time, .dt = DT}, world);
 }
 
 auto make_drone(Position position, Entity target, InOut<World> world)
@@ -81,8 +81,8 @@ auto make_drone(Position position, Entity target, InOut<World> world)
               .with(Kinematics{.position = position})
               .with(Control{})
               .with(Health{.points = 1.0})
-              .with(Warhead{.fuse = 30.0 * model::meter,
-                            .radius = 100.0 * model::meter,
+              .with(Warhead{.fuse = 30.0 * meter,
+                            .radius = 100.0 * meter,
                             .damage = 10.0})
               .with(Target{.entity = target})
               .with(RedDrone{})
@@ -92,8 +92,8 @@ auto make_drone(Position position, Entity target, InOut<World> world)
 auto make_radar(Position position, InOut<World> world) -> Entity {
   return *world->create<archetype::Radar>()
               .with(Kinematics{.position = position})
-              .with(Radar{.range = 1000.0 * model::meter,
-                          .scan = engine::RateGate{1s}})
+              .with(
+                  Radar{.range = 1000.0 * meter, .scan = engine::RateGate{1s}})
               .build();
 }
 
@@ -101,7 +101,7 @@ auto make_launcher(Position position, InOut<World> world) -> Entity {
   return *world->create<archetype::Launcher>()
               .with(Kinematics{.position = position})
               .with(Launcher{
-                  .range = 3000.0 * model::meter, .inventory = 5, .reload = 2s})
+                  .range = 3000.0 * meter, .inventory = 5, .reload = 2s})
               .build();
 }
 
@@ -121,11 +121,10 @@ auto make_interceptor(Position position, Entity target, TimePoint expires_at,
               .with(Control{})
               .with(InterceptorDesign{}.warhead)
               .with(Target{.entity = target})
-              .with(Interceptor{
-                  .speed = 150.0 * model::meter_per_second,
-                  .agility = 300.0 * model::meter_per_second_squared,
-                  .seeker_range = 1000.0 * model::meter,
-                  .expires_at = expires_at})
+              .with(Interceptor{.speed = 150.0 * meter_per_second,
+                                .agility = 300.0 * meter_per_second_squared,
+                                .seeker_range = 1000.0 * meter,
+                                .expires_at = expires_at})
               .build();
 }
 
@@ -183,7 +182,7 @@ TEST_CASE("DefenseSimulation") {
 
   SECTION("ShouldHoldFireUntilHoldExpiresGivenTimedHold") {
     Scenario scenario;
-    scenario.holds = {TimedHold{.sector = {.radius = 1000.0 * model::meter},
+    scenario.holds = {TimedHold{.sector = {.radius = 1000.0 * meter},
                                 .from = TimePoint{},
                                 .lasting = 90s}};
     Simulation simulation{scenario};
@@ -207,7 +206,7 @@ TEST_CASE("DefenseSimulation") {
 
   SECTION("ShouldStayHeldGivenOverlappingHoldExpiresFirst") {
     Scenario scenario;
-    const Sector home{.radius = 1000.0 * model::meter};
+    const Sector home{.radius = 1000.0 * meter};
     scenario.holds = {
         TimedHold{.sector = home, .from = TimePoint{}, .lasting = 120s},
         TimedHold{.sector = home, .from = TimePoint{30s}, .lasting = 30s}};
@@ -289,15 +288,15 @@ TEST_CASE("ScanRadars") {
   World world;
   build_small_world(Out(world));
   framework::Scheduler<World, SystemList<ScanRadars>> scheduler;
-  Radar radar{.range = 1000.0 * model::meter, .scan = engine::RateGate{1s}};
+  Radar radar{.range = 1000.0 * meter, .scan = engine::RateGate{1s}};
 
   // Counts a site's radars that scanned on each step of the first second.
   auto scans_per_step = [&](SiteBuilder site) {
-    REQUIRE(std::move(site).watched_by(4, radar, 500.0 * model::meter).build());
+    REQUIRE(std::move(site).watched_by(4, radar, 500.0 * meter).build());
     world.sync();
     std::vector<int> scans;
     for (TimePoint time{}; time < TimePoint{1s}; time += 250ms) {
-      scheduler.step(framework::Step{.time = time, .dt = 250ms}, InOut(world));
+      scheduler.step(Step{.time = time, .dt = 250ms}, InOut(world));
       int scanned = 0;
       world.store_of<Radar>().for_each(
           [&](Entity, const Radar& radar) { scanned += radar.scanned; });
@@ -307,13 +306,13 @@ TEST_CASE("ScanRadars") {
   };
 
   SECTION("ShouldScanTogetherGivenSite") {
-    CHECK(scans_per_step(create_site(model::meters(0, 0, 0), Depend(world))) ==
+    CHECK(scans_per_step(create_site(meters(0, 0, 0), Depend(world))) ==
           std::vector<int>{4, 0, 0, 0});
   }
 
   SECTION("ShouldScanInTurnGivenSiteScanningInTurn") {
-    CHECK(scans_per_step(create_site(model::meters(0, 0, 0), Depend(world))
-                             .scanning_in_turn()) ==
+    CHECK(scans_per_step(
+              create_site(meters(0, 0, 0), Depend(world)).scanning_in_turn()) ==
           std::vector<int>{1, 1, 1, 1});
   }
 }
@@ -324,10 +323,9 @@ TEST_CASE("DetectDrones") {
   framework::Scheduler<World, SystemList<ScanRadars, DetectDrones>> scheduler;
 
   SECTION("ShouldCreateOneTrackGivenTwoRadarsSeeingOneDrone") {
-    make_radar(model::meters(0.0, 0.0, 0.0), InOut(world));
-    make_radar(model::meters(100.0, 0.0, 0.0), InOut(world));
-    Entity drone =
-        make_drone(model::meters(500.0, 0.0, 0.0), Entity{}, InOut(world));
+    make_radar(meters(0.0, 0.0, 0.0), InOut(world));
+    make_radar(meters(100.0, 0.0, 0.0), InOut(world));
+    Entity drone = make_drone(meters(500.0, 0.0, 0.0), Entity{}, InOut(world));
     world.sync();
 
     step(TimePoint{}, InOut(scheduler), InOut(world));
@@ -339,8 +337,8 @@ TEST_CASE("DetectDrones") {
   }
 
   SECTION("ShouldNotTrackGivenDroneOutOfRange") {
-    make_radar(model::meters(0.0, 0.0, 0.0), InOut(world));
-    make_drone(model::meters(5000.0, 0.0, 0.0), Entity{}, InOut(world));
+    make_radar(meters(0.0, 0.0, 0.0), InOut(world));
+    make_drone(meters(5000.0, 0.0, 0.0), Entity{}, InOut(world));
     world.sync();
 
     step(TimePoint{}, InOut(scheduler), InOut(world));
@@ -349,8 +347,8 @@ TEST_CASE("DetectDrones") {
   }
 
   SECTION("ShouldNotTrackAgainGivenDroneAlreadyTracked") {
-    make_radar(model::meters(0.0, 0.0, 0.0), InOut(world));
-    make_drone(model::meters(500.0, 0.0, 0.0), Entity{}, InOut(world));
+    make_radar(meters(0.0, 0.0, 0.0), InOut(world));
+    make_drone(meters(500.0, 0.0, 0.0), Entity{}, InOut(world));
     world.sync();
 
     step(TimePoint{}, InOut(scheduler), InOut(world));
@@ -367,33 +365,29 @@ TEST_CASE("UpdateTracks") {
   framework::Scheduler<World, SystemList<ScanRadars, UpdateTracks>> scheduler;
 
   SECTION("ShouldUpdateEstimateGivenScanningRadarCoversTarget") {
-    make_radar(model::meters(0.0, 0.0, 0.0), InOut(world));
-    Entity drone =
-        make_drone(model::meters(500.0, 0.0, 0.0), Entity{}, InOut(world));
-    Entity track =
-        make_track(drone, model::meters(0.0, 0.0, 0.0), InOut(world));
+    make_radar(meters(0.0, 0.0, 0.0), InOut(world));
+    Entity drone = make_drone(meters(500.0, 0.0, 0.0), Entity{}, InOut(world));
+    Entity track = make_track(drone, meters(0.0, 0.0, 0.0), InOut(world));
     world.sync();
 
     step(TimePoint{2s}, InOut(scheduler), InOut(world));
 
     CHECK(world.store_of<Estimate>().component_of(track).position ==
-          model::meters(500.0, 0.0, 0.0));
+          meters(500.0, 0.0, 0.0));
     CHECK(world.store_of<Track>().component_of(track).last_seen ==
           TimePoint{2s});
   }
 
   SECTION("ShouldKeepEstimateGivenTargetOutOfRange") {
-    make_radar(model::meters(0.0, 0.0, 0.0), InOut(world));
-    Entity drone =
-        make_drone(model::meters(5000.0, 0.0, 0.0), Entity{}, InOut(world));
-    Entity track =
-        make_track(drone, model::meters(4500.0, 0.0, 0.0), InOut(world));
+    make_radar(meters(0.0, 0.0, 0.0), InOut(world));
+    Entity drone = make_drone(meters(5000.0, 0.0, 0.0), Entity{}, InOut(world));
+    Entity track = make_track(drone, meters(4500.0, 0.0, 0.0), InOut(world));
     world.sync();
 
     step(TimePoint{2s}, InOut(scheduler), InOut(world));
 
     CHECK(world.store_of<Estimate>().component_of(track).position ==
-          model::meters(4500.0, 0.0, 0.0));
+          meters(4500.0, 0.0, 0.0));
     CHECK(world.store_of<Track>().component_of(track).last_seen == TimePoint{});
   }
 }
@@ -404,10 +398,8 @@ TEST_CASE("DropStaleTracks") {
   framework::Scheduler<World, SystemList<DropStaleTracks>> scheduler;
 
   SECTION("ShouldDropTrackAndUnmarkDroneGivenNotSeenForTimeout") {
-    Entity drone =
-        make_drone(model::meters(0.0, 0.0, 0.0), Entity{}, InOut(world));
-    Entity track =
-        make_track(drone, model::meters(0.0, 0.0, 0.0), InOut(world));
+    Entity drone = make_drone(meters(0.0, 0.0, 0.0), Entity{}, InOut(world));
+    Entity track = make_track(drone, meters(0.0, 0.0, 0.0), InOut(world));
     world.sync();
     REQUIRE(world.change(drone).attach(Tracked{.track = track}).build());
     world.sync();
@@ -425,11 +417,10 @@ TEST_CASE("Engaging") {
   framework::Scheduler<World, Engaging> scheduler;
 
   SECTION("ShouldLaunchOneInterceptorGivenTwoLaunchersProposingOneTrack") {
-    make_launcher(model::meters(0.0, 0.0, 0.0), InOut(world));
-    make_launcher(model::meters(50.0, 0.0, 0.0), InOut(world));
-    Entity drone =
-        make_drone(model::meters(2000.0, 0.0, 0.0), Entity{}, InOut(world));
-    make_track(drone, model::meters(2000.0, 0.0, 0.0), InOut(world));
+    make_launcher(meters(0.0, 0.0, 0.0), InOut(world));
+    make_launcher(meters(50.0, 0.0, 0.0), InOut(world));
+    Entity drone = make_drone(meters(2000.0, 0.0, 0.0), Entity{}, InOut(world));
+    make_track(drone, meters(2000.0, 0.0, 0.0), InOut(world));
     world.sync();
 
     step(TimePoint{}, InOut(scheduler), InOut(world));
@@ -439,16 +430,15 @@ TEST_CASE("Engaging") {
     Entity interceptor = collect_owners<Interceptor>(world).front();
     Entity launcher = *world.parent_of(interceptor);
     CHECK(world.store_of<Kinematics>().component_of(launcher).position ==
-          model::meters(50.0, 0.0, 0.0));
+          meters(50.0, 0.0, 0.0));
     CHECK(world.store_of<Target>().component_of(interceptor).entity == drone);
   }
 
   SECTION("ShouldWaitForReloadGivenSecondTrack") {
-    Entity launcher = make_launcher(model::meters(0.0, 0.0, 0.0), InOut(world));
+    Entity launcher = make_launcher(meters(0.0, 0.0, 0.0), InOut(world));
     for (double x : {1000.0, 2000.0}) {
-      Entity drone =
-          make_drone(model::meters(x, 0.0, 0.0), Entity{}, InOut(world));
-      make_track(drone, model::meters(x, 0.0, 0.0), InOut(world));
+      Entity drone = make_drone(meters(x, 0.0, 0.0), Entity{}, InOut(world));
+      make_track(drone, meters(x, 0.0, 0.0), InOut(world));
     }
     world.sync();
 
@@ -462,10 +452,9 @@ TEST_CASE("Engaging") {
   }
 
   SECTION("ShouldNotEngageGivenTrackOutOfRange") {
-    make_launcher(model::meters(0.0, 0.0, 0.0), InOut(world));
-    Entity drone =
-        make_drone(model::meters(9000.0, 0.0, 0.0), Entity{}, InOut(world));
-    make_track(drone, model::meters(9000.0, 0.0, 0.0), InOut(world));
+    make_launcher(meters(0.0, 0.0, 0.0), InOut(world));
+    Entity drone = make_drone(meters(9000.0, 0.0, 0.0), Entity{}, InOut(world));
+    make_track(drone, meters(9000.0, 0.0, 0.0), InOut(world));
     world.sync();
 
     step(TimePoint{}, InOut(scheduler), InOut(world));
@@ -478,14 +467,12 @@ TEST_CASE("OperatorCommands") {
   World world;
   build_small_world(Out(world));
   framework::Scheduler<World, Engaging> scheduler;
-  const Sector home{.center = model::meters(0.0, 0.0, 0.0),
-                    .radius = 500.0 * model::meter};
-  Entity drone =
-      make_drone(model::meters(2000.0, 0.0, 0.0), Entity{}, InOut(world));
-  make_track(drone, model::meters(2000.0, 0.0, 0.0), InOut(world));
+  const Sector home{.center = meters(0.0, 0.0, 0.0), .radius = 500.0 * meter};
+  Entity drone = make_drone(meters(2000.0, 0.0, 0.0), Entity{}, InOut(world));
+  make_track(drone, meters(2000.0, 0.0, 0.0), InOut(world));
 
   SECTION("ShouldNotEngageGivenWeaponsHold") {
-    make_launcher(model::meters(0.0, 0.0, 0.0), InOut(world));
+    make_launcher(meters(0.0, 0.0, 0.0), InOut(world));
     world.sync();
 
     auto held = hold_weapons(home, InOut(world));
@@ -497,7 +484,7 @@ TEST_CASE("OperatorCommands") {
   }
 
   SECTION("ShouldEngageAgainGivenWeaponsFree") {
-    make_launcher(model::meters(0.0, 0.0, 0.0), InOut(world));
+    make_launcher(meters(0.0, 0.0, 0.0), InOut(world));
     world.sync();
     REQUIRE(hold_weapons(home, InOut(world)));
     world.sync();
@@ -513,9 +500,8 @@ TEST_CASE("OperatorCommands") {
   }
 
   SECTION("ShouldHoldOnlyLaunchersInSectorGivenSector") {
-    make_launcher(model::meters(0.0, 0.0, 0.0), InOut(world));
-    Entity distant =
-        make_launcher(model::meters(4000.0, 0.0, 0.0), InOut(world));
+    make_launcher(meters(0.0, 0.0, 0.0), InOut(world));
+    Entity distant = make_launcher(meters(4000.0, 0.0, 0.0), InOut(world));
     world.sync();
 
     REQUIRE(hold_weapons(home, InOut(world)) == 1u);
@@ -528,7 +514,7 @@ TEST_CASE("OperatorCommands") {
   }
 
   SECTION("ShouldSkipHeldLaunchersGivenSecondHoldBeforeSync") {
-    make_launcher(model::meters(0.0, 0.0, 0.0), InOut(world));
+    make_launcher(meters(0.0, 0.0, 0.0), InOut(world));
     world.sync();
 
     auto first = hold_weapons(home, InOut(world));
@@ -539,9 +525,9 @@ TEST_CASE("OperatorCommands") {
   }
 
   SECTION("ShouldDestroyInterceptorsInSectorGivenCommandDestruct") {
-    Entity near = make_interceptor(model::meters(100.0, 0.0, 0.0), drone,
+    Entity near = make_interceptor(meters(100.0, 0.0, 0.0), drone,
                                    TimePoint{1min}, InOut(world));
-    Entity far = make_interceptor(model::meters(1500.0, 0.0, 0.0), drone,
+    Entity far = make_interceptor(meters(1500.0, 0.0, 0.0), drone,
                                   TimePoint{1min}, InOut(world));
     world.sync();
 
@@ -560,11 +546,10 @@ TEST_CASE("GuideInterceptors") {
   framework::Scheduler<World, SystemList<GuideInterceptors>> scheduler;
 
   SECTION("ShouldRetargetNearestDroneGivenTargetGone") {
-    Entity near =
-        make_drone(model::meters(300.0, 0.0, 0.0), Entity{}, InOut(world));
-    make_drone(model::meters(600.0, 0.0, 0.0), Entity{}, InOut(world));
-    Entity interceptor = make_interceptor(
-        model::meters(0.0, 0.0, 0.0), Entity{}, TimePoint{1min}, InOut(world));
+    Entity near = make_drone(meters(300.0, 0.0, 0.0), Entity{}, InOut(world));
+    make_drone(meters(600.0, 0.0, 0.0), Entity{}, InOut(world));
+    Entity interceptor = make_interceptor(meters(0.0, 0.0, 0.0), Entity{},
+                                          TimePoint{1min}, InOut(world));
     world.sync();
 
     step(TimePoint{}, InOut(scheduler), InOut(world));
@@ -573,9 +558,9 @@ TEST_CASE("GuideInterceptors") {
   }
 
   SECTION("ShouldSelfDestructGivenNoDroneInSeekerRange") {
-    make_drone(model::meters(5000.0, 0.0, 0.0), Entity{}, InOut(world));
-    Entity interceptor = make_interceptor(
-        model::meters(0.0, 0.0, 0.0), Entity{}, TimePoint{1min}, InOut(world));
+    make_drone(meters(5000.0, 0.0, 0.0), Entity{}, InOut(world));
+    Entity interceptor = make_interceptor(meters(0.0, 0.0, 0.0), Entity{},
+                                          TimePoint{1min}, InOut(world));
     world.sync();
 
     step(TimePoint{}, InOut(scheduler), InOut(world));
@@ -584,9 +569,8 @@ TEST_CASE("GuideInterceptors") {
   }
 
   SECTION("ShouldSelfDestructGivenFlightTimeUp") {
-    Entity drone =
-        make_drone(model::meters(300.0, 0.0, 0.0), Entity{}, InOut(world));
-    Entity interceptor = make_interceptor(model::meters(0.0, 0.0, 0.0), drone,
+    Entity drone = make_drone(meters(300.0, 0.0, 0.0), Entity{}, InOut(world));
+    Entity interceptor = make_interceptor(meters(0.0, 0.0, 0.0), drone,
                                           TimePoint{5s}, InOut(world));
     world.sync();
 
@@ -602,9 +586,8 @@ TEST_CASE("Blasts") {
   framework::Scheduler<World, Blasts> scheduler;
 
   SECTION("ShouldDestroyDroneAndInterceptorGivenFuseDistance") {
-    Entity drone =
-        make_drone(model::meters(10.0, 0.0, 0.0), Entity{}, InOut(world));
-    Entity interceptor = make_interceptor(model::meters(0.0, 0.0, 0.0), drone,
+    Entity drone = make_drone(meters(10.0, 0.0, 0.0), Entity{}, InOut(world));
+    Entity interceptor = make_interceptor(meters(0.0, 0.0, 0.0), drone,
                                           TimePoint{1min}, InOut(world));
     world.sync();
 
@@ -621,8 +604,7 @@ TEST_CASE("Blasts") {
                         .with(Health{.points = 30.0})
                         .with(Asset{})
                         .build();
-    Entity drone =
-        make_drone(model::meters(20.0, 0.0, 0.0), asset, InOut(world));
+    Entity drone = make_drone(meters(20.0, 0.0, 0.0), asset, InOut(world));
     world.sync();
 
     step(TimePoint{}, InOut(scheduler), InOut(world));

@@ -38,8 +38,8 @@
 #include "application/automotive/simulation.hpp"
 #include "application/viewing.hpp"
 #include "base/core.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 #include "imgui/imgui.h"
 #include "implot/implot.h"
 #include "model/collision.hpp"
@@ -382,7 +382,7 @@ class TrafficViewer final {
       : scenario_{std::move(scenario)},
         desired_{static_cast<float>(
             scenario_.following.desired_speed.numerical_value_in(
-                model::meter_per_second))},
+                meter_per_second))},
         scale_{scale},
         map_{scale} {
     restart();
@@ -418,7 +418,7 @@ class TrafficViewer final {
  private:
   auto restart() -> void {
     scenario_.following.desired_speed =
-        static_cast<double>(desired_) * model::meter_per_second;
+        static_cast<double>(desired_) * meter_per_second;
     session_.reset();
     session_ = std::make_unique<TrafficSession>(
         scenario_, engine::Timing{.max_step = 100ms}, speed_);
@@ -436,7 +436,7 @@ class TrafficViewer final {
     double sum = 0.0;
     std::size_t count = 0;
     world.store_of<LaneState>().for_each([&](Entity, const LaneState& state) {
-      sum += state.speed.numerical_value_in(model::meter_per_second);
+      sum += state.speed.numerical_value_in(meter_per_second);
       ++count;
     });
     mean_.append(time, count > 0 ? sum / static_cast<double>(count) : 0.0);
@@ -444,7 +444,7 @@ class TrafficViewer final {
         followed_ ? world.store_of<LaneState>().maybe_component_of(*followed_)
                   : nullptr;
     followed_speed_.append(
-        time, state ? state->speed.numerical_value_in(model::meter_per_second)
+        time, state ? state->speed.numerical_value_in(meter_per_second)
                     : std::numeric_limits<double>::quiet_NaN());
   }
 
@@ -458,7 +458,7 @@ class TrafficViewer final {
       Length s = find_s_along(network, line.lane, line.along);
       int inner = line.lane.lane > 0 ? line.lane.lane - 1 : line.lane.lane + 1;
       auto at = [&](int id) {
-        Vector3 p = model::eigen(model::compute_road_position(
+        Vector3 p = eigen(model::compute_road_position(
             road, s, model::compute_lane_border(road, section, s, id)));
         return model::Point2{.x = p.x(), .y = p.y()};
       };
@@ -475,7 +475,7 @@ class TrafficViewer final {
       std::vector<model::Point2> corners;
       for (const Position& corner :
            model::compute_outline(road, object, object.outlines.front())) {
-        Vector3 p = model::eigen(corner);
+        Vector3 p = eigen(corner);
         corners.push_back({.x = p.x(), .y = p.y()});
       }
       crosswalks_.push_back(std::move(corners));
@@ -514,10 +514,10 @@ class TrafficViewer final {
             return;
           }
           const WalkCommand* command = commands.maybe_component_of(entity);
-          ImVec4 color = command && command->on                         ? CYAN
-                         : state.speed < 0.05 * model::meter_per_second ? ORANGE
-                                                                        : WHITE;
-          Vector3 at = model::eigen(pose->position);
+          ImVec4 color = command && command->on                  ? CYAN
+                         : state.speed < 0.05 * meter_per_second ? ORANGE
+                                                                 : WHITE;
+          Vector3 at = eigen(pose->position);
           map_.draw_dot({.x = at.x(), .y = at.y()}, PEDESTRIAN_SIZE,
                         convert_color(color));
         });
@@ -526,9 +526,9 @@ class TrafficViewer final {
   // A vehicle's box: its pose is its front bumper.
   auto convert_to_box(const RoadPose& pose, const Driver& driver) const
       -> model::OrientedBox {
-    Vector3 front = model::eigen(pose.position);
-    double heading = model::radians(pose.heading);
-    double length = driver.length.numerical_value_in(model::meter);
+    Vector3 front = eigen(pose.position);
+    double heading = radians(pose.heading);
+    double length = driver.length.numerical_value_in(meter);
     return {.x = front.x() - 0.5 * length * std::cos(heading),
             .y = front.y() - 0.5 * length * std::sin(heading),
             .heading = heading,
@@ -556,18 +556,18 @@ class TrafficViewer final {
     double slowest = std::numeric_limits<double>::infinity();
     double fastest = 0.0;
     world.store_of<LaneState>().for_each([&](Entity, const LaneState& state) {
-      double v = state.speed.numerical_value_in(model::meter_per_second);
+      double v = state.speed.numerical_value_in(meter_per_second);
       slowest = std::min(slowest, v);
       fastest = std::max(fastest, v);
     });
     std::size_t crossing = 0;
     std::size_t standing = 0;
-    world.store_of<WalkCommand>().for_each([&](Entity,
-                                               const WalkCommand& command) {
-      crossing += command.on ? 1 : 0;
-      standing +=
-          !command.on && command.speed < 0.05 * model::meter_per_second ? 1 : 0;
-    });
+    world.store_of<WalkCommand>().for_each(
+        [&](Entity, const WalkCommand& command) {
+          crossing += command.on ? 1 : 0;
+          standing +=
+              !command.on && command.speed < 0.05 * meter_per_second ? 1 : 0;
+        });
     ImGui::SeparatorText("Pedestrians");
     ImGui::Text("Walking       %7zu", world.store_of<WalkState>().size());
     ImGui::Text("Crossing      %7zu", crossing);
@@ -598,13 +598,12 @@ class TrafficViewer final {
     ImGui::Text("Road          %7s",
                 network.roads.roads[state->lane.road].id.c_str());
     ImGui::Text("Lane          %7d", state->lane.lane);
-    ImGui::Text("s             %7.1f m",
-                state->s.numerical_value_in(model::meter));
+    ImGui::Text("s             %7.1f m", state->s.numerical_value_in(meter));
     ImGui::Text("Speed         %7.1f m/s",
-                state->speed.numerical_value_in(model::meter_per_second));
-    ImGui::Text("Acceleration  %7.2f m/s^2",
-                command.acceleration.numerical_value_in(
-                    model::meter_per_second_squared));
+                state->speed.numerical_value_in(meter_per_second));
+    ImGui::Text(
+        "Acceleration  %7.2f m/s^2",
+        command.acceleration.numerical_value_in(meter_per_second_squared));
     ImGui::Text("Turns taken   %7u", state->turns);
     if (ImGui::Button("Stop following", ImVec2(-1.0f, 0.0f))) {
       followed_.reset();
@@ -621,7 +620,7 @@ class TrafficViewer final {
     if (running && followed_ && keep_in_view_) {
       if (const RoadPose* pose =
               world.store_of<RoadPose>().maybe_component_of(*followed_)) {
-        Vector3 at = model::eigen(pose->position);
+        Vector3 at = eigen(pose->position);
         follow = model::Point2{.x = at.x(), .y = at.y()};
       }
     }
@@ -642,7 +641,7 @@ class TrafficViewer final {
               return;
             }
             model::OrientedBox box = convert_to_box(pose, *driver);
-            double v = state->speed.numerical_value_in(model::meter_per_second);
+            double v = state->speed.numerical_value_in(meter_per_second);
             ImU32 fill = convert_color(ImPlot::SampleColormap(
                 static_cast<float>(std::clamp(v / top_speed(), 0.0, 1.0)),
                 ImPlotColormap_Viridis));

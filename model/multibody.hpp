@@ -7,8 +7,8 @@
 
 #include <array>
 
-#include "framework/step.hpp"
-#include "model/units.hpp"
+#include "core/time.hpp"
+#include "core/units.hpp"
 #include "model/vehicle.hpp"
 
 // CommonRoad's multibody vehicle model (Althoff and Wuersching, "CommonRoad:
@@ -119,7 +119,7 @@ auto operator+(const MultibodyVehicleRate& a, const MultibodyVehicleRate& b)
 auto operator*(double weight, const MultibodyVehicleRate& rate)
     -> MultibodyVehicleRate;
 auto advance(const MultibodyVehicle& state, const MultibodyVehicleRate& rate,
-             framework::Duration dt) -> MultibodyVehicle;
+             Duration dt) -> MultibodyVehicle;
 
 // The multibody state straight ahead at `speed`, its wheels rolling and its
 // suspension at rest (CommonRoad's init_mb).

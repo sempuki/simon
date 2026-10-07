@@ -11,8 +11,8 @@
 #include <vector>
 
 #include "base/core.hpp"
-#include "framework/vocabulary.hpp"
-#include "model/units.hpp"
+#include "core/units.hpp"
+#include "core/vocabulary.hpp"
 
 // Control blocks: the pieces flight control laws are built from, as free
 // functions and small value types. Each is exact or stable at any step, so a
@@ -62,14 +62,14 @@ auto output_of(const ValueType& value) -> OutputType {
 }
 
 // `value` clamped to [low, high], for numbers or quantities alike; see
-// model::clamp in units.hpp for why quantities do not use std::clamp.
+// clamp in units.hpp for why quantities do not use std::clamp.
 template <typename ValueType>
 auto clamp(const ValueType& value, const ValueType& low, const ValueType& high)
     -> ValueType {
   if constexpr (std::is_arithmetic_v<ValueType>) {
     return std::clamp(value, low, high);
   } else {
-    return model::clamp(value, low, high);
+    return simon::clamp(value, low, high);
   }
 }
 

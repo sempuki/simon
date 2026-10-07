@@ -19,7 +19,7 @@ cc_library(
     deps = [
         "//format:aircraft_file",
         "//model:trim",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         "//engine:lifecycle",
         "//engine:rate_gate",
         "//framework",
@@ -28,10 +28,10 @@ cc_library(
         "//model:control",
         "//model:aircraft_data",
         "//model:flight_path",
-        "//model:random",
+        "//core:random",
         "//model:rigid_aircraft",
         "//model:rigid_body",
-        "//model:units",
+        "//core:units",
         "@lib//base:core",
     ],
 )
@@ -43,9 +43,9 @@ cc_library(
     copts = COPTS,
     deps = [
         "//application:testing",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         "//model:rigid_body",
-        "//model:units",
+        "//core:units",
         "@lib//base:testing",
     ],
 )
@@ -60,7 +60,7 @@ cc_test(
     ],
     deps = [
         "//format:aircraft_file",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         ":aeronautic_library",
         "//engine:driver",
         "@lib//base:testing",
@@ -75,7 +75,7 @@ cc_test(
     data = ["reference/jsbsim_737.csv"],
     deps = [
         ":testing",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         ":aeronautic_library",
         "@lib//base:testing",
     ],
@@ -96,7 +96,7 @@ cc_test(
         ":testing",
         "//model:aerodynamics",
         "//model:aircraft_data",
-        "//model:units",
+        "//core:units",
         "@lib//base:testing",
     ],
 )
@@ -117,7 +117,7 @@ cc_test(
         "//model:earth",
         "//model:rigid_aircraft",
         "//model:rigid_body",
-        "//model:units",
+        "//core:units",
         "@lib//base:testing",
     ],
 )
@@ -137,7 +137,7 @@ cc_test(
         ":testing",
         "//model:aircraft_data",
         "//model:turbine",
-        "//model:units",
+        "//core:units",
         "@lib//base:testing",
     ],
 )
@@ -157,7 +157,7 @@ cc_test(
         ":testing",
         "//model:aircraft_data",
         "//model:flight_control",
-        "//model:units",
+        "//core:units",
         "@lib//base:testing",
     ],
 )
@@ -178,7 +178,7 @@ cc_test(
     deps = [
         "//format:aircraft_file",
         ":testing",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         ":aeronautic_library",
         "//model:trim",
         "@lib//base:testing",
@@ -193,7 +193,7 @@ cc_binary(
         "//3rd_party:jsbsim",
     ],
     deps = [
-        "//framework:vocabulary",
+        "//core:vocabulary",
         ":aeronautic_library",
         "//application:viewing",
         "//engine:driver",
@@ -220,7 +220,7 @@ cc_test(
     ],
     env = {"SDL_VIDEODRIVER": "dummy"},
     deps = [
-        "//framework:vocabulary",
+        "//core:vocabulary",
         ":aeronautic_library",
         "//application:viewing",
         "//engine:driver",
@@ -238,7 +238,7 @@ cc_binary(
         "//3rd_party:jsbsim",
     ],
     deps = [
-        "//framework:vocabulary",
+        "//core:vocabulary",
         ":aeronautic_library",
         "//engine:driver",
     ],
@@ -251,7 +251,7 @@ cc_binary(
     data = ["//3rd_party:jsbsim"],
     deps = [
         "//format:aircraft_file",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         ":aeronautic_library",
         "//framework",
         "//framework:benchmarking",
@@ -266,7 +266,7 @@ cc_binary(
     data = ["//3rd_party:jsbsim"],
     deps = [
         "//format:aircraft_file",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         ":aeronautic_library",
         "//framework:benchmarking",
         "@lib//base:core",
@@ -290,7 +290,7 @@ cc_test(
         "//model:atmosphere",
         "//model:rigid_aircraft",
         "//model:trim",
-        "//model:units",
+        "//core:units",
         "@lib//base:testing",
     ],
 )

@@ -9,7 +9,7 @@
 #include <variant>
 #include <vector>
 
-#include "model/units.hpp"
+#include "core/units.hpp"
 
 // Roads as ASAM OpenDRIVE describes them (see model/REFERENCES.md): a
 // reference line in the plane, built of lines, arcs, spirals and parametric

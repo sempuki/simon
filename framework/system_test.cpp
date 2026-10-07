@@ -9,8 +9,8 @@
 #include <vector>
 
 #include "base/testing.hpp"
+#include "core/vocabulary.hpp"
 #include "framework/test_world.hpp"
-#include "framework/vocabulary.hpp"
 
 namespace simon::framework {
 

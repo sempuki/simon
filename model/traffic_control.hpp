@@ -11,10 +11,10 @@
 #include <string>
 #include <vector>
 
+#include "core/units.hpp"
 #include "model/lane_graph.hpp"
 #include "model/road.hpp"
 #include "model/traffic.hpp"
-#include "model/units.hpp"
 
 // Traffic lights (see model/REFERENCES.md): fixed-time plans for groups of
 // signals, the stop lines their signals put on lanes, and what a driver does

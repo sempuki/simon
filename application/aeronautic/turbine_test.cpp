@@ -9,10 +9,10 @@
 
 #include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
+#include "core/units.hpp"
 #include "format/aircraft_file.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/turbine.hpp"
-#include "model/units.hpp"
 
 // The 737's turbines and the F-16's, converted from JSBSim, against
 // JSBSim's own, frame by frame through throttle steps, ramps and reheat that

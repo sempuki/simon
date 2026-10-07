@@ -10,8 +10,8 @@
 #include <type_traits>
 #include <utility>
 
-#include "framework/vocabulary.hpp"
-#include "model/random.hpp"
+#include "core/random.hpp"
+#include "core/vocabulary.hpp"
 
 namespace simon::aeronautic {
 
@@ -97,8 +97,7 @@ auto trim_in_cruise(const model::AircraftData& data, const model::Earth& earth,
                     Length altitude, Speed speed)
     -> std::expected<model::Trim, framework::Status> {
   model::FlightCondition condition{
-      .position =
-          model::meters(0.0, 0.0, altitude.numerical_value_in(model::meter)),
+      .position = meters(0.0, 0.0, altitude.numerical_value_in(meter)),
       .speed = speed,
       .tanks = model::fill_fuel_tanks(data),
   };
@@ -112,30 +111,28 @@ auto create_rigid_aircraft(const model::AircraftData& data,
                            InOut<World> world, const model::WindField& wind,
                            std::uint64_t seed)
     -> std::expected<Entity, framework::Status> {
-  model::Time start = 0.0 * model::second;
+  Time start = 0.0 * second;
   Length altitude = earth.altitude(trim.body, start);
   Speed speed{magnitude(earth.air_velocity(trim.body).numerical_value_in(
-                  model::meter_per_second)) *
-              model::meter_per_second};
-  auto body_at = [&](const model::AngularVelocity& rate) {
+                  meter_per_second)) *
+              meter_per_second};
+  auto body_at = [&](const AngularVelocity& rate) {
     return earth.body_at(
-        model::meters(x.numerical_value_in(model::meter),
-                      y.numerical_value_in(model::meter),
-                      altitude.numerical_value_in(model::meter)),
+        meters(x.numerical_value_in(meter), y.numerical_value_in(meter),
+               altitude.numerical_value_in(meter)),
         trim.bank, trim.pitch, heading, earth.air_velocity(trim.body), rate,
         start);
   };
   // Level round the Earth on the new heading.
-  RigidBody body = body_at(model::QuantityVector{} * model::radian_per_second);
+  RigidBody body = body_at(QuantityVector{} * radian_per_second);
   body = body_at(earth.level_rate(body, start));
   // Moving with the air.
   model::Wind steady = model::compute_wind(wind);
   body.velocity +=
-      model::QuantityVector{
+      QuantityVector{
           earth.place(body, start).north_east_down *
-          steady.north_east_down.numerical_value_in(model::meter_per_second)
-              .eigen()} *
-      model::meter_per_second;
+          steady.north_east_down.numerical_value_in(meter_per_second).eigen()} *
+      meter_per_second;
 
   auto create = [&]<typename ArchetypeType>() {
     return world->create<ArchetypeType>()
@@ -186,12 +183,12 @@ auto build_scenario(const Scenario& scenario, const RigidTypes& types,
   CHECK_PRECONDITION(airliners == 0 || types.airliner);
   CHECK_PRECONDITION(fighters == 0 || types.fighter);
   model::Earth earth = model::Earth::flat();
-  model::Random random{scenario.seed};
-  double side = scenario.spacing.numerical_value_in(model::meter) *
+  Random random{scenario.seed};
+  double side = scenario.spacing.numerical_value_in(meter) *
                 std::sqrt(static_cast<double>(simple + precise));
-  double reach = scenario.route_reach.numerical_value_in(model::meter);
-  double lowest = scenario.lowest.numerical_value_in(model::meter);
-  double highest = scenario.highest.numerical_value_in(model::meter);
+  double reach = scenario.route_reach.numerical_value_in(meter);
+  double lowest = scenario.lowest.numerical_value_in(meter);
+  double highest = scenario.highest.numerical_value_in(meter);
 
   // One trim serves every rigid aircraft of a type: over a flat Earth it
   // holds anywhere, on any heading.
@@ -209,18 +206,17 @@ auto build_scenario(const Scenario& scenario, const RigidTypes& types,
   for (std::size_t i = 0; i < all; ++i) {
     double x = random.uniform(0.0, side);
     double y = random.uniform(0.0, side);
-    Route route{
-        .speed =
-            random.uniform(
-                scenario.slowest.numerical_value_in(model::meter_per_second),
-                scenario.fastest.numerical_value_in(model::meter_per_second)) *
-            model::meter_per_second};
+    Route route{.speed =
+                    random.uniform(
+                        scenario.slowest.numerical_value_in(meter_per_second),
+                        scenario.fastest.numerical_value_in(meter_per_second)) *
+                    meter_per_second};
     for (Position& waypoint : route.waypoints) {
-      waypoint = model::meters(x + random.uniform(-reach, reach),
-                               y + random.uniform(-reach, reach),
-                               random.uniform(lowest, highest));
+      waypoint = meters(x + random.uniform(-reach, reach),
+                        y + random.uniform(-reach, reach),
+                        random.uniform(lowest, highest));
     }
-    Position start = model::meters(x, y, random.uniform(lowest, highest));
+    Position start = meters(x, y, random.uniform(lowest, highest));
     AirState state{
         .position = start,
         .speed = route.speed,
@@ -234,13 +230,13 @@ auto build_scenario(const Scenario& scenario, const RigidTypes& types,
     } else if (i < simple + precise + airliners) {
       RETURN_IF_UNEXPECTED(create_rigid_aircraft(
           *types.airliner, earth, *airliner_trim, scenario.airliner_gains,
-          x * model::meter, y * model::meter, state.heading, route, world,
-          scenario.wind, gust_seed(scenario, i)));
+          x * meter, y * meter, state.heading, route, world, scenario.wind,
+          gust_seed(scenario, i)));
     } else {
       RETURN_IF_UNEXPECTED(create_rigid_aircraft(
           *types.fighter, earth, *fighter_trim, scenario.fighter_gains,
-          x * model::meter, y * model::meter, state.heading, route, world,
-          scenario.wind, gust_seed(scenario, i)));
+          x * meter, y * meter, state.heading, route, world, scenario.wind,
+          gust_seed(scenario, i)));
     }
   }
   transaction.commit();
@@ -267,7 +263,7 @@ auto Simulation::configure() -> engine::PhaseResult {
   return engine::Flow::CONTINUE;
 }
 
-auto Simulation::step(const framework::Step& step) -> engine::PhaseResult {
+auto Simulation::step(const Step& step) -> engine::PhaseResult {
   scheduler_.step(step, InOut(world_));
   return engine::Flow::CONTINUE;
 }

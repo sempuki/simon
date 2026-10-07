@@ -55,11 +55,11 @@ auto sample_entities(const ScenarioSimulation& simulation)
   world.store_of<ScenarioActor>().for_each(
       [&](Entity owner, const ScenarioActor& actor) {
         const RoadPose& pose = world.store_of<RoadPose>().component_of(owner);
-        Vector3 at = model::eigen(pose.position);
+        Vector3 at = eigen(pose.position);
         samples[actor.entity] = {
             .x = at.x(),
             .y = at.y(),
-            .heading = model::radians(pose.heading),
+            .heading = radians(pose.heading),
             .speed = world.store_of<ScenarioSpeed>().component_of(owner).speed};
       });
   return samples;
@@ -89,14 +89,14 @@ auto measure_sample(std::span<const RunSample> samples,
 
 auto record_run(const std::string& path,
                 std::vector<scenario::ParameterAssignment> assignments,
-                framework::Duration step, std::size_t limit)
+                Duration step, std::size_t limit)
     -> std::expected<RunRecord, lib::Status> {
   ScenarioSimulation simulation{path, std::move(assignments)};
   RETURN_IF_UNEXPECTED(simulation.configure());
   RunRecord run{.step = std::chrono::duration<double>(step).count(),
                 .boxes = convert_entities_to_boxes(simulation.scenario())};
   for (std::size_t k = 0; k < limit; ++k) {
-    framework::Step now{.time = framework::TimePoint{} + k * step, .dt = step};
+    Step now{.time = TimePoint{} + k * step, .dt = step};
     RETURN_OR_ASSIGN(engine::Flow flow, simulation.step(now));
     // The step on which the storyboard stops is not sampled, as esmini
     // does not log it.
@@ -152,7 +152,7 @@ auto measure_run(const RunRecord& run) -> RunMeasures {
 }
 
 auto run_batch(const scenario::ParameterDistribution& distribution,
-               std::size_t threads, framework::Duration step, std::size_t limit)
+               std::size_t threads, Duration step, std::size_t limit)
     -> std::vector<BatchRun> {
   std::size_t count = scenario::count_permutations(distribution);
   std::vector<BatchRun> runs;

@@ -6,7 +6,7 @@
 #include <expected>
 
 #include "base/status.hpp"
-#include "framework/step.hpp"
+#include "core/time.hpp"
 
 namespace simon::engine {
 
@@ -29,7 +29,7 @@ using FinishResult = std::expected<void, Status>;
 // as `using Tick = ...;`, and its steps are BasicSteps of that tick.
 template <typename Type>
 struct TickOf final {
-  using type = framework::Duration;
+  using type = Duration;
 };
 template <typename Type>
   requires requires { typename Type::Tick; }
@@ -40,10 +40,10 @@ template <typename Type>
 using tick_of_t = typename TickOf<Type>::type;
 
 template <typename Type>
-concept Simulation = requires(
-    Type simulation, const framework::BasicStep<tick_of_t<Type>>& step) {
-  { simulation.step(step) } -> std::same_as<PhaseResult>;
-};
+concept Simulation =
+    requires(Type simulation, const BasicStep<tick_of_t<Type>>& step) {
+      { simulation.step(step) } -> std::same_as<PhaseResult>;
+    };
 
 // A driver's phase in the lifecycle.
 enum class Phase {

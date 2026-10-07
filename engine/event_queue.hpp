@@ -13,12 +13,9 @@
 #include <utility>
 #include <vector>
 
-#include "framework/step.hpp"
+#include "core/time.hpp"
 
 namespace simon::engine {
-
-using framework::Duration;
-using framework::TimePoint;
 
 // Identifies a message type. Handlers are found by it, and it is checked before
 // an event is cast back to its message type, so no dynamic_cast is needed.

@@ -29,8 +29,8 @@
 
 #include "application/automotive/simulation.hpp"
 #include "base/core.hpp"
+#include "core/vocabulary.hpp"
 #include "framework/benchmarking.hpp"
-#include "framework/vocabulary.hpp"
 
 namespace simon::automotive {
 namespace {
@@ -57,7 +57,7 @@ auto time_systems(const Network& network, InOut<World> world, int steps,
   double ordering = 0.0;
   keep_road_order(network, world);
   for (int i = 0; i < SETTLING_STEPS + steps; ++i) {
-    framework::Step step{.time = TimePoint{} + i * DT, .dt = DT};
+    Step step{.time = TimePoint{} + i * DT, .dt = DT};
     std::size_t index = 0;
     std::apply(
         [&](auto&... scheduler) {
@@ -102,10 +102,9 @@ auto time_systems(const Network& network, InOut<World> world, int steps,
 }
 
 auto measure_rings(const Network& network, int vehicles, int steps) -> void {
-  Scenario scenario{
-      .vehicles = vehicles,
-      .starting_speed = 25.0 * model::meter_per_second,
-      .following = {.desired_speed = 30.0 * model::meter_per_second}};
+  Scenario scenario{.vehicles = vehicles,
+                    .starting_speed = 25.0 * meter_per_second,
+                    .following = {.desired_speed = 30.0 * meter_per_second}};
   World world;
   CHECK_POSTCONDITION(build_world(scenario, network, Out(world)).has_value());
   CHECK_POSTCONDITION(
@@ -118,7 +117,7 @@ auto measure_rings(const Network& network, int vehicles, int steps) -> void {
 
   double speeds = 0.0;
   world.store_of<LaneState>().for_each([&](Entity, const LaneState& state) {
-    speeds += state.speed.numerical_value_in(model::meter_per_second);
+    speeds += state.speed.numerical_value_in(meter_per_second);
   });
   std::println("  ending at {:.1f} m/s", speeds / vehicles);
 }
@@ -127,8 +126,8 @@ auto measure_grid(const Network& network, int vehicles, int pedestrians,
                   int steps) -> void {
   Scenario scenario{
       .vehicles = vehicles,
-      .starting_speed = 10.0 * model::meter_per_second,
-      .following = {.desired_speed = 50.0 / 3.6 * model::meter_per_second},
+      .starting_speed = 10.0 * meter_per_second,
+      .following = {.desired_speed = 50.0 / 3.6 * meter_per_second},
       .pedestrians = pedestrians};
   World world;
   CHECK_POSTCONDITION(build_world(scenario, network, Out(world)).has_value());
@@ -145,7 +144,7 @@ auto measure_grid(const Network& network, int vehicles, int pedestrians,
 
   double speeds = 0.0;
   world.store_of<LaneState>().for_each([&](Entity, const LaneState& state) {
-    speeds += state.speed.numerical_value_in(model::meter_per_second);
+    speeds += state.speed.numerical_value_in(meter_per_second);
   });
   std::uint64_t trips = 0;
   world.store_of<WalkRoute>().for_each(

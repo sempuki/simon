@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 #include "model/articulated_arithmetic.hpp"
 
 // A port of MuJoCo 3.14.0's native convex collision, engine_collision_gjk.c

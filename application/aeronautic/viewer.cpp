@@ -28,8 +28,8 @@
 #include "application/aeronautic/simulation.hpp"
 #include "application/viewing.hpp"
 #include "base/core.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 #include "imgui/imgui.h"
 #include "implot/implot.h"
 
@@ -55,7 +55,7 @@ constexpr double CHART_SECONDS = 120.0;
 
 // Appends `position` to `scatter`: its east and north.
 auto append(const Position& position, InOut<Scatter> scatter) -> void {
-  model::QuantityVector meters = position.numerical_value_in(model::meter);
+  QuantityVector meters = position.numerical_value_in(meter);
   scatter->append(meters.x(), meters.y());
 }
 
@@ -100,7 +100,7 @@ class Viewer final {
     // The wind blows from `wind_from_`, so the air moves the other way.
     double from = wind_from_ / RAD_TO_DEG;
     scenario_.wind = model::WindField{
-        .north_east_down = model::meters_per_second(
+        .north_east_down = meters_per_second(
             -wind_speed_ * std::cos(from), -wind_speed_ * std::sin(from), 0.0),
         .turbulence = static_cast<model::Turbulence>(turbulence_),
     };
@@ -143,9 +143,9 @@ class Viewer final {
       }
       history.times.push_back(time);
       history.altitudes.push_back(
-          model::altitude_of(*state).numerical_value_in(model::meter));
+          model::altitude_of(*state).numerical_value_in(meter));
       history.speeds.push_back(
-          state->speed.numerical_value_in(model::meter_per_second));
+          state->speed.numerical_value_in(meter_per_second));
       while (!history.times.empty() &&
              history.times.front() < time - CHART_SECONDS) {
         history.times.pop_front();
@@ -246,16 +246,16 @@ class Viewer final {
     const model::AircraftData& data = *type->data;
     model::Earth earth = model::Earth::flat();
     Matrix3 attitude =
-        earth.convert_body_to_north_east_down(*body, model::seconds(0.0s));
-    Vector3 uvw = model::compute_air_velocity(
-                      *body, earth, earth.place(*body, model::seconds(0.0s)),
-                      wind ? *wind : Wind{})
-                      .numerical_value_in(model::meter_per_second)
+        earth.convert_body_to_north_east_down(*body, seconds(0.0s));
+    Vector3 uvw = model::compute_air_velocity(*body, earth,
+                                              earth.place(*body, seconds(0.0s)),
+                                              wind ? *wind : Wind{})
+                      .numerical_value_in(meter_per_second)
                       .eigen();
     Vector3 ground =
-        body->velocity.numerical_value_in(model::meter_per_second).eigen();
-    double g = model::STANDARD_GRAVITY.numerical_value_in(
-        model::meter_per_second_squared);
+        body->velocity.numerical_value_in(meter_per_second).eigen();
+    double g =
+        model::STANDARD_GRAVITY.numerical_value_in(meter_per_second_squared);
     auto signal = [&](std::string_view name) -> std::optional<double> {
       std::optional<std::size_t> found =
           model::find_signal(data.flight_controls, name);
@@ -266,40 +266,39 @@ class Viewer final {
     };
 
     ImGui::Text("Altitude      %7.0f m",
-                model::altitude_of(*state).numerical_value_in(model::meter));
+                model::altitude_of(*state).numerical_value_in(meter));
     ImGui::Text("Airspeed      %7.1f m/s",
-                state->speed.numerical_value_in(model::meter_per_second));
+                state->speed.numerical_value_in(meter_per_second));
     ImGui::Text("Ground speed  %7.1f m/s", std::hypot(ground.x(), ground.y()));
     if (wind) {
       Vector3 air =
-          wind->north_east_down.numerical_value_in(model::meter_per_second)
-              .eigen();
+          wind->north_east_down.numerical_value_in(meter_per_second).eigen();
       ImGui::Text("Wind          %7.1f m/s", std::hypot(air.x(), air.y()));
       ImGui::Text("Rising air    %7.1f m/s", -air.z());
     }
     ImGui::Text("Heading       %7.1f deg",
-                model::radians(state->heading) * RAD_TO_DEG);
+                radians(state->heading) * RAD_TO_DEG);
     ImGui::Text("Climb angle   %7.1f deg",
-                model::radians(state->flight_path_angle) * RAD_TO_DEG);
+                radians(state->flight_path_angle) * RAD_TO_DEG);
     ImGui::Text("Bank          %7.1f deg",
                 std::atan2(attitude(2, 1), attitude(2, 2)) * RAD_TO_DEG);
     ImGui::Text("Pitch         %7.1f deg",
                 -std::asin(std::clamp(attitude(2, 0), -1.0, 1.0)) * RAD_TO_DEG);
     ImGui::Text("Alpha         %7.1f deg",
                 std::atan2(uvw.z(), uvw.x()) * RAD_TO_DEG);
-    ImGui::Text("Load factor   %7.2f g",
-                -felt->specific_force
-                        .numerical_value_in(model::meter_per_second_squared)
-                        .eigen()
-                        .z() /
-                    g);
+    ImGui::Text(
+        "Load factor   %7.2f g",
+        -felt->specific_force.numerical_value_in(meter_per_second_squared)
+                .eigen()
+                .z() /
+            g);
     if (std::optional<double> throttle = signal("throttle_0")) {
       ImGui::Text("Throttle      %7.2f%s", *throttle,
                   engines->turbines[0].reheat ? "  reheat" : "");
     }
     double thrust = 0.0;
     for (std::size_t i = 0; i < data.engines.size(); ++i) {
-      thrust += engines->turbines[i].thrust.numerical_value_in(model::newton);
+      thrust += engines->turbines[i].thrust.numerical_value_in(newton);
     }
     ImGui::Text("Thrust        %7.1f kN", thrust / 1000.0);
     for (auto [name, shown] : {std::pair{"elevator", "Elevator"},

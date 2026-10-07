@@ -10,7 +10,6 @@ namespace simon::model {
 
 namespace {
 
-using framework::Duration;
 using namespace std::chrono_literals;
 
 // A body climbing, banked and turning at 200 m/s through the air, 6 km up,

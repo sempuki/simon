@@ -9,6 +9,7 @@
 #include <memory>
 #include <vector>
 
+#include "core/units.hpp"
 #include "framework/archetype.hpp"
 #include "framework/spatial.hpp"
 #include "framework/world.hpp"
@@ -16,7 +17,6 @@
 #include "model/articulated_collision.hpp"
 #include "model/articulated_dynamics.hpp"
 #include "model/kinematics.hpp"
-#include "model/units.hpp"
 
 // The robotic simulation's components: each entity is one kinematic tree of
 // a model, its state and its dynamics sized by its archetype's capacity.
@@ -167,15 +167,15 @@ inline auto distance(const TreeBound& a, const TreeBound& b) -> double {
   return std::hypot(a.center[0] - b.center[0], a.center[1] - b.center[1],
                     a.center[2] - b.center[2]);
 }
-inline auto coordinates(const TreeBound& bound) -> framework::Coordinates {
+inline auto coordinates(const TreeBound& bound) -> Coordinates {
   return {bound.center[0], bound.center[1], bound.center[2]};
 }
 inline auto coordinate_length(const TreeBound&, double length) -> double {
   return length;
 }
 inline auto pose(const TreeBound& bound) -> model::Pose {
-  return model::Pose{.position = model::meters(bound.center[0], bound.center[1],
-                                               bound.center[2])};
+  return model::Pose{
+      .position = meters(bound.center[0], bound.center[1], bound.center[2])};
 }
 
 namespace archetype {

@@ -12,7 +12,7 @@
 #include <numbers>
 #include <span>
 
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 #include "model/articulated.hpp"
 #include "model/articulated_arithmetic.hpp"
 

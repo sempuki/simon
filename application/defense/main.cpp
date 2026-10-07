@@ -10,8 +10,8 @@
 #include <print>
 
 #include "application/defense/simulation.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 
 auto main(int argc, char** argv) -> int {
   using namespace simon;
@@ -25,7 +25,7 @@ auto main(int argc, char** argv) -> int {
   engine::BatchDriver driver{engine::Timing{.max_step = 10ms},
                              Depend(simulation)};
 
-  auto reached = driver.run(framework::TimePoint{10min});
+  auto reached = driver.run(TimePoint{10min});
   if (!reached) {
     std::println(stderr, "Error: {}", reached.error().message());
     return EXIT_FAILURE;

@@ -1,12 +1,12 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-#include "model/random.hpp"
+#include "core/random.hpp"
 
 #include <cmath>
 
 #include "base/testing.hpp"
 
-namespace simon::model {
+namespace simon {
 
 TEST_CASE("Random") {
   SECTION("ShouldRepeatGivenSameSeed") {
@@ -51,4 +51,4 @@ TEST_CASE("Random") {
   }
 }
 
-}  // namespace simon::model
+}  // namespace simon

@@ -6,10 +6,11 @@
 #include <optional>
 #include <vector>
 
+#include "core/time.hpp"
+#include "core/units.hpp"
+#include "core/vocabulary.hpp"
 #include "framework/archetype.hpp"
 #include "framework/entity.hpp"
-#include "framework/step.hpp"
-#include "framework/vocabulary.hpp"
 #include "framework/world.hpp"
 #include "model/kinematics.hpp"
 #include "model/lane_graph.hpp"
@@ -19,7 +20,6 @@
 #include "model/road_placement.hpp"
 #include "model/traffic.hpp"
 #include "model/traffic_control.hpp"
-#include "model/units.hpp"
 #include "model/walking_graph.hpp"
 #include "scenario/storyboard.hpp"
 #include "scenario/transition.hpp"
@@ -32,16 +32,8 @@
 // follows from the road's geometry.
 namespace simon::automotive {
 
-using framework::Duration;
 using framework::Entity;
-using framework::Step;
-using framework::TimePoint;
-using model::AccelerationMagnitude;
-using model::Angle;
 using model::LaneKey;
-using model::Length;
-using model::Position;
-using model::Speed;
 
 // The roads vehicles drive on, how their lanes link, and the signal groups
 // and stop lines on them, read once and shared by the systems. It outlives
@@ -66,8 +58,8 @@ struct Network final {
 // at each fork.
 struct LaneState final {
   LaneKey lane;
-  Length s = 0.0 * model::meter;
-  Speed speed = 0.0 * model::meter_per_second;
+  Length s = 0.0 * meter;
+  Speed speed = 0.0 * meter_per_second;
   std::uint32_t turns = 0;
 };
 
@@ -75,7 +67,7 @@ struct LaneState final {
 struct Driver final {
   model::IntelligentDriver following;
   model::LaneChanger changing;
-  Length length = 4.5 * model::meter;
+  Length length = 4.5 * meter;
   std::uint64_t seed = 0;  // Picks its way at forks.
 };
 
@@ -91,7 +83,7 @@ struct Tactical final {
   static constexpr std::uint32_t NONE = ~std::uint32_t{0};
 
   model::LightBraking braking;
-  model::Time critical_gap = 6.0 * model::second;
+  Time critical_gap = 6.0 * second;
   std::optional<LaneKey> entering;
   std::uint32_t committed = NONE;
 };
@@ -113,7 +105,7 @@ struct SignalState final {
 // What a vehicle's driver decided this step: its acceleration, and the lane
 // it changes to, if any.
 struct DriveCommand final {
-  AccelerationMagnitude acceleration = 0.0 * model::meter_per_second_squared;
+  AccelerationMagnitude acceleration = 0.0 * meter_per_second_squared;
   std::optional<LaneKey> change;
 };
 
@@ -121,8 +113,8 @@ struct DriveCommand final {
 // vehicle's front bumper or a pedestrian's middle, and its heading,
 // counterclockwise from east.
 struct RoadPose final {
-  Position position = model::meters(0.0, 0.0, 0.0);
-  Angle heading = 0.0 * model::radian;
+  Position position = meters(0.0, 0.0, 0.0);
+  Angle heading = 0.0 * radian;
 };
 
 //-- As a spatial component ---------------------------------------------------
@@ -130,16 +122,16 @@ struct RoadPose final {
 inline auto distance(const RoadPose& a, const RoadPose& b) -> Length {
   return norm(a.position - b.position);
 }
-inline auto coordinates(const RoadPose& pose) -> framework::Coordinates {
+inline auto coordinates(const RoadPose& pose) -> Coordinates {
   return model::coordinates(pose.position);
 }
 inline auto coordinate_length(const RoadPose&, Length length) -> double {
-  return length.numerical_value_in(model::meter);
+  return length.numerical_value_in(meter);
 }
 inline auto pose(const RoadPose& vehicle) -> model::Pose {
   return model::Pose{.position = vehicle.position,
                      .orientation = Quaternion{AngleAxis{
-                         model::radians(vehicle.heading), Vector3::UnitZ()}}};
+                         radians(vehicle.heading), Vector3::UnitZ()}}};
 }
 
 //-- Scenarios ----------------------------------------------------------------
@@ -253,8 +245,8 @@ struct WalkRoute final {
 // and its speed.
 struct WalkState final {
   std::uint32_t leg = 0;
-  Length along = 0.0 * model::meter;
-  Speed speed = 0.0 * model::meter_per_second;
+  Length along = 0.0 * meter;
+  Speed speed = 0.0 * meter_per_second;
 };
 
 // A pedestrian's walking speed, as it would walk alone; its start-up time,
@@ -262,8 +254,8 @@ struct WalkState final {
 // seed, which picks where it goes; and whether it waits for a light that
 // tells it to.
 struct Walker final {
-  Speed desired_speed = 1.34 * model::meter_per_second;
-  model::Time start_up = 2.0 * model::second;
+  Speed desired_speed = 1.34 * meter_per_second;
+  Time start_up = 2.0 * second;
   std::uint64_t seed = 0;
   bool complies = true;
 };
@@ -274,8 +266,8 @@ struct Walker final {
 struct WalkCommand final {
   static constexpr std::uint32_t NONE = ~std::uint32_t{0};
 
-  Speed speed = 0.0 * model::meter_per_second;
-  model::Time clear = 0.0 * model::second;
+  Speed speed = 0.0 * meter_per_second;
+  Time clear = 0.0 * second;
   std::uint32_t crossing = NONE;
   bool on = false;  // On the crosswalk already.
 };

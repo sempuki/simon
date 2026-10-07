@@ -18,11 +18,11 @@
 #include <string_view>
 
 #include "application/galactic/simulation.hpp"
+#include "core/random.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 #include "model/galaxy.hpp"
 #include "model/gravity.hpp"
-#include "model/random.hpp"
 
 namespace simon::galactic {
 namespace {
@@ -34,7 +34,7 @@ auto make_plummer_scenario(std::size_t bodies, GravityMethod gravity)
     -> Scenario {
   Scenario scenario{
       .softening = 0.01 * KILOPARSEC, .gravity = gravity, .opening_angle = 0.5};
-  model::Random random{1};
+  Random random{1};
   model::append_plummer(
       model::Plummer{.mass = 1e10 * SOLAR_MASS, .scale = KILOPARSEC}, bodies,
       InOut(random), InOut(scenario.bodies));
@@ -47,11 +47,10 @@ auto make_restricted_scenario(std::size_t particles) -> Scenario {
   Scenario scenario{.softening = 0.1 * KILOPARSEC};
   model::BodyStart center{.mass = 1e11 * SOLAR_MASS};
   scenario.bodies = {
-      center,
-      model::BodyStart{
-          .position = model::meters(
-              50.0 * KILOPARSEC.numerical_value_in(model::meter), 0.0, 0.0),
-          .mass = 1e11 * SOLAR_MASS}};
+      center, model::BodyStart{
+                  .position = meters(
+                      50.0 * KILOPARSEC.numerical_value_in(meter), 0.0, 0.0),
+                  .mass = 1e11 * SOLAR_MASS}};
   model::RingDisk disk{.softening = scenario.softening};
   constexpr int RINGS = 100;
   for (int ring = 0; ring < RINGS; ++ring) {
@@ -98,8 +97,7 @@ auto main(int argc, char** argv) -> int {
     return EXIT_FAILURE;
   }
   auto start = std::chrono::steady_clock::now();
-  if (auto reached =
-          driver.advance_to(framework::BasicTimePoint<Year>{} + steps * step);
+  if (auto reached = driver.advance_to(BasicTimePoint<Year>{} + steps * step);
       !reached) {
     std::println(stderr, "Error: {}", reached.error().message());
     return EXIT_FAILURE;

@@ -6,9 +6,9 @@
 #include <span>
 #include <vector>
 
+#include "core/units.hpp"
 #include "model/lane_graph.hpp"
 #include "model/road.hpp"
-#include "model/units.hpp"
 
 // Where pedestrians walk: a graph of sidewalk lanes, crossings from
 // crosswalks, and links across junction corners where sidewalks end near

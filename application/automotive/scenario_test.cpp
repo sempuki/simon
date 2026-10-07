@@ -64,7 +64,7 @@ auto play(std::string_view scenario, std::size_t steps) -> Run {
   }
   Run run(1);
   for (std::size_t k = 0; k < steps; ++k) {
-    framework::Step step{.time = framework::TimePoint{} + k * 50ms, .dt = 50ms};
+    Step step{.time = TimePoint{} + k * 50ms, .dt = 50ms};
     if (simulation.step(step).value() == engine::Flow::STOP) {
       break;
     }
@@ -75,11 +75,11 @@ auto play(std::string_view scenario, std::size_t steps) -> Run {
           const RoadPose& pose = world.store_of<RoadPose>().component_of(owner);
           const ScenarioSpeed& speed =
               world.store_of<ScenarioSpeed>().component_of(owner);
-          Vector3 at = model::eigen(pose.position);
+          Vector3 at = eigen(pose.position);
           samples[simulation.scenario().entities[actor.entity].name] =
               Sample{.x = at.x(),
                      .y = at.y(),
-                     .heading = model::radians(pose.heading),
+                     .heading = radians(pose.heading),
                      .speed = speed.speed};
         });
     run.push_back(std::move(samples));

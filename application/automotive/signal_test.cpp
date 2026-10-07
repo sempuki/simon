@@ -12,7 +12,7 @@
 #include "application/automotive/simulation_systems.hpp"
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 
 // Traffic lights against SUMO: a queue at a red light and away on green,
 // every vehicle's position and speed compared with sumo_signal.csv.
@@ -22,8 +22,6 @@ namespace {
 
 using namespace std::chrono_literals;
 using namespace testing;
-using model::meter;
-using model::meter_per_second;
 
 constexpr int VEHICLES = 10;
 

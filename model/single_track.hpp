@@ -7,8 +7,8 @@
 
 #include <cmath>
 
-#include "framework/step.hpp"
-#include "model/units.hpp"
+#include "core/time.hpp"
+#include "core/units.hpp"
 #include "model/vehicle.hpp"
 
 // Single-track vehicle models, as CommonRoad defines them (Althoff and
@@ -75,9 +75,9 @@ inline auto operator*(double weight, const KinematicSingleTrackRate& rate)
 }
 
 inline auto advance(const KinematicSingleTrack& state,
-                    const KinematicSingleTrackRate& rate,
-                    framework::Duration dt) -> KinematicSingleTrack {
-  Time seconds = model::seconds(dt);
+                    const KinematicSingleTrackRate& rate, Duration dt)
+    -> KinematicSingleTrack {
+  Time seconds = simon::seconds(dt);
   return {.x = state.x + rate.x * seconds,
           .y = state.y + rate.y * seconds,
           .steering = state.steering + rate.steering * seconds,
@@ -135,7 +135,7 @@ auto operator+(const DynamicSingleTrackRate& a, const DynamicSingleTrackRate& b)
 auto operator*(double weight, const DynamicSingleTrackRate& rate)
     -> DynamicSingleTrackRate;
 auto advance(const DynamicSingleTrack& state,
-             const DynamicSingleTrackRate& rate, framework::Duration dt)
+             const DynamicSingleTrackRate& rate, Duration dt)
     -> DynamicSingleTrack;
 
 // The dynamic model's rate under `input` (CommonRoad's vehicle_dynamics_st),
@@ -181,7 +181,7 @@ auto operator+(const DriftSingleTrackRate& a, const DriftSingleTrackRate& b)
 auto operator*(double weight, const DriftSingleTrackRate& rate)
     -> DriftSingleTrackRate;
 auto advance(const DriftSingleTrack& state, const DriftSingleTrackRate& rate,
-             framework::Duration dt) -> DriftSingleTrack;
+             Duration dt) -> DriftSingleTrack;
 
 // The drift model's state straight ahead at `speed`, its wheels rolling.
 auto start_drift_single_track(Speed speed, const VehicleParameters& vehicle)

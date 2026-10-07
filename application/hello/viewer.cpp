@@ -18,8 +18,8 @@
 #include "application/hello/hello.hpp"
 #include "application/viewing.hpp"
 #include "base/core.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 #include "imgui/imgui.h"
 #include "implot/implot.h"
 
@@ -82,7 +82,7 @@ class Viewer final {
     ImGui::Text("Balls   %zu", world.store_of<Body>().size());
     ImGui::Text("Energy  %.1f MJ",
                 compute_energy(world, session_->scenario().gravity)
-                        .numerical_value_in(model::units::si::joule) /
+                        .numerical_value_in(units::si::joule) /
                     1e6);
 
     std::vector<double> speeds;
@@ -128,7 +128,7 @@ class Viewer final {
     world.store_of<Body>().for_each([&](Entity entity, const Body& body) {
       const Kinematics& ball =
           world.store_of<Kinematics>().component_of(entity);
-      model::QuantityVector at = ball.position.numerical_value_in(meter);
+      QuantityVector at = ball.position.numerical_value_in(meter);
       double speed =
           magnitude(ball.velocity.numerical_value_in(meter_per_second));
       ImVec2 center = ImPlot::PlotToPixels(at.x(), at.y());

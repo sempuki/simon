@@ -27,7 +27,7 @@ cc_library(
         "//engine:lifecycle",
         "//engine:rate_gate",
         "//framework",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         "//model:kinematics",
         "//model:lane_graph",
         "//model:right_of_way",
@@ -39,14 +39,14 @@ cc_library(
         "//scenario:parameter_distribution",
         "//model:collision",
         "//model:driving_metrics",
-        "//model:random",
+        "//core:random",
         "//model:road",
         "//model:polyline",
         "//model:road_placement",
         "//scenario:storyboard",
         "//model:traffic",
         "//scenario:transition",
-        "//model:units",
+        "//core:units",
         "@lib//base:core",
     ],
 )
@@ -59,7 +59,7 @@ cc_binary(
     deps = [
         ":automotive_library",
         "//engine:driver",
-        "//framework:vocabulary",
+        "//core:vocabulary",
     ],
 )
 
@@ -71,7 +71,7 @@ cc_binary(
     deps = [
         ":automotive_library",
         "//engine:driver",
-        "//framework:vocabulary",
+        "//core:vocabulary",
     ],
 )
 
@@ -105,7 +105,7 @@ cc_binary(
     deps = [
         ":automotive_library",
         "//framework:benchmarking",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         "@lib//base:core",
     ],
 )
@@ -118,7 +118,7 @@ cc_test(
     data = glob(["roads/*.xodr"]) + ["//3rd_party:carla"],
     deps = [
         ":automotive_library",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         "@lib//base:testing",
     ],
 )
@@ -132,7 +132,7 @@ cc_library(
         ":automotive_library",
         "//application:testing",
         "//model:collision",
-        "//model:units",
+        "//core:units",
         "//model:vehicle",
         "@lib//base:testing",
     ],
@@ -225,7 +225,7 @@ cc_test(
     deps = [
         ":automotive_library",
         ":testing",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         "//model:collision",
         "@lib//base:testing",
     ],
@@ -240,7 +240,7 @@ cc_test(
     deps = [
         ":automotive_library",
         ":testing",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         "@lib//base:testing",
     ],
 )
@@ -254,7 +254,7 @@ cc_test(
     deps = [
         ":automotive_library",
         ":testing",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         "//model:collision",
         "@lib//base:testing",
     ],
@@ -273,7 +273,7 @@ cc_test(
     deps = [
         ":automotive_library",
         ":testing",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         "@lib//base:testing",
     ],
 )
@@ -293,7 +293,7 @@ cc_test(
     ],
     deps = [
         ":testing",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         "//model:lane_graph",
         "//format:opendrive",
         "//model:road",
@@ -340,7 +340,7 @@ cc_test(
     deps = [
         ":automotive_library",
         ":testing",
-        "//framework:vocabulary",
+        "//core:vocabulary",
         "@lib//base:testing",
     ],
 )
@@ -409,7 +409,7 @@ VIEWER_DEPS = [
     ":road_drawing",
     "//application:viewing",
     "//engine:driver",
-    "//framework:vocabulary",
+    "//core:vocabulary",
     "//model:collision",
     "//3rd_party:imgui",
     "//3rd_party:implot",

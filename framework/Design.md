@@ -1476,7 +1476,7 @@ is not inlined into a hot loop shows up as its own line in `perf report`:
 **Use `model::max`, `min` and `clamp` on quantities in hot code.**
 `std::max` and its relatives compare through mp-units' `<=>`, and GCC 16
 compiles that to branches and stack spills instead of one `maxsd`.
-`model::max`, `min` and `clamp` (in `model/units.hpp`) take quantities and
+`max`, `min` and `clamp` (in `core/units.hpp`) take quantities and
 compare their numbers, so the code keeps its units.
 
 What each of these is worth is in [Compilers](#compilers).
@@ -1647,7 +1647,7 @@ linear algebra do not mix easily:
   compile on both compilers.
 
 **Decision: plain SI units, over a `QuantityVector` wrapper of Eigen's
-`Vector3`, everywhere.** `model/units.hpp` holds the wrapper, the vector
+`Vector3`, everywhere.** `core/units.hpp` holds the wrapper, the vector
 algebra (`dot`, `cross`, `norm`), a `seconds()` conversion from `std::chrono`,
 and every quantity type as an alias:
 
@@ -2133,7 +2133,9 @@ already bounded quantities through `model`'s helpers, got 6% and 3% faster.
 
 ```
 simon/
-  framework/     Entity, ComponentStore, World, Spatial, names, builders, commands, Step, System, schedules, and this design
+  core/          What every layer speaks and no layer owns: Vector3 and the parameter vocabulary, units, Duration and Step,
+                 Coordinates, Random, and the Lie groups SO(3) and SE(3)
+  framework/     Entity, ComponentStore, World, Spatial, names, builders, commands, System, schedules, and this design
   engine/        Lifecycle, drivers, RateGate, EventQueue
   model/         Reusable physics and maths, as free functions, and the data they work on: frames, the
                  atmosphere and Earth, rigid bodies, aircraft and their engines, roads and lanes, tires,
@@ -2160,8 +2162,11 @@ was retired in step 1. Its event queue moved to `engine/`.
 
 `model/` holds no file reading and no state that runs over time: a reader
 needs a parser, errors and a policy for what it refuses, and the scenario
-player keeps a storyboard's states from step to step. `scenario/` depends on
-`model/`, `format/` on both, and the applications on all three.
+player keeps a storyboard's states from step to step. `core/` depends on
+nothing in simon, `framework/` and `model/` on `core/`, `scenario/` on
+`model/`, `format/` on both, and the applications on all of them. The few
+model files that are systems (gravity, the leapfrog, motion) depend on
+`framework/` as well.
 
 ## Applications
 

@@ -10,8 +10,8 @@
 #include "application/aeronautic/simulation_components.hpp"
 #include "application/aeronautic/simulation_systems.hpp"
 #include "base/core.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/lifecycle.hpp"
-#include "framework/vocabulary.hpp"
 #include "model/trim.hpp"
 
 namespace simon::aeronautic {
@@ -38,40 +38,40 @@ struct Scenario final {
   // A fighter's fly-by-wire turns a stick into rates and load, which the
   // airliner's gains fly as well; it banks to 60 degrees, so it turns on
   // about 2 km at 200 m/s.
-  SurfaceGains fighter_gains{.max_bank = 1.05 * model::radian};
+  SurfaceGains fighter_gains{.max_bank = 1.05 * radian};
 
   // The air every aircraft flies in, still by default. Point-mass aircraft
   // drift with its steady wind; rigid aircraft fly through it, and through
   // its turbulence, each meeting its own gusts.
   model::WindField wind;
 
-  Length spacing = 5000.0 * model::meter;  // Per aircraft, on average.
-  Length route_reach = 20000.0 * model::meter;
-  Length lowest = 3000.0 * model::meter;
-  Length highest = 9000.0 * model::meter;
-  Speed slowest = 180.0 * model::meter_per_second;
-  Speed fastest = 240.0 * model::meter_per_second;
+  Length spacing = 5000.0 * meter;  // Per aircraft, on average.
+  Length route_reach = 20000.0 * meter;
+  Length lowest = 3000.0 * meter;
+  Length highest = 9000.0 * meter;
+  Speed slowest = 180.0 * meter_per_second;
+  Speed fastest = 240.0 * meter_per_second;
 
   // A generic twin-engine jet.
-  Airframe airframe{.mass = 20000.0 * model::kilogram,
-                    .wing_area = 50.0 * model::square_meter,
+  Airframe airframe{.mass = 20000.0 * kilogram,
+                    .wing_area = 50.0 * square_meter,
                     .zero_lift_drag = 0.02,
                     .induced_drag = 0.045,
-                    .thrust = 100000.0 * model::newton};
+                    .thrust = 100000.0 * newton};
   Handling handling{.max_load_factor = 3.0,
                     .min_load_factor = 0.0,
-                    .max_bank = 1.0 * model::radian,
-                    .roll_rate = 1.0 * model::radian_per_second,
-                    .load_factor_lag = 0.5 * model::second,
-                    .throttle_lag = 2.0 * model::second};
+                    .max_bank = 1.0 * radian,
+                    .roll_rate = 1.0 * radian_per_second,
+                    .load_factor_lag = 0.5 * second,
+                    .throttle_lag = 2.0 * second};
 };
 
 // Trims a rigid aircraft of type `data` over `earth` for level flight at
 // `altitude` and `speed`, its tanks full, heading north from the world's
 // origin.
 auto trim_in_cruise(const model::AircraftData& data, const model::Earth& earth,
-                    Length altitude = 6000.0 * model::meter,
-                    Speed speed = 200.0 * model::meter_per_second)
+                    Length altitude = 6000.0 * meter,
+                    Speed speed = 200.0 * meter_per_second)
     -> std::expected<model::Trim, framework::Status>;
 
 // Creates a rigid aircraft of type `data` over `earth`, trimmed by `trim`,
@@ -117,7 +117,7 @@ class Simulation final {
   // fails this phase with the builder's Status.
   auto configure() -> engine::PhaseResult;
 
-  auto step(const framework::Step& step) -> engine::PhaseResult;
+  auto step(const Step& step) -> engine::PhaseResult;
 
   // The world: empty until configured.
   auto world() const -> const World& { return world_; }

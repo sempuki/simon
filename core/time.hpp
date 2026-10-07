@@ -6,7 +6,7 @@
 
 #include "base/time.hpp"
 
-namespace simon::framework {
+namespace simon {
 
 using lib::Duration;
 using lib::TimePoint;
@@ -28,4 +28,4 @@ struct BasicStep final {
 
 using Step = BasicStep<Duration>;
 
-}  // namespace simon::framework
+}  // namespace simon

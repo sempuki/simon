@@ -12,8 +12,8 @@
 #include "application/automotive/simulation.hpp"
 #include "application/testing.hpp"
 #include "base/testing.hpp"
+#include "core/units.hpp"
 #include "model/collision.hpp"
-#include "model/units.hpp"
 #include "model/vehicle.hpp"
 
 // Shared by the automotive tests: the reference tables in
@@ -55,9 +55,9 @@ inline constexpr double CAR_WIDTH = 1.8;  // m.
 // The box a vehicle covers, from its front at `pose` back its length.
 inline auto create_box(const RoadPose& pose, const Driver& driver)
     -> model::OrientedBox {
-  Vector3 front = pose.position.numerical_value_in(model::meter).eigen();
-  double heading = pose.heading.numerical_value_in(model::radian);
-  double length = driver.length.numerical_value_in(model::meter);
+  Vector3 front = pose.position.numerical_value_in(meter).eigen();
+  double heading = pose.heading.numerical_value_in(radian);
+  double length = driver.length.numerical_value_in(meter);
   return {.x = front.x() - 0.5 * length * std::cos(heading),
           .y = front.y() - 0.5 * length * std::sin(heading),
           .heading = heading,

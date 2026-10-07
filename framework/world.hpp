@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "base/core.hpp"
+#include "core/vocabulary.hpp"
 #include "framework/archetype.hpp"
 #include "framework/build_error.hpp"
 #include "framework/command.hpp"
@@ -35,7 +36,6 @@
 #include "framework/spatial.hpp"
 #include "framework/spatial_index.hpp"
 #include "framework/type_list.hpp"
-#include "framework/vocabulary.hpp"
 #include "framework/world_builder.hpp"
 
 namespace simon::framework {

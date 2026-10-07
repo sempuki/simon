@@ -71,10 +71,10 @@
 #include <vector>
 
 #include "base/core.hpp"
+#include "core/vocabulary.hpp"
 #include "framework/benchmarking.hpp"
 #include "framework/component_store.hpp"
 #include "framework/entity.hpp"
-#include "framework/vocabulary.hpp"
 
 namespace simon::framework {
 namespace {

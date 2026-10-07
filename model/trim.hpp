@@ -9,12 +9,12 @@
 #include <expected>
 
 #include "base/status.hpp"
+#include "core/units.hpp"
 #include "model/aircraft_data.hpp"
 #include "model/atmosphere.hpp"
 #include "model/flight_control.hpp"
 #include "model/rigid_aircraft.hpp"
 #include "model/rigid_body.hpp"
-#include "model/units.hpp"
 
 // A rigid aircraft's trim: the attitude, controls and throttle at which it
 // flies a steady, straight path, its forces and moments in balance. Round the

@@ -8,11 +8,11 @@
 #include <numbers>
 
 #include "Eigen/Geometry"
-#include "framework/spatial_index.hpp"
-#include "framework/step.hpp"
+#include "core/coordinates.hpp"
+#include "core/time.hpp"
+#include "core/units.hpp"
 #include "model/atmosphere.hpp"
 #include "model/kinematics.hpp"
-#include "model/units.hpp"
 
 // A point-mass flight-path model: an aircraft as a point with a speed, a
 // flight-path angle and a heading, flown by commanding its load factor, bank
@@ -61,8 +61,8 @@ inline auto operator*(double weight, const AirStateRate& rate) -> AirStateRate {
 
 // Moves `state` along `rate` for `dt`, keeping the heading in [-pi, pi].
 inline auto advance(const AirState& state, const AirStateRate& rate,
-                    framework::Duration dt) -> AirState {
-  Time seconds = model::seconds(dt);
+                    Duration dt) -> AirState {
+  Time seconds = simon::seconds(dt);
   return AirState{
       .position = state.position + rate.velocity * seconds,
       .speed = state.speed + rate.acceleration * seconds,
@@ -92,7 +92,7 @@ inline auto altitude_of(const AirState& state) -> Length {
 inline auto distance(const AirState& a, const AirState& b) -> Length {
   return norm(a.position - b.position);
 }
-inline auto coordinates(const AirState& state) -> framework::Coordinates {
+inline auto coordinates(const AirState& state) -> Coordinates {
   return coordinates(state.position);
 }
 inline auto coordinate_length(const AirState&, Length length) -> double {
@@ -192,9 +192,9 @@ inline auto compute_point_mass_rate(const AirState& state,
 // The new velocity is the old one plus its derivative over the step, which
 // follows from the rate and the old direction of flight without another sine
 // or cosine.
-inline auto fly(const AirState& state, const AirStateRate& rate,
-                framework::Duration dt) -> AirState {
-  Time seconds = model::seconds(dt);
+inline auto fly(const AirState& state, const AirStateRate& rate, Duration dt)
+    -> AirState {
+  Time seconds = simon::seconds(dt);
   AirState next{
       .position = state.position,
       .speed = state.speed + rate.acceleration * seconds,

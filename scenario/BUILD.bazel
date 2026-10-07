@@ -21,7 +21,7 @@ cc_library(
         ":openscenario",
         "//model:road",
         "//model:road_placement",
-        "//model:units",
+        "//core:units",
     ],
 )
 

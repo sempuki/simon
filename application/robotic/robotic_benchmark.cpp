@@ -16,7 +16,7 @@
 #include <string>
 
 #include "application/robotic/simulation.hpp"
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 
 auto main(int argc, char** argv) -> int {
   using namespace simon;
@@ -33,8 +33,8 @@ auto main(int argc, char** argv) -> int {
   double h = simulation.mechanics().model().physics.timestep;
   auto dt = std::chrono::nanoseconds{std::llround(h * 1e9)};
   auto step = [&](int k) {
-    if (auto stepped = simulation.step(
-            framework::Step{.time = framework::TimePoint{} + k * dt, .dt = dt});
+    if (auto stepped =
+            simulation.step(Step{.time = TimePoint{} + k * dt, .dt = dt});
         !stepped) {
       std::cerr << "Error: " << stepped.error().message() << "\n";
       std::exit(EXIT_FAILURE);

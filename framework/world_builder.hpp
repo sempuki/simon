@@ -15,11 +15,11 @@
 
 #include "base/core.hpp"
 #include "base/status.hpp"
+#include "core/vocabulary.hpp"
 #include "framework/archetype.hpp"
 #include "framework/build_error.hpp"
 #include "framework/spatial.hpp"
 #include "framework/type_list.hpp"
-#include "framework/vocabulary.hpp"
 
 namespace simon::framework {
 

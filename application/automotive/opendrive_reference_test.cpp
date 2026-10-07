@@ -13,8 +13,8 @@
 
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
+#include "core/vocabulary.hpp"
 #include "format/opendrive.hpp"
-#include "framework/vocabulary.hpp"
 #include "model/lane_graph.hpp"
 #include "model/road.hpp"
 
@@ -27,8 +27,6 @@
 namespace simon::automotive {
 
 namespace {
-
-using model::meter;
 
 using namespace testing;
 
@@ -89,7 +87,7 @@ using Largest = std::map<std::string, double, std::less<>>;
 auto position_errors(std::string_view table) -> Largest {
   Largest largest;
   for (const Row& row : load_rows(table)) {
-    model::Position position = model::compute_road_position(
+    Position position = model::compute_road_position(
         find_road(row), number(row, "s") * meter, number(row, "t") * meter,
         number(row, "h") * meter);
     Vector3 apart =
@@ -213,7 +211,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
         validities.emplace(static_cast<int>(number(row, "from_lane")),
                            static_cast<int>(number(row, "to_lane")));
       }
-      model::Position position = model::compute_road_position(
+      Position position = model::compute_road_position(
           find_road(row), signal.s * meter, signal.t * meter,
           signal.z_offset * meter);
       Vector3 apart =
@@ -262,7 +260,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
       CHECK(validities == row.at("validities"));
       const model::RoadObject::Outline& outline =
           object.outlines.at(static_cast<std::size_t>(number(row, "outline")));
-      std::vector<model::Position> corners =
+      std::vector<Position> corners =
           model::compute_outline(find_road(row), object, outline);
       Vector3 apart =
           corners.at(static_cast<std::size_t>(number(row, "corner")))

@@ -9,11 +9,11 @@
 
 #include "application/galactic/simulation.hpp"
 #include "base/testing.hpp"
+#include "core/random.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 #include "model/galaxy.hpp"
 #include "model/gravity.hpp"
-#include "model/random.hpp"
 
 namespace simon::galactic {
 namespace {
@@ -39,10 +39,9 @@ auto collect_disk(const Simulation& simulation) -> Disk {
     const Kinematics& body =
         simulation.world().store_of<Kinematics>().component_of(
             simulation.bodies()[i]);
-    disk.positions.push_back(
-        body.position.numerical_value_in(model::meter).eigen());
+    disk.positions.push_back(body.position.numerical_value_in(meter).eigen());
     disk.velocities.push_back(
-        body.velocity.numerical_value_in(model::meter_per_second).eigen());
+        body.velocity.numerical_value_in(meter_per_second).eigen());
   }
   return disk;
 }
@@ -63,7 +62,7 @@ auto compute_thickness(const Disk& disk) -> double {
 }  // namespace
 
 TEST_CASE("DiskGalaxy") {
-  const double h = GALAXY.disk_scale.numerical_value_in(model::meter);
+  const double h = GALAXY.disk_scale.numerical_value_in(meter);
 
   SECTION("ShouldStartAsDesignedGivenSample") {
     Simulation simulation{make_galaxy_scenario()};
@@ -87,21 +86,21 @@ TEST_CASE("DiskGalaxy") {
     rotation /= count;
     double circular =
         model::compute_circular_speed(GALAXY, 2.5 * GALAXY.disk_scale)
-            .numerical_value_in(model::meter_per_second);
+            .numerical_value_in(meter_per_second);
     Mechanics mechanics =
         measure_mechanics(simulation.world(), simulation.scenario().softening);
 
     // Toomre's Q from the measured dispersion: sigma_R kappa / 3.36 G Sigma.
     double r = 2.5 * h;
     auto v2 = [&](double x) {
-      return std::pow(model::compute_circular_speed(GALAXY, x * model::meter)
-                          .numerical_value_in(model::meter_per_second),
+      return std::pow(model::compute_circular_speed(GALAXY, x * meter)
+                          .numerical_value_in(meter_per_second),
                       2.0);
     };
     double kappa =
         std::sqrt((v2(r * 1.0001) - v2(r * 0.9999)) / (2e-4 * r) / r +
                   2.0 * v2(r) / (r * r));
-    double sigma = GALAXY.disk_mass.numerical_value_in(model::kilogram) /
+    double sigma = GALAXY.disk_mass.numerical_value_in(kilogram) /
                    (2.0 * std::numbers::pi * h * h) * std::exp(-2.5);
     double q = std::sqrt(radial2 / count) * kappa /
                (3.36 * model::GRAVITATIONAL_CONSTANT * sigma);
@@ -109,7 +108,7 @@ TEST_CASE("DiskGalaxy") {
     // layer's z_0 pi / 2 sqrt(3) = 0.544, rotation at 0.972 of circular
     // (asymmetric drift), Q 1.56 over 249 bodies, and a virial ratio of 0.953.
     double half_mass = 1.678 * h;
-    double layer = GALAXY.disk_thickness.numerical_value_in(model::meter) *
+    double layer = GALAXY.disk_thickness.numerical_value_in(meter) *
                    std::numbers::pi / (2.0 * std::sqrt(3.0));
     CHECK(std::abs(compute_half_mass_radius(disk) / half_mass - 1.0) < 0.03);
     CHECK(std::abs(compute_thickness(disk) / layer - 1.0) < 0.05);
@@ -130,7 +129,7 @@ TEST_CASE("DiskGalaxy") {
     Simulation simulation{make_galaxy_scenario()};
     const Year step{2000000};
     engine::BatchDriver driver{Timing{.max_step = step}, Depend(simulation)};
-    REQUIRE(driver.run(framework::BasicTimePoint<Year>{} + 50 * step));
+    REQUIRE(driver.run(BasicTimePoint<Year>{} + 50 * step));
     Disk after = collect_disk(simulation);
     Mechanics mechanics_after =
         measure_mechanics(simulation.world(), simulation.scenario().softening);

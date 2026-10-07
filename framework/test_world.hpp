@@ -5,8 +5,8 @@
 #include <cmath>
 #include <expected>
 
+#include "core/vocabulary.hpp"
 #include "framework/archetype.hpp"
-#include "framework/vocabulary.hpp"
 #include "framework/world.hpp"
 
 // A small world for framework tests: a one-dimensional position and two

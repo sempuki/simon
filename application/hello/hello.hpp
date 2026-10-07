@@ -8,10 +8,10 @@
 #include <expected>
 
 #include "base/core.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/lifecycle.hpp"
 #include "framework/archetype.hpp"
 #include "framework/system.hpp"
-#include "framework/vocabulary.hpp"
 #include "framework/world.hpp"
 #include "model/kinematics.hpp"
 #include "model/motion.hpp"
@@ -21,36 +21,21 @@
 namespace simon::hello {
 
 using framework::Entity;
-using model::AccelerationMagnitude;
 using model::Control;
-using model::Density;
-using model::Displacement;
-using model::ForceVector;
 using model::Kinematics;
-using model::Length;
-using model::Mass;
-using model::meter;
-using model::meter_per_second;
-using model::meter_per_second_squared;
-using model::meters;
-using model::meters_per_second;
-using model::Speed;
-using model::Time;
-using model::Velocity;
 
 //-- Components ----------------------------------------------------------------
 
 // A ball's size and mass. Collisions read both.
 struct Body final {
   Length radius = 0.0 * meter;
-  Mass mass = 0.0 * model::kilogram;
+  Mass mass = 0.0 * kilogram;
 };
 
 // The force a ball's contacts with other balls put on it this step. Written
 // by DetectContacts and applied by ApplyContacts.
 struct Contact final {
-  ForceVector force =
-      model::meters_per_second_squared(0.0, 0.0, 0.0) * model::kilogram;
+  ForceVector force = meters_per_second_squared(0.0, 0.0, 0.0) * kilogram;
 };
 
 // A ball falls under the gravity its Control holds, which nothing changes.
@@ -75,7 +60,7 @@ struct Box final {
 // the ball leaves it `restitution` times as fast as it met it. Restitution is
 // more than 0 and at most 1.
 struct Springiness final {
-  Time duration = 0.05 * model::second;
+  Time duration = 0.05 * second;
   double restitution = 1.0;
 };
 
@@ -105,7 +90,7 @@ struct DetectContacts final          //
   auto prepare(auto& world) -> void {
     largest_radius = 0.0 * meter;
     store_of<Body>(world).for_each([&](Entity, const Body& body) {
-      largest_radius = model::max(largest_radius, body.radius);
+      largest_radius = max(largest_radius, body.radius);
     });
   }
 
@@ -145,10 +130,9 @@ struct ApplyContacts final              //
                   Kinematics& kinematics,  //
                   const Contact* contact,  //
                   const Body* body,        //
-                  framework::Step step) const -> void {
+                  Step step) const -> void {
     if (!contact || !body) return;
-    kinematics.velocity +=
-        contact->force / body->mass * model::seconds(step.dt);
+    kinematics.velocity += contact->force / body->mass * seconds(step.dt);
   }
 };
 
@@ -160,7 +144,7 @@ using Scheduler = framework::Scheduler<World, Schedule>;
 
 // The step to run the balls at: a tenth of a contact, short enough that an
 // elastic contact gives back the energy it took.
-inline constexpr framework::Duration STEP = std::chrono::milliseconds{5};
+inline constexpr Duration STEP = std::chrono::milliseconds{5};
 
 // Everything a run depends on. The same scenario gives the same run.
 struct Scenario final {
@@ -170,7 +154,7 @@ struct Scenario final {
   Box box;
   Length smallest = 0.35 * meter;
   Length largest = 0.5 * meter;
-  Density density = 1000.0 * model::kilogram_per_cubic_meter;
+  Density density = 1000.0 * kilogram_per_cubic_meter;
   Speed fastest = 8.0 * meter_per_second;  // Each ball starts slower.
 
   AccelerationMagnitude gravity = 9.8 * meter_per_second_squared;
@@ -190,9 +174,8 @@ auto compute_capacity(const Scenario& scenario) -> std::size_t;
 auto build_balls(const Scenario& scenario, InOut<World> world)
     -> std::expected<void, framework::Status>;
 
-using Momentum = model::units::quantity<model::kilogram * meter_per_second,
-                                        model::QuantityVector>;
-using Energy = model::units::quantity<model::units::si::joule, double>;
+using Momentum = units::quantity<kilogram * meter_per_second, QuantityVector>;
+using Energy = units::quantity<units::si::joule, double>;
 
 // Computes the balls' total momentum.
 auto compute_momentum(const World& world) -> Momentum;
@@ -208,7 +191,7 @@ class Simulation final {
 
   // Builds the world and the balls in it.
   auto configure() -> engine::PhaseResult;
-  auto step(const framework::Step& step) -> engine::PhaseResult;
+  auto step(const Step& step) -> engine::PhaseResult;
 
   auto scenario() const -> const Scenario& { return scenario_; }
 

@@ -24,8 +24,8 @@
 #include "application/robotic/simulation.hpp"
 #include "application/viewing.hpp"
 #include "base/core.hpp"
+#include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "framework/vocabulary.hpp"
 #include "imgui/imgui.h"
 #include "model/articulated_arithmetic.hpp"
 

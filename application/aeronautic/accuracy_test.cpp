@@ -14,7 +14,7 @@
 #include "application/aeronautic/simulation_systems.hpp"
 #include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 
 // Measures the drift of simon's point-mass model from JSBSim's 737 flying the
 // same maneuvers. reference/jsbsim_737.py flew them and recorded the controls a
@@ -33,20 +33,20 @@ constexpr std::string_view REFERENCE =
 constexpr Duration SAMPLE = 200ms;  // Between the reference's rows.
 
 // The 737, as jsbsim_737.py fitted it.
-constexpr Airframe BOEING_737{.mass = 48534.3 * model::kilogram,
-                              .wing_area = 108.789 * model::square_meter,
+constexpr Airframe BOEING_737{.mass = 48534.3 * kilogram,
+                              .wing_area = 108.789 * square_meter,
                               .zero_lift_drag = 0.01561,
                               .lift_drag = 0.03020,
                               .induced_drag = 0.05189,
-                              .thrust = 200000.0 * model::newton};
+                              .thrust = 200000.0 * newton};
 
 // One row of the reference: the controls at a time, and where the 737 was.
 struct Sample final {
   auto state() const -> AirState {
-    return AirState{.position = model::meters(x, y, z),
-                    .speed = speed * model::meter_per_second,
-                    .flight_path_angle = flight_path_angle * model::radian,
-                    .heading = heading * model::radian};
+    return AirState{.position = meters(x, y, z),
+                    .speed = speed * meter_per_second,
+                    .flight_path_angle = flight_path_angle * radian,
+                    .heading = heading * radian};
   }
 
   double time = 0.0;  // Seconds.
@@ -100,7 +100,7 @@ struct Replay final  //
 
     controls = FlightControls{
         .load_factor = between(low.load_factor, high.load_factor),
-        .bank = between(low.bank, high.bank) * model::radian,
+        .bank = between(low.bank, high.bank) * radian,
         .throttle = between(low.throttle, high.throttle)};
   }
 
@@ -113,19 +113,16 @@ struct Drift final {
   auto add(const AirState& state, const Sample& sample) -> void {
     AirState expected = sample.state();
     position = std::max(
-        position,
-        model::distance(state, expected).numerical_value_in(model::meter));
-    altitude = std::max(
-        altitude,
-        std::abs((model::altitude_of(state) - model::altitude_of(expected))
-                     .numerical_value_in(model::meter)));
-    speed = std::max(
-        speed, std::abs((state.speed - expected.speed)
-                            .numerical_value_in(model::meter_per_second)));
-    heading = std::max(
-        heading,
-        std::abs(std::remainder(model::radians(state.heading) - sample.heading,
-                                2.0 * std::numbers::pi)));
+        position, model::distance(state, expected).numerical_value_in(meter));
+    altitude = std::max(altitude, std::abs((model::altitude_of(state) -
+                                            model::altitude_of(expected))
+                                               .numerical_value_in(meter)));
+    speed =
+        std::max(speed, std::abs((state.speed - expected.speed)
+                                     .numerical_value_in(meter_per_second)));
+    heading = std::max(heading, std::abs(std::remainder(
+                                    radians(state.heading) - sample.heading,
+                                    2.0 * std::numbers::pi)));
   }
 
   double position = 0.0;  // Meters.

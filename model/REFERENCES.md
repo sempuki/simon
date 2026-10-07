@@ -1,10 +1,19 @@
 # References
 
-The sources of the math and the formats in `model/`, `format/`, `scenario/`
-and `framework/`, files named from `model/` but where a directory is given. Each algorithm's comment
+The sources of the math and the formats in `core/`, `model/`, `format/`,
+`scenario/` and `framework/`, files named from `model/` but where a directory
+is given. Each algorithm's comment
 names its source in brief, and the full reference is here. Where a comment
 says the math is derived here, it shows the derivation. A source is given in
 full where it first appears, and as "above" after.
+
+## Rotations and rigid motions
+
+| Where | What | Source |
+|---|---|---|
+| `core/lie.hpp` | SO(3) and SE(3) as Lie groups: the exponential and logarithm, the adjoint, the left and right Jacobians and their inverses, with a twist written translation first | J. Solà, J. Deray and D. Atchuthan, "A micro Lie theory for state estimation in robotics", arXiv:1812.01537, 2018, sections 4 and 7 and appendices A and B |
+| `core/lie.hpp` | The rotation of a vector about an axis, as a quaternion | O. Rodrigues, "Des lois géométriques qui régissent les déplacements d'un système solide dans l'espace", *Journal de Mathématiques Pures et Appliquées* 5, 1840, pp. 380-440 |
+| `core/lie.hpp` | The block of the SE(3) Jacobian that couples translation to rotation | T. D. Barfoot, *State Estimation for Robotics*, Cambridge University Press, 2017, equation 7.86 |
 
 ## The Earth and the air
 
@@ -22,7 +31,7 @@ full where it first appears, and as "above" after.
 | `wind.cpp` | Sampling a filter driven by white noise exactly over a step | C. F. Van Loan, "Computing integrals involving the matrix exponential", *IEEE Transactions on Automatic Control* 23(3), 1978, pp. 395-404 |
 | `wind.cpp` | A lag whose input moves in a straight line over a step | The triangle-hold equivalent, G. F. Franklin, J. D. Powell and M. L. Workman, *Digital Control of Dynamic Systems*, 3rd edition, Addison-Wesley, 1998, section 6.3.2 |
 | `wind.cpp`, `application/automotive/simulation_systems.hpp` | SplitMix64 | G. L. Steele Jr., D. Lea and C. H. Flood, "Fast splittable pseudorandom number generators", OOPSLA 2014, pp. 453-472; its constants as in S. Vigna's [splitmix64.c](https://prng.di.unimi.it/splitmix64.c) |
-| `wind.cpp`, `random.hpp` | Normal numbers from uniform ones | G. E. P. Box and M. E. Muller, "A note on the generation of random normal deviates", *Annals of Mathematical Statistics* 29(2), 1958, pp. 610-611 |
+| `wind.cpp`, `core/random.hpp` | Normal numbers from uniform ones | G. E. P. Box and M. E. Muller, "A note on the generation of random normal deviates", *Annals of Mathematical Statistics* 29(2), 1958, pp. 610-611 |
 
 ## Aircraft
 

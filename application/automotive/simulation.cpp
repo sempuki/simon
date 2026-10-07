@@ -10,8 +10,8 @@
 #include <utility>
 #include <vector>
 
+#include "core/random.hpp"
 #include "format/opendrive.hpp"
-#include "model/random.hpp"
 
 namespace simon::automotive {
 
@@ -145,7 +145,7 @@ auto build_scenario(const Scenario& scenario, const Network& network,
                     InOut<World> world)
     -> std::expected<void, framework::Status> {
   double spacing = (scenario.length + scenario.following.minimum_gap)
-                       .numerical_value_in(model::meter) +
+                       .numerical_value_in(meter) +
                    5.0;
   std::vector<Room> lanes = driving_lanes(network, spacing);
   double total = 0.0;
@@ -154,7 +154,7 @@ auto build_scenario(const Scenario& scenario, const Network& network,
   }
   CHECK_PRECONDITION(total > 0.0);
 
-  model::Random random{scenario.seed};
+  Random random{scenario.seed};
   std::map<LaneKey, std::vector<double>> taken;
   auto transaction = world->transaction();
   for (std::size_t i = 0; i < count(scenario.vehicles); ++i) {
@@ -253,18 +253,17 @@ auto build_scenario(const Scenario& scenario, const Network& network,
     std::vector<model::Leg> onward =
         plan_walk(network, network.walking.edges()[edge].to, seed, 0);
     route.legs.insert(route.legs.end(), onward.begin(), onward.end());
-    WalkState state{.along = at * model::meter};
+    WalkState state{.along = at * meter};
     double speed = std::clamp(
         random.normal(
-            scenario.walking_speed.numerical_value_in(model::meter_per_second),
-            scenario.walking_spread.numerical_value_in(
-                model::meter_per_second)),
+            scenario.walking_speed.numerical_value_in(meter_per_second),
+            scenario.walking_spread.numerical_value_in(meter_per_second)),
         0.5, 2.5);
     RETURN_IF_UNEXPECTED(
         world->create<archetype::Pedestrian>()
             .with(PlaceWalker::locate_walker(network, route, state))
             .with(state)
-            .with(Walker{.desired_speed = speed * model::meter_per_second,
+            .with(Walker{.desired_speed = speed * meter_per_second,
                          .start_up = scenario.start_up,
                          .seed = seed,
                          .complies = random.unit() < scenario.compliance})
@@ -288,7 +287,7 @@ auto keep_road_order(const Network& network, InOut<World> world) -> void {
   auto road_order = [&](Entity entity) {
     const LaneState& state = world->store_of<LaneState>().component_of(entity);
     return std::pair{numbering.number_of(state.lane),
-                     state.s.numerical_value_in(model::meter)};
+                     state.s.numerical_value_in(meter)};
   };
   world->reorder<archetype::Vehicle>(road_order);
   world->reorder<archetype::TacticalVehicle>(road_order);
@@ -298,7 +297,7 @@ auto keep_road_order(const Network& network, InOut<World> world) -> void {
     std::uint32_t edge = state.leg < route.legs.size()
                              ? route.legs[state.leg].edge
                              : model::WalkEdge::NONE;
-    return std::pair{edge, state.along.numerical_value_in(model::meter)};
+    return std::pair{edge, state.along.numerical_value_in(meter)};
   });
 }
 
@@ -316,7 +315,7 @@ auto Simulation::configure() -> engine::PhaseResult {
   return engine::Flow::CONTINUE;
 }
 
-auto Simulation::step(const framework::Step& step) -> engine::PhaseResult {
+auto Simulation::step(const Step& step) -> engine::PhaseResult {
   scheduler_->step(step, InOut(world_));
   if (++steps_ >= ROAD_ORDER_STEPS && world_.pending() == 0) {
     keep_road_order(*network_, InOut(world_));

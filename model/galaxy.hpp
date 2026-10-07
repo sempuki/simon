@@ -7,8 +7,8 @@
 #include <vector>
 
 #include "base/core.hpp"
-#include "model/random.hpp"
-#include "model/units.hpp"
+#include "core/random.hpp"
+#include "core/units.hpp"
 
 // Galaxies and star clusters as bodies: the mass distributions galaxy codes
 // start from, sampled body by body (see model/REFERENCES.md).

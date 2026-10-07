@@ -55,7 +55,7 @@ class ScanningRadars final {
   template <typename ProjectedWorldType>
   auto collect(ProjectedWorldType& world) -> bool {
     scanning_.clear();
-    longest_ = 0.0 * model::meter;
+    longest_ = 0.0 * meter;
     const auto& radars = world.template store_of<Radar>();
     radars.for_each([&](Entity owner, const Radar& radar) {
       const Kinematics* kinematics =
@@ -86,7 +86,7 @@ class ScanningRadars final {
     }
     return index_
         ->nearest(model::coordinates(target),
-                  longest_.numerical_value_in(model::meter),
+                  longest_.numerical_value_in(meter),
                   [&](std::uint32_t slot) {
                     const Scanning& scanning = scanning_[slot];
                     return distance(*scanning.radar, target) <= scanning.range;
@@ -97,11 +97,11 @@ class ScanningRadars final {
  private:
   struct Scanning final {
     const Kinematics* radar = nullptr;  // Valid until the next sync point.
-    Length range = 0.0 * model::meter;
+    Length range = 0.0 * meter;
   };
 
   std::vector<Scanning> scanning_;
-  Length longest_ = 0.0 * model::meter;
+  Length longest_ = 0.0 * meter;
   std::optional<framework::SpatialIndex> index_;  // Sized on first use.
 };
 
@@ -249,8 +249,7 @@ struct ProposeEngagements final  //
     }
     std::optional<std::uint32_t> nearest = tracks_->nearest(
         model::coordinates(kinematics->position),
-        launcher.range.numerical_value_in(model::meter),
-        [&](std::uint32_t slot) {
+        launcher.range.numerical_value_in(meter), [&](std::uint32_t slot) {
           const Engagement* engagement =
               world.maybe_component_of<Engagement>(estimates.owner_at(slot));
           return engagement && (engagement->engaged_by == Entity{} ||
@@ -334,14 +333,12 @@ struct ResolveEngagements final  //
 
 // The parameters every interceptor is built with.
 struct InterceptorDesign final {
-  Speed speed = 150.0 * model::meter_per_second;
-  AccelerationMagnitude agility = 300.0 * model::meter_per_second_squared;
+  Speed speed = 150.0 * meter_per_second;
+  AccelerationMagnitude agility = 300.0 * meter_per_second_squared;
   double navigation_gain = 4.0;
-  Length seeker_range = 1000.0 * model::meter;
+  Length seeker_range = 1000.0 * meter;
   Duration lifetime = 30s;
-  Warhead warhead{.fuse = 15.0 * model::meter,
-                  .radius = 25.0 * model::meter,
-                  .damage = 5.0};
+  Warhead warhead{.fuse = 15.0 * meter, .radius = 25.0 * meter, .damage = 5.0};
 };
 
 // Launchers whose proposal was accepted build an interceptor aimed at the
@@ -367,11 +364,10 @@ struct LaunchInterceptors final  //
       return;
     }
     TimePoint now = step.time;
-    model::Displacement aim = estimate->position - kinematics->position;
+    Displacement aim = estimate->position - kinematics->position;
     Length range = norm(aim);
-    Velocity velocity = range > 0.0 * model::meter
-                            ? aim * (design.speed / range)
-                            : model::meters_per_second(0.0, 0.0, 0.0);
+    Velocity velocity = range > 0.0 * meter ? aim * (design.speed / range)
+                                            : meters_per_second(0.0, 0.0, 0.0);
     auto interceptor =
         world.create<archetype::Interceptor>()
             .under(self)
@@ -434,7 +430,7 @@ struct GuideInterceptors final   //
       auto _ = world.destroy(self).build();
       return;
     }
-    constexpr Rate SPEED_RESPONSE = 2.0 * model::per_second;
+    constexpr Rate SPEED_RESPONSE = 2.0 * per_second;
     control->acceleration = model::limit(
         model::compute_proportional_navigation(*kinematics, *target,
                                                interceptor.navigation_gain) +
@@ -476,14 +472,14 @@ struct SteerRedDrones final     //
     if (!kinematics || !control || !target_of) {
       return;
     }
-    constexpr Rate RESPONSE = 1.0 * model::per_second;
+    constexpr Rate RESPONSE = 1.0 * per_second;
     const Kinematics* target =
         world.maybe_component_of<Kinematics>(target_of->entity);
     control->acceleration =
         target ? model::limit(model::steer_toward(*kinematics, target->position,
                                                   drone.cruise, RESPONSE),
                               drone.agility)
-               : model::meters_per_second_squared(0.0, 0.0, 0.0);
+               : meters_per_second_squared(0.0, 0.0, 0.0);
   }
 };
 
@@ -574,7 +570,7 @@ struct ApplyBlasts final  //
  private:
   struct Burst final {
     const Kinematics* center = nullptr;  // Valid until the next sync point.
-    Length radius = 0.0 * model::meter;
+    Length radius = 0.0 * meter;
     double damage = 0.0;
   };
   std::vector<Burst> blasts_;

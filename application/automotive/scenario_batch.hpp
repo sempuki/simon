@@ -12,7 +12,7 @@
 
 #include "application/automotive/scenario_simulation.hpp"
 #include "base/status.hpp"
-#include "framework/step.hpp"
+#include "core/time.hpp"
 #include "scenario/openscenario.hpp"
 #include "scenario/parameter_distribution.hpp"
 
@@ -71,7 +71,7 @@ struct RunRecord final {
 // its storyboard stops or `limit` steps have run.
 auto record_run(const std::string& path,
                 std::vector<scenario::ParameterAssignment> assignments,
-                framework::Duration step, std::size_t limit)
+                Duration step, std::size_t limit)
     -> std::expected<RunRecord, lib::Status>;
 
 // nuPlan's measures of a run's ego, and how near it came to the others.
@@ -108,7 +108,7 @@ struct BatchRun final {
 // Plays every permutation of `distribution` on `threads` threads, each as
 // record_run does, and measures it. In permutation order.
 auto run_batch(const scenario::ParameterDistribution& distribution,
-               std::size_t threads, framework::Duration step, std::size_t limit)
+               std::size_t threads, Duration step, std::size_t limit)
     -> std::vector<BatchRun>;
 
 }  // namespace simon::automotive

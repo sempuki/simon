@@ -9,8 +9,8 @@
 #include <vector>
 
 #include "application/robotic/simulation_components.hpp"
+#include "core/vocabulary.hpp"
 #include "framework/system.hpp"
-#include "framework/vocabulary.hpp"
 #include "model/articulated_constraint.hpp"
 
 // The robotic simulation's systems, each once per capacity but Collide:
@@ -20,7 +20,6 @@
 namespace simon::robotic {
 
 using framework::Entity;
-using framework::Step;
 using framework::System;
 using framework::SystemList;
 

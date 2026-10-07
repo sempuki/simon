@@ -2,8 +2,8 @@
 
 #pragma once
 
+#include "core/vocabulary.hpp"
 #include "framework/system.hpp"
-#include "framework/vocabulary.hpp"
 #include "model/gravity.hpp"
 #include "model/kinematics.hpp"
 

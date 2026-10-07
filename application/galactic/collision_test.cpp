@@ -7,7 +7,7 @@
 
 #include "application/galactic/simulation.hpp"
 #include "base/testing.hpp"
-#include "framework/vocabulary.hpp"
+#include "core/vocabulary.hpp"
 #include "model/galaxy.hpp"
 #include "model/gravity.hpp"
 
@@ -29,22 +29,19 @@ auto measure_group(const Scenario& scenario, const BodyGroup& group)
   Vector3 momentum = Vector3::Zero();
   for (std::size_t i = group.first; i < group.first + group.count; ++i) {
     const BodyStart& body = scenario.bodies[i];
-    double m = body.mass.numerical_value_in(model::kilogram);
+    double m = body.mass.numerical_value_in(kilogram);
     measure.mass += m;
-    moment += m * body.position.numerical_value_in(model::meter).eigen();
-    momentum +=
-        m * body.velocity.numerical_value_in(model::meter_per_second).eigen();
+    moment += m * body.position.numerical_value_in(meter).eigen();
+    momentum += m * body.velocity.numerical_value_in(meter_per_second).eigen();
   }
   measure.center = moment / measure.mass;
   measure.velocity = momentum / measure.mass;
   for (std::size_t i = group.first; i < group.first + group.count; ++i) {
     const BodyStart& body = scenario.bodies[i];
     measure.spin +=
-        body.mass.numerical_value_in(model::kilogram) *
-        (body.position.numerical_value_in(model::meter).eigen() -
-         measure.center)
-            .cross(body.velocity.numerical_value_in(model::meter_per_second)
-                       .eigen() -
+        body.mass.numerical_value_in(kilogram) *
+        (body.position.numerical_value_in(meter).eigen() - measure.center)
+            .cross(body.velocity.numerical_value_in(meter_per_second).eigen() -
                    measure.velocity);
   }
   return measure;
@@ -60,17 +57,16 @@ TEST_CASE("Collision") {
 
   SECTION("ShouldPlaceGalaxiesOnTheirOrbitGivenStandardCollision") {
     const model::DiskGalaxy& galaxy = collision.galaxy;
-    double cut = model::number_of(galaxy.halo_cutoff /
-                                  (galaxy.halo_cutoff + galaxy.halo_scale));
-    model::Mass mass = galaxy.disk_mass + galaxy.halo_mass * cut * cut;
+    double cut = number_of(galaxy.halo_cutoff /
+                           (galaxy.halo_cutoff + galaxy.halo_scale));
+    Mass mass = galaxy.disk_mass + galaxy.halo_mass * cut * cut;
     model::Separation separation = model::compute_parabolic_separation(
         model::ParabolicOrbit{
             .first = mass, .second = mass, .pericenter = collision.pericenter},
         -collision.before);
-    Vector3 expected =
-        separation.position.numerical_value_in(model::meter).eigen();
+    Vector3 expected = separation.position.numerical_value_in(meter).eigen();
     Vector3 expected_velocity =
-        separation.velocity.numerical_value_in(model::meter_per_second).eigen();
+        separation.velocity.numerical_value_in(meter_per_second).eigen();
 
     // Each galaxy's disk and halo are centered on its place on the orbit.
     for (std::size_t g = 0; g < 4; ++g) {
@@ -103,10 +99,10 @@ TEST_CASE("Collision") {
                               scenario.groups[0], 10.0 * model::KILOPARSEC) -
          compute_group_center(simulation.world(), simulation.bodies(),
                               scenario.groups[2], 10.0 * model::KILOPARSEC))
-            .numerical_value_in(model::meter)
+            .numerical_value_in(meter)
             .eigen()
             .norm() /
-        model::KILOPARSEC.numerical_value_in(model::meter);
+        model::KILOPARSEC.numerical_value_in(meter);
     CHECK(separation > 170.0);
     CHECK(separation < 180.0);
   }

@@ -4,32 +4,23 @@
 
 #include <cstdint>
 
+#include "core/time.hpp"
+#include "core/units.hpp"
 #include "engine/rate_gate.hpp"
 #include "framework/archetype.hpp"
 #include "framework/entity.hpp"
 #include "framework/name.hpp"
-#include "framework/step.hpp"
 #include "framework/world.hpp"
 #include "model/kinematics.hpp"
-#include "model/units.hpp"
 
 // Red drones fly at a protected asset. Blue radars track them, blue launchers
 // fire interceptors, and every kill is a blast applied to Health.
 namespace simon::defense {
 
-using framework::Duration;
 using framework::Entity;
 using framework::Name;
-using framework::Step;
-using framework::TimePoint;
-using model::AccelerationMagnitude;
 using model::Control;
 using model::Kinematics;
-using model::Length;
-using model::Position;
-using model::Rate;
-using model::Speed;
-using model::Velocity;
 
 struct Health final {
   double points = 1.0;
@@ -37,14 +28,14 @@ struct Health final {
 
 // Detonates within `fuse` of its target, creating a Blast.
 struct Warhead final {
-  Length fuse = 0.0 * model::meter;
-  Length radius = 0.0 * model::meter;
+  Length fuse = 0.0 * meter;
+  Length radius = 0.0 * meter;
   double damage = 1.0;
 };
 
 // Damages every Health within `radius`. Lives for one step.
 struct Blast final {
-  Length radius = 0.0 * model::meter;
+  Length radius = 0.0 * meter;
   double damage = 1.0;
   Name source;  // The warhead's entity.
 };
@@ -57,8 +48,8 @@ struct Target final {
 };
 
 struct RedDrone final {
-  Speed cruise = 0.0 * model::meter_per_second;
-  AccelerationMagnitude agility = 0.0 * model::meter_per_second_squared;
+  Speed cruise = 0.0 * meter_per_second;
+  AccelerationMagnitude agility = 0.0 * meter_per_second_squared;
 };
 
 // Marks a red drone that has a track, so radars do not track it twice.
@@ -69,7 +60,7 @@ struct Tracked final {
 struct Asset final {};
 
 struct Radar final {
-  Length range = 0.0 * model::meter;
+  Length range = 0.0 * meter;
   engine::RateGate scan;
   bool scanned = false;  // Whether it scanned this step.
 };
@@ -84,8 +75,8 @@ struct Track final {
 
 // Blue's estimate of a tracked drone's motion.
 struct Estimate final {
-  Position position = model::meters(0.0, 0.0, 0.0);
-  Velocity velocity = model::meters_per_second(0.0, 0.0, 0.0);
+  Position position = meters(0.0, 0.0, 0.0);
+  Velocity velocity = meters_per_second(0.0, 0.0, 0.0);
 };
 
 // The launcher engaging a track, if any, and until when.
@@ -95,7 +86,7 @@ struct Engagement final {
 };
 
 struct Launcher final {
-  Length range = 0.0 * model::meter;
+  Length range = 0.0 * meter;
   std::uint32_t inventory = 0;
   Duration reload{};
   TimePoint ready_at{};
@@ -108,9 +99,9 @@ struct WeaponsHold final {};
 
 struct Interceptor final {
   double navigation_gain = 4.0;
-  Speed speed = 0.0 * model::meter_per_second;
-  AccelerationMagnitude agility = 0.0 * model::meter_per_second_squared;
-  Length seeker_range = 0.0 * model::meter;
+  Speed speed = 0.0 * meter_per_second;
+  AccelerationMagnitude agility = 0.0 * meter_per_second_squared;
+  Length seeker_range = 0.0 * meter;
   TimePoint expires_at{};
 };
 
