@@ -54,7 +54,6 @@ inline auto exp(const Vector3& w) -> Quaternion {
                       0.5 * w.z()}
         .normalized();
   }
-  double half = 0.5 * angle;
   Vector3 axis = w / angle;
   return Quaternion{Eigen::AngleAxisd{angle, axis}};
 }

@@ -120,11 +120,12 @@ constexpr std::uint32_t NONE = ~std::uint32_t{0};
 inline auto shift_inertia(const Vector3& principal, const Matrix3& axes,
                           const Vector3& offset, double mass)
     -> SpatialInertia {
-  return {.rotational = axes * principal.asDiagonal() * axes.transpose() +
-                        mass * (offset.squaredNorm() * Matrix3::Identity() -
-                                offset * offset.transpose()),
-          .moment = mass * offset,
-          .mass = mass};
+  Vector3 moment = mass * offset;
+  Matrix3 rotational;
+  rotational.noalias() = axes * principal.asDiagonal() * axes.transpose();
+  rotational.noalias() -= moment * offset.transpose();
+  rotational.diagonal().array() += moment.dot(offset);
+  return {.rotational = rotational, .moment = moment, .mass = mass};
 }
 
 // A rotation about `axis` at `offset` from the center of mass, as a motion
