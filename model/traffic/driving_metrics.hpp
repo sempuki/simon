@@ -8,7 +8,7 @@
 #include <span>
 #include <vector>
 
-#include "model/road/collision.hpp"
+#include "model/collision.hpp"
 
 // Measures of a vehicle's run, as nuPlan defines them (see
 // model/REFERENCES.md): how comfortable its ride is, and its time to

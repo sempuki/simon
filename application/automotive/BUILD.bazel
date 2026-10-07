@@ -37,7 +37,7 @@ cc_library(
         "//format:openscenario",
         "//scenario:openscenario",
         "//scenario:parameter_distribution",
-        "//model/road:collision",
+        "//model:collision",
         "//model/traffic:driving_metrics",
         "//core:random",
         "//model/road:road",
@@ -81,7 +81,7 @@ cc_library(
     hdrs = ["road_drawing.hpp"],
     copts = COPTS,
     deps = [
-        "//model/road:collision",
+        "//model:collision",
         "//model/road:road",
     ],
 )
@@ -131,7 +131,7 @@ cc_library(
     deps = [
         ":automotive_library",
         "//application:testing",
-        "//model/road:collision",
+        "//model:collision",
         "//core:units",
         "//model/vehicle:vehicle",
         "@lib//base:testing",
@@ -166,7 +166,7 @@ cc_test(
     data = ["reference/shapely_boxes.csv"],
     deps = [
         ":testing",
-        "//model/road:collision",
+        "//model:collision",
         "@lib//base:testing",
     ],
 )
@@ -226,7 +226,7 @@ cc_test(
         ":automotive_library",
         ":testing",
         "//core:vocabulary",
-        "//model/road:collision",
+        "//model:collision",
         "@lib//base:testing",
     ],
 )
@@ -255,7 +255,7 @@ cc_test(
         ":automotive_library",
         ":testing",
         "//core:vocabulary",
-        "//model/road:collision",
+        "//model:collision",
         "@lib//base:testing",
     ],
 )
@@ -410,7 +410,7 @@ VIEWER_DEPS = [
     "//application:viewing",
     "//engine:driver",
     "//core:vocabulary",
-    "//model/road:collision",
+    "//model:collision",
     "//3rd_party:imgui",
     "//3rd_party:implot",
     "@lib//base:core",

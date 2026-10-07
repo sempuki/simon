@@ -15,7 +15,7 @@
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
 #include "core/vocabulary.hpp"
-#include "model/road/collision.hpp"
+#include "model/collision.hpp"
 
 // Right of way in junctions: who gives way to whom on the test networks,
 // gap acceptance against Harders' capacity of a minor stream, and traffic

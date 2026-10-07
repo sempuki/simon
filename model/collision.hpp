@@ -4,8 +4,8 @@
 
 #include <array>
 
-// Vehicles as boxes in the plane: whether two overlap, and how far apart
-// they are (see model/REFERENCES.md). Two convex polygons are apart exactly
+// Oriented boxes in the plane: whether two overlap, and how far apart they
+// are (see model/REFERENCES.md). Two convex polygons are apart exactly
 // when one of their edges' normals separates them, the separating axis
 // theorem; boxes that touch overlap, as GEOS counts them. Plain SI numbers.
 namespace simon::model {

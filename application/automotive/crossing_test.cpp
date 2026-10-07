@@ -16,7 +16,7 @@
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
 #include "core/vocabulary.hpp"
-#include "model/road/collision.hpp"
+#include "model/collision.hpp"
 
 // Pedestrians crossing: how long they wait at a light, and at a crosswalk
 // whose traffic does not yield, against the Highway Capacity Manual; and

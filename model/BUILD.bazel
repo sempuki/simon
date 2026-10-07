@@ -94,6 +94,13 @@ cc_test(
 )
 
 
+cc_library(
+    name = "collision",
+    srcs = ["collision.cpp"],
+    hdrs = ["collision.hpp"],
+    copts = COPTS,
+)
+
 [cc_test(
     name = test + "_test",
     size = "small",

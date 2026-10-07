@@ -5,7 +5,7 @@
 
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
-#include "model/road/collision.hpp"
+#include "model/collision.hpp"
 
 // Boxes against Shapely's GEOS, from the table reference/shapely_boxes.py
 // recorded: whether pairs overlap, a quarter of them a nanometer from

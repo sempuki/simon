@@ -1,6 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-#include "model/road/collision.hpp"
+#include "model/collision.hpp"
 
 #include <algorithm>
 #include <cmath>

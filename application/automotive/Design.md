@@ -344,7 +344,7 @@ has it, and a condition on the phase firing as the phase first begins.
 
 ## Metrics and batch runs
 
-`model/road/collision` treats vehicles as boxes in the plane. Two boxes overlap
+`model/collision` treats vehicles as boxes in the plane. Two boxes overlap
 when no axis among their edges' normals separates their projections, the
 separating axis theorem; boxes that touch overlap, as GEOS counts them.
 Apart, their gap is the least distance from a corner of either to an edge

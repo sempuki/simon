@@ -2138,10 +2138,10 @@ simon/
   framework/     Entity, ComponentStore, World, Spatial, names, builders, commands, System, schedules, and this design
   engine/        Lifecycle, drivers, RateGate, EventQueue
   model/         Reusable physics and maths, as free functions, and the data they work on. Kinematics,
-                 rigid bodies, control and guidance at the top; then by domain:
+                 rigid bodies, control, guidance and planar collision at the top; then by domain:
     aircraft/    Aerodynamics, flight controls, engines, frames, mass balance, sensing, trim
     earth/       The Earth, the atmosphere and the wind
-    road/        Roads, lanes, placement, polylines, walking graphs, planar collision
+    road/        Roads, lanes, placement, polylines, walking graphs
     traffic/     Driver models, traffic control, right of way, driving metrics
     vehicle/     Tires and the single-track, drift and multibody vehicles
     articulated/ Articulated rigid bodies: dynamics, constraints, collision, the convex collider

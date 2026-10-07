@@ -125,8 +125,8 @@ full where it first appears, and as "above" after.
 
 | Where | What | Source |
 |---|---|---|
-| `road/collision.hpp` | Overlap of two boxes by the separating axis theorem | C. Ericson, *Real-Time Collision Detection*, Morgan Kaufmann, 2005, sections 4.4.1 and 5.2.1; S. Gottschalk, M. C. Lin and D. Manocha, "OBBTree: A hierarchical structure for rapid interference detection", SIGGRAPH 1996, pp. 171-180, where the test for boxes comes from |
-| `road/collision.hpp` | The gap between two boxes apart: the least distance from a corner of either to an edge of the other | Ericson, above, section 5.1.2, the distance of a point to a segment |
+| `collision.hpp` | Overlap of two boxes by the separating axis theorem | C. Ericson, *Real-Time Collision Detection*, Morgan Kaufmann, 2005, sections 4.4.1 and 5.2.1; S. Gottschalk, M. C. Lin and D. Manocha, "OBBTree: A hierarchical structure for rapid interference detection", SIGGRAPH 1996, pp. 171-180, where the test for boxes comes from |
+| `collision.hpp` | The gap between two boxes apart: the least distance from a corner of either to an edge of the other | Ericson, above, section 5.1.2, the distance of a point to a segment |
 | `traffic/driving_metrics.hpp` | Comfort, its signals and bounds, and time to collision | H. Caesar et al., "nuPlan: A closed-loop ML-based planning benchmark for autonomous vehicles", arXiv:2106.11810, 2021; the metrics and state extractors of the nuplan-devkit repository at its v1.2.2 tag |
 | `traffic/driving_metrics.cpp` | The Savitzky-Golay filter and its derivatives | A. Savitzky and M. J. E. Golay, "Smoothing and differentiation of data by simplified least squares procedures", *Analytical Chemistry* 36(8), 1964, pp. 1627-1639; SciPy 1.18's `savgol_filter` for the edges and even windows |
 

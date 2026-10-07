@@ -67,12 +67,6 @@ cc_library(
 )
 
 
-cc_library(
-    name = "collision",
-    srcs = ["collision.cpp"],
-    hdrs = ["collision.hpp"],
-    copts = COPTS,
-)
 
 
 [cc_test(
