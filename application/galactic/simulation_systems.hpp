@@ -15,11 +15,9 @@
 namespace simon::galactic {
 
 using framework::Entity;
-using model::Gravity;
 using model::GravitySource;
 using model::GravityTree;
 using model::Kinematics;
-using model::PointMass;
 
 //-- Gravity -------------------------------------------------------------------
 

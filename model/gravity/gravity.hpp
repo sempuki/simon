@@ -37,19 +37,6 @@ inline constexpr Mass SOLAR_MASS =
 inline constexpr Time JULIAN_YEAR = 365.25 * 86400.0 * second;
 inline constexpr Time MEGAYEAR = 1e6 * JULIAN_YEAR;
 
-//-- Components ----------------------------------------------------------------
-
-// A body's mass, which pulls on every other body. A body without one feels
-// gravity but exerts none: a test particle.
-struct PointMass final {
-  Mass mass = 0.0 * kilogram;
-};
-
-// The acceleration gravity gives a body.
-struct Gravity final {
-  Acceleration acceleration = meters_per_second_squared(0.0, 0.0, 0.0);
-};
-
 //-- Direct summation ----------------------------------------------------------
 
 // A body that pulls on others. `id` is the caller's name for the body, which

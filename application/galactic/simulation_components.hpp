@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "core/units.hpp"
 #include "core/vocabulary.hpp"
 #include "framework/archetype.hpp"
 #include "framework/world.hpp"
@@ -14,9 +15,19 @@
 namespace simon::galactic {
 
 using framework::Entity;
-using model::Gravity;
 using model::Kinematics;
-using model::PointMass;
+
+// A body's mass, which pulls on every other body. A body without one feels
+// gravity but exerts none: a test particle.
+struct PointMass final {
+  Mass mass = 0.0 * kilogram;
+};
+
+// The acceleration gravity gives a body. The gravity systems write it; the
+// leapfrog's kicks read it.
+struct Gravity final {
+  Acceleration acceleration = meters_per_second_squared(0.0, 0.0, 0.0);
+};
 
 // A body that pulls on every other and is pulled by them.
 struct Body final
