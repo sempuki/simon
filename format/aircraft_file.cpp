@@ -3,28 +3,22 @@
 #include "format/aircraft_file.hpp"
 
 #include <algorithm>
-#include <charconv>
-#include <cmath>
-#include <fstream>
 #include <functional>
-#include <sstream>
+#include <optional>
 #include <utility>
+#include <vector>
 
-template <>
-const std::array<lib::StatusConditionEntry,
-                 simon::format::AIRCRAFT_FILE_ERROR_COUNT>
-    lib::EnumStatusKindConditionMixin<
-        simon::format::AircraftFileError,
-        simon::format::AIRCRAFT_FILE_ERROR_COUNT>::conditions_ = {
-        lib::StatusConditionEntry{"aircraft unreadable"},
-        lib::StatusConditionEntry{"aircraft malformed"},
-};
+#include "base/core.hpp"
+#include "format/text.hpp"
 
 namespace simon::format {
 
 using namespace model;
 
 namespace {
+
+using lib::InOut;
+using lib::Out;
 
 // The file as lines of words, without comments or blank lines.
 struct Line final {
@@ -61,8 +55,7 @@ auto split_lines(std::string_view text) -> std::vector<Line> {
   return lines;
 }
 
-using Failure = std::unexpected<lib::Status>;
-
+// Reads the lines in order, saying on which line anything is wrong.
 class Parser final {
  public:
   explicit Parser(std::vector<Line> lines) : lines_{std::move(lines)} {}
@@ -77,36 +70,32 @@ class Parser final {
     AircraftData data;
     while (!done()) {
       std::string_view key = line().words[0];
-      std::expected<void, lib::Status> read;
       if (key == "name") {
-        read = read_text(Out(data.name));
+        RETURN_IF_UNEXPECTED(read_text(Out(data.name)));
       } else if (key == "metrics") {
-        read = read_metrics(InOut(data));
+        RETURN_IF_UNEXPECTED(read_metrics(InOut(data)));
       } else if (key == "aero_reference") {
-        read = read_location(Out(data.aero_reference));
+        RETURN_IF_UNEXPECTED(read_location(Out(data.aero_reference)));
       } else if (key == "eye_point") {
-        read = read_location(Out(data.eye_point));
+        RETURN_IF_UNEXPECTED(read_location(Out(data.eye_point)));
       } else if (key == "point_mass") {
-        read = append_point_mass(InOut(data));
+        RETURN_IF_UNEXPECTED(append_point_mass(InOut(data)));
       } else if (key == "empty_mass") {
-        read = read_mass(Out(data.empty_mass));
+        RETURN_IF_UNEXPECTED(read_mass(Out(data.empty_mass)));
       } else if (key == "empty_inertia") {
-        read = read_numbers(Out(data.empty_inertia));
+        RETURN_IF_UNEXPECTED(read_numbers(Out(data.empty_inertia)));
       } else if (key == "empty_center_of_mass") {
-        read = read_location(Out(data.empty_center_of_mass));
+        RETURN_IF_UNEXPECTED(read_location(Out(data.empty_center_of_mass)));
       } else if (key == "tank") {
-        read = append_tank(InOut(data));
+        RETURN_IF_UNEXPECTED(append_tank(InOut(data)));
       } else if (key == "engine") {
-        read = append_engine(InOut(data));
+        RETURN_IF_UNEXPECTED(append_engine(InOut(data)));
       } else if (key == "term") {
-        read = append_term(InOut(data));
+        RETURN_IF_UNEXPECTED(append_term(InOut(data)));
       } else if (key == "flight_controls") {
-        read = read_flight_controls(InOut(data));
+        RETURN_IF_UNEXPECTED(read_flight_controls(InOut(data)));
       } else {
         return fail("unknown entry `" + std::string{key} + "`");
-      }
-      if (!read) {
-        return Failure{read.error()};
       }
     }
     if (data.engines.size() > MAX_ENGINES || data.tanks.size() > MAX_TANKS) {
@@ -144,11 +133,11 @@ class Parser final {
   auto done() const -> bool { return at_ >= lines_.size(); }
   auto line() const -> const Line& { return lines_[at_]; }
 
-  auto fail(const std::string& why) const -> Failure {
+  // A failure on the current line, or past the last.
+  auto fail(std::string_view why) const -> Failure {
     std::size_t number =
         done() ? (lines_.empty() ? 0 : lines_.back().number) : line().number;
-    return Failure{lib::raise(AircraftFileError::MALFORMED,
-                              "line " + std::to_string(number) + ": " + why)};
+    return fail_at(number, why);
   }
 
   // The words after the key on the current line, if there are `count`.
@@ -161,11 +150,8 @@ class Parser final {
     }
     std::vector<double> result;
     for (std::size_t i = 1; i < current.words.size(); ++i) {
-      std::expected<double, lib::Status> value = number(current.words[i]);
-      if (!value) {
-        return Failure{value.error()};
-      }
-      result.push_back(*value);
+      RETURN_OR_ASSIGN(double value, number(current.words[i]));
+      result.push_back(value);
     }
     ++at_;
     return result;
@@ -173,16 +159,11 @@ class Parser final {
 
   auto number(std::string_view word) const
       -> std::expected<double, lib::Status> {
-    double value = 0.0;
-    auto [end, error] =
-        std::from_chars(word.data(), word.data() + word.size(), value);
-    if (error != std::errc{} || end != word.data() + word.size()) {
-      return fail("`" + std::string{word} + "` is not a number");
-    }
-    if (!std::isfinite(value)) {
+    std::optional<double> value = parse_number(word);
+    if (!value) {
       return fail("`" + std::string{word} + "` is not a finite number");
     }
-    return value;
+    return *value;
   }
 
   // The words after the key, joined by single spaces.
@@ -205,70 +186,57 @@ class Parser final {
   template <std::size_t Count>
   auto read_numbers(Out<std::array<double, Count>> out)
       -> std::expected<void, lib::Status> {
-    auto read = values(Count);
-    if (!read) {
-      return Failure{read.error()};
-    }
-    std::ranges::copy(*read, out->begin());
+    RETURN_OR_ASSIGN(std::vector<double> read, values(Count));
+    std::ranges::copy(read, out->begin());
     return {};
   }
 
   auto read_location(Out<Displacement> out)
       -> std::expected<void, lib::Status> {
     std::array<double, 3> xyz{};
-    auto read = read_numbers(Out(xyz));
-    if (read) {
-      *out = meters(xyz[0], xyz[1], xyz[2]);
-    }
-    return read;
+    RETURN_IF_UNEXPECTED(read_numbers(Out(xyz)));
+    *out = meters(xyz[0], xyz[1], xyz[2]);
+    return {};
   }
 
   auto read_mass(Out<Mass> out) -> std::expected<void, lib::Status> {
     std::array<double, 1> value{};
-    auto read = read_numbers(Out(value));
-    if (read) {
-      *out = value[0] * kilogram;
-    }
-    return read;
+    RETURN_IF_UNEXPECTED(read_numbers(Out(value)));
+    *out = value[0] * kilogram;
+    return {};
   }
 
   auto read_metrics(InOut<AircraftData> data)
       -> std::expected<void, lib::Status> {
     std::array<double, 3> value{};
-    auto read = read_numbers(Out(value));
-    if (read) {
-      data->wing_area = value[0] * square_meter;
-      data->wing_span = value[1] * meter;
-      data->chord = value[2] * meter;
-    }
-    return read;
+    RETURN_IF_UNEXPECTED(read_numbers(Out(value)));
+    data->wing_area = value[0] * square_meter;
+    data->wing_span = value[1] * meter;
+    data->chord = value[2] * meter;
+    return {};
   }
 
   auto append_point_mass(InOut<AircraftData> data)
       -> std::expected<void, lib::Status> {
     std::array<double, 4> value{};
-    auto read = read_numbers(Out(value));
-    if (read) {
-      data->point_masses.push_back(PointMass{
-          .mass = value[0] * kilogram,
-          .location = meters(value[1], value[2], value[3]),
-      });
-    }
-    return read;
+    RETURN_IF_UNEXPECTED(read_numbers(Out(value)));
+    data->point_masses.push_back(PointMass{
+        .mass = value[0] * kilogram,
+        .location = meters(value[1], value[2], value[3]),
+    });
+    return {};
   }
 
   auto append_tank(InOut<AircraftData> data)
       -> std::expected<void, lib::Status> {
     std::array<double, 5> value{};
-    auto read = read_numbers(Out(value));
-    if (read) {
-      data->tanks.push_back(FuelTank{
-          .location = meters(value[0], value[1], value[2]),
-          .capacity = value[3] * kilogram,
-          .contents = value[4] * kilogram,
-      });
-    }
-    return read;
+    RETURN_IF_UNEXPECTED(read_numbers(Out(value)));
+    data->tanks.push_back(FuelTank{
+        .location = meters(value[0], value[1], value[2]),
+        .capacity = value[3] * kilogram,
+        .contents = value[4] * kilogram,
+    });
+    return {};
   }
 
   // An input by name: a variable, else a flight control signal, which the
@@ -319,17 +287,10 @@ class Parser final {
     if (header.words.size() < 2 || header.words.size() > 3) {
       return fail("`table` takes one or two inputs");
     }
-    auto row = input(header.words[1], data);
-    if (!row) {
-      return Failure{row.error()};
-    }
+    RETURN_OR_ASSIGN(AeroInput row, input(header.words[1], data));
     std::optional<AeroInput> column;
     if (header.words.size() == 3) {
-      auto found = input(header.words[2], data);
-      if (!found) {
-        return Failure{found.error()};
-      }
-      column = *found;
+      RETURN_OR_ASSIGN(column, input(header.words[2], data));
     }
     ++at_;
 
@@ -341,11 +302,8 @@ class Parser final {
         return fail("a table of two variables starts with `columns`");
       }
       for (std::size_t i = 1; i < line().words.size(); ++i) {
-        auto value = number(line().words[i]);
-        if (!value) {
-          return Failure{value.error()};
-        }
-        columns.push_back(*value);
+        RETURN_OR_ASSIGN(double value, number(line().words[i]));
+        columns.push_back(value);
       }
       ++at_;
     }
@@ -356,11 +314,8 @@ class Parser final {
                     std::to_string(width) + " values");
       }
       for (std::size_t i = 0; i < line().words.size(); ++i) {
-        auto value = number(line().words[i]);
-        if (!value) {
-          return Failure{value.error()};
-        }
-        (i == 0 ? rows : values).push_back(*value);
+        RETURN_OR_ASSIGN(double value, number(line().words[i]));
+        (i == 0 ? rows : values).push_back(value);
       }
       ++at_;
     }
@@ -373,12 +328,12 @@ class Parser final {
     ++at_;
 
     if (column) {
-      return AeroTable{.row = *row,
+      return AeroTable{.row = row,
                        .column = column,
                        .table = Table2<>{std::move(rows), std::move(columns),
                                          std::move(values)}};
     }
-    return AeroTable{.row = *row,
+    return AeroTable{.row = row,
                      .table = Table1<>{std::move(rows), std::move(values)}};
   }
 
@@ -398,27 +353,18 @@ class Parser final {
     while (!done() && line().words[0] != "end") {
       std::string_view key = line().words[0];
       if (key == "constant") {
-        auto value = values(1);
-        if (!value) {
-          return Failure{value.error()};
-        }
-        term.constant = (*value)[0];
+        RETURN_OR_ASSIGN(std::vector<double> value, values(1));
+        term.constant = value[0];
       } else if (key == "factor") {
         if (line().words.size() != 2) {
           return fail("`factor` takes one input");
         }
-        auto factor = input(line().words[1], data);
-        if (!factor) {
-          return Failure{factor.error()};
-        }
-        term.factors.push_back(*factor);
+        RETURN_OR_ASSIGN(AeroInput factor, input(line().words[1], data));
+        term.factors.push_back(factor);
         ++at_;
       } else if (key == "table") {
-        auto read = table(data);
-        if (!read) {
-          return Failure{read.error()};
-        }
-        term.tables.push_back(std::move(*read));
+        RETURN_OR_ASSIGN(AeroTable read, table(data));
+        term.tables.push_back(std::move(read));
       } else {
         return fail("unknown term entry `" + std::string{key} + "`");
       }
@@ -440,23 +386,20 @@ class Parser final {
     TurbineData turbine{.name = std::string{header.words[2]}};
     ++at_;
 
+    // One value on the current line.
+    auto scalar = [&](Out<double> out) -> std::expected<void, lib::Status> {
+      RETURN_OR_ASSIGN(std::vector<double> value, values(1));
+      *out = value[0];
+      return {};
+    };
     while (!done() && line().words[0] != "end") {
       std::string_view key = line().words[0];
-      std::expected<void, lib::Status> read;
-      auto scalar = [&](Out<double> out) -> std::expected<void, lib::Status> {
-        auto value = values(1);
-        if (!value) {
-          return Failure{value.error()};
-        }
-        *out = (*value)[0];
-        return {};
-      };
       double thrust = 0.0;
       if (key == "location") {
-        read = read_location(Out(turbine.location));
+        RETURN_IF_UNEXPECTED(read_location(Out(turbine.location)));
       } else if (key == "feeds") {
         for (std::size_t i = 1; i < line().words.size(); ++i) {
-          auto value = number(line().words[i]);
+          std::optional<double> value = parse_number(line().words[i]);
           if (!value || *value < 0.0) {
             return fail("a feed is a tank's index");
           }
@@ -464,56 +407,52 @@ class Parser final {
         }
         ++at_;
       } else if (key == "military_thrust") {
-        read = scalar(Out(thrust));
+        RETURN_IF_UNEXPECTED(scalar(Out(thrust)));
         turbine.military_thrust = thrust * newton;
       } else if (key == "bypass_ratio") {
-        read = scalar(Out(turbine.bypass_ratio));
+        RETURN_IF_UNEXPECTED(scalar(Out(turbine.bypass_ratio)));
       } else if (key == "thrust_specific_fuel_consumption") {
-        read = scalar(Out(turbine.thrust_specific_fuel_consumption));
+        RETURN_IF_UNEXPECTED(
+            scalar(Out(turbine.thrust_specific_fuel_consumption)));
       } else if (key == "bleed") {
-        read = scalar(Out(turbine.bleed));
+        RETURN_IF_UNEXPECTED(scalar(Out(turbine.bleed)));
       } else if (key == "max_thrust") {
-        read = scalar(Out(thrust));
+        RETURN_IF_UNEXPECTED(scalar(Out(thrust)));
         turbine.max_thrust = thrust * newton;
       } else if (key == "reheat_thrust_specific_fuel_consumption") {
-        read = scalar(Out(turbine.reheat_thrust_specific_fuel_consumption));
+        RETURN_IF_UNEXPECTED(
+            scalar(Out(turbine.reheat_thrust_specific_fuel_consumption)));
       } else if (key == "idle_n1") {
-        read = scalar(Out(turbine.idle_n1));
+        RETURN_IF_UNEXPECTED(scalar(Out(turbine.idle_n1)));
       } else if (key == "idle_n2") {
-        read = scalar(Out(turbine.idle_n2));
+        RETURN_IF_UNEXPECTED(scalar(Out(turbine.idle_n2)));
       } else if (key == "max_n1") {
-        read = scalar(Out(turbine.max_n1));
+        RETURN_IF_UNEXPECTED(scalar(Out(turbine.max_n1)));
       } else if (key == "max_n2") {
-        read = scalar(Out(turbine.max_n2));
+        RETURN_IF_UNEXPECTED(scalar(Out(turbine.max_n2)));
       } else if (key == "idle_fuel_flow") {
-        read = scalar(Out(turbine.idle_fuel_flow));
+        RETURN_IF_UNEXPECTED(scalar(Out(turbine.idle_fuel_flow)));
       } else if (key == "n1_spool_up") {
-        read = scalar(Out(turbine.n1_spool_up));
+        RETURN_IF_UNEXPECTED(scalar(Out(turbine.n1_spool_up)));
       } else if (key == "n1_spool_down") {
-        read = scalar(Out(turbine.n1_spool_down));
+        RETURN_IF_UNEXPECTED(scalar(Out(turbine.n1_spool_down)));
       } else if (key == "n2_spool_up") {
-        read = scalar(Out(turbine.n2_spool_up));
+        RETURN_IF_UNEXPECTED(scalar(Out(turbine.n2_spool_up)));
       } else if (key == "n2_spool_down") {
-        read = scalar(Out(turbine.n2_spool_down));
+        RETURN_IF_UNEXPECTED(scalar(Out(turbine.n2_spool_down)));
       } else if (key == "idle_thrust" || key == "military_thrust_factor" ||
                  key == "max_thrust_factor") {
         ++at_;
         if (done() || line().words[0] != "table") {
           return fail("`" + std::string{key} + "` is followed by a table");
         }
-        auto table_read = table(data);
-        if (!table_read) {
-          return Failure{table_read.error()};
-        }
+        RETURN_OR_ASSIGN(AeroTable read, table(data));
         (key == "idle_thrust"              ? turbine.idle_thrust
          : key == "military_thrust_factor" ? turbine.military_thrust_factor
                                            : turbine.max_thrust_factor) =
-            std::move(*table_read);
+            std::move(read);
       } else {
         return fail("unknown engine entry `" + std::string{key} + "`");
-      }
-      if (!read) {
-        return Failure{read.error()};
       }
     }
     if (done()) {
@@ -580,11 +519,8 @@ class Parser final {
         ++at_;
         continue;
       }
-      auto read = block();
-      if (!read) {
-        return Failure{read.error()};
-      }
-      named.push_back(std::move(*read));
+      RETURN_OR_ASSIGN(NamedBlock read, block());
+      named.push_back(std::move(read));
     }
     if (done()) {
       return fail("`flight_controls` needs an `end`");
@@ -631,10 +567,7 @@ class Parser final {
 
     // Then what each block reads.
     for (NamedBlock& each : named) {
-      auto resolved = resolve(InOut(controls), InOut(each));
-      if (!resolved) {
-        return Failure{resolved.error()};
-      }
+      RETURN_IF_UNEXPECTED(resolve(InOut(controls), InOut(each)));
       controls.blocks.push_back(std::move(each.block));
     }
     return {};
@@ -716,9 +649,7 @@ class Parser final {
       }
     }
     if (!missing.empty()) {
-      return Failure{lib::raise(AircraftFileError::MALFORMED,
-                                "line " + std::to_string(each->line) +
-                                    ": no signal `" + missing + "`")};
+      return fail_at(each->line, "no signal `" + missing + "`");
     }
     return {};
   }
@@ -737,22 +668,15 @@ class Parser final {
     NamedInput named{.name = std::string{negated ? name.substr(1) : name},
                      .negated = negated};
     if (words.size() == at + 2) {
-      auto scale = number(words[at + 1]);
-      if (!scale) {
-        return Failure{scale.error()};
-      }
-      named.scale = *scale;
+      RETURN_OR_ASSIGN(named.scale, number(words[at + 1]));
     }
     return named;
   }
 
   // A number, or a signal's name, maybe negated.
-  auto operand(std::string_view word) const -> NamedOperand {
-    double value = 0.0;
-    auto [end, error] =
-        std::from_chars(word.data(), word.data() + word.size(), value);
-    if (error == std::errc{} && end == word.data() + word.size()) {
-      return NamedOperand{.value = value};
+  static auto operand(std::string_view word) -> NamedOperand {
+    if (std::optional<double> value = parse_number(word)) {
+      return NamedOperand{.value = *value};
     }
     bool negated = word.starts_with('-');
     return NamedOperand{
@@ -838,22 +762,19 @@ class Parser final {
       const std::vector<std::string_view>& words = line().words;
       if (key == "input" || key == "output" || key == "trigger" ||
           key == "push") {
-        auto read = named_input(1);
-        if (!read) {
-          return Failure{read.error()};
-        }
+        RETURN_OR_ASSIGN(NamedInput read, named_input(1));
         if (key == "input") {
-          named.inputs.push_back(std::move(*read));
+          named.inputs.push_back(std::move(read));
         } else if (key == "output") {
-          if (read->negated) {
+          if (read.negated) {
             return fail("an output cannot be negated");
           }
-          named.output = std::move(*read);
+          named.output = std::move(read);
         } else if (key == "trigger") {
-          named.trigger = std::move(*read);
+          named.trigger = std::move(read);
         } else {
           block.operations.push_back(Operation{.kind = Operation::Kind::PUSH});
-          named.pushes.push_back(std::move(*read));
+          named.pushes.push_back(std::move(read));
         }
         ++at_;
         continue;
@@ -867,12 +788,10 @@ class Parser final {
         std::vector<double> xs;
         std::vector<double> ys;
         while (!done() && line().words[0] != "end") {
-          auto row = values(1);
-          if (!row) {
-            return Failure{row.error()};
-          }
-          xs.push_back(*number(lines_[at_ - 1].words[0]));
-          ys.push_back((*row)[0]);
+          RETURN_OR_ASSIGN(double x, number(line().words[0]));
+          RETURN_OR_ASSIGN(std::vector<double> row, values(1));
+          xs.push_back(x);
+          ys.push_back(row[0]);
         }
         if (done()) {
           return fail("a table needs an `end`");
@@ -893,11 +812,8 @@ class Parser final {
         continue;
       }
       if (key == "test") {
-        auto read = test();
-        if (!read) {
-          return Failure{read.error()};
-        }
-        named.tests.push_back(std::move(*read));
+        RETURN_OR_ASSIGN(NamedTest read, test());
+        named.tests.push_back(std::move(read));
         continue;
       }
       if (key == "integrator") {
@@ -947,11 +863,7 @@ class Parser final {
           key == "clip" || key == "domain" || key == "range" || key == "setting"
               ? 2
               : 1;
-      auto read = values(count);
-      if (!read) {
-        return Failure{read.error()};
-      }
-      const std::vector<double>& v = *read;
+      RETURN_OR_ASSIGN(std::vector<double> v, values(count));
       if (key == "clip") {
         block.clip = std::pair{v[0], v[1]};
       } else if (key == "domain") {
@@ -1066,14 +978,8 @@ auto parse_aircraft(std::string_view text)
 
 auto load_aircraft(const std::string& path)
     -> std::expected<AircraftData, lib::Status> {
-  std::ifstream file{path};
-  if (!file) {
-    return std::unexpected(
-        lib::raise(AircraftFileError::UNREADABLE, "cannot open " + path));
-  }
-  std::stringstream text;
-  text << file.rdbuf();
-  return parse_aircraft(text.str());
+  RETURN_OR_ASSIGN(std::string text, read_text_file(path));
+  return parse_aircraft(text);
 }
 
 }  // namespace simon::format

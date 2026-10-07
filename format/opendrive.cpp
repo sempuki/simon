@@ -3,24 +3,15 @@
 #include "format/opendrive.hpp"
 
 #include <algorithm>
-#include <charconv>
 #include <cmath>
-#include <fstream>
 #include <limits>
-#include <sstream>
+#include <optional>
 #include <utility>
 
+#include "base/core.hpp"
+#include "format/text.hpp"
+#include "format/xml.hpp"
 #include "pugixml.hpp"
-
-template <>
-const std::array<lib::StatusConditionEntry,
-                 simon::format::OPEN_DRIVE_ERROR_COUNT>
-    lib::EnumStatusKindConditionMixin<
-        simon::format::OpenDriveError,
-        simon::format::OPEN_DRIVE_ERROR_COUNT>::conditions_ = {
-        lib::StatusConditionEntry{"road network unreadable"},
-        lib::StatusConditionEntry{"road network malformed"},
-};
 
 namespace simon::format {
 
@@ -28,23 +19,15 @@ using namespace model;
 
 namespace {
 
-using Failure = std::unexpected<lib::Status>;
+using lib::InOut;
+using lib::Out;
 
-// Reads one document, saying where in the text anything is wrong.
+// Reads one document, saying on which line anything is wrong.
 class Parser final {
  public:
-  explicit Parser(std::string_view text) : text_{text} {}
-
-  auto parse() -> std::expected<RoadNetwork, lib::Status> {
-    pugi::xml_parse_result result =
-        document_.load_buffer(text_.data(), text_.size());
-    if (!result) {
-      return fail(result.offset, result.description());
-    }
-    pugi::xml_node root = document_.child("OpenDRIVE");
-    if (!root) {
-      return fail(0, "no OpenDRIVE element");
-    }
+  auto parse(std::string_view text) -> std::expected<RoadNetwork, lib::Status> {
+    RETURN_IF_UNEXPECTED(document_.load(std::string{text}));
+    RETURN_OR_ASSIGN(pugi::xml_node root, document_.find_root("OpenDRIVE"));
     RoadNetwork network;
     for (pugi::xml_node node : root.children("road")) {
       RETURN_OR_ASSIGN(Road road, read_road(node));
@@ -62,46 +45,18 @@ class Parser final {
   }
 
  private:
-  // The line of `offset` into the text, from 1.
-  auto line_at(std::ptrdiff_t offset) const -> std::size_t {
-    auto end = static_cast<std::size_t>(std::clamp<std::ptrdiff_t>(
-        offset, 0, static_cast<std::ptrdiff_t>(text_.size())));
-    return 1 + static_cast<std::size_t>(
-                   std::count(text_.begin(), text_.begin() + end, '\n'));
-  }
-
-  auto fail(std::ptrdiff_t offset, std::string_view why) const -> Failure {
-    return Failure{lib::raise(
-        OpenDriveError::MALFORMED,
-        "line " + std::to_string(line_at(offset)) + ": " + std::string{why})};
-  }
-
   auto fail(pugi::xml_node node, std::string_view why) const -> Failure {
-    return fail(node.offset_debug(),
-                "<" + std::string{node.name()} + "> " + std::string{why});
+    return document_.fail(node, why);
   }
 
   // The number in `node`'s attribute `name`, or `fallback` if it has none.
   auto read_number(pugi::xml_node node, const char* name,
                    std::optional<double> fallback = std::nullopt) const
       -> std::expected<double, lib::Status> {
-    pugi::xml_attribute attribute = node.attribute(name);
-    if (!attribute) {
-      if (fallback) {
-        return *fallback;
-      }
-      return fail(node, std::string{"needs "} + name);
+    if (fallback && !node.attribute(name)) {
+      return *fallback;
     }
-    std::string_view word = attribute.value();
-    double value = 0.0;
-    auto [end, error] =
-        std::from_chars(word.data(), word.data() + word.size(), value);
-    if (error != std::errc{} || end != word.data() + word.size() ||
-        !std::isfinite(value)) {
-      return fail(node, std::string{name} + " `" + std::string{word} +
-                            "` is not a finite number");
-    }
-    return value;
+    return document_.read_number(node, name);
   }
 
   auto read_contact(pugi::xml_node node, std::string_view value) const
@@ -570,27 +525,20 @@ class Parser final {
     return road;
   }
 
-  std::string_view text_;
-  pugi::xml_document document_;
+  XmlDocument document_;
 };
 
 }  // namespace
 
 auto parse_opendrive(std::string_view text)
     -> std::expected<RoadNetwork, lib::Status> {
-  return Parser{text}.parse();
+  return Parser{}.parse(text);
 }
 
 auto load_opendrive(const std::string& path)
     -> std::expected<RoadNetwork, lib::Status> {
-  std::ifstream file{path};
-  if (!file) {
-    return std::unexpected(
-        lib::raise(OpenDriveError::UNREADABLE, "cannot open " + path));
-  }
-  std::stringstream text;
-  text << file.rdbuf();
-  return parse_opendrive(text.str());
+  RETURN_OR_ASSIGN(std::string text, read_text_file(path));
+  return parse_opendrive(text);
 }
 
 }  // namespace simon::format

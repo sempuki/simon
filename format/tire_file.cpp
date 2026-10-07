@@ -3,29 +3,18 @@
 #include "format/tire_file.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
-#include <charconv>
-#include <fstream>
-#include <sstream>
-#include <utility>
+#include <optional>
 
-template <>
-const std::array<lib::StatusConditionEntry,
-                 simon::format::TIRE_FILE_ERROR_COUNT>
-    lib::EnumStatusKindConditionMixin<
-        simon::format::TireFileError,
-        simon::format::TIRE_FILE_ERROR_COUNT>::conditions_ = {
-        lib::StatusConditionEntry{"tire file unreadable"},
-        lib::StatusConditionEntry{"tire file malformed"},
-};
+#include "base/core.hpp"
+#include "format/text.hpp"
 
 namespace simon::format {
 
 using namespace model;
 
 namespace {
-
-using Failure = std::unexpected<lib::Status>;
 
 // Each coefficient by the name a property file gives it.
 struct Field final {
@@ -146,31 +135,12 @@ constexpr std::array FIELDS{
 constexpr std::array FORMATS{std::string_view{"PAC2002"},
                              std::string_view{"MF_05"}};
 
-auto trim(std::string_view text) -> std::string_view {
-  auto blank = [](char c) {
-    return std::isspace(static_cast<unsigned char>(c)) != 0;
-  };
-  while (!text.empty() && blank(text.front())) {
-    text.remove_prefix(1);
-  }
-  while (!text.empty() && blank(text.back())) {
-    text.remove_suffix(1);
-  }
-  return text;
-}
-
 auto upper(std::string_view text) -> std::string {
   std::string result{text};
   std::ranges::transform(result, result.begin(), [](char c) {
     return static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
   });
   return result;
-}
-
-auto fail(std::size_t line, std::string_view why) -> Failure {
-  return Failure{
-      lib::raise(TireFileError::MALFORMED,
-                 "line " + std::to_string(line) + ": " + std::string{why})};
 }
 
 }  // namespace
@@ -206,8 +176,8 @@ auto parse_tire_file(std::string_view text)
       std::erase(format, '\'');
       format = std::string{trim(format)};
       if (std::ranges::find(FORMATS, format) == FORMATS.end()) {
-        return fail(number,
-                    "format " + format + " is not the Magic Formula 5.2");
+        return fail_at(number,
+                       "format " + format + " is not the Magic Formula 5.2");
       }
       has_format = true;
       continue;
@@ -216,36 +186,28 @@ auto parse_tire_file(std::string_view text)
     if (field == FIELDS.end()) {
       continue;  // Not a steady-state coefficient.
     }
-    double parsed = 0.0;
-    auto [rest, error] =
-        std::from_chars(value.data(), value.data() + value.size(), parsed);
-    if (error != std::errc{} ||
-        !trim(std::string_view{rest, value.data() + value.size()}).empty()) {
-      return fail(number, key + " is not a number");
+    std::optional<double> parsed = parse_number(value);
+    if (!parsed) {
+      return fail_at(
+          number, key + " `" + std::string{value} + "` is not a finite number");
     }
-    tire.*(field->member) = parsed;
+    tire.*(field->member) = *parsed;
     has_radius = has_radius || key == "UNLOADED_RADIUS";
     has_load = has_load || key == "FNOMIN";
   }
   if (!has_format) {
-    return fail(number, "no PROPERTY_FILE_FORMAT");
+    return fail_at(number, "no PROPERTY_FILE_FORMAT");
   }
   if (!has_radius || !has_load || !(tire.fnomin > 0.0)) {
-    return fail(number, "no UNLOADED_RADIUS and positive FNOMIN");
+    return fail_at(number, "no UNLOADED_RADIUS and positive FNOMIN");
   }
   return tire;
 }
 
 auto load_tire_file(const std::string& path)
     -> std::expected<MagicFormulaTire, lib::Status> {
-  std::ifstream file{path};
-  if (!file) {
-    return std::unexpected(
-        lib::raise(TireFileError::UNREADABLE, "cannot open " + path));
-  }
-  std::stringstream text;
-  text << file.rdbuf();
-  return parse_tire_file(text.str());
+  RETURN_OR_ASSIGN(std::string text, read_text_file(path));
+  return parse_tire_file(text);
 }
 
 }  // namespace simon::format

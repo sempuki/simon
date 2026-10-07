@@ -2,8 +2,6 @@
 
 #pragma once
 
-#include <array>
-#include <cstddef>
 #include <expected>
 #include <span>
 #include <string>
@@ -11,6 +9,7 @@
 #include <vector>
 
 #include "base/status.hpp"
+#include "format/format_error.hpp"  // IWYU pragma: export
 #include "scenario/openscenario.hpp"
 #include "scenario/parameter_distribution.hpp"
 
@@ -20,19 +19,8 @@
 // defines them: numbers, parameters, + - * / %, parentheses and unary minus.
 // Anything else that would change what happens is refused, so that a
 // scenario never runs other than as written; what only shows a scenario, its
-// scene graph and 3D models, is left out.
+// scene graph and 3D models, is left out. A failure is a FormatError.
 namespace simon::format {
-
-// The reasons a scenario could not be read.
-enum class ScenarioError {
-  UNREADABLE,   // A file could not be opened.
-  MALFORMED,    // The message says where and how.
-  UNSUPPORTED,  // An element simon does not run; the message names it.
-  COUNT,
-};
-
-inline constexpr std::size_t SCENARIO_ERROR_COUNT =
-    static_cast<std::size_t>(ScenarioError::COUNT);
 
 // Reads the scenario that `text` describes, its relative paths, to the road
 // network and catalogs, from `directory`. Each of `assignments` replaces the
@@ -65,16 +53,9 @@ auto load_parameter_distribution(const std::string& path)
     -> std::expected<scenario::ParameterDistribution, lib::Status>;
 
 // The value of the expression `text` (the body of ${...}) with
-// `parameters`' values.
+// `parameters`' values; MALFORMED if it is not an expression.
 auto evaluate_expression(std::string_view text,
                          const std::vector<scenario::Parameter>& parameters)
-    -> std::expected<double, std::string>;
+    -> std::expected<double, lib::Status>;
 
 }  // namespace simon::format
-
-// Messages for each ScenarioError, defined in openscenario.cpp.
-template <>
-const std::array<lib::StatusConditionEntry, simon::format::SCENARIO_ERROR_COUNT>
-    lib::EnumStatusKindConditionMixin<
-        simon::format::ScenarioError,
-        simon::format::SCENARIO_ERROR_COUNT>::conditions_;

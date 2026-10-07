@@ -239,13 +239,13 @@ auto Simulation::configure() -> engine::PhaseResult {
   if (model.physics.integrator != model::Physics::Integrator::EULER &&
       model.physics.integrator != model::Physics::Integrator::IMPLICIT_FAST) {
     return std::unexpected(
-        lib::raise(format::MjcfError::UNSUPPORTED,
+        lib::raise(format::FormatError::UNSUPPORTED,
                    "integrators other than Euler and implicitfast"));
   }
   if (scenario_.constrained &&
       model.physics.solver == model::Physics::Solver::CG) {
     return std::unexpected(
-        lib::raise(format::MjcfError::UNSUPPORTED, "the CG solver"));
+        lib::raise(format::FormatError::UNSUPPORTED, "the CG solver"));
   }
   mechanics_ = std::make_unique<Mechanics>(std::move(model));
   scheduler_ = std::make_unique<Scheduler>(
@@ -266,7 +266,7 @@ auto Simulation::configure() -> engine::PhaseResult {
       ++huge;
     } else {
       return std::unexpected(
-          lib::raise(format::MjcfError::UNSUPPORTED,
+          lib::raise(format::FormatError::UNSUPPORTED,
                      "a tree of more than 32 bodies or 64 degrees of freedom"));
     }
   }

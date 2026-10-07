@@ -5,10 +5,8 @@
 #include "format/mjcf.hpp"
 
 #include <algorithm>
-#include <charconv>
 #include <cmath>
 #include <filesystem>
-#include <fstream>
 #include <map>
 #include <numbers>
 #include <optional>
@@ -18,18 +16,10 @@
 #include <vector>
 
 #include "base/core.hpp"
+#include "format/text.hpp"
+#include "format/xml.hpp"
 #include "model/articulated_arithmetic.hpp"
 #include "pugixml.hpp"
-
-template <>
-const std::array<lib::StatusConditionEntry, simon::format::MJCF_ERROR_COUNT>
-    lib::EnumStatusKindConditionMixin<
-        simon::format::MjcfError,
-        simon::format::MJCF_ERROR_COUNT>::conditions_ = {
-        lib::StatusConditionEntry{"model unreadable"},
-        lib::StatusConditionEntry{"model malformed"},
-        lib::StatusConditionEntry{"model unsupported"},
-};
 
 namespace simon::format {
 
@@ -52,7 +42,6 @@ using model::Tendon;
 using model::articulated::cross;
 using model::articulated::transpose;
 
-using Failure = std::unexpected<lib::Status>;
 using lib::InOut;
 using lib::Out;
 
@@ -357,20 +346,15 @@ struct CompilerSpec final {
 
 //-- Reading -------------------------------------------------------------------
 
+// Reads one document, saying on which line anything in the text is wrong,
+// and compiles it, naming the body or joint anything in the model is wrong
+// in.
 class Reader final {
  public:
   auto read(std::string_view text)
       -> std::expected<ArticulatedModel, lib::Status> {
-    pugi::xml_document document;
-    if (pugi::xml_parse_result result =
-            document.load_buffer(text.data(), text.size());
-        !result) {
-      return fail(result.description());
-    }
-    pugi::xml_node root = document.child("mujoco");
-    if (!root) {
-      return fail("no mujoco element");
-    }
+    RETURN_IF_UNEXPECTED(document_.load(std::string{text}));
+    RETURN_OR_ASSIGN(pugi::xml_node root, document_.find_root("mujoco"));
     ArticulatedModel model{.name = root.attribute("model").as_string()};
     // The compiler's settings and the defaults come first, wherever they
     // stand.
@@ -426,18 +410,21 @@ class Reader final {
   }
 
  private:
-  auto fail(std::string_view why) const -> Failure {
-    return Failure{lib::raise(MjcfError::MALFORMED, std::string{why})};
+  // Something wrong in the text, at `node`.
+  auto fail(pugi::xml_node node, std::string_view why) const -> Failure {
+    return document_.fail(node, why);
   }
-  auto refuse(pugi::xml_node node) const -> Failure {
-    return Failure{lib::raise(MjcfError::UNSUPPORTED,
-                              "<" + std::string{node.name()} + ">")};
-  }
-  auto refuse(pugi::xml_node node, std::string_view attribute) const
+  auto refuse(pugi::xml_node node, std::string_view what = {}) const
       -> Failure {
-    return Failure{lib::raise(
-        MjcfError::UNSUPPORTED,
-        "<" + std::string{node.name()} + "> " + std::string{attribute})};
+    return document_.refuse(node, what);
+  }
+
+  // Something wrong in the compiled model, which the message names.
+  static auto fail(std::string_view why) -> Failure {
+    return Failure{lib::raise(FormatError::MALFORMED, std::string{why})};
+  }
+  static auto refuse(std::string_view what) -> Failure {
+    return format::refuse(what);
   }
 
   // Up to `into.size()` numbers from the attribute, if it is there, the
@@ -460,26 +447,18 @@ class Reader final {
       std::size_t end = text.find_first_of(" \t\n\r");
       std::string_view word = text.substr(0, end);
       if (count == into.size()) {
-        return fail("<" + std::string{node.name()} + "> " + name +
-                    " has too many numbers");
+        return fail(node, std::string{name} + " has too many numbers");
       }
-      double value = 0.0;
-      // A leading '+' or '.' from_chars does not take on its own.
-      std::string number{word};
-      if (number.starts_with('+')) {
-        number.erase(0, 1);
+      std::optional<double> value = parse_number(word);
+      if (!value) {
+        return fail(node, std::string{name} + " `" + std::string{word} +
+                              "` is not a finite number");
       }
-      auto [ptr, error] =
-          std::from_chars(number.data(), number.data() + number.size(), value);
-      if (error != std::errc{} || ptr != number.data() + number.size()) {
-        return fail("<" + std::string{node.name()} + "> " + name +
-                    " is not a number: " + std::string{word});
-      }
-      into[count++] = value;
+      into[count++] = *value;
       text.remove_prefix(end == std::string_view::npos ? text.size() : end);
     }
     if (count == 0) {
-      return fail("<" + std::string{node.name()} + "> " + name + " is empty");
+      return fail(node, std::string{name} + " is empty");
     }
     return true;
   }
@@ -517,8 +496,7 @@ class Reader final {
     }
     std::string_view text = attribute.as_string();
     if (text != "true" && text != "false") {
-      return fail("<" + std::string{node.name()} + "> " + name +
-                  " must be true or false");
+      return fail(node, std::string{name} + " must be true or false");
     }
     *into = text == "true";
     return {};
@@ -574,8 +552,7 @@ class Reader final {
       ++given;
     }
     if (given > 1) {
-      return fail("<" + std::string{node.name()} +
-                  "> gives more than one orientation");
+      return fail(node, "gives more than one orientation");
     }
     return {};
   }
@@ -661,7 +638,7 @@ class Reader final {
       } else if (name == "eulerseq") {
         if (value.size() != 3 ||
             value.find_first_not_of("xyzXYZ") != std::string_view::npos) {
-          return fail("eulerseq must be three of x, y, z, X, Y, Z");
+          return fail(node, "eulerseq must be three of x, y, z, X, Y, Z");
         }
         compiler_.euler_sequence = std::string{value};
       } else if (name == "inertiafromgeom") {
@@ -721,7 +698,7 @@ class Reader final {
         auto found = std::ranges::find(NAMES, value,
                                        &decltype(NAMES)::value_type::first);
         if (found == NAMES.end()) {
-          return fail("unknown integrator " + std::string{value});
+          return fail(node, "unknown integrator " + std::string{value});
         }
         physics->integrator = found->second;
       } else if (name == "cone") {
@@ -778,7 +755,7 @@ class Reader final {
     defaults_[name] = defaults;
     for (pugi::xml_node child : node.children("default")) {
       if (!child.attribute("class")) {
-        return fail("a nested <default> needs a class");
+        return fail(child, "needs a class, being nested");
       }
       RETURN_IF_UNEXPECTED(read_defaults(child, defaults_[name]));
     }
@@ -792,7 +769,7 @@ class Reader final {
     std::string name = node.attribute("class").as_string(inherited.c_str());
     auto found = defaults_.find(name);
     if (found == defaults_.end()) {
-      return fail("no default class " + name);
+      return fail(node, "no default class " + name);
     }
     return &found->second;
   }
@@ -921,7 +898,7 @@ class Reader final {
                                      : JointType::HINGE;
       if (text != "free" && text != "ball" && text != "slide" &&
           text != "hinge") {
-        return fail("unknown joint type " + std::string{text});
+        return fail(node, "unknown joint type " + std::string{text});
       }
     }
     RETURN_IF_UNEXPECTED(read_array(node, "pos", InOut(joint.pos)));
@@ -1004,7 +981,7 @@ class Reader final {
       RETURN_OR_ASSIGN(bool has_kv, read_number(node, "kv", InOut(kv)));
       if (has_kv) {
         if (kv < 0) {
-          return fail("kv cannot be negative");
+          return fail(node, "kv cannot be negative");
         }
         actuator.bias[2] = -kv;
       }
@@ -1057,7 +1034,7 @@ class Reader final {
     RETURN_OR_ASSIGN(bool has_mass,
                      read_number(node, "mass", InOut(spec.mass)));
     if (!has_mass) {
-      return fail("<inertial> needs a mass");
+      return fail(node, "needs a mass");
     }
     RETURN_OR_ASSIGN(bool diagonal,
                      read_array(node, "diaginertia", InOut(spec.diagonal)));
@@ -1068,7 +1045,7 @@ class Reader final {
       spec.full = full;
     }
     if (diagonal == has_full) {
-      return fail("<inertial> needs one of diaginertia and fullinertia");
+      return fail(node, "needs one of diaginertia and fullinertia");
     }
     return spec;
   }
@@ -1201,7 +1178,7 @@ class Reader final {
     actuator.joint.clear();
     RETURN_IF_UNEXPECTED(apply_actuator(node, InOut(actuator)));
     if (actuator.joint.empty()) {
-      return fail("<" + std::string{kind} + "> needs a joint");
+      return fail(node, "needs a joint");
     }
     actuators_.push_back(std::move(actuator));
     return {};
@@ -1305,12 +1282,10 @@ class Reader final {
     // its shape is not read.
     if (geom.type == GeomType::MESH) {
       if (geom.contype != 0 || geom.conaffinity != 0) {
-        return Failure{
-            lib::raise(MjcfError::UNSUPPORTED, "a mesh geom that collides")};
+        return refuse("a mesh geom that collides");
       }
       if (infer && (spec.mass ? *spec.mass != 0.0 : spec.density != 0.0)) {
-        return Failure{lib::raise(MjcfError::UNSUPPORTED,
-                                  "a mesh geom that gives its body mass")};
+        return refuse("a mesh geom that gives its body mass");
       }
       return std::pair{geom, 0.0};
     }
@@ -1348,8 +1323,7 @@ class Reader final {
         return fail("no joint " + spec.joint + " for actuator");
       }
       if (joint->type == JointType::FREE || joint->type == JointType::BALL) {
-        return Failure{lib::raise(MjcfError::UNSUPPORTED,
-                                  "actuator on a ball or free joint")};
+        return refuse("actuator on a ball or free joint");
       }
       Actuator actuator = spec.actuator;
       actuator.joint =
@@ -1709,6 +1683,7 @@ class Reader final {
     return {};
   }
 
+  XmlDocument document_;
   CompilerSpec compiler_;
   std::map<std::string, Defaults> defaults_;
   std::vector<ActuatorSpec> actuators_;
@@ -1731,8 +1706,8 @@ namespace {
 auto expand_includes(pugi::xml_node node, const std::filesystem::path& folder,
                      int depth) -> std::expected<void, lib::Status> {
   if (depth > 16) {
-    return std::unexpected(
-        lib::raise(MjcfError::MALFORMED, "includes nested too deeply"));
+    return Failure{
+        lib::raise(FormatError::MALFORMED, "includes nested too deeply")};
   }
   for (pugi::xml_node child = node.first_child(); child;) {
     pugi::xml_node next = child.next_sibling();
@@ -1740,13 +1715,13 @@ auto expand_includes(pugi::xml_node node, const std::filesystem::path& folder,
       std::filesystem::path path = folder / child.attribute("file").as_string();
       pugi::xml_document included;
       if (!included.load_file(path.c_str())) {
-        return std::unexpected(
-            lib::raise(MjcfError::UNREADABLE, "cannot read " + path.string()));
+        return Failure{lib::raise(FormatError::UNREADABLE,
+                                  "cannot read " + path.string())};
       }
       pugi::xml_node root = included.child("mujoco");
       if (!root) {
-        return std::unexpected(lib::raise(
-            MjcfError::MALFORMED, "no mujoco element in " + path.string()));
+        return Failure{lib::raise(FormatError::MALFORMED,
+                                  "no mujoco element in " + path.string())};
       }
       for (pugi::xml_node part : root.children()) {
         node.insert_copy_before(part, child);
@@ -1767,8 +1742,7 @@ auto load_mjcf(const std::string& path)
     -> std::expected<model::ArticulatedModel, lib::Status> {
   pugi::xml_document document;
   if (!document.load_file(path.c_str())) {
-    return std::unexpected(
-        lib::raise(MjcfError::UNREADABLE, "cannot open " + path));
+    return Failure{lib::raise(FormatError::UNREADABLE, "cannot open " + path)};
   }
   RETURN_IF_UNEXPECTED(
       expand_includes(document, std::filesystem::path{path}.parent_path(), 0));

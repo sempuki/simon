@@ -6,26 +6,18 @@
 
 #include <algorithm>
 #include <cctype>
-#include <charconv>
 #include <cmath>
 #include <filesystem>
 #include <format>
-#include <fstream>
+#include <memory>
+#include <optional>
 #include <sstream>
 #include <utility>
 
 #include "base/core.hpp"
+#include "format/text.hpp"
+#include "format/xml.hpp"
 #include "pugixml.hpp"
-
-template <>
-const std::array<lib::StatusConditionEntry, simon::format::SCENARIO_ERROR_COUNT>
-    lib::EnumStatusKindConditionMixin<
-        simon::format::ScenarioError,
-        simon::format::SCENARIO_ERROR_COUNT>::conditions_ = {
-        lib::StatusConditionEntry{"scenario unreadable"},
-        lib::StatusConditionEntry{"scenario malformed"},
-        lib::StatusConditionEntry{"scenario unsupported"},
-};
 
 namespace simon::format {
 
@@ -33,42 +25,8 @@ using namespace scenario;
 
 namespace {
 
-using Failure = std::unexpected<lib::Status>;
 using lib::InOut;
 using lib::Out;
-
-auto read_file(const std::string& path)
-    -> std::expected<std::string, lib::Status> {
-  std::ifstream file{path};
-  if (!file) {
-    return std::unexpected(
-        lib::raise(ScenarioError::UNREADABLE, "cannot open " + path));
-  }
-  std::stringstream text;
-  text << file.rdbuf();
-  return text.str();
-}
-
-auto parse_double(std::string_view text) -> std::optional<double> {
-  while (!text.empty() &&
-         std::isspace(static_cast<unsigned char>(text.front()))) {
-    text.remove_prefix(1);
-  }
-  while (!text.empty() &&
-         std::isspace(static_cast<unsigned char>(text.back()))) {
-    text.remove_suffix(1);
-  }
-  if (!text.empty() && text.front() == '+') {
-    text.remove_prefix(1);
-  }
-  double value = 0.0;
-  auto [end, error] =
-      std::from_chars(text.data(), text.data() + text.size(), value);
-  if (error != std::errc{} || end != text.data() + text.size()) {
-    return std::nullopt;
-  }
-  return value;
-}
 
 // Evaluates OpenSCENARIO 1.1's arithmetic expressions by recursive descent:
 //
@@ -81,17 +39,20 @@ class Expression final {
   Expression(std::string_view text, const std::vector<Parameter>& parameters)
       : text_{text}, parameters_{&parameters} {}
 
-  auto evaluate() -> std::expected<double, std::string> {
+  auto evaluate() -> std::expected<double, lib::Status> {
     auto value = parse_expression();
     skip_space();
     if (value && at_ < text_.size()) {
-      return std::unexpected("unexpected '" + std::string{text_.substr(at_)} +
-                             "'");
+      return fail("unexpected '" + std::string{text_.substr(at_)} + "'");
     }
     return value;
   }
 
  private:
+  static auto fail(const std::string& why) -> Failure {
+    return Failure{lib::raise(FormatError::MALFORMED, why)};
+  }
+
   auto skip_space() -> void {
     while (at_ < text_.size() &&
            std::isspace(static_cast<unsigned char>(text_[at_]))) {
@@ -108,7 +69,7 @@ class Expression final {
     return false;
   }
 
-  auto parse_expression() -> std::expected<double, std::string> {
+  auto parse_expression() -> std::expected<double, lib::Status> {
     auto value = parse_term();
     while (value) {
       if (take('+')) {
@@ -130,7 +91,7 @@ class Expression final {
     return value;
   }
 
-  auto parse_term() -> std::expected<double, std::string> {
+  auto parse_term() -> std::expected<double, lib::Status> {
     auto value = parse_unary();
     while (value) {
       char op = 0;
@@ -154,7 +115,7 @@ class Expression final {
     return value;
   }
 
-  auto parse_unary() -> std::expected<double, std::string> {
+  auto parse_unary() -> std::expected<double, lib::Status> {
     if (take('-')) {
       auto value = parse_unary();
       if (value) {
@@ -165,12 +126,12 @@ class Expression final {
     return parse_primary();
   }
 
-  auto parse_primary() -> std::expected<double, std::string> {
+  auto parse_primary() -> std::expected<double, lib::Status> {
     skip_space();
     if (take('(')) {
       auto value = parse_expression();
       if (value && !take(')')) {
-        return std::unexpected("missing ')'");
+        return fail("missing ')'");
       }
       return value;
     }
@@ -184,12 +145,11 @@ class Expression final {
       std::string_view name = text_.substr(start, at_ - start);
       auto found = std::ranges::find(*parameters_, name, &Parameter::name);
       if (found == parameters_->end()) {
-        return std::unexpected("no parameter " + std::string{name});
+        return fail("no parameter " + std::string{name});
       }
-      auto value = parse_double(found->value);
+      std::optional<double> value = parse_number(found->value);
       if (!value) {
-        return std::unexpected("parameter " + std::string{name} +
-                               " is not a number");
+        return fail("parameter " + std::string{name} + " is not a number");
       }
       return *value;
     }
@@ -201,10 +161,11 @@ class Expression final {
              (text_[at_ - 1] == 'e' || text_[at_ - 1] == 'E')))) {
       ++at_;
     }
-    auto value = parse_double(text_.substr(start, at_ - start));
+    std::optional<double> value =
+        parse_number(text_.substr(start, at_ - start));
     if (!value) {
-      return std::unexpected("expected a number at '" +
-                             std::string{text_.substr(start)} + "'");
+      return fail("expected a number at '" + std::string{text_.substr(start)} +
+                  "'");
     }
     return *value;
   }
@@ -215,7 +176,8 @@ class Expression final {
 };
 
 // Reads one scenario, its parameters in scopes: the file's, then a story's
-// or a catalog entry's, innermost last.
+// or a catalog entry's, innermost last. Says on which line of the scenario
+// or of a catalog anything is wrong.
 class Parser final {
  public:
   Parser(std::string directory,
@@ -223,15 +185,8 @@ class Parser final {
       : directory_{std::move(directory)}, assignments_{assignments} {}
 
   auto parse(std::string_view text) -> std::expected<Scenario, lib::Status> {
-    pugi::xml_parse_result result =
-        document_.load_buffer(text.data(), text.size());
-    if (!result) {
-      return fail(result.description());
-    }
-    pugi::xml_node root = document_.child("OpenSCENARIO");
-    if (!root) {
-      return fail("no OpenSCENARIO element");
-    }
+    RETURN_IF_UNEXPECTED(document_.load(std::string{text}));
+    RETURN_OR_ASSIGN(pugi::xml_node root, document_.find_root("OpenSCENARIO"));
     RETURN_IF_UNEXPECTED(assign(root.child("ParameterDeclarations")));
     Scenario scenario;
     RETURN_IF_UNEXPECTED(
@@ -241,7 +196,7 @@ class Parser final {
 
     pugi::xml_node logic = root.child("RoadNetwork").child("LogicFile");
     if (!logic) {
-      return fail("<RoadNetwork> needs a LogicFile");
+      return fail(root.child("RoadNetwork"), "needs a LogicFile");
     }
     RETURN_OR_ASSIGN(std::string road, read_text(logic, "filepath"));
     scenario.road_network = resolve(road);
@@ -259,12 +214,21 @@ class Parser final {
   }
 
  private:
-  auto fail(std::string_view why) const -> Failure {
-    return Failure{lib::raise(ScenarioError::MALFORMED, std::string{why})};
+  // The document `node` stands in: the scenario's, or a catalog's.
+  auto document_of(pugi::xml_node node) const -> const XmlDocument& {
+    for (const auto& catalog : catalogs_) {
+      if (catalog->holds(node)) {
+        return *catalog;
+      }
+    }
+    return document_;
   }
-  auto refuse(pugi::xml_node node) const -> Failure {
-    return Failure{lib::raise(ScenarioError::UNSUPPORTED,
-                              "<" + std::string{node.name()} + ">")};
+  auto fail(pugi::xml_node node, std::string_view why) const -> Failure {
+    return document_of(node).fail(node, why);
+  }
+  auto refuse(pugi::xml_node node, std::string_view what = {}) const
+      -> Failure {
+    return document_of(node).refuse(node, what);
   }
 
   auto resolve(const std::string& path) const -> std::string {
@@ -282,7 +246,8 @@ class Parser final {
       pugi::xml_node declaration = declarations.find_child_by_attribute(
           "ParameterDeclaration", "name", assignment.name.c_str());
       if (!declaration) {
-        return fail("no parameter " + assignment.name + " to assign");
+        return fail(declarations,
+                    "no parameter " + assignment.name + " to assign");
       }
       declaration.attribute("value").set_value(assignment.value.c_str());
     }
@@ -313,18 +278,17 @@ class Parser final {
   // An attribute's text, its parameter or expression resolved.
   auto read_text(pugi::xml_node node, std::string_view name) const
       -> std::expected<std::string, lib::Status> {
-    pugi::xml_attribute attribute = node.attribute(std::string{name}.c_str());
+    pugi::xml_attribute attribute = node.attribute(name);
     if (!attribute) {
-      return fail("<" + std::string{node.name()} + "> needs " +
-                  std::string{name});
+      return fail(node, "needs " + std::string{name});
     }
     std::string text = attribute.as_string();
     if (text.starts_with("${") && text.ends_with("}")) {
       auto value = evaluate_expression(
           std::string_view{text}.substr(2, text.size() - 3), scope_);
       if (!value) {
-        return fail("<" + std::string{node.name()} + "> " + std::string{name} +
-                    ": " + value.error());
+        return fail(node, std::string{name} + ": " +
+                              std::string{value.error().message()});
       }
       std::ostringstream out;
       out.precision(17);
@@ -338,7 +302,7 @@ class Parser final {
           return it->value;
         }
       }
-      return fail("no parameter " + text.substr(1));
+      return fail(node, "no parameter " + text.substr(1));
     }
     return text;
   }
@@ -346,10 +310,10 @@ class Parser final {
   auto read_number(pugi::xml_node node, std::string_view name) const
       -> std::expected<double, lib::Status> {
     RETURN_OR_ASSIGN(std::string text, read_text(node, name));
-    auto value = parse_double(text);
+    std::optional<double> value = parse_number(text);
     if (!value) {
-      return fail("<" + std::string{node.name()} + "> " + std::string{name} +
-                  " is not a number: " + text);
+      return fail(node,
+                  std::string{name} + " `" + text + "` is not a finite number");
     }
     return *value;
   }
@@ -357,7 +321,7 @@ class Parser final {
   auto read_number_or(pugi::xml_node node, std::string_view name,
                       double otherwise) const
       -> std::expected<double, lib::Status> {
-    if (!node.attribute(std::string{name}.c_str())) {
+    if (!node.attribute(name)) {
       return otherwise;
     }
     return read_number(node, name);
@@ -365,7 +329,7 @@ class Parser final {
 
   auto read_flag(pugi::xml_node node, std::string_view name,
                  bool otherwise) const -> std::expected<bool, lib::Status> {
-    if (!node.attribute(std::string{name}.c_str())) {
+    if (!node.attribute(name)) {
       return otherwise;
     }
     RETURN_OR_ASSIGN(std::string text, read_text(node, name));
@@ -388,13 +352,12 @@ class Parser final {
         if (file.path().extension() != ".xosc") {
           continue;
         }
-        auto text = read_file(file.path().string());
-        if (!text) {
-          return std::unexpected(text.error());
-        }
-        auto document = std::make_unique<pugi::xml_document>();
-        if (!document->load_string(text->c_str())) {
-          return fail("catalog " + file.path().string() + " is not XML");
+        RETURN_OR_ASSIGN(std::string text,
+                         read_text_file(file.path().string()));
+        auto document = std::make_unique<XmlDocument>();
+        if (auto loaded = document->load(std::move(text)); !loaded) {
+          return fail(location, "catalog " + file.path().string() + ": " +
+                                    std::string{loaded.error().message()});
         }
         catalogs_.push_back(std::move(document));
       }
@@ -406,7 +369,8 @@ class Parser final {
   auto find_catalog_entry(std::string_view catalog,
                           std::string_view entry) const -> pugi::xml_node {
     for (const auto& document : catalogs_) {
-      pugi::xml_node root = document->child("OpenSCENARIO").child("Catalog");
+      pugi::xml_node root =
+          document->node().child("OpenSCENARIO").child("Catalog");
       if (root.attribute("name").as_string() != catalog) {
         continue;
       }
@@ -453,8 +417,7 @@ class Parser final {
         controller.phases.push_back(std::move(read));
       }
       if (controller.phases.empty()) {
-        return fail("<TrafficSignalController> " + controller.name +
-                    " has no phases");
+        return fail(node, controller.name + " has no phases");
       }
       controllers.push_back(std::move(controller));
     }
@@ -463,8 +426,9 @@ class Parser final {
           std::ranges::find(controllers, controller.reference,
                             &TrafficSignalController::name) ==
               controllers.end()) {
-        return fail("<TrafficSignalController> " + controller.name +
-                    " refers to no controller " + controller.reference);
+        return fail(signals, "controller " + controller.name +
+                                 " refers to no controller " +
+                                 controller.reference);
       }
     }
     return controllers;
@@ -490,7 +454,7 @@ class Parser final {
         RETURN_OR_ASSIGN(std::string name, read_text(child, "entryName"));
         pugi::xml_node vehicle = find_catalog_entry(catalog, name);
         if (!vehicle) {
-          return fail("no catalog entry " + catalog + "/" + name);
+          return fail(child, "no catalog entry " + catalog + "/" + name);
         }
         std::string_view entry = vehicle.name();
         if (entry != "Vehicle" && entry != "Pedestrian") {
@@ -674,7 +638,7 @@ class Parser final {
     } else if (dimension == "rate") {
       dynamics.dimension = DynamicsDimension::RATE;
     } else {
-      return fail("unknown dynamicsDimension " + dimension);
+      return fail(node, "unknown dynamicsDimension " + dimension);
     }
     RETURN_OR_ASSIGN(dynamics.value, read_number(node, "value"));
     return dynamics;
@@ -694,8 +658,7 @@ class Parser final {
     if (shape == "sinusoidal") {
       return DynamicsShape::SINUSOIDAL;
     }
-    return fail("<" + std::string{node.name()} + "> unknown shape " +
-                std::string{shape});
+    return fail(node, "unknown shape " + std::string{shape});
   }
 
   auto read_private_action(pugi::xml_node action)
@@ -808,7 +771,7 @@ class Parser final {
     action.route.name = route.attribute("name").as_string();
     RETURN_OR_ASSIGN(bool closed, read_flag(route, "closed", false));
     if (closed) {
-      return Failure{lib::raise(ScenarioError::UNSUPPORTED, "<Route> closed")};
+      return refuse(route, "closed");
     }
     for (pugi::xml_node waypoint : route.children("Waypoint")) {
       Waypoint read;
@@ -818,8 +781,7 @@ class Parser final {
       action.route.waypoints.push_back(std::move(read));
     }
     if (action.route.waypoints.size() < 2) {
-      return fail("<Route> " + action.route.name +
-                  " needs two waypoints or more");
+      return fail(route, action.route.name + " needs two waypoints or more");
     }
     return action;
   }
@@ -838,8 +800,7 @@ class Parser final {
                      read_number_or(node, "initialDistanceOffset", 0.0));
     RETURN_OR_ASSIGN(bool closed, read_flag(trajectory, "closed", false));
     if (closed) {
-      return Failure{
-          lib::raise(ScenarioError::UNSUPPORTED, "<Trajectory> closed")};
+      return refuse(trajectory, "closed");
     }
     pugi::xml_node shape = trajectory.child("Shape").first_child();
     if (std::string_view{shape.name()} != "Polyline") {
@@ -849,8 +810,7 @@ class Parser final {
       // esmini turns the entity to a vertex's own heading, which simon does
       // not.
       if (vertex.child("Position").first_child().child("Orientation")) {
-        return Failure{lib::raise(ScenarioError::UNSUPPORTED,
-                                  "<Vertex> with an orientation")};
+        return refuse(vertex, "with an orientation");
       }
       Vertex read;
       RETURN_OR_ASSIGN(read.time, read_number_or(vertex, "time", 0.0));
@@ -858,7 +818,7 @@ class Parser final {
       action.vertices.push_back(std::move(read));
     }
     if (action.vertices.size() < 2) {
-      return fail("<Trajectory> " + action.name + " needs two vertices");
+      return fail(trajectory, action.name + " needs two vertices");
     }
     pugi::xml_node timing = node.child("TimeReference").first_child();
     if (std::string_view{timing.name()} != "None") {
@@ -867,8 +827,7 @@ class Parser final {
     pugi::xml_node following = node.child("TrajectoryFollowingMode");
     RETURN_OR_ASSIGN(std::string mode, read_text(following, "followingMode"));
     if (mode != "position") {
-      return Failure{lib::raise(ScenarioError::UNSUPPORTED,
-                                "<TrajectoryFollowingMode> " + mode)};
+      return refuse(following, mode);
     }
     return action;
   }
@@ -943,7 +902,7 @@ class Parser final {
     if (rule == "notEqualTo") {
       return Rule::NOT_EQUAL_TO;
     }
-    return fail("unknown rule " + rule);
+    return fail(node, "unknown rule " + rule);
   }
 
   // How a condition measures distance. In 1.0, alongRoute: longitudinal
@@ -979,10 +938,7 @@ class Parser final {
     if (distance.freespace &&
         !(distance.along_road &&
           distance.kind == RelativeDistance::Kind::LONGITUDINAL)) {
-      return Failure{
-          lib::raise(ScenarioError::UNSUPPORTED,
-                     "<" + std::string{node.name()} +
-                         "> freespace other than longitudinal along the road")};
+      return refuse(node, "freespace other than longitudinal along the road");
     }
     return distance;
   }
@@ -1029,8 +985,7 @@ class Parser final {
       RETURN_OR_ASSIGN(distance.value, read_number(node, "value"));
       RETURN_OR_ASSIGN(distance.distance, read_relative_distance(node));
       if (distance.distance.freespace) {
-        return Failure{lib::raise(ScenarioError::UNSUPPORTED,
-                                  "<DistanceCondition> freespace")};
+        return refuse(node, "freespace");
       }
       RETURN_OR_ASSIGN(distance.rule, read_rule(node));
       RETURN_OR_ASSIGN(distance.position,
@@ -1082,7 +1037,7 @@ class Parser final {
       auto found_type =
           std::ranges::find(TYPES, type, &decltype(TYPES)::value_type::first);
       if (found_type == TYPES.end()) {
-        return fail("unknown storyboardElementType " + type);
+        return fail(node, "unknown storyboardElementType " + type);
       }
       state.type = found_type->second;
       RETURN_OR_ASSIGN(std::string name, read_text(node, "state"));
@@ -1098,7 +1053,7 @@ class Parser final {
       auto found_state =
           std::ranges::find(STATES, name, &decltype(STATES)::value_type::first);
       if (found_state == STATES.end()) {
-        return fail("unknown state " + name);
+        return fail(node, "unknown state " + name);
       }
       state.state = found_state->second;
       return state;
@@ -1148,7 +1103,7 @@ class Parser final {
                        read_value_condition(by_value.first_child()));
       condition.condition = std::move(value);
     } else {
-      return fail("<Condition> " + condition.name + " has no condition");
+      return fail(node, condition.name + " has no condition");
     }
     return condition;
   }
@@ -1280,8 +1235,8 @@ class Parser final {
 
   std::string directory_;
   std::span<const ParameterAssignment> assignments_;
-  pugi::xml_document document_;
-  std::vector<std::unique_ptr<pugi::xml_document>> catalogs_;
+  XmlDocument document_;
+  std::vector<std::unique_ptr<XmlDocument>> catalogs_;
   std::vector<Parameter> scope_;
 };
 
@@ -1289,7 +1244,7 @@ class Parser final {
 
 auto evaluate_expression(std::string_view text,
                          const std::vector<Parameter>& parameters)
-    -> std::expected<double, std::string> {
+    -> std::expected<double, lib::Status> {
   return Expression{text, parameters}.evaluate();
 }
 
@@ -1302,7 +1257,7 @@ auto parse_openscenario(std::string_view text, const std::string& directory,
 auto load_openscenario(const std::string& path,
                        std::span<const ParameterAssignment> assignments)
     -> std::expected<Scenario, lib::Status> {
-  RETURN_OR_ASSIGN(std::string text, read_file(path));
+  RETURN_OR_ASSIGN(std::string text, read_text_file(path));
   return parse_openscenario(
       text, std::filesystem::path{path}.parent_path().string(), assignments);
 }
@@ -1310,49 +1265,28 @@ auto load_openscenario(const std::string& path,
 auto parse_parameter_distribution(std::string_view text,
                                   const std::string& directory)
     -> std::expected<ParameterDistribution, lib::Status> {
-  auto fail = [](const std::string& why) {
-    return Failure{lib::raise(ScenarioError::MALFORMED, why)};
-  };
-  auto refuse = [](pugi::xml_node node) {
-    return Failure{lib::raise(ScenarioError::UNSUPPORTED,
-                              "<" + std::string{node.name()} + ">")};
-  };
-  auto read_number =
-      [&](pugi::xml_node node,
-          const char* name) -> std::expected<double, lib::Status> {
-    auto value = parse_double(node.attribute(name).as_string());
-    if (!value) {
-      return fail("<" + std::string{node.name()} + "> needs a number " + name);
-    }
-    return *value;
-  };
-
-  pugi::xml_document document;
-  if (pugi::xml_parse_result result =
-          document.load_buffer(text.data(), text.size());
-      !result) {
-    return fail(result.description());
-  }
-  pugi::xml_node root =
-      document.child("OpenSCENARIO").child("ParameterValueDistribution");
+  XmlDocument document;
+  RETURN_IF_UNEXPECTED(document.load(std::string{text}));
+  RETURN_OR_ASSIGN(pugi::xml_node scenario, document.find_root("OpenSCENARIO"));
+  pugi::xml_node root = scenario.child("ParameterValueDistribution");
   if (!root) {
-    return fail("no ParameterValueDistribution element");
+    return document.fail(scenario, "needs a ParameterValueDistribution");
   }
   std::string scenario_file =
       root.child("ScenarioFile").attribute("filepath").as_string();
   if (scenario_file.empty()) {
-    return fail("<ParameterValueDistribution> needs a ScenarioFile");
+    return document.fail(root, "needs a ScenarioFile");
   }
   ParameterDistribution distribution{
       .scenario = (std::filesystem::path{directory} / scenario_file)
                       .lexically_normal()
                       .string()};
   if (pugi::xml_node stochastic = root.child("Stochastic")) {
-    return refuse(stochastic);
+    return document.refuse(stochastic);
   }
   pugi::xml_node deterministic = root.child("Deterministic");
   if (!deterministic) {
-    return fail("<ParameterValueDistribution> needs a distribution");
+    return document.fail(root, "needs a distribution");
   }
   for (pugi::xml_node node : deterministic.children()) {
     std::vector<ParameterChoice> choices;
@@ -1371,7 +1305,7 @@ auto parse_parameter_distribution(std::string_view text,
     } else if (kind == "DeterministicSingleParameterDistribution") {
       std::string name = node.attribute("parameterName").as_string();
       if (name.empty()) {
-        return fail("<" + std::string{kind} + "> needs a parameterName");
+        return document.fail(node, "needs a parameterName");
       }
       if (pugi::xml_node set = node.child("DistributionSet")) {
         for (pugi::xml_node element : set.children("Element")) {
@@ -1380,13 +1314,16 @@ auto parse_parameter_distribution(std::string_view text,
                 .value = element.attribute("value").as_string()}});
         }
       } else if (pugi::xml_node range = node.child("DistributionRange")) {
-        RETURN_OR_ASSIGN(double step, read_number(range, "stepWidth"));
+        RETURN_OR_ASSIGN(double step, document.read_number(range, "stepWidth"));
         pugi::xml_node limits = range.child("Range");
-        RETURN_OR_ASSIGN(double lower, read_number(limits, "lowerLimit"));
-        RETURN_OR_ASSIGN(double upper, read_number(limits, "upperLimit"));
+        RETURN_OR_ASSIGN(double lower,
+                         document.read_number(limits, "lowerLimit"));
+        RETURN_OR_ASSIGN(double upper,
+                         document.read_number(limits, "upperLimit"));
         if (!(step > 0.0) || upper < lower) {
-          return fail("<DistributionRange> of " + name +
-                      " needs a positive step and a range lowest first");
+          return document.fail(
+              range,
+              "of " + name + " needs a positive step and a range lowest first");
         }
         // The steps that fit, allowing for the limits' rounding.
         auto steps = static_cast<std::size_t>(
@@ -1398,13 +1335,13 @@ auto parse_parameter_distribution(std::string_view text,
                                      lower + static_cast<double>(k) * step)}});
         }
       } else {
-        return refuse(node.first_child());
+        return document.refuse(node.first_child());
       }
     } else {
-      return refuse(node);
+      return document.refuse(node);
     }
     if (choices.empty()) {
-      return fail("<" + std::string{kind} + "> has no values");
+      return document.fail(node, "has no values");
     }
     distribution.distributions.push_back(std::move(choices));
   }
@@ -1413,7 +1350,7 @@ auto parse_parameter_distribution(std::string_view text,
 
 auto load_parameter_distribution(const std::string& path)
     -> std::expected<ParameterDistribution, lib::Status> {
-  RETURN_OR_ASSIGN(std::string text, read_file(path));
+  RETURN_OR_ASSIGN(std::string text, read_text_file(path));
   return parse_parameter_distribution(
       text, std::filesystem::path{path}.parent_path().string());
 }

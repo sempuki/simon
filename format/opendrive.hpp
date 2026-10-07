@@ -2,13 +2,12 @@
 
 #pragma once
 
-#include <array>
-#include <cstddef>
 #include <expected>
 #include <string>
 #include <string_view>
 
 #include "base/status.hpp"
+#include "format/format_error.hpp"  // IWYU pragma: export
 #include "model/road.hpp"
 
 // Reads roads from ASAM OpenDRIVE files (see model/REFERENCES.md): each
@@ -21,18 +20,8 @@
 // for traffic control. A road's lateral shape, lane heights, road marks,
 // signal references and repeated objects are left out. The deprecated poly3
 // geometry and lanes given by their borders rather than their widths are
-// refused, as libOpenDRIVE refuses them.
+// refused, as libOpenDRIVE refuses them. A failure is a FormatError.
 namespace simon::format {
-
-// The reasons a road network could not be read.
-enum class OpenDriveError {
-  UNREADABLE,  // The file could not be opened.
-  MALFORMED,   // The message says where and how.
-  COUNT,
-};
-
-inline constexpr std::size_t OPEN_DRIVE_ERROR_COUNT =
-    static_cast<std::size_t>(OpenDriveError::COUNT);
 
 // Reads the road network that `text` describes.
 auto parse_opendrive(std::string_view text)
@@ -43,11 +32,3 @@ auto load_opendrive(const std::string& path)
     -> std::expected<model::RoadNetwork, lib::Status>;
 
 }  // namespace simon::format
-
-// Messages for each OpenDriveError, defined in opendrive.cpp.
-template <>
-const std::array<lib::StatusConditionEntry,
-                 simon::format::OPEN_DRIVE_ERROR_COUNT>
-    lib::EnumStatusKindConditionMixin<
-        simon::format::OpenDriveError,
-        simon::format::OPEN_DRIVE_ERROR_COUNT>::conditions_;
