@@ -32,7 +32,7 @@ auto compute_plummer_energy(const Plummer& plummer)
     -> units::quantity<units::si::joule, double> {
   double m = plummer.mass.numerical_value_in(kilogram);
   double a = plummer.scale.numerical_value_in(meter);
-  return -3.0 * std::numbers::pi * CONSTANT * m * m / (64.0 * a) *
+  return -3.0 * std::numbers::pi * GRAVITATIONAL_CONSTANT * m * m / (64.0 * a) *
          units::si::joule;
 }
 
@@ -41,7 +41,8 @@ auto compute_crossing_time(Mass mass,
     -> Time {
   double m = mass.numerical_value_in(kilogram);
   double e = energy.numerical_value_in(units::si::joule);
-  return CONSTANT * std::pow(m, 2.5) / std::pow(-2.0 * e, 1.5) * second;
+  return GRAVITATIONAL_CONSTANT * std::pow(m, 2.5) / std::pow(-2.0 * e, 1.5) *
+         second;
 }
 
 // In units where G = M = a = 1, a body's radius solves M(r) = r^3 (1 +
@@ -54,7 +55,7 @@ auto append_plummer(const Plummer& plummer, std::size_t count,
     -> void {
   double m = plummer.mass.numerical_value_in(kilogram);
   double a = plummer.scale.numerical_value_in(meter);
-  double speed_unit = std::sqrt(CONSTANT * m / a);
+  double speed_unit = std::sqrt(GRAVITATIONAL_CONSTANT * m / a);
   double each = m / static_cast<double>(count);
 
   std::vector<Vector3> positions;
@@ -146,14 +147,14 @@ struct HaloTable final {
     double total = numbers.halo_inside(numbers.cutoff) +
                    numbers.disk_inside(numbers.cutoff);
     double pressure = 0.0;  // int rho G M / r^2.
-    double depth = CONSTANT * total / numbers.cutoff;
+    double depth = GRAVITATIONAL_CONSTANT * total / numbers.cutoff;
     for (int i = POINTS - 1; i >= 0; --i) {
       double r = radius_at(i);
       if (i < POINTS - 1) {
         double outer = radius_at(i + 1);
         auto pull = [&](double x) {
-          return CONSTANT * (numbers.halo_inside(x) + numbers.disk_inside(x)) /
-                 (x * x);
+          return GRAVITATIONAL_CONSTANT *
+                 (numbers.halo_inside(x) + numbers.disk_inside(x)) / (x * x);
         };
         pressure += 0.5 *
                     (numbers.halo_density(r) * pull(r) +
@@ -227,9 +228,9 @@ auto compute_circular_speed(const DiskGalaxy& galaxy, Length radius) -> Speed {
   GalaxyNumbers numbers{galaxy};
   double r = radius.numerical_value_in(meter);
   if (!(r > 0.0)) return 0.0 * meter_per_second;
-  double halo = CONSTANT * numbers.halo_inside(r) / r;
+  double halo = GRAVITATIONAL_CONSTANT * numbers.halo_inside(r) / r;
   double y = r / (2.0 * numbers.h);
-  double disk = 4.0 * std::numbers::pi * CONSTANT *
+  double disk = 4.0 * std::numbers::pi * GRAVITATIONAL_CONSTANT *
                 numbers.surface_density(0.0) * numbers.h * y * y *
                 (std::cyl_bessel_i(0.0, y) * std::cyl_bessel_k(0.0, y) -
                  std::cyl_bessel_i(1.0, y) * std::cyl_bessel_k(1.0, y));
@@ -261,7 +262,7 @@ auto append_disk_galaxy(const DiskGalaxy& galaxy, InOut<Random> random,
            2.0 * speed2(r) / (r * r);
   };
   double reference = galaxy.stability_radius.numerical_value_in(meter);
-  double radial_reference = galaxy.stability * 3.36 * CONSTANT *
+  double radial_reference = galaxy.stability * 3.36 * GRAVITATIONAL_CONSTANT *
                             numbers.surface_density(reference) /
                             std::sqrt(epicyclic2(reference));
 
@@ -277,7 +278,7 @@ auto append_disk_galaxy(const DiskGalaxy& galaxy, InOut<Random> random,
     double kappa2 = epicyclic2(r);
     double radial =
         radial_reference * std::exp(-0.5 * (r - reference) / numbers.h);
-    double vertical = std::sqrt(std::numbers::pi * CONSTANT *
+    double vertical = std::sqrt(std::numbers::pi * GRAVITATIONAL_CONSTANT *
                                 numbers.surface_density(r) * numbers.z0);
     double azimuthal = radial * std::sqrt(kappa2 / (4.0 * omega2));
     double mean2 =
@@ -345,8 +346,8 @@ auto place_bodies(std::size_t first, const Matrix3& rotation,
 // changes at sqrt(mu / 2 q^3) / (1 + D^2) (derived here from Barker's).
 auto compute_parabolic_separation(const ParabolicOrbit& orbit, Time time)
     -> Separation {
-  double mu =
-      CONSTANT * (orbit.first + orbit.second).numerical_value_in(kilogram);
+  double mu = GRAVITATIONAL_CONSTANT *
+              (orbit.first + orbit.second).numerical_value_in(kilogram);
   double q = orbit.pericenter.numerical_value_in(meter);
   double rate = std::sqrt(mu / (2.0 * q * q * q));
   double a = 1.5 * rate * time.numerical_value_in(second);
@@ -372,7 +373,7 @@ auto make_toomre_disk(Length pericenter, Length softening) -> RingDisk {
 // centripetal acceleration (derived here).
 auto append_ring_disk(const RingDisk& disk, const BodyStart& center,
                       InOut<std::vector<BodyStart>> bodies) -> void {
-  double gm = CONSTANT * center.mass.numerical_value_in(kilogram);
+  double gm = GRAVITATIONAL_CONSTANT * center.mass.numerical_value_in(kilogram);
   double e = disk.softening.numerical_value_in(meter);
   for (std::size_t ring = 0; ring < disk.radii.size(); ++ring) {
     double r = disk.radii[ring].numerical_value_in(meter);

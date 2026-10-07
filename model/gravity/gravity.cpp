@@ -20,7 +20,7 @@ auto sum_acceleration(std::span<const Source> sources, std::uint32_t self,
     double dy = position.y() - source.position.y();
     double dz = position.z() - source.position.z();
     double r = std::sqrt(dx * dx + dy * dy + dz * dz + softening2);
-    double pull = -CONSTANT / (r * r * r) * source.mass;
+    double pull = -GRAVITATIONAL_CONSTANT / (r * r * r) * source.mass;
     acceleration.x() += pull * dx;
     acceleration.y() += pull * dy;
     acceleration.z() += pull * dz;
@@ -35,7 +35,7 @@ auto compute_potential_energy(std::span<const Source> sources, double softening)
   for (std::size_t i = 0; i < sources.size(); ++i) {
     for (std::size_t j = 0; j < i; ++j) {
       Vector3 d = sources[i].position - sources[j].position;
-      energy -= CONSTANT * sources[i].mass * sources[j].mass /
+      energy -= GRAVITATIONAL_CONSTANT * sources[i].mass * sources[j].mass /
                 std::sqrt(d.squaredNorm() + softening2);
     }
   }
@@ -178,7 +178,7 @@ auto Tree::compute_acceleration(std::uint32_t self, const Vector3& position,
       continue;
     }
     double r = std::sqrt(r2 + softening2);
-    double pull = -CONSTANT / (r * r * r) * cell.mass;
+    double pull = -GRAVITATIONAL_CONSTANT / (r * r * r) * cell.mass;
     acceleration.x() += pull * dx;
     acceleration.y() += pull * dy;
     acceleration.z() += pull * dz;

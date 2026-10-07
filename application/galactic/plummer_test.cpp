@@ -88,7 +88,7 @@ TEST_CASE("Plummer") {
         compute_mass_radii(simulation.world(), fractions);
     double scale_momentum =
         PLUMMER.mass.numerical_value_in(kilogram) *
-        std::sqrt(gravity::CONSTANT *
+        std::sqrt(gravity::GRAVITATIONAL_CONSTANT *
                   PLUMMER.mass.numerical_value_in(kilogram) /
                   PLUMMER.scale.numerical_value_in(meter));
     double scale_angular =

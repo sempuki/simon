@@ -59,7 +59,8 @@ TEST_CASE("Encounter") {
   SECTION("ShouldTakeToomresPeriodGivenOuterRing") {
     // Toomre and Toomre's outermost ring, 15 kpc about 10^11 suns, turns in
     // 5.442 of their units of 10^8 years.
-    double gm = gravity::CONSTANT * TOOMRE.victim.numerical_value_in(kilogram);
+    double gm = gravity::GRAVITATIONAL_CONSTANT *
+                TOOMRE.victim.numerical_value_in(kilogram);
     double r = (0.6 * TOOMRE.pericenter).numerical_value_in(meter);
     double period = 2.0 * std::numbers::pi * std::sqrt(r * r * r / gm);
     CHECK(std::abs(period / (5.442e8 *
@@ -122,8 +123,8 @@ TEST_CASE("Encounter") {
     REQUIRE(driver.run(BasicTimePoint<Year>{} + 128000 * step));
 
     std::vector<gravity::BodyStart> states = collect_states(simulation);
-    double gm =
-        gravity::CONSTANT * converged.companion.numerical_value_in(kilogram);
+    double gm = gravity::GRAVITATIONAL_CONSTANT *
+                converged.companion.numerical_value_in(kilogram);
     double e = converged.softening.numerical_value_in(meter);
     auto energy_about = [&](const gravity::BodyStart& particle,
                             const gravity::BodyStart& mass) {
