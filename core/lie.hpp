@@ -13,10 +13,11 @@
 // a small change on the group. Rotations are quaternions and rigid motions
 // are a rotation and a translation, as the rest of simon holds them.
 //
-// A twist is [translation; rotation], translation first, as Solà, Deray and
-// Atchuthan and Barfoot write it (see model/REFERENCES.md). The right
-// Jacobian relates a change on the right, X exp(delta): the body frame. The
-// left Jacobian relates exp(delta) X: the world frame.
+// A twist is [rotation; translation], rotation first, as Featherstone and
+// Lynch and Park write it and MuJoCo stores it (see model/REFERENCES.md); a
+// wrench likewise, [torque; force]. The right Jacobian relates a change on
+// the right, X exp(delta): the body frame. The left Jacobian relates
+// exp(delta) X: the world frame.
 namespace simon {
 
 using Vector6 = Eigen::Matrix<double, 6, 1>;
@@ -141,31 +142,49 @@ inline auto act(const Pose& pose, const Vector3& point) -> Vector3 {
 // The 4x4 matrix of a twist, [[w]x, v; 0, 0].
 inline auto hat(const Vector6& twist) -> Eigen::Matrix4d {
   Eigen::Matrix4d twist_x = Eigen::Matrix4d::Zero();
-  twist_x.topLeftCorner<3, 3>() = so3::hat(twist.tail<3>());
-  twist_x.topRightCorner<3, 1>() = twist.head<3>();
+  twist_x.topLeftCorner<3, 3>() = so3::hat(twist.head<3>());
+  twist_x.topRightCorner<3, 1>() = twist.tail<3>();
   return twist_x;
 }
 
 inline auto vee(const Eigen::Matrix4d& twist_x) -> Vector6 {
   Vector6 twist;
-  twist.head<3>() = twist_x.topRightCorner<3, 1>();
-  twist.tail<3>() = so3::vee(twist_x.topLeftCorner<3, 3>());
+  twist.head<3>() = so3::vee(twist_x.topLeftCorner<3, 3>());
+  twist.tail<3>() = twist_x.topRightCorner<3, 1>();
   return twist;
+}
+
+// The Lie bracket [a, b], ad_a b: how the motion `b` changes as seen from a
+// frame moving with `a` (Featherstone's motion cross product, a x b).
+inline auto cross_motion(const Vector6& a, const Vector6& b) -> Vector6 {
+  Vector6 r;
+  r.head<3>() = a.head<3>().cross(b.head<3>());
+  r.tail<3>() = a.head<3>().cross(b.tail<3>()) + a.tail<3>().cross(b.head<3>());
+  return r;
+}
+
+// Its dual on wrenches, -ad_aᵀ f: how the wrench `f` changes as seen from a
+// frame moving with `a` (Featherstone's force cross product, a x* f).
+inline auto cross_force(const Vector6& a, const Vector6& f) -> Vector6 {
+  Vector6 r;
+  r.head<3>() = a.head<3>().cross(f.head<3>()) + a.tail<3>().cross(f.tail<3>());
+  r.tail<3>() = a.head<3>().cross(f.tail<3>());
+  return r;
 }
 
 // The motion a twist makes in unit time: the rotation by its angular part,
 // and the translation its linear part sweeps while turning.
 inline auto exp(const Vector6& twist) -> Pose {
-  Vector3 rotation = twist.tail<3>();
+  Vector3 rotation = twist.head<3>();
   return {.rotation = so3::exp(rotation),
-          .translation = so3::left_jacobian(rotation) * twist.head<3>()};
+          .translation = so3::left_jacobian(rotation) * twist.tail<3>()};
 }
 
 inline auto log(const Pose& pose) -> Vector6 {
   Vector3 rotation = so3::log(pose.rotation);
   Vector6 twist;
-  twist.head<3>() = so3::inverse_left_jacobian(rotation) * pose.translation;
-  twist.tail<3>() = rotation;
+  twist.head<3>() = rotation;
+  twist.tail<3>() = so3::inverse_left_jacobian(rotation) * pose.translation;
   return twist;
 }
 
@@ -175,7 +194,7 @@ inline auto adjoint(const Pose& pose) -> Matrix6 {
   Matrix3 rotation = pose.rotation.toRotationMatrix();
   Matrix6 adjoint = Matrix6::Zero();
   adjoint.topLeftCorner<3, 3>() = rotation;
-  adjoint.topRightCorner<3, 3>() = so3::hat(pose.translation) * rotation;
+  adjoint.bottomLeftCorner<3, 3>() = so3::hat(pose.translation) * rotation;
   adjoint.bottomRightCorner<3, 3>() = rotation;
   return adjoint;
 }
@@ -183,8 +202,8 @@ inline auto adjoint(const Pose& pose) -> Matrix6 {
 // The block of the SE(3) left Jacobian that couples the translation to the
 // rotation (Barfoot's Q; see model/REFERENCES.md).
 inline auto coupling(const Vector6& twist) -> Matrix3 {
-  Vector3 rho = twist.head<3>();
-  Vector3 w = twist.tail<3>();
+  Vector3 w = twist.head<3>();
+  Vector3 rho = twist.tail<3>();
   double angle = w.norm();
   Matrix3 rho_x = so3::hat(rho);
   Matrix3 w_x = so3::hat(w);
@@ -219,10 +238,10 @@ inline auto coupling(const Vector6& twist) -> Matrix3 {
 // The left Jacobian: exp(twist + delta) = exp(J_l(twist) delta) exp(twist),
 // to first order.
 inline auto left_jacobian(const Vector6& twist) -> Matrix6 {
-  Matrix3 rotation = so3::left_jacobian(twist.tail<3>());
+  Matrix3 rotation = so3::left_jacobian(twist.head<3>());
   Matrix6 jacobian = Matrix6::Zero();
   jacobian.topLeftCorner<3, 3>() = rotation;
-  jacobian.topRightCorner<3, 3>() = coupling(twist);
+  jacobian.bottomLeftCorner<3, 3>() = coupling(twist);
   jacobian.bottomRightCorner<3, 3>() = rotation;
   return jacobian;
 }
@@ -234,10 +253,10 @@ inline auto right_jacobian(const Vector6& twist) -> Matrix6 {
 }
 
 inline auto inverse_left_jacobian(const Vector6& twist) -> Matrix6 {
-  Matrix3 inverted = so3::inverse_left_jacobian(twist.tail<3>());
+  Matrix3 inverted = so3::inverse_left_jacobian(twist.head<3>());
   Matrix6 jacobian = Matrix6::Zero();
   jacobian.topLeftCorner<3, 3>() = inverted;
-  jacobian.topRightCorner<3, 3>() = -inverted * coupling(twist) * inverted;
+  jacobian.bottomLeftCorner<3, 3>() = -inverted * coupling(twist) * inverted;
   jacobian.bottomRightCorner<3, 3>() = inverted;
   return jacobian;
 }

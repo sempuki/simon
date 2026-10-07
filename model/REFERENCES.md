@@ -11,7 +11,8 @@ full where it first appears, and as "above" after.
 
 | Where | What | Source |
 |---|---|---|
-| `core/lie.hpp` | SO(3) and SE(3) as Lie groups: the exponential and logarithm, the adjoint, the left and right Jacobians and their inverses, with a twist written translation first | J. Solà, J. Deray and D. Atchuthan, "A micro Lie theory for state estimation in robotics", arXiv:1812.01537, 2018, sections 4 and 7 and appendices A and B |
+| `core/lie.hpp` | SO(3) and SE(3) as Lie groups: the exponential and logarithm, the adjoint, the left and right Jacobians and their inverses | J. Solà, J. Deray and D. Atchuthan, "A micro Lie theory for state estimation in robotics", arXiv:1812.01537, 2018, sections 4 and 7 and appendices A and B |
+| `core/lie.hpp` | Twists rotation first, and the motion and force cross products, the bracket ad and its dual | R. Featherstone, *Rigid Body Dynamics Algorithms*, Springer, 2008, sections 2.9 and 2.10; K. M. Lynch and F. C. Park, *Modern Robotics*, Cambridge University Press, 2017, section 8.2 |
 | `core/lie.hpp` | The rotation of a vector about an axis, as a quaternion | O. Rodrigues, "Des lois géométriques qui régissent les déplacements d'un système solide dans l'espace", *Journal de Mathématiques Pures et Appliquées* 5, 1840, pp. 380-440 |
 | `core/lie.hpp` | The block of the SE(3) Jacobian that couples translation to rotation | T. D. Barfoot, *State Estimation for Robotics*, Cambridge University Press, 2017, equation 7.86 |
 

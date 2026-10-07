@@ -21,9 +21,10 @@ auto near(const Eigen::MatrixBase<LeftType>& a,
 
 const Vector3 W{0.3, -0.7, 0.5};
 const Vector3 W_SMALL{1e-8, -2e-8, 3e-8};
-const Vector6 TWIST{(Vector6{} << 1.0, -2.0, 0.5, 0.3, -0.7, 0.5).finished()};
+// Rotation first.
+const Vector6 TWIST{(Vector6{} << 0.3, -0.7, 0.5, 1.0, -2.0, 0.5).finished()};
 const Vector6 TWIST_SMALL{
-    (Vector6{} << 1.0, -2.0, 0.5, 1e-8, -2e-8, 3e-8).finished()};
+    (Vector6{} << 1e-8, -2e-8, 3e-8, 1.0, -2.0, 0.5).finished()};
 
 TEST_CASE("SO3") {
   SECTION("ShouldRoundTripGivenExpAndLog") {
@@ -99,7 +100,7 @@ TEST_CASE("SE3") {
 
   SECTION("ShouldMatchExpAsMatrixExponentialGivenPureTranslation") {
     Vector6 translation =
-        (Vector6{} << 1.0, 2.0, 3.0, 0.0, 0.0, 0.0).finished();
+        (Vector6{} << 0.0, 0.0, 0.0, 1.0, 2.0, 3.0).finished();
     se3::Pose pose = se3::exp(translation);
     CHECK(near(pose.translation, Vector3{1.0, 2.0, 3.0}, TIGHT));
     CHECK(near(so3::log(pose.rotation), Vector3::Zero(), TIGHT));
@@ -135,6 +136,24 @@ TEST_CASE("SE3") {
           near(se3::right_jacobian(twist) * se3::inverse_right_jacobian(twist),
                Matrix6::Identity(), TIGHT));
     }
+  }
+
+  SECTION("ShouldBracketAsMatricesCommuteGivenCrossMotion") {
+    // hat([a, b]) = hat(a) hat(b) - hat(b) hat(a).
+    Vector6 a = TWIST;
+    Vector6 b = (Vector6{} << 0.2, 0.1, -0.3, 0.05, 0.1, -0.02).finished();
+    CHECK(near(se3::hat(se3::cross_motion(a, b)),
+               se3::hat(a) * se3::hat(b) - se3::hat(b) * se3::hat(a), TIGHT));
+  }
+
+  SECTION("ShouldBeDualGivenCrossForce") {
+    // A wrench's power on a motion is the same seen from a moving frame:
+    // (a x m) . f = -m . (a x* f).
+    Vector6 a = TWIST;
+    Vector6 m = (Vector6{} << 0.2, 0.1, -0.3, 0.05, 0.1, -0.02).finished();
+    Vector6 f = (Vector6{} << -1.0, 0.5, 2.0, 0.3, -0.4, 0.7).finished();
+    CHECK(std::abs(se3::cross_motion(a, m).dot(f) +
+                   m.dot(se3::cross_force(a, f))) < TIGHT);
   }
 
   SECTION("ShouldUndoPlusGivenMinus") {
