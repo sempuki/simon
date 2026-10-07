@@ -10,12 +10,12 @@
 
 namespace simon::model {
 
-auto sum_gravity(std::span<const GravitySource> sources, framework::Entity self,
+auto sum_gravity(std::span<const GravitySource> sources, std::uint32_t self,
                  const Vector3& position, double softening) -> Vector3 {
   double softening2 = softening * softening;
   Vector3 acceleration = Vector3::Zero();
   for (const GravitySource& source : sources) {
-    if (source.entity == self) continue;
+    if (source.id == self) continue;
     double dx = position.x() - source.position.x();
     double dy = position.y() - source.position.y();
     double dz = position.z() - source.position.z();
@@ -147,7 +147,7 @@ auto GravityTree::build_cell(std::uint32_t cell, std::uint32_t begin,
   cells_[cell].center_of_mass = mass > 0.0 ? Vector3{moment / mass} : middle;
 }
 
-auto GravityTree::compute_acceleration(framework::Entity self,
+auto GravityTree::compute_acceleration(std::uint32_t self,
                                        const Vector3& position,
                                        double opening_angle,
                                        double softening) const -> Vector3 {

@@ -10,9 +10,6 @@
 
 #include "core/units.hpp"
 #include "core/vocabulary.hpp"
-#include "framework/entity.hpp"
-#include "framework/system.hpp"
-#include "model/kinematics.hpp"
 
 // Newtonian gravity between point masses, softened so that close passes stay
 // finite, and the astronomical scales it works at (see model/REFERENCES.md).
@@ -48,81 +45,32 @@ struct PointMass final {
   Mass mass = 0.0 * kilogram;
 };
 
-// The acceleration gravity gives a body. A gravity system writes it; the
-// leapfrog's kicks read it.
+// The acceleration gravity gives a body.
 struct Gravity final {
   Acceleration acceleration = meters_per_second_squared(0.0, 0.0, 0.0);
 };
 
 //-- Direct summation ----------------------------------------------------------
 
-// A body that pulls on others, as a gravity system gathers it.
+// A body that pulls on others. `id` is the caller's name for the body, which
+// leaves it out of its own pull.
 struct GravitySource final {
   Vector3 position = Vector3::Zero();  // Meters.
   double mass = 0.0;                   // Kilograms.
-  framework::Entity entity;
+  std::uint32_t id = 0;
 };
 
-// Computes the acceleration at `position` from every source but `self`, each
+// Computes the acceleration at `position` from every source but the one
+// whose id is `self`, each
 // softened by Plummer's kernel: G m d / (|d|^2 + softening^2)^(3/2) (Dehnen),
 // in REBOUND's order of operations. Meters, kilograms and seconds.
-auto sum_gravity(std::span<const GravitySource> sources, framework::Entity self,
+auto sum_gravity(std::span<const GravitySource> sources, std::uint32_t self,
                  const Vector3& position, double softening) -> Vector3;
 
 // Computes the potential energy of `sources`, each pair once, softened as
 // sum_gravity softens them: -G m_i m_j / (|d|^2 + softening^2)^(1/2). Joules.
 auto compute_potential_energy(std::span<const GravitySource> sources,
                               double softening) -> double;
-
-// Gathers into `sources` every body of `world` with a PointMass and a
-// Kinematics, in the PointMass store's order.
-template <typename WorldType>
-auto gather_sources(const WorldType& world,
-                    InOut<std::vector<GravitySource>> sources) -> void {
-  sources->clear();
-  store_of<PointMass>(world).for_each([&](framework::Entity entity,
-                                          const PointMass& point) {
-    const Kinematics* kinematics =
-        maybe_component_of<Kinematics>(world, entity);
-    if (!kinematics) return;
-    sources->push_back(GravitySource{
-        .position = kinematics->position.numerical_value_ref_in(meter).eigen(),
-        .mass = point.mass.numerical_value_in(kilogram),
-        .entity = entity});
-  });
-}
-
-// Sums every source's pull on each body directly. It costs N^2 and is exact
-// to rounding: the reference for faster methods. Each body writes only its
-// own Gravity, from sources gathered once a step, so bodies run in any order.
-// It does nothing unless enabled.
-struct SumGravity final           //
-    : framework::System<Gravity,  //
-                        const Kinematics> {
-  using AllowComponentList = framework::TypeList<Kinematics, PointMass>;
-
-  auto prepare(auto& world) -> bool {
-    if (!enabled) return false;
-    gather_sources(world, InOut(sources));
-    return true;
-  }
-
-  auto operator()(auto&, framework::Entity self,  //
-                  Gravity& gravity,               //
-                  const Kinematics* kinematics) const -> void {
-    if (!kinematics) return;
-    gravity.acceleration =
-        QuantityVector{sum_gravity(
-            sources, self,
-            kinematics->position.numerical_value_ref_in(meter).eigen(),
-            softening.numerical_value_in(meter))} *
-        meter_per_second_squared;
-  }
-
-  Length softening = 0.0 * meter;
-  std::vector<GravitySource> sources;
-  bool enabled = true;
-};
 
 //-- Barnes and Hut's tree -----------------------------------------------------
 
@@ -141,7 +89,7 @@ class GravityTree final {
   // `position` to its center of mass, as REBOUND's tree does. An unopened cell
   // pulls as a point; a source pulls as sum_gravity has it. Meters, kilograms
   // and seconds.
-  auto compute_acceleration(framework::Entity self, const Vector3& position,
+  auto compute_acceleration(std::uint32_t self, const Vector3& position,
                             double opening_angle, double softening) const
       -> Vector3;
 
@@ -163,40 +111,6 @@ class GravityTree final {
   std::vector<GravitySource> sources_;  // In tree order.
   std::vector<GravitySource> scratch_;
   std::vector<Cell> cells_;
-};
-
-// Computes each body's gravity from a Barnes and Hut tree of every source,
-// built once a step. Each body walks the tree on its own and writes only its
-// own Gravity. Its forces are not exactly equal and opposite, so momentum
-// drifts by the tree's error. It does nothing unless enabled.
-struct TreeGravity final          //
-    : framework::System<Gravity,  //
-                        const Kinematics> {
-  using AllowComponentList = framework::TypeList<Kinematics, PointMass>;
-
-  auto prepare(auto& world) -> bool {
-    if (!enabled) return false;
-    gather_sources(world, InOut(sources));
-    tree.build(sources);
-    return true;
-  }
-
-  auto operator()(auto&, framework::Entity self,  //
-                  Gravity& gravity,               //
-                  const Kinematics* kinematics) const -> void {
-    if (!kinematics) return;
-    gravity.acceleration =
-        QuantityVector{tree.compute_acceleration(
-            self, kinematics->position.numerical_value_ref_in(meter).eigen(),
-            opening_angle, softening.numerical_value_in(meter))} *
-        meter_per_second_squared;
-  }
-
-  double opening_angle = 0.5;
-  Length softening = 0.0 * meter;
-  std::vector<GravitySource> sources;
-  GravityTree tree;
-  bool enabled = false;
 };
 
 }  // namespace simon::model

@@ -12,10 +12,8 @@ cc_library(
     hdrs = ["gravity.hpp"],
     copts = COPTS,
     deps = [
-        "//core:vocabulary",
-        "//model:kinematics",
         "//core:units",
-        "//framework",
+        "//core:vocabulary",
     ],
 )
 
@@ -33,16 +31,4 @@ cc_library(
     ],
 )
 
-
-cc_library(
-    name = "leapfrog",
-    hdrs = ["leapfrog.hpp"],
-    copts = COPTS,
-    deps = [
-        "//core:vocabulary",
-        ":gravity",
-        "//model:kinematics",
-        "//framework",
-    ],
-)
 

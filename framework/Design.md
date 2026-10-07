@@ -2145,7 +2145,7 @@ simon/
     traffic/     Driver models, traffic control, right of way, driving metrics
     vehicle/     Tires and the single-track, drift and multibody vehicles
     articulated/ Articulated rigid bodies: dynamics, constraints, collision, the convex collider
-    gravity/     Gravity, direct and by tree, galaxies and the leapfrog
+    gravity/     Gravity, direct and by tree, and galaxies
   format/        Readers from files into model/ and scenario/ data: OpenDRIVE, OpenSCENARIO, tire
                  property files, converted aircraft
   scenario/      Scenarios and parameter distributions as OpenSCENARIO describes them, and the player that runs their storyboards
@@ -2170,9 +2170,9 @@ was retired in step 1. Its event queue moved to `engine/`.
 needs a parser, errors and a policy for what it refuses, and the scenario
 player keeps a storyboard's states from step to step. `core/` depends on
 nothing in simon, `framework/` and `model/` on `core/`, `scenario/` on
-`model/`, `format/` on both, and the applications on all of them. The few
-model files that are systems (gravity, the leapfrog, motion) depend on
-`framework/` as well.
+`model/`, `format/` on both, and the applications on all of them. Systems
+belong to the applications; the one model file that is still a system
+(motion, shared by hello and defense) depends on `framework/` as well.
 
 ## Applications
 

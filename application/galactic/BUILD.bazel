@@ -24,7 +24,6 @@ cc_library(
         "//model/gravity:galaxy",
         "//model/gravity:gravity",
         "//model:kinematics",
-        "//model/gravity:leapfrog",
         "//core:random",
         "//core:units",
     ],

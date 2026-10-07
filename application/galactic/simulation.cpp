@@ -198,7 +198,7 @@ auto collect_sample(const World& world) -> Sample {
         sample.sources.push_back(model::GravitySource{
             .position = kinematics.position.numerical_value_in(meter).eigen(),
             .mass = point.mass.numerical_value_in(kilogram),
-            .entity = entity});
+            .id = entity.index});
         sample.velocities.push_back(
             kinematics.velocity.numerical_value_in(meter_per_second).eigen());
       });
@@ -261,8 +261,8 @@ auto Simulation::configure() -> engine::PhaseResult {
   RETURN_IF_UNEXPECTED(
       build_bodies(scenario_, Out(world_), Out(bodies_), Out(test_particles_)));
   auto set_gravity = [&](auto& scheduler) {
-    auto& direct = scheduler.template system<model::SumGravity>();
-    auto& tree = scheduler.template system<model::TreeGravity>();
+    auto& direct = scheduler.template system<SumGravity>();
+    auto& tree = scheduler.template system<TreeGravity>();
     direct.enabled = scenario_.gravity == GravityMethod::DIRECT;
     direct.softening = scenario_.softening;
     tree.enabled = scenario_.gravity == GravityMethod::TREE;
