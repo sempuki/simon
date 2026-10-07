@@ -8,7 +8,7 @@
 
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
-#include "model/traffic.hpp"
+#include "model/traffic/traffic.hpp"
 
 // simon's Intelligent Driver Model and MOBIL against their authors' movsim,
 // function by function where the two agree with the published models, and a

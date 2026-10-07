@@ -2137,9 +2137,15 @@ simon/
                  Coordinates, Random, and the Lie groups SO(3) and SE(3)
   framework/     Entity, ComponentStore, World, Spatial, names, builders, commands, System, schedules, and this design
   engine/        Lifecycle, drivers, RateGate, EventQueue
-  model/         Reusable physics and maths, as free functions, and the data they work on: frames, the
-                 atmosphere and Earth, rigid bodies, aircraft and their engines, roads and lanes, tires,
-                 vehicles and drivers
+  model/         Reusable physics and maths, as free functions, and the data they work on. Kinematics,
+                 rigid bodies, control and guidance at the top; then by domain:
+    aircraft/    Aerodynamics, flight controls, engines, frames, mass balance, sensing, trim
+    earth/       The Earth, the atmosphere and the wind
+    road/        Roads, lanes, placement, polylines, walking graphs, planar collision
+    traffic/     Driver models, traffic control, right of way, driving metrics
+    vehicle/     Tires and the single-track, drift and multibody vehicles
+    articulated/ Articulated rigid bodies: dynamics, constraints, collision, the convex collider
+    gravity/     Gravity, direct and by tree, galaxies and the leapfrog
   format/        Readers from files into model/ and scenario/ data: OpenDRIVE, OpenSCENARIO, tire
                  property files, converted aircraft
   scenario/      Scenarios and parameter distributions as OpenSCENARIO describes them, and the player that runs their storyboards

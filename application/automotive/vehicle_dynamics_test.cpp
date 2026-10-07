@@ -13,9 +13,9 @@
 
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
-#include "model/multibody.hpp"
-#include "model/single_track.hpp"
-#include "model/tire.hpp"
+#include "model/vehicle/multibody.hpp"
+#include "model/vehicle/single_track.hpp"
+#include "model/vehicle/tire.hpp"
 
 // simon's tire, dynamic and drift single-track models and multibody model
 // against CommonRoad's, for its three vehicles: the tire's forces, each

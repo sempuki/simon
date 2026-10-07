@@ -10,7 +10,7 @@
 
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
-#include "model/driving_metrics.hpp"
+#include "model/traffic/driving_metrics.hpp"
 
 // nuPlan's metrics on esmini's runs, from the table
 // reference/nuplan_metrics.py recorded with nuPlan's own code: the comfort

@@ -1,0 +1,55 @@
+# Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+
+load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "multibody",
+    srcs = ["multibody.cpp"],
+    hdrs = ["multibody.hpp"],
+    copts = COPTS,
+    deps = [
+        ":tire",
+        ":vehicle",
+        "//core:time",
+        "//core:units",
+    ],
+)
+
+
+cc_library(
+    name = "single_track",
+    srcs = ["single_track.cpp"],
+    hdrs = ["single_track.hpp"],
+    copts = COPTS,
+    deps = [
+        ":tire",
+        ":vehicle",
+        "//core:time",
+        "//core:units",
+    ],
+)
+
+
+cc_library(
+    name = "tire",
+    srcs = ["tire.cpp"],
+    hdrs = ["tire.hpp"],
+    copts = COPTS,
+    deps = ["//core:units"],
+)
+
+
+cc_library(
+    name = "vehicle",
+    hdrs = ["vehicle.hpp"],
+    copts = COPTS,
+    deps = [
+        ":tire",
+        "//core:units",
+    ],
+)
+

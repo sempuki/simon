@@ -8,7 +8,7 @@
 
 #include "base/status.hpp"
 #include "format/format_error.hpp"  // IWYU pragma: export
-#include "model/tire.hpp"
+#include "model/vehicle/tire.hpp"
 
 // Reads a Magic Formula 5.2 tire from a TNO tire property file (.tir), as
 // MF-Tyre, ADAMS and Project Chrono write them for the PAC2002 format (see

@@ -17,7 +17,7 @@
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 #include "core/vocabulary.hpp"
 #include "format/aircraft_file.hpp"
-#include "model/trim.hpp"
+#include "model/aircraft/trim.hpp"
 
 // The whole 737, and the whole F-16, against JSBSim's, open loop: from the
 // same trim, flown through the check cases reference/jsbsim_737_check_cases.py

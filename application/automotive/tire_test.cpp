@@ -8,7 +8,7 @@
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
 #include "format/tire_file.hpp"
-#include "model/tire.hpp"
+#include "model/vehicle/tire.hpp"
 
 // simon's Magic Formula 5.2 tire against Project Chrono's Pac02, on the
 // Sedan's tire, from the table reference/chrono_reference.cpp recorded.

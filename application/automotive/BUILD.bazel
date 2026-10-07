@@ -29,22 +29,22 @@ cc_library(
         "//framework",
         "//core:vocabulary",
         "//model:kinematics",
-        "//model:lane_graph",
-        "//model:right_of_way",
-        "//model:walking_graph",
-        "//model:traffic_control",
+        "//model/road:lane_graph",
+        "//model/traffic:right_of_way",
+        "//model/road:walking_graph",
+        "//model/traffic:traffic_control",
         "//format:opendrive",
         "//format:openscenario",
         "//scenario:openscenario",
         "//scenario:parameter_distribution",
-        "//model:collision",
-        "//model:driving_metrics",
+        "//model/road:collision",
+        "//model/traffic:driving_metrics",
         "//core:random",
-        "//model:road",
-        "//model:polyline",
-        "//model:road_placement",
+        "//model/road:road",
+        "//model/road:polyline",
+        "//model/road:road_placement",
         "//scenario:storyboard",
-        "//model:traffic",
+        "//model/traffic:traffic",
         "//scenario:transition",
         "//core:units",
         "@lib//base:core",
@@ -81,8 +81,8 @@ cc_library(
     hdrs = ["road_drawing.hpp"],
     copts = COPTS,
     deps = [
-        "//model:collision",
-        "//model:road",
+        "//model/road:collision",
+        "//model/road:road",
     ],
 )
 
@@ -131,9 +131,9 @@ cc_library(
     deps = [
         ":automotive_library",
         "//application:testing",
-        "//model:collision",
+        "//model/road:collision",
         "//core:units",
-        "//model:vehicle",
+        "//model/vehicle:vehicle",
         "@lib//base:testing",
     ],
 )
@@ -166,7 +166,7 @@ cc_test(
     data = ["reference/shapely_boxes.csv"],
     deps = [
         ":testing",
-        "//model:collision",
+        "//model/road:collision",
         "@lib//base:testing",
     ],
 )
@@ -182,7 +182,7 @@ cc_test(
     ],
     deps = [
         ":testing",
-        "//model:driving_metrics",
+        "//model/traffic:driving_metrics",
         "@lib//base:testing",
     ],
 )
@@ -196,8 +196,8 @@ cc_test(
     deps = [
         ":testing",
         "//framework",
-        "//model:multibody",
-        "//model:single_track",
+        "//model/vehicle:multibody",
+        "//model/vehicle:single_track",
         "//format:tire_file",
         "@lib//base:testing",
     ],
@@ -226,7 +226,7 @@ cc_test(
         ":automotive_library",
         ":testing",
         "//core:vocabulary",
-        "//model:collision",
+        "//model/road:collision",
         "@lib//base:testing",
     ],
 )
@@ -255,7 +255,7 @@ cc_test(
         ":automotive_library",
         ":testing",
         "//core:vocabulary",
-        "//model:collision",
+        "//model/road:collision",
         "@lib//base:testing",
     ],
 )
@@ -294,9 +294,9 @@ cc_test(
     deps = [
         ":testing",
         "//core:vocabulary",
-        "//model:lane_graph",
+        "//model/road:lane_graph",
         "//format:opendrive",
-        "//model:road",
+        "//model/road:road",
         "@lib//base:testing",
     ],
 )
@@ -322,7 +322,7 @@ cc_test(
     copts = COPTS,
     deps = [
         "//format:openscenario",
-        "//model:road",
+        "//model/road:road",
         "//scenario:storyboard",
         "@lib//base:testing",
     ],
@@ -353,7 +353,7 @@ cc_test(
     data = glob(["reference/commonroad_*.csv"]),
     deps = [
         ":testing",
-        "//model:single_track",
+        "//model/vehicle:single_track",
         "@lib//base:testing",
     ],
 )
@@ -366,9 +366,9 @@ cc_test(
     data = glob(["reference/commonroad_*.csv"]),
     deps = [
         ":testing",
-        "//model:multibody",
-        "//model:single_track",
-        "//model:tire",
+        "//model/vehicle:multibody",
+        "//model/vehicle:single_track",
+        "//model/vehicle:tire",
         "@lib//base:testing",
     ],
 )
@@ -381,7 +381,7 @@ cc_test(
     data = glob(["reference/chrono_*.csv"]) + ["//3rd_party:chrono"],
     deps = [
         ":testing",
-        "//model:tire",
+        "//model/vehicle:tire",
         "//format:tire_file",
         "@lib//base:testing",
     ],
@@ -399,7 +399,7 @@ cc_test(
     ],
     deps = [
         ":testing",
-        "//model:traffic",
+        "//model/traffic:traffic",
         "@lib//base:testing",
     ],
 )
@@ -410,7 +410,7 @@ VIEWER_DEPS = [
     "//application:viewing",
     "//engine:driver",
     "//core:vocabulary",
-    "//model:collision",
+    "//model/road:collision",
     "//3rd_party:imgui",
     "//3rd_party:implot",
     "@lib//base:core",

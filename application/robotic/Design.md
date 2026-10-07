@@ -61,7 +61,7 @@ Each choice says what it is, why, and where it comes from.
 
 ## Models
 
-`format/mjcf` reads MJCF and compiles it into `model/articulated`'s
+`format/mjcf` reads MJCF and compiles it into `model/articulated/articulated`'s
 `ArticulatedModel` as MuJoCo 3.14.0's compiler does, in its order of
 operations: default classes, each from its parent, and `childclass`;
 attribute vectors given in part; angles in degrees unless the compiler says
@@ -95,7 +95,7 @@ and exclusions, and checks every compiled value against MuJoCo's
 
 ## Dynamics
 
-`model/articulated_dynamics` steps one tree as MuJoCo steps a model, in
+`model/articulated/dynamics` steps one tree as MuJoCo steps a model, in
 MuJoCo 3.14.0's order of operations: forward kinematics, each joint turning
 or sliding its body from the parent's frame; each body's inertia and each
 degree of freedom's motion in a frame at the tree's center of mass; the
@@ -177,7 +177,7 @@ last bit.
 
 ## Contacts
 
-`model/articulated_collision` finds contacts as MuJoCo 3.14.0 does. Two
+`model/articulated/collision` finds contacts as MuJoCo 3.14.0 does. Two
 bodies may touch unless they are on one rigid assembly (a body without
 joints is welded to its parent), neither can move, or one's assembly is the
 other's parent's; two geoms, if one's contact type meets the other's
@@ -189,7 +189,7 @@ capsule or a box; and a box with a box, by the separating axis test, faces
 preferred on near-ties, then either the nearest points of two edges or the
 other box's face clipped to the reference face. The pairs those leave
 out, an ellipsoid with anything and a cylinder with a capsule, a box or a
-cylinder, go to `model/articulated_convex`, a port of MuJoCo's native
+cylinder, go to `model/articulated/convex`, a port of MuJoCo's native
 convex collider: the Gilbert–Johnson–Keerthi distance between the two
 shapes' support functions, the expanding polytope for the depth where
 they overlap, and then, where two faces meet, the one face clipped
@@ -219,7 +219,7 @@ all 1,903 of MuJoCo's contacts, each equal to the last bit.
 
 ## Constraints
 
-`model/articulated_constraint` solves an island's constraints as MuJoCo
+`model/articulated/constraint` solves an island's constraints as MuJoCo
 3.14.0 does (Todorov, ICRA 2014). Each constraint is a soft row of the
 Jacobian: a dof's or a tendon's dry friction, a joint's or a tendon's limit
 once within its margin (a hinge, a slide or a tendon on either side, a ball

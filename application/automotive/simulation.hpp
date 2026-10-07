@@ -14,7 +14,7 @@
 #include "base/core.hpp"
 #include "core/vocabulary.hpp"
 #include "engine/lifecycle.hpp"
-#include "model/traffic.hpp"
+#include "model/traffic/traffic.hpp"
 
 namespace simon::automotive {
 

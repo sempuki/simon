@@ -27,7 +27,7 @@
 #include "engine/driver.hpp"
 #include "imgui/imgui.h"
 #include "implot/implot.h"
-#include "model/gravity.hpp"
+#include "model/gravity/gravity.hpp"
 
 namespace simon::galactic {
 namespace {

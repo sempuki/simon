@@ -67,7 +67,7 @@ Each choice says what it is, why, and where it comes from.
 
 ## Gravity
 
-`model/gravity` gathers the bodies that pull, those with a `PointMass`, into
+`model/gravity/gravity` gathers the bodies that pull, those with a `PointMass`, into
 a list once a step. `SumGravity` sums every one's pull on each body in the
 list's order, with REBOUND's operations in REBOUND's order, so the two agree
 to the last bit: REBOUND's loop over pairs happens to add each body's terms

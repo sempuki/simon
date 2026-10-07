@@ -5,7 +5,7 @@
 #include "core/vocabulary.hpp"
 #include "framework/archetype.hpp"
 #include "framework/world.hpp"
-#include "model/gravity.hpp"
+#include "model/gravity/gravity.hpp"
 #include "model/kinematics.hpp"
 
 // The galactic world: bodies under each other's gravity. A body stands for

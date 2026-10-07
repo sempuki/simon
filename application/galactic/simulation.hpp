@@ -16,7 +16,7 @@
 #include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
 #include "engine/lifecycle.hpp"
-#include "model/galaxy.hpp"
+#include "model/gravity/galaxy.hpp"
 
 namespace simon::galactic {
 

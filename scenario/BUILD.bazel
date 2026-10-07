@@ -19,8 +19,8 @@ cc_library(
     copts = COPTS,
     deps = [
         ":openscenario",
-        "//model:road",
-        "//model:road_placement",
+        "//model/road:road",
+        "//model/road:road_placement",
         "//core:units",
     ],
 )

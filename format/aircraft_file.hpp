@@ -8,7 +8,7 @@
 
 #include "base/status.hpp"
 #include "format/format_error.hpp"  // IWYU pragma: export
-#include "model/aircraft_data.hpp"
+#include "model/aircraft/aircraft_data.hpp"
 
 // Reads an aircraft from the file tools/jsbsim/convert.py writes from a
 // JSBSim aircraft (see model/aircraft_data.hpp). A failure is a FormatError.

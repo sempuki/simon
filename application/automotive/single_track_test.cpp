@@ -9,7 +9,7 @@
 
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
-#include "model/single_track.hpp"
+#include "model/vehicle/single_track.hpp"
 
 // simon's kinematic single-track model against CommonRoad's, for its three
 // vehicles: the rates at states and inputs on and past every limit, and whole

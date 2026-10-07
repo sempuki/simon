@@ -12,8 +12,8 @@
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
 #include "format/tire_file.hpp"
-#include "model/multibody.hpp"
-#include "model/single_track.hpp"
+#include "model/vehicle/multibody.hpp"
+#include "model/vehicle/single_track.hpp"
 
 // simon's drift single-track model against Project Chrono's Sedan through
 // the handling maneuvers, from the table reference/chrono_reference.cpp

@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "model/collision.hpp"
-#include "model/road.hpp"
+#include "model/road/collision.hpp"
+#include "model/road/road.hpp"
 
 // A road network as a map draws it, in the plane: each lane a strip between
 // its inner and outer borders, and each road's center line, sampled along

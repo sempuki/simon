@@ -42,7 +42,7 @@
 #include "engine/driver.hpp"
 #include "imgui/imgui.h"
 #include "implot/implot.h"
-#include "model/collision.hpp"
+#include "model/road/collision.hpp"
 
 namespace simon::automotive {
 namespace {

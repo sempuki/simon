@@ -5,7 +5,7 @@
 
 #include "base/testing.hpp"
 #include "format/openscenario.hpp"
-#include "model/road.hpp"
+#include "model/road/road.hpp"
 #include "scenario/storyboard.hpp"
 
 // OpenSCENARIO's traffic signal controllers, which esmini does not run,

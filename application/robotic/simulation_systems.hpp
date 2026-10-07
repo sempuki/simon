@@ -11,7 +11,7 @@
 #include "application/robotic/simulation_components.hpp"
 #include "core/vocabulary.hpp"
 #include "framework/system.hpp"
-#include "model/articulated_constraint.hpp"
+#include "model/articulated/constraint.hpp"
 
 // The robotic simulation's systems, each once per capacity but Collide:
 // Control sets each tree's controls, Forward computes its poses, mass matrix

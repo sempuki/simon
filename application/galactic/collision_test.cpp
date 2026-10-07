@@ -8,8 +8,8 @@
 #include "application/galactic/simulation.hpp"
 #include "base/testing.hpp"
 #include "core/vocabulary.hpp"
-#include "model/galaxy.hpp"
-#include "model/gravity.hpp"
+#include "model/gravity/galaxy.hpp"
+#include "model/gravity/gravity.hpp"
 
 namespace simon::galactic {
 namespace {

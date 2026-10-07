@@ -1,0 +1,66 @@
+# Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+
+load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "right_of_way",
+    srcs = ["right_of_way.cpp"],
+    hdrs = ["right_of_way.hpp"],
+    copts = COPTS,
+    deps = [
+        "//model/road:lane_graph",
+        "//model/road:road",
+        ":traffic_control",
+        "//core:units",
+    ],
+)
+
+
+cc_library(
+    name = "traffic_control",
+    srcs = ["traffic_control.cpp"],
+    hdrs = ["traffic_control.hpp"],
+    copts = COPTS,
+    deps = [
+        "//model/road:lane_graph",
+        "//model/road:road",
+        ":traffic",
+        "//core:units",
+        "@lib//base:core",
+    ],
+)
+
+
+cc_library(
+    name = "traffic",
+    hdrs = ["traffic.hpp"],
+    copts = COPTS,
+    deps = ["//core:units"],
+)
+
+
+cc_library(
+    name = "driving_metrics",
+    srcs = ["driving_metrics.cpp"],
+    hdrs = ["driving_metrics.hpp"],
+    copts = COPTS,
+    deps = ["//model/road:collision"],
+)
+
+
+[cc_test(
+    name = test + "_test",
+    size = "small",
+    srcs = [test + "_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":" + test,
+        "@lib//base:testing",
+    ],
+) for test in [
+    "traffic_control",
+]]

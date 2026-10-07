@@ -1,0 +1,70 @@
+# Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+
+load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "articulated",
+    srcs = ["articulated.cpp"],
+    hdrs = ["articulated.hpp"],
+    copts = COPTS,
+)
+
+
+cc_library(
+    name = "arithmetic",
+    hdrs = ["arithmetic.hpp"],
+    copts = COPTS,
+    deps = [
+        ":articulated",
+        "//core:vocabulary",
+    ],
+)
+
+
+cc_library(
+    name = "dynamics",
+    hdrs = ["dynamics.hpp"],
+    copts = COPTS,
+    deps = [
+        ":articulated",
+        ":arithmetic",
+        "//core:vocabulary",
+    ],
+)
+
+
+cc_library(
+    name = "constraint",
+    srcs = ["constraint.cpp"],
+    hdrs = ["constraint.hpp"],
+    copts = COPTS,
+    deps = [
+        ":articulated",
+        "//core:vocabulary",
+    ],
+)
+
+
+cc_library(
+    name = "collision",
+    srcs = [
+        "collision.cpp",
+        "convex.cpp",
+    ],
+    hdrs = [
+        "collision.hpp",
+        "convex.hpp",
+    ],
+    copts = COPTS,
+    deps = [
+        ":articulated",
+        ":arithmetic",
+        ":dynamics",
+        "//core:vocabulary",
+    ],
+)
+

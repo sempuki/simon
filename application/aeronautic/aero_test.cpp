@@ -12,9 +12,9 @@
 #include "base/testing.hpp"
 #include "core/units.hpp"
 #include "format/aircraft_file.hpp"
-#include "model/aerodynamics.hpp"
-#include "model/aircraft_data.hpp"
-#include "model/flight_control.hpp"
+#include "model/aircraft/aerodynamics.hpp"
+#include "model/aircraft/aircraft_data.hpp"
+#include "model/aircraft/flight_control.hpp"
 
 // The 737's and the F-16's aerodynamics, converted from JSBSim by
 // tools/jsbsim/convert.py, against JSBSim's own at states that

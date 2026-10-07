@@ -12,9 +12,9 @@
 #include "base/testing.hpp"
 #include "core/units.hpp"
 #include "format/aircraft_file.hpp"
-#include "model/aircraft_data.hpp"
-#include "model/earth.hpp"
-#include "model/rigid_aircraft.hpp"
+#include "model/aircraft/aircraft_data.hpp"
+#include "model/aircraft/rigid_aircraft.hpp"
+#include "model/earth/earth.hpp"
 #include "model/rigid_body.hpp"
 
 // simon's equations of motion against JSBSim's, at states that

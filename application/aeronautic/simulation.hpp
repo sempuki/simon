@@ -12,7 +12,7 @@
 #include "base/core.hpp"
 #include "core/vocabulary.hpp"
 #include "engine/lifecycle.hpp"
-#include "model/trim.hpp"
+#include "model/aircraft/trim.hpp"
 
 namespace simon::aeronautic {
 

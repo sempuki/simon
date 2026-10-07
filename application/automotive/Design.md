@@ -13,7 +13,7 @@ esmini, metrics and batch runs, and a viewer.
 
 ## Roads
 
-`model/road` holds roads as ASAM OpenDRIVE describes them, and
+`model/road/road` holds roads as ASAM OpenDRIVE describes them, and
 `format/opendrive` reads them from OpenDRIVE files with pugixml. A road is a
 reference line of lines, arcs, spirals and parametric cubics, with an
 elevation, a superelevation and a lane offset along it, and lane sections
@@ -38,7 +38,7 @@ libOpenDRIVE does.
   at the file's length.
 - **Lane borders sum the lanes' widths** from the center out, each evaluated
   at s, plus the lane offset.
-- **The lane graph follows travel.** `model/lane_graph` links each lane to
+- **The lane graph follows travel.** `model/road/lane_graph` links each lane to
   the lanes traffic moves into from it: across lane sections, across road
   links by their contact points, and from a junction's incoming lanes into its
   connecting roads, as OpenDRIVE's links give them. Traffic keeps right, so a
@@ -88,7 +88,7 @@ neighbor's border can take a point in the neighbor's middle.
 
 ## Vehicles
 
-`model/single_track` holds CommonRoad's single-track models, each axle's
+`model/vehicle/single_track` holds CommonRoad's single-track models, each axle's
 wheels lumped into one on the center line. The kinematic model rolls without
 slip: its state is the rear axle's position, the steering angle, the speed and
 the heading, and it is driven by a steering rate and an acceleration, which
@@ -108,19 +108,19 @@ three vehicles, a Ford Escort, a BMW 320i and a VW Vanagon:
 Three dynamic models follow CommonRoad's, for fidelity where the kinematic
 model is not enough, each opt in:
 
-- **The dynamic single-track model** (`model/single_track`) follows the
+- **The dynamic single-track model** (`model/vehicle/single_track`) follows the
   center of gravity, which slips sideways and yaws under each axle's lateral
   force, linear in its slip angle, with the axle's load shifted by braking
   and speeding up.
 - **The drift model** adds each axle's wheel spin, and its tires follow the
   Magic Formula in combined slip, so it brakes, spins its wheels and drifts.
-- **The multibody model** (`model/multibody`), after the US Department of
+- **The multibody model** (`model/vehicle/multibody`), after the US Department of
   Transportation's vehicle dynamics, has a sprung body that yaws, rolls,
   pitches and heaves on its suspension over two unsprung axles, four wheels,
   and compliant pins at each axle's roll axis: 29 states.
 
-`model/tire` holds the Magic Formula 5.2 in CommonRoad's subset: pure and
-combined slip, every scaling factor 1, turn slip left out. `model/vehicle`
+`model/vehicle/tire` holds the Magic Formula 5.2 in CommonRoad's subset: pure and
+combined slip, every scaling factor 1, turn slip left out. `model/vehicle/vehicle`
 holds every parameter of CommonRoad's vehicles, and the limits on how they
 are driven. At a crawl, where slips are undefined, each model drives as the
 kinematic model about the center of gravity.
@@ -170,7 +170,7 @@ Sedan's parameters through the handling maneuvers the standards define, and
 measures both as the standards measure them
 (`application/automotive/reference/chrono_reference.cpp` records Chrono).
 
-**The tire.** `model/tire` holds the whole of the Magic Formula 5.2's steady
+**The tire.** `model/vehicle/tire` holds the whole of the Magic Formula 5.2's steady
 state, pure and combined slip and the aligning moment, and `format/tire_file`
 reads it from TNO tire property files (.tir). A tire on the right is the
 left one mirrored about its wheel plane, so that a pair's asymmetries cancel.
@@ -263,7 +263,7 @@ signal's state, as text such as "on;off;off": set by signal actions, and by
 the controllers, each running its phases in turn from a delay after its
 reference's first phase and setting its signals' states as a phase begins.
 A controller action moves a controller's cycle so that the phase starts
-then; a signal action holds until the next phase changes that signal. `model/road_placement` places a
+then; a signal action holds until the next phase changes that signal. `model/road/road_placement` places a
 vehicle by road, lane, s and offset, either way along any lane, and moves it
 along its path at its t, s changing by the distance over 1 - kappa t. In the
 ECS, `RunStoryboard` evaluates the storyboard and gives each vehicle its
@@ -344,7 +344,7 @@ has it, and a condition on the phase firing as the phase first begins.
 
 ## Metrics and batch runs
 
-`model/collision` treats vehicles as boxes in the plane. Two boxes overlap
+`model/road/collision` treats vehicles as boxes in the plane. Two boxes overlap
 when no axis among their edges' normals separates their projections, the
 separating axis theorem; boxes that touch overlap, as GEOS counts them.
 Apart, their gap is the least distance from a corner of either to an edge
@@ -353,7 +353,7 @@ truck's at any heading, a quarter of them a hair from touching, against
 Shapely 2.1.2 on GEOS 3.13.1, which nuPlan uses: every overlap agrees, and
 every gap to 1e-12 m.
 
-`model/driving_metrics` measures a run as nuPlan's devkit (1.2.2) defines
+`model/traffic/driving_metrics` measures a run as nuPlan's devkit (1.2.2) defines
 it:
 
 - **Comfort.** The accelerations along and across the heading, smoothed by
@@ -407,7 +407,7 @@ vehicle that cuts in and brakes, in esmini as in simon. On one thread the
 
 ## Drivers
 
-`model/traffic` holds the drivers' models: the Intelligent Driver Model for
+`model/traffic/traffic` holds the drivers' models: the Intelligent Driver Model for
 following, in the form of Treiber and Kesting's *Traffic Flow Dynamics*, its
 desired gap never less than the minimum gap, and MOBIL for changing lanes, by
 its symmetric criterion with a bias toward the right lane. MOBIL weighs a
@@ -518,7 +518,7 @@ is read and sorted by s along each lane:
 
 ### Traffic lights
 
-`model/traffic_control` builds a network's signal groups, one per OpenDRIVE
+`model/traffic/traffic_control` builds a network's signal groups, one per OpenDRIVE
 `<controller>`, and a stop line on each driving lane a controlled traffic
 light holds for: the lanes its orientation runs on, narrowed by its
 validities. Each group is a `SignalController` entity holding a fixed-time
@@ -572,7 +572,7 @@ treat as a standing leader 250 m ahead and SUMO's leave the network at.
 
 ### Right of way
 
-`model/right_of_way` finds, in each junction, where two connecting lanes
+`model/traffic/right_of_way` finds, in each junction, where two connecting lanes
 from different approaches cross, their middles sampled every 0.25 m, or
 merge into one lane, where their middles first come within 2 m, a car's
 width, of each other; and where lanes leaving one approach part, a car's
@@ -652,7 +652,7 @@ outlines, and links where sidewalks meet at junctions, in one dimension as
 vehicles drive lanes, so they cost what traffic does; a social force model
 (Helbing and Molnar, 1995) is a later opt-in for crowds.
 
-`model/walking_graph` builds the graph: each sidewalk lane's middle, split
+`model/road/walking_graph` builds the graph: each sidewalk lane's middle, split
 where a crosswalk meets it; a crossing along each crosswalk between the
 sidewalks nearest the road on either side; and a corner link between
 sidewalk ends of different roads within 25 m of each other whose straight

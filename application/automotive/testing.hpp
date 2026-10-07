@@ -13,8 +13,8 @@
 #include "application/testing.hpp"
 #include "base/testing.hpp"
 #include "core/units.hpp"
-#include "model/collision.hpp"
-#include "model/vehicle.hpp"
+#include "model/road/collision.hpp"
+#include "model/vehicle/vehicle.hpp"
 
 // Shared by the automotive tests: the reference tables in
 // application/automotive/reference, read as rows of text by column name.

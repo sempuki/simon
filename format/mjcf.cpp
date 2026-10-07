@@ -18,7 +18,7 @@
 #include "base/core.hpp"
 #include "format/text.hpp"
 #include "format/xml.hpp"
-#include "model/articulated_arithmetic.hpp"
+#include "model/articulated/arithmetic.hpp"
 #include "pugixml.hpp"
 
 namespace simon::format {

@@ -19,11 +19,11 @@
 #include "core/vocabulary.hpp"
 #include "engine/rate_gate.hpp"
 #include "framework/system.hpp"
-#include "model/lane_graph.hpp"
-#include "model/road.hpp"
-#include "model/traffic.hpp"
-#include "model/traffic_control.hpp"
-#include "model/walking_graph.hpp"
+#include "model/road/lane_graph.hpp"
+#include "model/road/road.hpp"
+#include "model/road/walking_graph.hpp"
+#include "model/traffic/traffic.hpp"
+#include "model/traffic/traffic_control.hpp"
 
 namespace simon::automotive {
 

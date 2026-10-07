@@ -10,7 +10,7 @@
 
 #include "base/status.hpp"
 #include "format/format_error.hpp"  // IWYU pragma: export
-#include "model/articulated.hpp"
+#include "model/articulated/articulated.hpp"
 
 // Reads articulated models from MJCF, MuJoCo's XML format (see
 // model/REFERENCES.md), and compiles them as MuJoCo's compiler does: default

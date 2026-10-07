@@ -40,7 +40,7 @@ released their models.
 
 | Project | What robotic takes from it | License |
 |---|---|---|
-| [MuJoCo](https://github.com/google-deepmind/mujoco) 3.14.0 | The reference every check runs against. Its MJCF compiler, smooth dynamics, collision detection, convex collider, constraint solvers, islands and tendons are translated in `format/mjcf`, `model/articulated*` and the simulation's systems, in its order of operations (see `NOTICE.md`). Its humanoid is vendored in `3rd_party/mujoco` | Apache-2.0 |
+| [MuJoCo](https://github.com/google-deepmind/mujoco) 3.14.0 | The reference every check runs against. Its MJCF compiler, smooth dynamics, collision detection, convex collider, constraint solvers, islands and tendons are translated in `format/mjcf`, `model/articulated/articulated*` and the simulation's systems, in its order of operations (see `NOTICE.md`). Its humanoid is vendored in `3rd_party/mujoco` | Apache-2.0 |
 | [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) | The MJCF of Unitree's Go1 and H1, Universal Robots' UR5e (by ROS-Industrial) and ANYbotics' ANYmal C, vendored without meshes in `3rd_party/menagerie` | BSD-3-Clause, each model's own |
 
 The papers behind the algorithms are cited in

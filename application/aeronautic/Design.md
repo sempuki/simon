@@ -183,16 +183,16 @@ turbines, flight control system and aerodynamics. The 737 is
 
 | Layer | Holds |
 |---|---|
-| `model/aerodynamics` | The coefficient build-up: terms of a constant, inputs and tables of inputs, summed by axis, and turned into body loads about the center of mass. An input is a state variable or a flight control signal, such as a surface's deflection, so an aircraft's surfaces need no code |
-| `model/flight_control` | Flight control blocks over named signals: summers, gains, scheduled gains, surface scales, kinematic actuators, switches, PIDs and functions |
-| `model/turbine` | JSBSim's turbine: spools, thrust from idle to military and through reheat to maximum, fuel flow |
-| `model/earth` | The WGS84 ellipsoid, J2 gravitation, the Earth's rotation, geodetic conversion |
+| `model/aircraft/aerodynamics` | The coefficient build-up: terms of a constant, inputs and tables of inputs, summed by axis, and turned into body loads about the center of mass. An input is a state variable or a flight control signal, such as a surface's deflection, so an aircraft's surfaces need no code |
+| `model/aircraft/flight_control` | Flight control blocks over named signals: summers, gains, scheduled gains, surface scales, kinematic actuators, switches, PIDs and functions |
+| `model/aircraft/turbine` | JSBSim's turbine: spools, thrust from idle to military and through reheat to maximum, fuel flow |
+| `model/earth/earth` | The WGS84 ellipsoid, J2 gravitation, the Earth's rotation, geodetic conversion |
 | `model/rigid_body` | Stevens and Lewis's equations of motion in an inertial frame, as a `ContinuousState` |
-| `model/frames` | The flat or round Earth, a body's place on it, and its motion relative to the air and the wind |
-| `model/mass_balance` | Fuel tanks, and the mass, center of mass and inertia they give with the empty aircraft |
-| `model/propulsion` | The engines' air, their spools and thrust at the throttles, and the fuel they burn |
-| `model/sensing` | The air data, attitude, motion and pilot's accelerations the flight controls read |
-| `model/rigid_aircraft` | The aerodynamics' inputs and the body's rate, and a header that includes the four above |
+| `model/aircraft/frames` | The flat or round Earth, a body's place on it, and its motion relative to the air and the wind |
+| `model/aircraft/mass_balance` | Fuel tanks, and the mass, center of mass and inertia they give with the empty aircraft |
+| `model/aircraft/propulsion` | The engines' air, their spools and thrust at the throttles, and the fuel they burn |
+| `model/aircraft/sensing` | The air data, attitude, motion and pilot's accelerations the flight controls read |
+| `model/aircraft/rigid_aircraft` | The aerodynamics' inputs and the body's rate, and a header that includes the four above |
 | `application/aeronautic` | The archetype and its systems |
 
 Each step a rigid aircraft runs `RunFlightControls`, `RunEngines`, then
@@ -297,7 +297,7 @@ what the 737 lacks:
 
 - **Fly-by-wire flight controls.** They close loops on roll rate, on pitch
   rate and load factor, and on yaw rate and lateral acceleration, through
-  three PIDs, eleven switches and a function. `model/flight_control` gains those three
+  three PIDs, eleven switches and a function. `model/aircraft/flight_control` gains those three
   kinds of block.
 - **Reheat.** A throttle past 1 lights it, and the flight controls double
   the pilot's throttle, so half throttle is military power.
@@ -373,7 +373,7 @@ the F-16's sensing costs it nothing.
 
 ## Trim
 
-`model/trim` finds the attitude, controls and throttle at which a rigid
+`model/aircraft/trim` finds the attitude, controls and throttle at which a rigid
 aircraft flies a steady, straight path. Six unknowns balance six
 accelerations, paired as JSBSim's full trim pairs them: angle of attack the
 acceleration along body z, throttle along body x, pitch trim the pitch, bank

@@ -10,10 +10,10 @@
 #include "base/testing.hpp"
 #include "core/units.hpp"
 #include "format/aircraft_file.hpp"
-#include "model/aircraft_data.hpp"
-#include "model/atmosphere.hpp"
-#include "model/rigid_aircraft.hpp"
-#include "model/trim.hpp"
+#include "model/aircraft/aircraft_data.hpp"
+#include "model/aircraft/rigid_aircraft.hpp"
+#include "model/aircraft/trim.hpp"
+#include "model/earth/atmosphere.hpp"
 
 // simon's trim of the 737 and the F-16 against JSBSim's, at the condition
 // JSBSim trimmed each for its check cases: 6 km, 200 m/s, 30 degrees north,

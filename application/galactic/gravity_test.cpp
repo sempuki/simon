@@ -12,7 +12,7 @@
 #include "base/testing.hpp"
 #include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
-#include "model/gravity.hpp"
+#include "model/gravity/gravity.hpp"
 
 namespace simon::galactic {
 namespace {

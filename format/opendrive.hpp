@@ -8,7 +8,7 @@
 
 #include "base/status.hpp"
 #include "format/format_error.hpp"  // IWYU pragma: export
-#include "model/road.hpp"
+#include "model/road/road.hpp"
 
 // Reads roads from ASAM OpenDRIVE files (see model/REFERENCES.md): each
 // road's reference line (lines, arcs, spirals and parametric cubics), its

@@ -91,7 +91,7 @@ N-body code that is open, documented and easy to run beside another.
 
 | Project | What galactic takes from it | License |
 |---|---|---|
-| [REBOUND](https://github.com/hannorein/rebound) 5.2.2 | The reference every check runs against, through its Python module. Its direct summation, which `model/gravity` follows in its order of operations (see `NOTICE.md`), and its tree's opening test, which simon's tree shares | GPL-3.0 |
+| [REBOUND](https://github.com/hannorein/rebound) 5.2.2 | The reference every check runs against, through its Python module. Its direct summation, which `model/gravity/gravity` follows in its order of operations (see `NOTICE.md`), and its tree's opening test, which simon's tree shares | GPL-3.0 |
 | [GADGET-2](https://wwwmpa.mpa-garching.mpg.de/gadget/) | The leapfrog's kick-drift-kick form, from its paper; no code | |
 
 The papers behind the physics are cited in

@@ -1,0 +1,48 @@
+# Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+
+load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "gravity",
+    srcs = ["gravity.cpp"],
+    hdrs = ["gravity.hpp"],
+    copts = COPTS,
+    deps = [
+        "//core:vocabulary",
+        "//model:kinematics",
+        "//core:units",
+        "//framework",
+    ],
+)
+
+
+cc_library(
+    name = "galaxy",
+    srcs = ["galaxy.cpp"],
+    hdrs = ["galaxy.hpp"],
+    copts = COPTS,
+    deps = [
+        ":gravity",
+        "//core:random",
+        "//core:units",
+        "@lib//base:core",
+    ],
+)
+
+
+cc_library(
+    name = "leapfrog",
+    hdrs = ["leapfrog.hpp"],
+    copts = COPTS,
+    deps = [
+        "//core:vocabulary",
+        ":gravity",
+        "//model:kinematics",
+        "//framework",
+    ],
+)
+

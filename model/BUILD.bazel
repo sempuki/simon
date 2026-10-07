@@ -19,6 +19,7 @@ cc_library(
     ],
 )
 
+
 cc_library(
     name = "motion",
     hdrs = ["motion.hpp"],
@@ -30,43 +31,6 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "gravity",
-    srcs = ["gravity.cpp"],
-    hdrs = ["gravity.hpp"],
-    copts = COPTS,
-    deps = [
-        "//core:vocabulary",
-        ":kinematics",
-        "//core:units",
-        "//framework",
-    ],
-)
-
-cc_library(
-    name = "galaxy",
-    srcs = ["galaxy.cpp"],
-    hdrs = ["galaxy.hpp"],
-    copts = COPTS,
-    deps = [
-        ":gravity",
-        "//core:random",
-        "//core:units",
-        "@lib//base:core",
-    ],
-)
-
-cc_library(
-    name = "leapfrog",
-    hdrs = ["leapfrog.hpp"],
-    copts = COPTS,
-    deps = [
-        "//core:vocabulary",
-        ":gravity",
-        ":kinematics",
-        "//framework",
-    ],
-)
 
 cc_test(
     name = "kinematics_test",
@@ -80,6 +44,7 @@ cc_test(
     ],
 )
 
+
 cc_library(
     name = "guidance",
     hdrs = ["guidance.hpp"],
@@ -90,12 +55,6 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "atmosphere",
-    hdrs = ["atmosphere.hpp"],
-    copts = COPTS,
-    deps = ["//core:units"],
-)
 
 cc_library(
     name = "control",
@@ -108,48 +67,6 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "aerodynamics",
-    srcs = ["aerodynamics.cpp"],
-    hdrs = ["aerodynamics.hpp"],
-    copts = COPTS,
-    deps = [
-        ":control",
-        "//core:units",
-    ],
-)
-
-cc_library(
-    name = "flight_control",
-    srcs = ["flight_control.cpp"],
-    hdrs = ["flight_control.hpp"],
-    copts = COPTS,
-    deps = [
-        ":control",
-        "//core:units",
-    ],
-)
-
-cc_library(
-    name = "aircraft_data",
-    hdrs = ["aircraft_data.hpp"],
-    copts = COPTS,
-    deps = [
-        ":aerodynamics",
-        ":flight_control",
-        "//core:units",
-    ],
-)
-
-cc_library(
-    name = "earth",
-    hdrs = ["earth.hpp"],
-    copts = COPTS,
-    deps = [
-        "//core:units",
-        "//3rd_party:eigen",
-    ],
-)
 
 cc_library(
     name = "rigid_body",
@@ -163,128 +80,6 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "turbine",
-    srcs = ["turbine.cpp"],
-    hdrs = ["turbine.hpp"],
-    copts = COPTS,
-    deps = [
-        ":aerodynamics",
-        ":aircraft_data",
-        "//core:units",
-    ],
-)
-
-cc_library(
-    name = "frames",
-    srcs = ["frames.cpp"],
-    hdrs = ["frames.hpp"],
-    copts = COPTS,
-    deps = [
-        ":earth",
-        ":flight_path",
-        ":rigid_body",
-        "//core:units",
-        ":wind",
-        "//3rd_party:eigen",
-    ],
-)
-
-cc_library(
-    name = "mass_balance",
-    srcs = ["mass_balance.cpp"],
-    hdrs = ["mass_balance.hpp"],
-    copts = COPTS,
-    deps = [
-        ":aircraft_data",
-        ":rigid_body",
-        "//core:units",
-        "@lib//base:core",
-    ],
-)
-
-cc_library(
-    name = "propulsion",
-    srcs = ["propulsion.cpp"],
-    hdrs = ["propulsion.hpp"],
-    copts = COPTS,
-    deps = [
-        ":aircraft_data",
-        ":atmosphere",
-        ":frames",
-        ":mass_balance",
-        ":rigid_body",
-        ":turbine",
-        "//core:units",
-        ":wind",
-    ],
-)
-
-cc_library(
-    name = "sensing",
-    srcs = ["sensing.cpp"],
-    hdrs = ["sensing.hpp"],
-    copts = COPTS,
-    deps = [
-        ":aircraft_data",
-        ":atmosphere",
-        ":frames",
-        ":mass_balance",
-        ":rigid_body",
-        "//core:units",
-        ":wind",
-    ],
-)
-
-cc_library(
-    name = "rigid_aircraft",
-    srcs = ["rigid_aircraft.cpp"],
-    hdrs = ["rigid_aircraft.hpp"],
-    copts = COPTS,
-    deps = [
-        ":aerodynamics",
-        ":aircraft_data",
-        ":atmosphere",
-        ":frames",
-        ":mass_balance",
-        ":propulsion",
-        ":rigid_body",
-        ":sensing",
-        "//core:units",
-        ":wind",
-        "//3rd_party:eigen",
-        "@lib//base:core",
-    ],
-)
-
-cc_test(
-    name = "rigid_aircraft_test",
-    size = "small",
-    srcs = ["rigid_aircraft_test.cpp"],
-    copts = COPTS,
-    deps = [
-        ":rigid_aircraft",
-        "@lib//base:testing",
-    ],
-)
-
-cc_library(
-    name = "trim",
-    srcs = ["trim.cpp"],
-    hdrs = ["trim.hpp"],
-    copts = COPTS,
-    deps = [
-        ":aircraft_data",
-        ":atmosphere",
-        ":flight_control",
-        ":rigid_aircraft",
-        ":rigid_body",
-        "//core:units",
-        "//3rd_party:eigen",
-        "@lib//base:core",
-        "@lib//base:status",
-    ],
-)
 
 cc_test(
     name = "rigid_body_test",
@@ -298,238 +93,6 @@ cc_test(
     ],
 )
 
-cc_library(
-    name = "flight_path",
-    hdrs = ["flight_path.hpp"],
-    copts = COPTS,
-    deps = [
-        ":atmosphere",
-        ":kinematics",
-        "//core:coordinates",
-        "//core:time",
-        "//core:units",
-        "//3rd_party:eigen",
-    ],
-)
-
-cc_library(
-    name = "wind",
-    srcs = ["wind.cpp"],
-    hdrs = ["wind.hpp"],
-    copts = COPTS,
-    deps = [
-        "//core:units",
-        "//core:vocabulary",
-        "//3rd_party:eigen",
-    ],
-)
-
-cc_library(
-    name = "road",
-    srcs = ["road.cpp"],
-    hdrs = ["road.hpp"],
-    copts = COPTS,
-    deps = [
-        "//core:units",
-        "//3rd_party:eigen",
-        "@lib//base:core",
-    ],
-)
-
-cc_library(
-    name = "lane_graph",
-    srcs = ["lane_graph.cpp"],
-    hdrs = ["lane_graph.hpp"],
-    copts = COPTS,
-    deps = [
-        ":road",
-        "@lib//base:core",
-    ],
-)
-
-cc_library(
-    name = "right_of_way",
-    srcs = ["right_of_way.cpp"],
-    hdrs = ["right_of_way.hpp"],
-    copts = COPTS,
-    deps = [
-        ":lane_graph",
-        ":road",
-        ":traffic_control",
-        "//core:units",
-    ],
-)
-
-cc_library(
-    name = "walking_graph",
-    srcs = ["walking_graph.cpp"],
-    hdrs = ["walking_graph.hpp"],
-    copts = COPTS,
-    deps = [
-        ":lane_graph",
-        ":road",
-        "//core:units",
-        "@lib//base:core",
-    ],
-)
-
-cc_library(
-    name = "traffic_control",
-    srcs = ["traffic_control.cpp"],
-    hdrs = ["traffic_control.hpp"],
-    copts = COPTS,
-    deps = [
-        ":lane_graph",
-        ":road",
-        ":traffic",
-        "//core:units",
-        "@lib//base:core",
-    ],
-)
-
-cc_library(
-    name = "multibody",
-    srcs = ["multibody.cpp"],
-    hdrs = ["multibody.hpp"],
-    copts = COPTS,
-    deps = [
-        ":tire",
-        ":vehicle",
-        "//core:time",
-        "//core:units",
-    ],
-)
-
-cc_library(
-    name = "single_track",
-    srcs = ["single_track.cpp"],
-    hdrs = ["single_track.hpp"],
-    copts = COPTS,
-    deps = [
-        ":tire",
-        ":vehicle",
-        "//core:time",
-        "//core:units",
-    ],
-)
-
-cc_library(
-    name = "tire",
-    srcs = ["tire.cpp"],
-    hdrs = ["tire.hpp"],
-    copts = COPTS,
-    deps = ["//core:units"],
-)
-
-cc_library(
-    name = "vehicle",
-    hdrs = ["vehicle.hpp"],
-    copts = COPTS,
-    deps = [
-        ":tire",
-        "//core:units",
-    ],
-)
-
-cc_library(
-    name = "traffic",
-    hdrs = ["traffic.hpp"],
-    copts = COPTS,
-    deps = ["//core:units"],
-)
-
-cc_library(
-    name = "articulated",
-    srcs = ["articulated.cpp"],
-    hdrs = ["articulated.hpp"],
-    copts = COPTS,
-)
-
-cc_library(
-    name = "articulated_arithmetic",
-    hdrs = ["articulated_arithmetic.hpp"],
-    copts = COPTS,
-    deps = [
-        ":articulated",
-        "//core:vocabulary",
-    ],
-)
-
-cc_library(
-    name = "articulated_dynamics",
-    hdrs = ["articulated_dynamics.hpp"],
-    copts = COPTS,
-    deps = [
-        ":articulated",
-        ":articulated_arithmetic",
-        "//core:vocabulary",
-    ],
-)
-
-cc_library(
-    name = "articulated_constraint",
-    srcs = ["articulated_constraint.cpp"],
-    hdrs = ["articulated_constraint.hpp"],
-    copts = COPTS,
-    deps = [
-        ":articulated",
-        "//core:vocabulary",
-    ],
-)
-
-cc_library(
-    name = "articulated_collision",
-    srcs = [
-        "articulated_collision.cpp",
-        "articulated_convex.cpp",
-    ],
-    hdrs = [
-        "articulated_collision.hpp",
-        "articulated_convex.hpp",
-    ],
-    copts = COPTS,
-    deps = [
-        ":articulated",
-        ":articulated_arithmetic",
-        ":articulated_dynamics",
-        "//core:vocabulary",
-    ],
-)
-
-cc_library(
-    name = "polyline",
-    srcs = ["polyline.cpp"],
-    hdrs = ["polyline.hpp"],
-    copts = COPTS,
-)
-
-cc_library(
-    name = "road_placement",
-    srcs = ["road_placement.cpp"],
-    hdrs = ["road_placement.hpp"],
-    copts = COPTS,
-    deps = [
-        ":lane_graph",
-        ":road",
-        "//core:units",
-        "@lib//base:core",
-    ],
-)
-
-cc_library(
-    name = "collision",
-    srcs = ["collision.cpp"],
-    hdrs = ["collision.hpp"],
-    copts = COPTS,
-)
-
-cc_library(
-    name = "driving_metrics",
-    srcs = ["driving_metrics.cpp"],
-    hdrs = ["driving_metrics.hpp"],
-    copts = COPTS,
-    deps = [":collision"],
-)
 
 [cc_test(
     name = test + "_test",
@@ -541,14 +104,6 @@ cc_library(
         "@lib//base:testing",
     ],
 ) for test in [
-    "aerodynamics",
-    "atmosphere",
-    "earth",
     "control",
-    "flight_path",
     "guidance",
-    "lane_graph",
-    "road",
-    "traffic_control",
-    "wind",
 ]]

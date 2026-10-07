@@ -13,8 +13,8 @@
 #include <thread>
 #include <utility>
 
-#include "model/collision.hpp"
-#include "model/driving_metrics.hpp"
+#include "model/road/collision.hpp"
+#include "model/traffic/driving_metrics.hpp"
 
 namespace simon::automotive {
 

@@ -9,7 +9,7 @@
 #include "application/robotic/testing.hpp"
 #include "base/testing.hpp"
 #include "format/mjcf.hpp"
-#include "model/articulated.hpp"
+#include "model/articulated/articulated.hpp"
 
 // robotic's test models compiled by simon and by MuJoCo, field by field,
 // against the table reference/mujoco_models.py recorded: every body's frame,

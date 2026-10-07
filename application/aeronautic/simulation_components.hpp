@@ -10,11 +10,11 @@
 #include "framework/archetype.hpp"
 #include "framework/entity.hpp"
 #include "framework/world.hpp"
-#include "model/aircraft_data.hpp"
-#include "model/flight_path.hpp"
-#include "model/rigid_aircraft.hpp"
+#include "model/aircraft/aircraft_data.hpp"
+#include "model/aircraft/flight_path.hpp"
+#include "model/aircraft/rigid_aircraft.hpp"
+#include "model/earth/wind.hpp"
 #include "model/rigid_body.hpp"
-#include "model/wind.hpp"
 
 // Aircraft fly routes of waypoints under an autopilot. Most fly a cheap,
 // single-pass point-mass model; aircraft whose archetype opts in are

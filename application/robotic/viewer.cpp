@@ -27,7 +27,7 @@
 #include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
 #include "imgui/imgui.h"
-#include "model/articulated_arithmetic.hpp"
+#include "model/articulated/arithmetic.hpp"
 
 namespace simon::robotic {
 namespace {

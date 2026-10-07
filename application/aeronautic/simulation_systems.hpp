@@ -12,11 +12,11 @@
 #include "engine/rate_gate.hpp"
 #include "framework/continuous.hpp"
 #include "framework/system.hpp"
-#include "model/atmosphere.hpp"
+#include "model/aircraft/flight_path.hpp"
+#include "model/aircraft/rigid_aircraft.hpp"
 #include "model/control.hpp"
-#include "model/flight_path.hpp"
-#include "model/rigid_aircraft.hpp"
-#include "model/wind.hpp"
+#include "model/earth/atmosphere.hpp"
+#include "model/earth/wind.hpp"
 
 namespace simon::aeronautic {
 

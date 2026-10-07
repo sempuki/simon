@@ -13,9 +13,9 @@
 #include "framework/archetype.hpp"
 #include "framework/spatial.hpp"
 #include "framework/world.hpp"
-#include "model/articulated.hpp"
-#include "model/articulated_collision.hpp"
-#include "model/articulated_dynamics.hpp"
+#include "model/articulated/articulated.hpp"
+#include "model/articulated/collision.hpp"
+#include "model/articulated/dynamics.hpp"
 #include "model/kinematics.hpp"
 
 // The robotic simulation's components: each entity is one kinematic tree of

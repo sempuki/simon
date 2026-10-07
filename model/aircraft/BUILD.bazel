@@ -1,0 +1,203 @@
+# Copyright 2026 -- CONTRIBUTORS. See LICENSE.
+
+load("@lib//bazel:copts.bzl", "COPTS")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "aerodynamics",
+    srcs = ["aerodynamics.cpp"],
+    hdrs = ["aerodynamics.hpp"],
+    copts = COPTS,
+    deps = [
+        "//model:control",
+        "//core:units",
+    ],
+)
+
+
+cc_library(
+    name = "flight_control",
+    srcs = ["flight_control.cpp"],
+    hdrs = ["flight_control.hpp"],
+    copts = COPTS,
+    deps = [
+        "//model:control",
+        "//core:units",
+    ],
+)
+
+
+cc_library(
+    name = "aircraft_data",
+    hdrs = ["aircraft_data.hpp"],
+    copts = COPTS,
+    deps = [
+        ":aerodynamics",
+        ":flight_control",
+        "//core:units",
+    ],
+)
+
+
+cc_library(
+    name = "turbine",
+    srcs = ["turbine.cpp"],
+    hdrs = ["turbine.hpp"],
+    copts = COPTS,
+    deps = [
+        ":aerodynamics",
+        ":aircraft_data",
+        "//core:units",
+    ],
+)
+
+
+cc_library(
+    name = "frames",
+    srcs = ["frames.cpp"],
+    hdrs = ["frames.hpp"],
+    copts = COPTS,
+    deps = [
+        "//model/earth:earth",
+        ":flight_path",
+        "//model:rigid_body",
+        "//core:units",
+        "//model/earth:wind",
+        "//3rd_party:eigen",
+    ],
+)
+
+
+cc_library(
+    name = "mass_balance",
+    srcs = ["mass_balance.cpp"],
+    hdrs = ["mass_balance.hpp"],
+    copts = COPTS,
+    deps = [
+        ":aircraft_data",
+        "//model:rigid_body",
+        "//core:units",
+        "@lib//base:core",
+    ],
+)
+
+
+cc_library(
+    name = "propulsion",
+    srcs = ["propulsion.cpp"],
+    hdrs = ["propulsion.hpp"],
+    copts = COPTS,
+    deps = [
+        ":aircraft_data",
+        "//model/earth:atmosphere",
+        ":frames",
+        ":mass_balance",
+        "//model:rigid_body",
+        ":turbine",
+        "//core:units",
+        "//model/earth:wind",
+    ],
+)
+
+
+cc_library(
+    name = "sensing",
+    srcs = ["sensing.cpp"],
+    hdrs = ["sensing.hpp"],
+    copts = COPTS,
+    deps = [
+        ":aircraft_data",
+        "//model/earth:atmosphere",
+        ":frames",
+        ":mass_balance",
+        "//model:rigid_body",
+        "//core:units",
+        "//model/earth:wind",
+    ],
+)
+
+
+cc_library(
+    name = "rigid_aircraft",
+    srcs = ["rigid_aircraft.cpp"],
+    hdrs = ["rigid_aircraft.hpp"],
+    copts = COPTS,
+    deps = [
+        ":aerodynamics",
+        ":aircraft_data",
+        "//model/earth:atmosphere",
+        ":frames",
+        ":mass_balance",
+        ":propulsion",
+        "//model:rigid_body",
+        ":sensing",
+        "//core:units",
+        "//model/earth:wind",
+        "//3rd_party:eigen",
+        "@lib//base:core",
+    ],
+)
+
+
+cc_test(
+    name = "rigid_aircraft_test",
+    size = "small",
+    srcs = ["rigid_aircraft_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":rigid_aircraft",
+        "@lib//base:testing",
+    ],
+)
+
+
+cc_library(
+    name = "trim",
+    srcs = ["trim.cpp"],
+    hdrs = ["trim.hpp"],
+    copts = COPTS,
+    deps = [
+        ":aircraft_data",
+        "//model/earth:atmosphere",
+        ":flight_control",
+        ":rigid_aircraft",
+        "//model:rigid_body",
+        "//core:units",
+        "//3rd_party:eigen",
+        "@lib//base:core",
+        "@lib//base:status",
+    ],
+)
+
+
+cc_library(
+    name = "flight_path",
+    hdrs = ["flight_path.hpp"],
+    copts = COPTS,
+    deps = [
+        "//model/earth:atmosphere",
+        "//model:kinematics",
+        "//core:coordinates",
+        "//core:time",
+        "//core:units",
+        "//3rd_party:eigen",
+    ],
+)
+
+
+[cc_test(
+    name = test + "_test",
+    size = "small",
+    srcs = [test + "_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":" + test,
+        "@lib//base:testing",
+    ],
+) for test in [
+    "aerodynamics",
+    "flight_path",
+]]

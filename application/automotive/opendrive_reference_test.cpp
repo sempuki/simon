@@ -15,8 +15,8 @@
 #include "base/testing.hpp"
 #include "core/vocabulary.hpp"
 #include "format/opendrive.hpp"
-#include "model/lane_graph.hpp"
-#include "model/road.hpp"
+#include "model/road/lane_graph.hpp"
+#include "model/road/road.hpp"
 
 // simon's roads against libOpenDRIVE's, on the roads in
 // application/automotive/roads, CARLA's Town01 and esmini's signed roads:

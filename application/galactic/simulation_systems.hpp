@@ -4,8 +4,8 @@
 
 #include "application/galactic/simulation_components.hpp"
 #include "framework/system.hpp"
-#include "model/gravity.hpp"
-#include "model/leapfrog.hpp"
+#include "model/gravity/gravity.hpp"
+#include "model/gravity/leapfrog.hpp"
 
 namespace simon::galactic {
 
