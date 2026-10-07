@@ -36,7 +36,6 @@ cc_library(
         "//core:vocabulary",
         "@lib//base:core",
         "@lib//base:status",
-        "@lib//base:time",
     ],
 )
 
