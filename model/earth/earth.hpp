@@ -47,17 +47,7 @@ struct Geodetic final {
 };
 
 // The ECEF position of a geodetic one.
-inline auto convert_geodetic_to_fixed(const Geodetic& where) -> Position {
-  double sin_latitude = sin(where.latitude);
-  double cos_latitude = cos(where.latitude);
-  double normal = SEMIMAJOR_AXIS /
-                  std::sqrt(1.0 - ECCENTRICITY_SQUARED * sin_latitude *
-                                      sin_latitude);  // Prime vertical radius.
-  double h = where.altitude.numerical_value_in(meter);
-  return meters((normal + h) * cos_latitude * cos(where.longitude),
-                (normal + h) * cos_latitude * sin(where.longitude),
-                (normal * (1.0 - ECCENTRICITY_SQUARED) + h) * sin_latitude);
-}
+auto convert_geodetic_to_fixed(const Geodetic& where) -> Position;
 
 // Where an ECEF position is on the ellipsoid, by Heikkinen's closed form
 // (1982), exact to a few nanometers for any point not near the Earth's
@@ -112,15 +102,7 @@ inline auto locate(const Position& fixed) -> Location {
 }
 
 // The geodetic position of an ECEF one (see locate).
-inline auto convert_fixed_to_geodetic(const Position& fixed) -> Geodetic {
-  Location where = locate(fixed);
-  return Geodetic{
-      .latitude = std::atan2(where.sin_latitude, where.cos_latitude) * radian,
-      .longitude =
-          std::atan2(where.sin_longitude, where.cos_longitude) * radian,
-      .altitude = where.altitude,
-  };
-}
+auto convert_fixed_to_geodetic(const Position& fixed) -> Geodetic;
 
 // The gravitational acceleration at an ECEF position, to the J2 term. It
 // leaves out the centrifugal acceleration of the Earth's rotation, which

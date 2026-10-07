@@ -16,6 +16,7 @@ cc_library(
 
 cc_library(
     name = "earth",
+    srcs = ["earth.cpp"],
     hdrs = ["earth.hpp"],
     copts = COPTS,
     deps = [
