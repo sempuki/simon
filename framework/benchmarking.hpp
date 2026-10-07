@@ -187,22 +187,26 @@ class SystemTimer final {
       total += other.seconds;
       width = std::max(width, other.name.size());
     }
+    // Padded by hand: Clang cannot check a dynamic width in libstdc++'s
+    // format strings at compile time.
+    auto pad = [&](std::string_view name) {
+      return std::string{name} + std::string(width - name.size(), ' ');
+    };
     double steps = std::max(steps_, 1);
     std::println(
-        "  {:<{}} {:10.3f} ms/step {:10.1f} ns/entity-step, slowest step "
-        "{:.3f} ms",
-        "total", width, 1e3 * total / steps,
+        "  {} {:10.3f} ms/step {:10.1f} ns/entity-step, slowest step {:.3f} ms",
+        pad("total"), 1e3 * total / steps,
         1e9 * total / std::max(entity_steps, 1.0), 1e3 * slowest_);
     auto share = [&](double seconds) {
       return total > 0.0 ? 100.0 * seconds / total : 0.0;
     };
     for (std::size_t i = 0; i < NAMES.size(); ++i) {
-      std::println("  {:<{}} {:10.3f} ms/step {:6.1f}% {:6} B/entity", NAMES[i],
-                   width, 1e3 * seconds_[i] / steps, share(seconds_[i]),
+      std::println("  {} {:10.3f} ms/step {:6.1f}% {:6} B/entity",
+                   pad(NAMES[i]), 1e3 * seconds_[i] / steps, share(seconds_[i]),
                    BYTES[i]);
     }
     for (const Other& other : others_) {
-      std::println("  {:<{}} {:10.3f} ms/step {:6.1f}%", other.name, width,
+      std::println("  {} {:10.3f} ms/step {:6.1f}%", pad(other.name),
                    1e3 * other.seconds / steps, share(other.seconds));
     }
   }
