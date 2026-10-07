@@ -17,16 +17,17 @@
 namespace simon::galactic {
 namespace {
 
-using model::KILOPARSEC;
-using model::SOLAR_MASS;
+using gravity::KILOPARSEC;
+using gravity::SOLAR_MASS;
 
 // A sphere of 10^10 solar masses with a scale radius of 1 kpc.
-const model::Plummer PLUMMER{.mass = 1e10 * SOLAR_MASS, .scale = KILOPARSEC};
+const gravity::Plummer PLUMMER{.mass = 1e10 * SOLAR_MASS, .scale = KILOPARSEC};
 
 auto make_plummer_scenario(std::size_t bodies, double softening) -> Scenario {
   Scenario scenario{.softening = softening * PLUMMER.scale};
   Random random{7};
-  model::append_plummer(PLUMMER, bodies, InOut(random), InOut(scenario.bodies));
+  gravity::append_plummer(PLUMMER, bodies, InOut(random),
+                          InOut(scenario.bodies));
   return scenario;
 }
 
@@ -43,7 +44,7 @@ TEST_CASE("Plummer") {
         compute_mass_radii(simulation.world(), fractions);
     for (std::size_t i = 0; i < fractions.size(); ++i) {
       double expected = number_of(
-          radii[i] / model::compute_plummer_radius(PLUMMER, fractions[i]));
+          radii[i] / gravity::compute_plummer_radius(PLUMMER, fractions[i]));
       CHECK(std::abs(expected - 1.0) < 0.05);
     }
   }
@@ -55,11 +56,11 @@ TEST_CASE("Plummer") {
     Mechanics mechanics =
         measure_mechanics(simulation.world(), simulation.scenario().softening);
     CHECK(std::abs(mechanics.virial_ratio() - 1.0) < 0.05);
-    CHECK(
-        std::abs(mechanics.energy() /
-                     model::compute_plummer_energy(PLUMMER).numerical_value_in(
-                         units::si::joule) -
-                 1.0) < 0.05);
+    CHECK(std::abs(
+              mechanics.energy() /
+                  gravity::compute_plummer_energy(PLUMMER).numerical_value_in(
+                      units::si::joule) -
+              1.0) < 0.05);
     double scale_momentum = PLUMMER.mass.numerical_value_in(kilogram) * 100e3;
     CHECK(mechanics.momentum.norm() / scale_momentum < 1e-15);
   }
@@ -67,8 +68,8 @@ TEST_CASE("Plummer") {
   // 256 bodies, softened by 0.05 a, for ten crossing times of 128 steps.
   SECTION("ShouldStayInEquilibriumGivenTenCrossingTimes") {
     Scenario scenario = make_plummer_scenario(256, 0.05);
-    Time crossing = model::compute_crossing_time(
-        PLUMMER.mass, model::compute_plummer_energy(PLUMMER));
+    Time crossing = gravity::compute_crossing_time(
+        PLUMMER.mass, gravity::compute_plummer_energy(PLUMMER));
     Year step = std::chrono::round<Year>(std::chrono::duration<double>(
         crossing.numerical_value_in(second) / 128.0));
 
@@ -87,7 +88,7 @@ TEST_CASE("Plummer") {
         compute_mass_radii(simulation.world(), fractions);
     double scale_momentum =
         PLUMMER.mass.numerical_value_in(kilogram) *
-        std::sqrt(model::GRAVITATIONAL_CONSTANT *
+        std::sqrt(gravity::GRAVITATIONAL_CONSTANT *
                   PLUMMER.mass.numerical_value_in(kilogram) /
                   PLUMMER.scale.numerical_value_in(meter));
     double scale_angular =

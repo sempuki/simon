@@ -15,7 +15,7 @@
 // An aircraft as data: what tools/jsbsim/convert.py writes from a JSBSim
 // aircraft, read back by format/aircraft_file. Locations are in JSBSim's
 // structural frame (x aft, y right, z up), in meters.
-namespace simon::model {
+namespace simon::aircraft {
 
 // The most engines and tanks an aircraft may have.
 inline constexpr std::size_t MAX_ENGINES = 4;
@@ -86,4 +86,4 @@ struct AircraftData final {
   AeroModel aero;
 };
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

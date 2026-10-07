@@ -16,8 +16,8 @@
 namespace simon::galactic {
 
 using framework::Entity;
-using model::GravitySource;
-using model::GravityTree;
+using gravity::GravitySource;
+using gravity::GravityTree;
 using model::Kinematics;
 
 template <typename SystemType>

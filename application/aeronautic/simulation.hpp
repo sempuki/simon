@@ -43,7 +43,7 @@ struct Scenario final {
   // The air every aircraft flies in, still by default. Point-mass aircraft
   // drift with its steady wind; rigid aircraft fly through it, and through
   // its turbulence, each meeting its own gusts.
-  model::WindField wind;
+  earth::WindField wind;
 
   Length spacing = 5000.0 * meter;  // Per aircraft, on average.
   Length route_reach = 20000.0 * meter;
@@ -69,10 +69,11 @@ struct Scenario final {
 // Trims a rigid aircraft of type `data` over `earth` for level flight at
 // `altitude` and `speed`, its tanks full, heading north from the world's
 // origin.
-auto trim_in_cruise(const model::AircraftData& data, const model::Earth& earth,
+auto trim_in_cruise(const aircraft::AircraftData& data,
+                    const aircraft::Earth& earth,
                     Length altitude = 6000.0 * meter,
                     Speed speed = 200.0 * meter_per_second)
-    -> std::expected<model::Trim, framework::Status>;
+    -> std::expected<aircraft::Trim, framework::Status>;
 
 // Creates a rigid aircraft of type `data` over `earth`, trimmed by `trim`,
 // at `x` and `y` in the world's local frame, at the trim's altitude, and
@@ -80,20 +81,18 @@ auto trim_in_cruise(const model::AircraftData& data, const model::Earth& earth,
 // a trim holds wherever the aircraft is and whichever way it heads, and in a
 // steady wind, whose air it moves with. In a `wind` that is not still the
 // aircraft has a Wind, and in turbulence Gusts drawn from `seed`.
-auto create_rigid_aircraft(const model::AircraftData& data,
-                           const model::Earth& earth, const model::Trim& trim,
-                           const SurfaceGains& gains, Length x, Length y,
-                           Angle heading, const Route& route,
-                           InOut<World> world,
-                           const model::WindField& wind = {},
-                           std::uint64_t seed = 0)
+auto create_rigid_aircraft(
+    const aircraft::AircraftData& data, const aircraft::Earth& earth,
+    const aircraft::Trim& trim, const SurfaceGains& gains, Length x, Length y,
+    Angle heading, const Route& route, InOut<World> world,
+    const earth::WindField& wind = {}, std::uint64_t seed = 0)
     -> std::expected<Entity, framework::Status>;
 
 // The rigid aircraft types a scenario flies, read once: null where it flies
 // none of that type.
 struct RigidTypes final {
-  const model::AircraftData* airliner = nullptr;
-  const model::AircraftData* fighter = nullptr;
+  const aircraft::AircraftData* airliner = nullptr;
+  const aircraft::AircraftData* fighter = nullptr;
 };
 
 // Builds in `world` the world a scenario needs.
@@ -135,8 +134,8 @@ class Simulation final {
  private:
   Scenario scenario_;
   // Each rigid type, read if the scenario flies any.
-  std::unique_ptr<model::AircraftData> airliner_;
-  std::unique_ptr<model::AircraftData> fighter_;
+  std::unique_ptr<aircraft::AircraftData> airliner_;
+  std::unique_ptr<aircraft::AircraftData> fighter_;
   World world_;  // Empty until configure builds it.
   Scheduler scheduler_;
 };

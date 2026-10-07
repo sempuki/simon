@@ -59,7 +59,7 @@ auto create(const AirState& state, const Route& route, InOut<World> world)
                      .with(Commands{.throttle = 0.3})
                      .with(scenario.airframe)
                      .with(scenario.handling)
-                     .with(Autopilot{.altitude = model::altitude_of(state),
+                     .with(Autopilot{.altitude = aircraft::altitude_of(state),
                                      .heading = state.heading,
                                      .speed = route.speed,
                                      .throttle_integral = 0.3})
@@ -103,7 +103,7 @@ TEST_CASE("Autopilot") {
     fly_for(3min, InOut(scheduler), InOut(world));
 
     const AirState& state = state_of(world, aircraft);
-    CHECK(std::abs(model::altitude_of(state).numerical_value_in(meter) -
+    CHECK(std::abs(aircraft::altitude_of(state).numerical_value_in(meter) -
                    6000.0) < 20.0);
     CHECK(std::abs(state.speed.numerical_value_in(meter_per_second) - 220.0) <
           2.0);
@@ -121,7 +121,7 @@ TEST_CASE("Autopilot") {
     const AirState& state = state_of(world, aircraft);
     double heading = radians(state.heading);
     CHECK(std::abs(std::remainder(heading - PI, 2.0 * PI)) < 0.05);
-    CHECK(std::abs(model::altitude_of(state).numerical_value_in(meter) -
+    CHECK(std::abs(aircraft::altitude_of(state).numerical_value_in(meter) -
                    5000.0) < 50.0);
   }
 }
@@ -163,7 +163,7 @@ TEST_CASE("Fidelity") {
     // The two fly the same route by different integrators: close, but not
     // the same.
     double apart =
-        model::distance(state_of(world, simple), state_of(world, precise))
+        aircraft::distance(state_of(world, simple), state_of(world, precise))
             .numerical_value_in(meter);
     CHECK(apart > 0.0);
     CHECK(apart < 100.0);
@@ -201,7 +201,7 @@ TEST_CASE("Simulation") {
     auto [states, reached] = run(Scenario{.aircraft = 100, .precise = 20});
 
     for (const AirState& state : states) {
-      double altitude = model::altitude_of(state).numerical_value_in(meter);
+      double altitude = aircraft::altitude_of(state).numerical_value_in(meter);
       CHECK(altitude > 2500.0);
       CHECK(altitude < 9500.0);
       CHECK(state.speed > 150.0 * meter_per_second);
@@ -222,16 +222,17 @@ TEST_CASE("Simulation") {
     for (TimePoint time{}; time < TimePoint{5min}; time += DT) {
       REQUIRE(simulation.step(Step{.time = time, .dt = DT}));
       const World& world = simulation.world();
-      world.store_of<RigidBody>().for_each([&](Entity entity,
-                                               const RigidBody&) {
-        const AirState& state = state_of(world, entity);
-        double altitude = model::altitude_of(state).numerical_value_in(meter);
-        double speed = state.speed.numerical_value_in(meter_per_second);
-        lowest = std::min(lowest, altitude);
-        highest = std::max(highest, altitude);
-        slowest = std::min(slowest, speed);
-        fastest = std::max(fastest, speed);
-      });
+      world.store_of<RigidBody>().for_each(
+          [&](Entity entity, const RigidBody&) {
+            const AirState& state = state_of(world, entity);
+            double altitude =
+                aircraft::altitude_of(state).numerical_value_in(meter);
+            double speed = state.speed.numerical_value_in(meter_per_second);
+            lowest = std::min(lowest, altitude);
+            highest = std::max(highest, altitude);
+            slowest = std::min(slowest, speed);
+            fastest = std::max(fastest, speed);
+          });
     }
     CAPTURE(lowest, highest, slowest, fastest);
     CHECK(lowest > 2500.0);
@@ -256,16 +257,17 @@ TEST_CASE("Simulation") {
     for (TimePoint time{}; time < TimePoint{5min}; time += DT) {
       REQUIRE(simulation.step(Step{.time = time, .dt = DT}));
       const World& world = simulation.world();
-      world.store_of<RigidBody>().for_each([&](Entity entity,
-                                               const RigidBody&) {
-        const AirState& state = state_of(world, entity);
-        double altitude = model::altitude_of(state).numerical_value_in(meter);
-        double speed = state.speed.numerical_value_in(meter_per_second);
-        lowest = std::min(lowest, altitude);
-        highest = std::max(highest, altitude);
-        slowest = std::min(slowest, speed);
-        fastest = std::max(fastest, speed);
-      });
+      world.store_of<RigidBody>().for_each(
+          [&](Entity entity, const RigidBody&) {
+            const AirState& state = state_of(world, entity);
+            double altitude =
+                aircraft::altitude_of(state).numerical_value_in(meter);
+            double speed = state.speed.numerical_value_in(meter_per_second);
+            lowest = std::min(lowest, altitude);
+            highest = std::max(highest, altitude);
+            slowest = std::min(slowest, speed);
+            fastest = std::max(fastest, speed);
+          });
     }
     CAPTURE(lowest, highest, slowest, fastest);
     CHECK(lowest > 2500.0);
@@ -285,7 +287,7 @@ TEST_CASE("Simulation") {
         .rigid = 4,
         .fighters = 4,
         .wind = {.north_east_down = meters_per_second(9.0, -12.0, 0.0),
-                 .turbulence = model::Turbulence::MODERATE}};
+                 .turbulence = earth::Turbulence::MODERATE}};
     Simulation simulation{scenario};
     REQUIRE(simulation.configure());
     double lowest = 1e9;
@@ -295,16 +297,17 @@ TEST_CASE("Simulation") {
     for (TimePoint time{}; time < TimePoint{5min}; time += DT) {
       REQUIRE(simulation.step(Step{.time = time, .dt = DT}));
       const World& world = simulation.world();
-      world.store_of<RigidBody>().for_each([&](Entity entity,
-                                               const RigidBody&) {
-        const AirState& state = state_of(world, entity);
-        double altitude = model::altitude_of(state).numerical_value_in(meter);
-        double speed = state.speed.numerical_value_in(meter_per_second);
-        lowest = std::min(lowest, altitude);
-        highest = std::max(highest, altitude);
-        slowest = std::min(slowest, speed);
-        fastest = std::max(fastest, speed);
-      });
+      world.store_of<RigidBody>().for_each(
+          [&](Entity entity, const RigidBody&) {
+            const AirState& state = state_of(world, entity);
+            double altitude =
+                aircraft::altitude_of(state).numerical_value_in(meter);
+            double speed = state.speed.numerical_value_in(meter_per_second);
+            lowest = std::min(lowest, altitude);
+            highest = std::max(highest, altitude);
+            slowest = std::min(slowest, speed);
+            fastest = std::max(fastest, speed);
+          });
     }
     CAPTURE(lowest, highest, slowest, fastest);
     CHECK(lowest > 2500.0);
@@ -321,7 +324,7 @@ TEST_CASE("Simulation") {
     // point-mass aircraft fly the same through the air, and the wind carries
     // them by its speed times the time. Within a second FollowRoute steers
     // only once, from where they start.
-    auto positions = [](const model::WindField& wind) {
+    auto positions = [](const earth::WindField& wind) {
       Scenario scenario{.seed = 5, .aircraft = 20, .precise = 5, .wind = wind};
       Simulation simulation{scenario};
       REQUIRE(simulation.configure());
@@ -355,7 +358,7 @@ constexpr std::string_view BOEING_737 = "3rd_party/jsbsim/737.aircraft";
 
 // A 737 trimmed in cruise at 6 km and 200 m/s, heading north from the
 // world's origin toward a waypoint 500 km ahead.
-auto rigid_737(const model::Earth& earth, const model::AircraftData& data,
+auto rigid_737(const aircraft::Earth& earth, const aircraft::AircraftData& data,
                InOut<World> world) -> Entity {
   Route route{.speed = 200.0 * meter_per_second};
   route.waypoints.fill(meters(0.0, 500000.0, 6000.0));
@@ -368,7 +371,7 @@ auto rigid_737(const model::Earth& earth, const model::AircraftData& data,
   return *entity;
 }
 
-auto scheduler_for(const model::Earth& earth) -> Scheduler {
+auto scheduler_for(const aircraft::Earth& earth) -> Scheduler {
   return Scheduler{Schedule{
       MoveAir{}, FollowRoute{}, FlyAutopilot{}, Actuate{}, Fly{}, Precise{},
       DriftWithWind{}, FlySurfaces{earth}, RunFlightControls{earth},
@@ -394,7 +397,7 @@ TEST_CASE("RigidAircraft") {
   build_small_world(Out(world));
 
   SECTION("ShouldFollowItsBodyGivenFlatEarth") {
-    model::Earth earth = model::Earth::flat();
+    aircraft::Earth earth = aircraft::Earth::flat();
     Entity aircraft = rigid_737(earth, *data, InOut(world));
     Scheduler scheduler = scheduler_for(earth);
 
@@ -416,8 +419,8 @@ TEST_CASE("RigidAircraft") {
   SECTION("ShouldAgreeWithFlatEarthGivenRoundEarthOverShortFlight") {
     // Over 10 s the Earth's rotation, curvature and gravity move a 737 a
     // few meters from where a flat Earth puts it.
-    model::Earth flat = model::Earth::flat();
-    model::Earth round = model::Earth::round(model::wgs84::Geodetic{});
+    aircraft::Earth flat = aircraft::Earth::flat();
+    aircraft::Earth round = aircraft::Earth::round(earth::wgs84::Geodetic{});
     Entity on_flat = rigid_737(flat, *data, InOut(world));
     World round_world;
     build_small_world(Out(round_world));
@@ -428,18 +431,18 @@ TEST_CASE("RigidAircraft") {
     fly_rigid(10s, InOut(flat_scheduler), InOut(world));
     fly_rigid(10s, InOut(round_scheduler), InOut(round_world));
 
-    double apart = model::distance(state_of(world, on_flat),
-                                   state_of(round_world, on_round))
+    double apart = aircraft::distance(state_of(world, on_flat),
+                                      state_of(round_world, on_round))
                        .numerical_value_in(meter);
     CHECK(apart > 0.01);
     CHECK(apart < 5.0);
   }
 
   SECTION("ShouldBurnFuelGivenEnginesRunning") {
-    model::Earth earth = model::Earth::flat();
+    aircraft::Earth earth = aircraft::Earth::flat();
     Entity aircraft = rigid_737(earth, *data, InOut(world));
     Scheduler scheduler = scheduler_for(earth);
-    Mass start = model::compute_mass_balance(*data).properties.mass;
+    Mass start = aircraft::compute_mass_balance(*data).properties.mass;
 
     fly_rigid(10s, InOut(scheduler), InOut(world));
 
@@ -458,7 +461,7 @@ TEST_CASE("RigidAircraft") {
     Route route =
         route_to(meters(0.0, 500000.0, 5000.0), 200.0 * meter_per_second);
     Entity point_mass = create(start, route, InOut(world));
-    rigid_737(model::Earth::flat(), *data, InOut(world));
+    rigid_737(aircraft::Earth::flat(), *data, InOut(world));
     World alone;
     build_small_world(Out(alone));
     Entity by_itself = create(start, route, InOut(alone));

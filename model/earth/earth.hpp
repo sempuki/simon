@@ -16,7 +16,7 @@
 // Earth-fixed frame (ECEF) turns with the Earth; the Earth-centered inertial
 // frame (ECI) does not, and the two share their z axis, the Earth's axis.
 // At `earth_angle` zero they coincide.
-namespace simon::model::wgs84 {
+namespace simon::earth::wgs84 {
 
 inline constexpr double SEMIMAJOR_AXIS = 6378137.0;                // m.
 inline constexpr double FLATTENING = 1.0 / 298.257223563;          //
@@ -122,4 +122,4 @@ inline auto compute_gravitation(const Position& fixed) -> Acceleration {
          meter_per_second_squared;
 }
 
-}  // namespace simon::model::wgs84
+}  // namespace simon::earth::wgs84

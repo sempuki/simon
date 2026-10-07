@@ -475,7 +475,7 @@ driver, so a viewer that no longer builds, starts or draws fails the tests.
 ## Wind and turbulence
 
 Wind is opt in, like every level. A scenario's `wind` is a
-`model::WindField`: a steady wind, the same everywhere, and turbulence of a
+`earth::WindField`: a steady wind, the same everywhere, and turbulence of a
 severity. By default the air is still, no aircraft has a `Wind`, and every
 level costs what it would without wind: 1.16 µs per rigid aircraft-step at
 1,000 over a flat Earth, and 6.50 ms per step for the mixed 100,000.

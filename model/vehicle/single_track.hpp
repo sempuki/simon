@@ -31,7 +31,7 @@
 // slips are undefined, and they drive as the kinematic model about the
 // center of gravity: the dynamic model below 0.1 m/s, and the drift model
 // blending into it about 0.2 m/s.
-namespace simon::model {
+namespace simon::vehicle {
 
 struct KinematicSingleTrackRate;
 
@@ -195,4 +195,4 @@ auto compute_drift_single_track_rate(const DriftSingleTrack& state,
                                      const VehicleParameters& vehicle)
     -> DriftSingleTrackRate;
 
-}  // namespace simon::model
+}  // namespace simon::vehicle

@@ -18,8 +18,8 @@
 namespace simon::galactic {
 namespace {
 
-using model::KILOPARSEC;
-using model::SOLAR_MASS;
+using gravity::KILOPARSEC;
+using gravity::SOLAR_MASS;
 
 constexpr std::string_view ENCOUNTER =
     "application/galactic/reference/rebound_encounter.csv";
@@ -27,25 +27,25 @@ constexpr std::string_view ENCOUNTER =
 const Encounter TOOMRE = make_toomre_encounter();
 const Year STEP{250000};
 
-auto read_state(const std::vector<std::string>& line) -> model::BodyStart {
+auto read_state(const std::vector<std::string>& line) -> gravity::BodyStart {
   auto number = [&](std::size_t column) {
     return testing::parse_number(line[column]);
   };
-  return model::BodyStart{
+  return gravity::BodyStart{
       .position = meters(number(2), number(3), number(4)),
       .velocity = meters_per_second(number(5), number(6), number(7))};
 }
 
 // Every body's state in `simulation`: the masses, then the test particles.
 auto collect_states(const Simulation& simulation)
-    -> std::vector<model::BodyStart> {
-  std::vector<model::BodyStart> states;
+    -> std::vector<gravity::BodyStart> {
+  std::vector<gravity::BodyStart> states;
   auto append = [&](const std::vector<Entity>& entities) {
     for (Entity entity : entities) {
       const Kinematics& kinematics =
           simulation.world().store_of<Kinematics>().component_of(entity);
-      states.push_back(model::BodyStart{.position = kinematics.position,
-                                        .velocity = kinematics.velocity});
+      states.push_back(gravity::BodyStart{.position = kinematics.position,
+                                          .velocity = kinematics.velocity});
     }
   };
   append(simulation.bodies());
@@ -59,26 +59,26 @@ TEST_CASE("Encounter") {
   SECTION("ShouldTakeToomresPeriodGivenOuterRing") {
     // Toomre and Toomre's outermost ring, 15 kpc about 10^11 suns, turns in
     // 5.442 of their units of 10^8 years.
-    double gm = model::GRAVITATIONAL_CONSTANT *
+    double gm = gravity::GRAVITATIONAL_CONSTANT *
                 TOOMRE.victim.numerical_value_in(kilogram);
     double r = (0.6 * TOOMRE.pericenter).numerical_value_in(meter);
     double period = 2.0 * std::numbers::pi * std::sqrt(r * r * r / gm);
     CHECK(std::abs(period / (5.442e8 *
-                             model::JULIAN_YEAR.numerical_value_in(second)) -
+                             gravity::JULIAN_YEAR.numerical_value_in(second)) -
                    1.0) < 1e-4);
   }
 
   SECTION("ShouldStartAsReboundGivenDirectPassage") {
     Simulation simulation{make_encounter_scenario(TOOMRE)};
     REQUIRE(simulation.configure());
-    std::vector<model::BodyStart> ours = collect_states(simulation);
+    std::vector<gravity::BodyStart> ours = collect_states(simulation);
 
     testing::Table table = testing::load_table(ENCOUNTER);
     std::size_t compared = 0;
     for (const std::vector<std::string>& line : table.lines) {
       if (line[0] != "0") continue;
       auto body = static_cast<std::size_t>(testing::parse_number(line[1]));
-      model::BodyStart theirs = read_state(line);
+      gravity::BodyStart theirs = read_state(line);
       CHECK(ours[body].position == theirs.position);  // Bit for bit.
       CHECK(ours[body].velocity == theirs.velocity);
       ++compared;
@@ -97,8 +97,8 @@ TEST_CASE("Encounter") {
       auto step = static_cast<int>(testing::parse_number(line[0]));
       auto body = static_cast<std::size_t>(testing::parse_number(line[1]));
       REQUIRE(driver.advance_to(BasicTimePoint<Year>{} + step * STEP));
-      model::BodyStart ours = collect_states(simulation)[body];
-      model::BodyStart theirs = read_state(line);
+      gravity::BodyStart ours = collect_states(simulation)[body];
+      gravity::BodyStart theirs = read_state(line);
       if (ours.position != theirs.position ||
           ours.velocity != theirs.velocity) {
         ++differing;
@@ -122,12 +122,12 @@ TEST_CASE("Encounter") {
     engine::BatchDriver driver{Timing{.max_step = step}, Depend(simulation)};
     REQUIRE(driver.run(BasicTimePoint<Year>{} + 128000 * step));
 
-    std::vector<model::BodyStart> states = collect_states(simulation);
-    double gm = model::GRAVITATIONAL_CONSTANT *
+    std::vector<gravity::BodyStart> states = collect_states(simulation);
+    double gm = gravity::GRAVITATIONAL_CONSTANT *
                 converged.companion.numerical_value_in(kilogram);
     double e = converged.softening.numerical_value_in(meter);
-    auto energy_about = [&](const model::BodyStart& particle,
-                            const model::BodyStart& mass) {
+    auto energy_about = [&](const gravity::BodyStart& particle,
+                            const gravity::BodyStart& mass) {
       Vector3 d =
           (particle.position - mass.position).numerical_value_in(meter).eigen();
       Vector3 v = (particle.velocity - mass.velocity)

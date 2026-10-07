@@ -16,7 +16,7 @@
 // links at a road's ends, and from incoming roads into a junction's
 // connecting roads. Traffic keeps right: a lane right of the reference line
 // (negative id) runs with s, and one left of it against s.
-namespace simon::model {
+namespace simon::road {
 
 // A lane of a network: its road and lane section, by index, and its id.
 struct LaneKey final {
@@ -172,4 +172,4 @@ auto build_lane_graph(const RoadNetwork& network) -> LaneGraph;
 auto build_lane_graph(const RoadNetwork& network, std::string_view type)
     -> LaneGraph;
 
-}  // namespace simon::model
+}  // namespace simon::road

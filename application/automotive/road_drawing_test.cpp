@@ -16,7 +16,7 @@ namespace {
 
 using namespace testing;
 
-auto load(std::string_view file) -> model::RoadNetwork {
+auto load(std::string_view file) -> road::RoadNetwork {
   auto network = format::load_opendrive(find_road_path(file));
   REQUIRE(network);
   return std::move(*network);
@@ -47,10 +47,10 @@ TEST_CASE("RoadDrawing") {
   SECTION("ShouldDrawEveryLane") {
     // Every lane of every lane section of CARLA's Town01, each border
     // sampled at the same s.
-    model::RoadNetwork network = load("Town01.xodr");
+    road::RoadNetwork network = load("Town01.xodr");
     std::size_t lanes = 0;
-    for (const model::Road& road : network.roads) {
-      for (const model::LaneSection& section : road.lane_sections) {
+    for (const road::Road& road : network.roads) {
+      for (const road::LaneSection& section : road.lane_sections) {
         lanes += section.left.size() + section.right.size();
       }
     }

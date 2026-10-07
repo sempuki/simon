@@ -6,7 +6,7 @@
 #include <cmath>
 #include <utility>
 
-namespace simon::model {
+namespace simon::aircraft {
 
 namespace {
 
@@ -60,10 +60,10 @@ auto find_aero_axis(std::string_view name) -> std::optional<AeroAxis> {
 }
 
 auto AeroTable::operator()(const AeroInputs& inputs) const -> double {
-  if (const auto* one = std::get_if<Table1<>>(&table)) {
+  if (const auto* one = std::get_if<model::Table1<>>(&table)) {
     return (*one)(inputs[row]);
   }
-  return std::get<Table2<>>(table)(inputs[row], inputs[*column]);
+  return std::get<model::Table2<>>(table)(inputs[row], inputs[*column]);
 }
 
 auto AeroTerm::operator()(const AeroInputs& inputs) const -> double {
@@ -156,4 +156,4 @@ auto compute_aero_loads(const AeroSums& sums, const WindAngles& wind,
   };
 }
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

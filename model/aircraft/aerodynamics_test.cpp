@@ -8,7 +8,7 @@
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 
-namespace simon::model {
+namespace simon::aircraft {
 
 using Catch::Matchers::WithinAbs;
 
@@ -41,10 +41,11 @@ TEST_CASE("AeroTerm") {
         .constant = 1.0,
         .tables = {
             AeroTable{.row = aero_input(AeroVariable::ALPHA),
-                      .table = Table1<>{{0.0, 0.2}, {0.0, 2.0}}},
-            AeroTable{.row = aero_input(AeroVariable::MACH),
-                      .column = aero_input(AeroVariable::ALPHA),
-                      .table = Table2<>{{0.0, 1.0}, {0.0, 0.2}, {1, 1, 3, 3}}},
+                      .table = model::Table1<>{{0.0, 0.2}, {0.0, 2.0}}},
+            AeroTable{
+                .row = aero_input(AeroVariable::MACH),
+                .column = aero_input(AeroVariable::ALPHA),
+                .table = model::Table2<>{{0.0, 1.0}, {0.0, 0.2}, {1, 1, 3, 3}}},
         }};
     // 1.0 from the first table, times 2.0 from the second.
     CHECK_THAT(term(inputs), WithinAbs(2.0, 1e-12));
@@ -95,4 +96,4 @@ TEST_CASE("AeroLoads") {
   }
 }
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

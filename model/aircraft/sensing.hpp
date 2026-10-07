@@ -15,7 +15,7 @@
 
 // What a rigid aircraft's flight controls sense: its air data, attitude and
 // motion, and the accelerations its pilot feels.
-namespace simon::model {
+namespace simon::aircraft {
 
 // What an aircraft's body feels, in body axes: the force on it but gravity's,
 // per unit mass, and its angular acceleration.
@@ -31,10 +31,11 @@ struct BodyAcceleration final {
 // velocity and angles of attack. JSBSim's flight controls read these from the
 // frame before; here only `felt` is, because a step's own needs the surfaces
 // the flight controls are about to set. No wheel carries weight.
-auto sense_flight_state(const RigidBody& body, const BodyAcceleration& felt,
-                        const MassBalance& mass, const AircraftData& aircraft,
-                        const Earth& earth, const StandardAirTable& air,
-                        const Wind& wind, Time time,
+auto sense_flight_state(const model::RigidBody& body,
+                        const BodyAcceleration& felt, const MassBalance& mass,
+                        const AircraftData& aircraft, const Earth& earth,
+                        const earth::StandardAirTable& air,
+                        const earth::Wind& wind, Time time,
                         InOut<FlightSignals> signals) -> void;
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

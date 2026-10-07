@@ -8,7 +8,7 @@
 
 #include "base/core.hpp"
 
-namespace simon::model {
+namespace simon::aircraft {
 
 auto fill_fuel_tanks(const AircraftData& aircraft) -> FuelTanks {
   FuelTanks tanks;
@@ -72,7 +72,7 @@ auto compute_mass_balance(const AircraftData& aircraft,
       terms[3], terms[1], terms[5],         //
       terms[4], terms[5], terms[2];
   return MassBalance{
-      .properties = compute_mass_properties(total * kilogram, inertia),
+      .properties = model::compute_mass_properties(total * kilogram, inertia),
       .center_of_mass = QuantityVector{center} * meter,
   };
 }
@@ -87,4 +87,4 @@ auto compute_mass_balance(const AircraftData& aircraft, const FuelTanks& tanks)
       aircraft, std::span{tanks.contents.data(), aircraft.tanks.size()});
 }
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

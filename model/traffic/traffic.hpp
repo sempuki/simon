@@ -11,7 +11,7 @@
 // Model for following (Treiber, Hennecke and Helbing 2000, in the form of
 // Treiber and Kesting's Traffic Flow Dynamics, 2013), and MOBIL for changing
 // lanes (Kesting, Treiber and Helbing 2007).
-namespace simon::model {
+namespace simon::traffic {
 
 // A driver's car-following preferences. The defaults are typical of a
 // highway, as Treiber and Kesting give them.
@@ -114,4 +114,4 @@ inline auto decide_lane_change(const LaneChanger& changer,
   return gain > changer.threshold - bias;
 }
 
-}  // namespace simon::model
+}  // namespace simon::traffic

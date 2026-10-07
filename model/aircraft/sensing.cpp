@@ -8,19 +8,20 @@
 #include <cmath>
 #include <optional>
 
-namespace simon::model {
+namespace simon::aircraft {
 
-auto sense_flight_state(const RigidBody& body, const BodyAcceleration& felt,
-                        const MassBalance& mass, const AircraftData& aircraft,
-                        const Earth& earth, const StandardAirTable& air,
-                        const Wind& wind, Time time,
+auto sense_flight_state(const model::RigidBody& body,
+                        const BodyAcceleration& felt, const MassBalance& mass,
+                        const AircraftData& aircraft, const Earth& earth,
+                        const earth::StandardAirTable& air,
+                        const earth::Wind& wind, Time time,
                         InOut<FlightSignals> signals) -> void {
   const FlightControlData& controls = aircraft.flight_controls;
   using enum FlightSignal;
   FlightSignals& values = *signals;
 
   // The body's place on the Earth, found once, if anything needs it.
-  bool still = is_still(wind);
+  bool still = earth::is_still(wind);
   bool air_data = controls.reads(MACH) || controls.reads(CALIBRATED_AIRSPEED);
   bool attitude = controls.reads(PITCH) || controls.reads(ROLL) ||
                   controls.reads(GROUND_SPEED);
@@ -56,13 +57,14 @@ auto sense_flight_state(const RigidBody& body, const BodyAcceleration& felt,
 
   if (air_data || attitude) {
     if (air_data) {
-      Air here = air(place->altitude);
+      earth::Air here = air(place->altitude);
       double mach =
           uvw.norm() / here.speed_of_sound.numerical_value_in(meter_per_second);
       values[MACH] = mach;
       if (controls.reads(CALIBRATED_AIRSPEED)) {
-        values[CALIBRATED_AIRSPEED] = compute_calibrated_airspeed(mach, here)
-                                          .numerical_value_in(meter_per_second);
+        values[CALIBRATED_AIRSPEED] =
+            earth::compute_calibrated_airspeed(mach, here)
+                .numerical_value_in(meter_per_second);
       }
     }
     if (attitude) {
@@ -93,11 +95,12 @@ auto sense_flight_state(const RigidBody& body, const BodyAcceleration& felt,
     Vector3 pilot = eigen(felt.specific_force) +
                     eigen(felt.angular).cross(eye) +
                     turning.cross(turning.cross(eye));
-    pilot /= STANDARD_GRAVITY.numerical_value_in(meter_per_second_squared);
+    pilot /=
+        earth::STANDARD_GRAVITY.numerical_value_in(meter_per_second_squared);
     values[PILOT_ACCELERATION_Y] = pilot.y();
     values[PILOT_ACCELERATION_Z] = pilot.z();
   }
   values[WEIGHT_ON_WHEELS] = 0.0;
 }
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

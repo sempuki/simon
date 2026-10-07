@@ -522,7 +522,7 @@ is read and sorted by s along each lane:
 `<controller>`, and a stop line on each driving lane a controlled traffic
 light holds for: the lanes its orientation runs on, narrowed by its
 validities. Each group is a `SignalController` entity holding a fixed-time
-`model::SignalPlan`, its phases repeating from an offset, and a
+`traffic::SignalPlan`, its phases repeating from an offset, and a
 `SignalState`, which `RunSignals` sets from the plan each step. OpenDRIVE says
 which signals change together but not when, so by default each junction's
 groups take turns in their order, green for 30 s and yellow for 3 s, with 2 s

@@ -11,7 +11,7 @@
 #include "Eigen/Geometry"
 #include "base/core.hpp"
 
-namespace simon::model {
+namespace simon::road {
 
 namespace {
 
@@ -416,4 +416,4 @@ auto find_road_coordinates(const Road& road, Length x, Length y)
   return best;
 }
 
-}  // namespace simon::model
+}  // namespace simon::road

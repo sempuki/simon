@@ -14,7 +14,7 @@
 // crosswalks, and links across junction corners where sidewalks end near
 // each other (see model/REFERENCES.md). Edges have no direction; a
 // pedestrian walks one either way.
-namespace simon::model {
+namespace simon::road {
 
 struct WalkPoint final {
   double x = 0.0;
@@ -118,4 +118,4 @@ class WalkingGraph final {
 auto build_walking_graph(const RoadNetwork& network, double corner_reach = 25.0)
     -> WalkingGraph;
 
-}  // namespace simon::model
+}  // namespace simon::road

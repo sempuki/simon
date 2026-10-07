@@ -14,7 +14,7 @@
 // CommonRoad's vehicle 1, a Ford Escort, whose multibody parameters come from
 // the US Department of Transportation's vehicle dynamics data. Each field
 // names CommonRoad's symbol for it.
-namespace simon::model {
+namespace simon::vehicle {
 
 // The steering a vehicle can do: its angle's range, and how fast the angle
 // can change.
@@ -155,4 +155,4 @@ inline auto limit_input(const VehicleInput& input, Angle steering, Speed speed,
                                              vehicle.longitudinal)};
 }
 
-}  // namespace simon::model
+}  // namespace simon::vehicle

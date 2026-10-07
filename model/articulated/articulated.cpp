@@ -4,7 +4,7 @@
 
 #include "model/articulated/articulated.hpp"
 
-namespace simon::model {
+namespace simon::articulated {
 
 auto find_trees(const ArticulatedModel& model) -> std::vector<Tree> {
   std::vector<Tree> trees;
@@ -40,4 +40,4 @@ auto find_trees(const ArticulatedModel& model) -> std::vector<Tree> {
   return trees;
 }
 
-}  // namespace simon::model
+}  // namespace simon::articulated

@@ -17,7 +17,7 @@
 // lanes cross or merge, which of them gives way, and the lanes that lead
 // into each such conflict, for finding the vehicles that will reach it.
 // Traffic keeps right.
-namespace simon::model {
+namespace simon::traffic {
 
 // Why one lane gives way to another where they meet.
 enum class Yielding : std::uint8_t {
@@ -35,8 +35,8 @@ enum class Yielding : std::uint8_t {
 // middles first come within a car's width there. Only the lane that gives
 // way keeps the conflict.
 struct Conflict final {
-  LaneKey lane;
-  LaneKey foe;
+  road::LaneKey lane;
+  road::LaneKey foe;
   double along = 0.0;
   double foe_along = 0.0;
   Yielding why = Yielding::RIGHT;
@@ -50,7 +50,7 @@ struct Conflict final {
 struct Approach final {
   static constexpr std::uint32_t NONE = ~std::uint32_t{0};
 
-  LaneKey lane;
+  road::LaneKey lane;
   double to_conflict = 0.0;
   std::uint32_t toward = NONE;
 };
@@ -62,11 +62,12 @@ class RightOfWay final {
   auto conflicts() const -> std::span<const Conflict> { return conflicts_; }
 
   // `lane`'s conflicts, in order along it.
-  auto conflicts_on(const LaneKey& lane) const -> std::span<const Conflict>;
+  auto conflicts_on(const road::LaneKey& lane) const
+      -> std::span<const Conflict>;
 
   // The conflicts whose foe is `lane`, where traffic gives way to it, by
   // their places among all the conflicts.
-  auto conflicts_against(const LaneKey& lane) const
+  auto conflicts_against(const road::LaneKey& lane) const
       -> std::span<const std::uint32_t>;
 
   // The approaches to conflict `index`'s foe lane, the foe lane first.
@@ -74,30 +75,30 @@ class RightOfWay final {
 
   // How far into `lane` its middle first comes within a car's width of
   // another lane that merges with it, if one does.
-  auto find_merge(const LaneKey& lane) const -> std::optional<double>;
+  auto find_merge(const road::LaneKey& lane) const -> std::optional<double>;
 
   // How far into `lane` its middle is first a car's width from every other
   // lane leaving the same lane, if another does.
-  auto find_parting(const LaneKey& lane) const -> std::optional<double>;
+  auto find_parting(const road::LaneKey& lane) const -> std::optional<double>;
 
  private:
-  friend auto build_right_of_way(const RoadNetwork& network,
-                                 const LaneGraph& graph,
+  friend auto build_right_of_way(const road::RoadNetwork& network,
+                                 const road::LaneGraph& graph,
                                  const TrafficControl& control, double reach)
       -> RightOfWay;
 
   std::vector<Conflict> conflicts_;
   std::vector<std::uint32_t> first_;  // Each conflict's approaches' start.
   std::vector<Approach> approaches_;
-  std::vector<std::pair<LaneKey, double>> merges_;    // By lane.
-  std::vector<std::pair<LaneKey, double>> partings_;  // By lane.
-  std::vector<std::uint32_t> against_;                // Conflicts by foe lane.
+  std::vector<std::pair<road::LaneKey, double>> merges_;    // By lane.
+  std::vector<std::pair<road::LaneKey, double>> partings_;  // By lane.
+  std::vector<std::uint32_t> against_;  // Conflicts by foe lane.
   // Into conflicts_, against_, merges_ and partings_, by lane number.
-  LaneNumbering numbering_;
-  LaneRanges on_;
-  LaneRanges against_ranges_;
-  LaneRanges merge_ranges_;
-  LaneRanges parting_ranges_;
+  road::LaneNumbering numbering_;
+  road::LaneRanges on_;
+  road::LaneRanges against_ranges_;
+  road::LaneRanges merge_ranges_;
+  road::LaneRanges parting_ranges_;
 };
 
 // The conflicts of every junction of `network`: each pair of driving lanes
@@ -107,7 +108,8 @@ class RightOfWay final {
 // keep apart lanes whose lights are of different groups, by give-way and
 // stop signs, by a left turn giving way to oncoming traffic, and by giving
 // way to traffic from the right. Approaches reach back `reach` meters.
-auto build_right_of_way(const RoadNetwork& network, const LaneGraph& graph,
+auto build_right_of_way(const road::RoadNetwork& network,
+                        const road::LaneGraph& graph,
                         const TrafficControl& control, double reach = 200.0)
     -> RightOfWay;
 
@@ -118,4 +120,4 @@ auto compute_soonest_arrival(Length distance, Speed speed,
                              AccelerationMagnitude acceleration,
                              Speed top_speed) -> Time;
 
-}  // namespace simon::model
+}  // namespace simon::traffic

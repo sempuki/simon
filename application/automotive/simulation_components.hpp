@@ -33,18 +33,18 @@
 namespace simon::automotive {
 
 using framework::Entity;
-using model::LaneKey;
+using road::LaneKey;
 
 // The roads vehicles drive on, how their lanes link, and the signal groups
 // and stop lines on them, read once and shared by the systems. It outlives
 // the world.
 struct Network final {
-  model::RoadNetwork roads;
-  model::LaneGraph graph;
-  model::LaneGraph driving;  // The driving lanes' graph alone.
-  model::TrafficControl control;
-  model::RightOfWay rights;
-  model::WalkingGraph walking;
+  road::RoadNetwork roads;
+  road::LaneGraph graph;
+  road::LaneGraph driving;  // The driving lanes' graph alone.
+  traffic::TrafficControl control;
+  traffic::RightOfWay rights;
+  road::WalkingGraph walking;
   std::vector<std::uint32_t> walking_components;  // Each node's.
   // Each crosswalk's signal group, if a light stands just before it, and
   // whether vehicles yield to pedestrians at crosswalks without one.
@@ -65,8 +65,8 @@ struct LaneState final {
 
 // A vehicle's driver, and the vehicle's length.
 struct Driver final {
-  model::IntelligentDriver following;
-  model::LaneChanger changing;
+  traffic::IntelligentDriver following;
+  traffic::LaneChanger changing;
   Length length = 4.5 * meter;
   std::uint64_t seed = 0;  // Picks its way at forks.
 };
@@ -82,7 +82,7 @@ struct Driver final {
 struct Tactical final {
   static constexpr std::uint32_t NONE = ~std::uint32_t{0};
 
-  model::LightBraking braking;
+  traffic::LightBraking braking;
   Time critical_gap = 6.0 * second;
   std::optional<LaneKey> entering;
   std::uint32_t committed = NONE;
@@ -99,7 +99,7 @@ struct Stopped final {
 // A signal group, by its place in the network's groups, and what it shows.
 struct SignalState final {
   std::uint32_t group = 0;
-  model::Aspect aspect = model::Aspect::RED;
+  traffic::Aspect aspect = traffic::Aspect::RED;
 };
 
 // What a vehicle's driver decided this step: its acceleration, and the lane
@@ -141,8 +141,8 @@ inline auto pose(const RoadPose& vehicle) -> model::Pose {
 // and orders as the storyboard saw and gave them this step. It outlives the
 // world.
 struct ScenarioContext final {
-  const model::RoadNetwork* roads = nullptr;
-  const model::LaneGraph* lanes = nullptr;
+  const road::RoadNetwork* roads = nullptr;
+  const road::LaneGraph* lanes = nullptr;
   const scenario::Scenario* scenario = nullptr;
   scenario::StoryboardPlayer* player = nullptr;
   std::vector<scenario::EntityState> states;  // By entity.
@@ -164,7 +164,7 @@ struct ScenarioOrders final {
   std::vector<scenario::ActionOrder> starts;
   // Where each teleport puts the vehicle, in the order given, each found
   // after the teleports before it, as a relative position needs.
-  std::vector<model::RoadPlacement> teleports;
+  std::vector<road::RoadPlacement> teleports;
   // Whether the storyboard teleported the vehicle this step, which then
   // stays where it was put; esmini's init teleports come before the first
   // step, and do not hold it.
@@ -214,7 +214,7 @@ struct LateralChange final {
 // moving backward when it started.
 struct TrajectoryRun final {
   std::uint32_t handle = 0;
-  model::Polyline polyline;
+  road::Polyline polyline;
   double along = 0.0;  // m.
   bool backward = false;
 };
@@ -223,11 +223,11 @@ struct TrajectoryRun final {
 // moving it, the roads its route runs through, how long it has been at the
 // end of its road, and the lateral actions it finished this step.
 struct ScenarioMotion final {
-  model::RoadPlacement placement;
+  road::RoadPlacement placement;
   std::optional<LateralChange> change;
   std::optional<TrajectoryRun> trajectory;
   // Where a trajectory put it this step, which its placement only nears.
-  std::optional<model::PlacementPose> pose;
+  std::optional<road::PlacementPose> pose;
   std::vector<std::size_t> route;  // By index.
   double end_of_road = -1.0;       // s, -1 if not there.
   std::vector<std::uint32_t> finished;
@@ -237,7 +237,7 @@ struct ScenarioMotion final {
 
 // A pedestrian's route on the walking graph, and how many it has walked.
 struct WalkRoute final {
-  std::vector<model::Leg> legs;
+  std::vector<road::Leg> legs;
   std::uint32_t trips = 0;
 };
 
@@ -296,9 +296,9 @@ struct Pedestrian final                                //
                          WalkRoute, WalkCommand>> {};  //
 
 // A signal group's controller, running its plan.
-struct SignalController final                                  //
-    : Archetype<"signal controller",                           //
-                Requires<model::SignalPlan, SignalState>> {};  //
+struct SignalController final                                    //
+    : Archetype<"signal controller",                             //
+                Requires<traffic::SignalPlan, SignalState>> {};  //
 
 struct ScenarioEntity final                              //
     : Archetype<"scenario entity",                       //
@@ -311,7 +311,7 @@ struct ScenarioEntity final                              //
 using World = framework::World<
     RoadPose,
     framework::TypeList<LaneState, Driver, DriveCommand, Tactical, Stopped,
-                        model::SignalPlan, SignalState, WalkState, Walker,
+                        traffic::SignalPlan, SignalState, WalkState, Walker,
                         WalkRoute, WalkCommand>,
     framework::TypeList<archetype::Vehicle, archetype::TacticalVehicle,
                         archetype::Pedestrian, archetype::SignalController>>;

@@ -21,12 +21,9 @@
 // and engine_collision_convex.c (Apache-2.0), for primitives, in its order
 // of operations. Each function names the one it ports, so the two read side
 // by side.
-namespace simon::model {
+namespace simon::articulated {
 
 namespace {
-
-using articulated::MINVAL;
-using articulated::normalize;
 
 constexpr double MINVAL2 = MINVAL * MINVAL;  // mjMINVAL2.
 constexpr double MAXVAL = 1e10;              // mjMAXVAL.
@@ -2116,4 +2113,4 @@ auto collide_convex(const Geom& first, const GeomFrame& first_frame,
   return static_cast<std::uint32_t>(ncon);
 }
 
-}  // namespace simon::model
+}  // namespace simon::articulated

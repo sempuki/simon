@@ -21,10 +21,10 @@ namespace {
 
 using namespace std::chrono_literals;
 using namespace testing;
-using model::KinematicSingleTrack;
-using model::KinematicSingleTrackRate;
-using model::VehicleInput;
-using model::VehicleParameters;
+using vehicle::KinematicSingleTrack;
+using vehicle::KinematicSingleTrackRate;
+using vehicle::VehicleInput;
+using vehicle::VehicleParameters;
 
 auto read_state(const Row& row) -> KinematicSingleTrack {
   return {.x = number(row, "x") * meter,
@@ -83,14 +83,14 @@ auto drive(const VehicleParameters& vehicle, std::chrono::microseconds dt)
   for (std::int64_t k = 0; k < steps; ++k) {
     VehicleInput input = inputs(std::chrono::duration<double>(k * dt).count());
     auto rate = [&](const KinematicSingleTrack& at) {
-      return model::compute_kinematic_single_track_rate(at, input, vehicle);
+      return vehicle::compute_kinematic_single_track_rate(at, input, vehicle);
     };
     KinematicSingleTrackRate k1 = rate(state);
-    KinematicSingleTrackRate k2 = rate(model::advance(state, 0.5 * k1, dt));
-    KinematicSingleTrackRate k3 = rate(model::advance(state, 0.5 * k2, dt));
-    KinematicSingleTrackRate k4 = rate(model::advance(state, k3, dt));
-    state = model::advance(state, (1.0 / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4),
-                           dt);
+    KinematicSingleTrackRate k2 = rate(vehicle::advance(state, 0.5 * k1, dt));
+    KinematicSingleTrackRate k3 = rate(vehicle::advance(state, 0.5 * k2, dt));
+    KinematicSingleTrackRate k4 = rate(vehicle::advance(state, k3, dt));
+    state = vehicle::advance(state,
+                             (1.0 / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4), dt);
     if ((k + 1) % every == 0) {
       path.push_back(state);
     }
@@ -111,7 +111,7 @@ TEST_CASE("KinematicSingleTrackAgainstCommonRoad") {
       const VehicleParameters& vehicle =
           by_id.at(static_cast<int>(number(row, "vehicle")));
       KinematicSingleTrackRate rate =
-          model::compute_kinematic_single_track_rate(
+          vehicle::compute_kinematic_single_track_rate(
               read_state(row),
               {.steering_rate =
                    number(row, "steering_rate") * radian_per_second,

@@ -8,7 +8,7 @@
 #include <cmath>
 #include <numbers>
 
-namespace simon::model {
+namespace simon::road {
 
 namespace {
 
@@ -87,4 +87,4 @@ auto Polyline::evaluate(double along) const -> PolylinePoint {
   return at;
 }
 
-}  // namespace simon::model
+}  // namespace simon::road

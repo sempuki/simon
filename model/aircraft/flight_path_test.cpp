@@ -9,7 +9,7 @@
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 
-namespace simon::model {
+namespace simon::aircraft {
 
 using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
@@ -33,7 +33,7 @@ auto level(double speed, double heading) -> AirState {
 }  // namespace
 
 TEST_CASE("PointMassRate") {
-  Air air = standard_air(5000.0 * meter);
+  earth::Air air = earth::standard_air(5000.0 * meter);
 
   SECTION("ShouldHoldPathGivenLevelUnbankedFlight") {
     AirStateRate rate =
@@ -97,8 +97,8 @@ TEST_CASE("Fly") {
     state.flight_path_angle = 0.1 * radian;
     FlightControls controls{
         .load_factor = 1.5, .bank = 0.6 * radian, .throttle = 0.5};
-    AirStateRate rate = compute_point_mass_rate(state, controls, JET,
-                                                standard_air(5000.0 * meter));
+    AirStateRate rate = compute_point_mass_rate(
+        state, controls, JET, earth::standard_air(5000.0 * meter));
 
     AirState next = fly(state, rate, 20ms);
     QuantityVector expected =
@@ -166,4 +166,4 @@ TEST_CASE("AutopilotLaws") {
   }
 }
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

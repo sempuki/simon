@@ -11,15 +11,15 @@
 #include "Eigen/Dense"
 
 template <>
-const std::array<lib::StatusConditionEntry, simon::model::TRIM_ERROR_COUNT>
+const std::array<lib::StatusConditionEntry, simon::aircraft::TRIM_ERROR_COUNT>
     lib::EnumStatusKindConditionMixin<
-        simon::model::TrimError, simon::model::TRIM_ERROR_COUNT>::conditions_ =
-        {
-            lib::StatusConditionEntry{"trim diverged"},
-            lib::StatusConditionEntry{"trim saturated"},
+        simon::aircraft::TrimError,
+        simon::aircraft::TRIM_ERROR_COUNT>::conditions_ = {
+        lib::StatusConditionEntry{"trim diverged"},
+        lib::StatusConditionEntry{"trim saturated"},
 };
 
-namespace simon::model {
+namespace simon::aircraft {
 
 namespace {
 
@@ -63,7 +63,7 @@ auto solve_pitch(double alpha, double bank, double gamma) -> double {
 class Trimmer final {
  public:
   Trimmer(const AircraftData& aircraft, const FlightCondition& condition,
-          const Earth& earth, const StandardAirTable& air)
+          const Earth& earth, const earth::StandardAirTable& air)
       : aircraft_{aircraft},
         condition_{condition},
         earth_{earth},
@@ -109,19 +109,20 @@ class Trimmer final {
     }
 
     // The flight controls and the airframe, each settled on the other.
-    EngineAir engine_air =
-        compute_engine_air(trim.body, earth_, air_, Wind{}, 0.0 * second);
-    RigidBodyRate rate;
+    EngineAir engine_air = compute_engine_air(trim.body, earth_, air_,
+                                              earth::Wind{}, 0.0 * second);
+    model::RigidBodyRate rate;
     for (int pass = 0; pass < 100; ++pass) {
       sense_flight_state(trim.body, trim.felt, trim.mass, aircraft_, earth_,
-                         air_, Wind{}, 0.0 * second, InOut(trim.signals));
+                         air_, earth::Wind{}, 0.0 * second,
+                         InOut(trim.signals));
       settle_flight_controls(aircraft_.flight_controls, InOut(trim.signals));
       trim.engines =
           compute_settled_engines(aircraft_, trim.signals, engine_air);
       BodyAcceleration felt;
-      rate = compute_rigid_aircraft_rate(trim.body, trim.signals, trim.engines,
-                                         trim.mass, aircraft_, earth_, air_,
-                                         Wind{}, 0.0 * second, Out(felt));
+      rate = aircraft::compute_rigid_aircraft_rate(
+          trim.body, trim.signals, trim.engines, trim.mass, aircraft_, earth_,
+          air_, earth::Wind{}, 0.0 * second, Out(felt));
       double change =
           magnitude((felt.specific_force - trim.felt.specific_force)
                         .numerical_value_in(meter_per_second_squared));
@@ -215,7 +216,7 @@ class Trimmer final {
   const AircraftData& aircraft_;
   const FlightCondition& condition_;
   const Earth& earth_;
-  const StandardAirTable& air_;
+  const earth::StandardAirTable& air_;
   MassBalance mass_;
   double span_ = 0.0;  // m.
 };
@@ -223,9 +224,9 @@ class Trimmer final {
 }  // namespace
 
 auto trim(const AircraftData& aircraft, const FlightCondition& condition,
-          const Earth& earth, const StandardAirTable& air)
+          const Earth& earth, const earth::StandardAirTable& air)
     -> std::expected<Trim, lib::Status> {
   return Trimmer{aircraft, condition, earth, air}.solve();
 }
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

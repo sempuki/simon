@@ -9,12 +9,9 @@
 
 #include "model/articulated/convex.hpp"
 
-namespace simon::model {
+namespace simon::articulated {
 
 namespace {
-
-using articulated::MINVAL;
-using articulated::normalize;
 
 constexpr double MAXVAL = 1e10;  // mjMAXVAL.
 
@@ -1209,4 +1206,4 @@ auto append_contacts(const ArticulatedModel& model, std::uint32_t first,
   }
 }
 
-}  // namespace simon::model
+}  // namespace simon::articulated

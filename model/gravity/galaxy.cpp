@@ -9,7 +9,7 @@
 
 #include "model/gravity/gravity.hpp"
 
-namespace simon::model {
+namespace simon::gravity {
 
 namespace {
 
@@ -391,4 +391,4 @@ auto append_ring_disk(const RingDisk& disk, const BodyStart& center,
   }
 }
 
-}  // namespace simon::model
+}  // namespace simon::gravity

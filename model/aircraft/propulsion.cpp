@@ -8,7 +8,7 @@
 #include <cmath>
 #include <cstddef>
 
-namespace simon::model {
+namespace simon::aircraft {
 
 auto compute_settled_engines(const AircraftData& aircraft,
                              const FlightSignals& signals, const EngineAir& air)
@@ -22,12 +22,12 @@ auto compute_settled_engines(const AircraftData& aircraft,
   return engines;
 }
 
-auto compute_engine_air(const RigidBody& body, const Earth& earth,
-                        const StandardAirTable& air, const Wind& wind,
-                        Time time) -> EngineAir {
+auto compute_engine_air(const model::RigidBody& body, const Earth& earth,
+                        const earth::StandardAirTable& air,
+                        const earth::Wind& wind, Time time) -> EngineAir {
   Length altitude = 0.0 * meter;
   double speed = 0.0;
-  if (is_still(wind)) {
+  if (earth::is_still(wind)) {
     altitude = earth.altitude(body, time);
     speed = eigen(earth.air_velocity(body)).norm();
   } else {
@@ -35,18 +35,18 @@ auto compute_engine_air(const RigidBody& body, const Earth& earth,
     altitude = place.altitude;
     speed = compute_inertial_air_velocity(body, earth, place, wind).norm();
   }
-  Air here = air(altitude);
+  earth::Air here = air(altitude);
   double sound = here.speed_of_sound.numerical_value_in(meter_per_second);
   // The speed of sound is sqrt(gamma R T).
-  double temperature =
-      sound * sound /
-      (internal::HEAT_RATIO *
-       internal::GAS_CONSTANT.numerical_value_in(joule_per_kilogram_kelvin));
+  double temperature = sound * sound /
+                       (earth::internal::HEAT_RATIO *
+                        earth::internal::GAS_CONSTANT.numerical_value_in(
+                            joule_per_kilogram_kelvin));
   return EngineAir{
       .mach = speed / sound,
       .density_altitude = altitude,
       .density_ratio =
-          number_of(here.density / standard_air(0.0 * meter).density),
+          number_of(here.density / earth::standard_air(0.0 * meter).density),
       .temperature = units::delta<kelvin>(temperature),
   };
 }
@@ -99,4 +99,4 @@ auto burn_fuel(const AircraftData& aircraft, const Engines& engines,
   }
 }
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

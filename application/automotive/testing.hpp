@@ -99,8 +99,8 @@ inline auto number(const Row& row, std::string_view column) -> double {
 // CommonRoad's vehicles 1, 2 and 3 by number, every parameter from
 // commonroad_vehicles.csv.
 inline auto load_commonroad_vehicles()
-    -> std::map<int, model::VehicleParameters> {
-  using namespace model;
+    -> std::map<int, vehicle::VehicleParameters> {
+  using namespace vehicle;
   std::map<int, std::map<std::string, double, std::less<>>> values;
   for (const Row& row : load_rows("commonroad_vehicles.csv")) {
     values[static_cast<int>(number(row, "vehicle"))][row.find("name")->second] =

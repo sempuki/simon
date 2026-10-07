@@ -8,7 +8,7 @@
 #include <cmath>
 #include <numbers>
 
-namespace simon::model {
+namespace simon::traffic {
 
 namespace {
 
@@ -200,7 +200,7 @@ auto check_comfort(const ComfortSignals& signals, const ComfortLimits& limits)
                 limits.max_yaw_acceleration);
 }
 
-auto check_ahead(double x, double y, double heading, Point2 to,
+auto check_ahead(double x, double y, double heading, model::Point2 to,
                  double tolerance) -> bool {
   double dx = to.x - x;
   double dy = to.y - y;
@@ -220,32 +220,33 @@ auto compute_time_to_collision(const MovingBox& ego,
     return std::nullopt;
   }
   auto displacement = [&](const MovingBox& moving) {
-    return Point2{.x = std::cos(moving.box.heading) * moving.speed * step,
-                  .y = std::sin(moving.box.heading) * moving.speed * step};
+    return model::Point2{
+        .x = std::cos(moving.box.heading) * moving.speed * step,
+        .y = std::sin(moving.box.heading) * moving.speed * step};
   };
-  auto stretch = [&](const MovingBox& moving, Point2 d) {
-    OrientedBox box = moving.box;
+  auto stretch = [&](const MovingBox& moving, model::Point2 d) {
+    model::OrientedBox box = moving.box;
     box.x = (horizon / step) / 2.0 * d.x + moving.box.x;
     box.y = (horizon / step) / 2.0 * d.y + moving.box.y;
     box.length = moving.box.length +
                  std::hypot(d.x * horizon / step, d.y * horizon / step);
     return box;
   };
-  Point2 ego_step = displacement(ego);
-  OrientedBox ego_reach = stretch(ego, ego_step);
-  std::vector<Point2> steps;
+  model::Point2 ego_step = displacement(ego);
+  model::OrientedBox ego_reach = stretch(ego, ego_step);
+  std::vector<model::Point2> steps;
   std::vector<std::size_t> followed;
   for (std::size_t i = 0; i < tracks.size(); ++i) {
     steps.push_back(displacement(tracks[i]));
-    if (detect_overlap(ego_reach, stretch(tracks[i], steps[i]))) {
+    if (model::detect_overlap(ego_reach, stretch(tracks[i], steps[i]))) {
       followed.push_back(i);
     }
   }
   if (followed.empty()) {
     return std::nullopt;
   }
-  OrientedBox moved_ego = ego.box;
-  std::vector<OrientedBox> moved;
+  model::OrientedBox moved_ego = ego.box;
+  std::vector<model::OrientedBox> moved;
   for (const MovingBox& track : tracks) {
     moved.push_back(track.box);
   }
@@ -259,7 +260,7 @@ auto compute_time_to_collision(const MovingBox& ego,
       moved[i].y += steps[i].y;
     }
     for (std::size_t i : followed) {
-      if (detect_overlap(moved_ego, moved[i])) {
+      if (model::detect_overlap(moved_ego, moved[i])) {
         return time;
       }
     }
@@ -267,4 +268,4 @@ auto compute_time_to_collision(const MovingBox& ego,
   return std::nullopt;
 }
 
-}  // namespace simon::model
+}  // namespace simon::traffic

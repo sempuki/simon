@@ -20,10 +20,10 @@ namespace simon::format {
 
 // Reads the tire that `text` describes.
 auto parse_tire_file(std::string_view text)
-    -> std::expected<model::MagicFormulaTire, lib::Status>;
+    -> std::expected<vehicle::MagicFormulaTire, lib::Status>;
 
 // Reads the tire in the file at `path`.
 auto load_tire_file(const std::string& path)
-    -> std::expected<model::MagicFormulaTire, lib::Status>;
+    -> std::expected<vehicle::MagicFormulaTire, lib::Status>;
 
 }  // namespace simon::format

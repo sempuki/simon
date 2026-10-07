@@ -18,7 +18,7 @@
 // solved in the accelerations by Newton's method with an exact line search,
 // or in the forces by projected Gauss–Seidel. Dense: an island's rows and
 // degrees of freedom are few.
-namespace simon::model {
+namespace simon::articulated {
 
 // A row's kind, in the order an island lists them: a degree of freedom's
 // dry friction, a joint's limit, a contact without friction, an edge of a
@@ -85,4 +85,4 @@ auto solve_constraints(const ConstraintProblem& problem,
                        const ConstraintSettings& settings,
                        Out<ConstraintSolution> solution) -> void;
 
-}  // namespace simon::model
+}  // namespace simon::articulated

@@ -104,7 +104,7 @@ TEST_CASE("Storyboard") {
   SECTION("ShouldRunTrafficSignalControllersAsTheStandardSays") {
     auto scenario = format::parse_openscenario(CONTROLLED, ".");
     REQUIRE(scenario.has_value());
-    model::RoadNetwork roads;
+    road::RoadNetwork roads;
     osc::StoryboardPlayer player{*scenario, roads};
     struct Expected final {
       double time = 0.0;

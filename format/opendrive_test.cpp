@@ -9,7 +9,7 @@
 
 namespace simon::format {
 
-using namespace model;
+using namespace road;
 
 namespace {
 

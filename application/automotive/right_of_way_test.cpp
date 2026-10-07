@@ -54,7 +54,7 @@ auto count_overlaps(const World& world) -> int {
 }
 
 auto road_index(const Network& network, std::string_view id) -> std::uint32_t {
-  const model::Road* road = network.roads.find_road(id);
+  const road::Road* road = network.roads.find_road(id);
   REQUIRE(road);
   return static_cast<std::uint32_t>(road - network.roads.roads.data());
 }
@@ -66,12 +66,12 @@ TEST_CASE("RightOfWay") {
     auto network = load_network(find_road_path("priority.xodr"));
     REQUIRE(network);
     std::map<std::string, int> why;
-    for (const model::Conflict& conflict : network->rights.conflicts()) {
+    for (const traffic::Conflict& conflict : network->rights.conflicts()) {
       std::string pair = network->roads.roads[conflict.lane.road].id + ">" +
                          network->roads.roads[conflict.foe.road].id;
       why[pair] = static_cast<int>(conflict.why);
     }
-    using model::Yielding;
+    using traffic::Yielding;
     CHECK(why == std::map<std::string, int>{
                      {"es>we", static_cast<int>(Yielding::PRIORITY)},
                      {"es>ws", static_cast<int>(Yielding::TURN)},
@@ -89,11 +89,11 @@ TEST_CASE("RightOfWay") {
     REQUIRE(network);
     std::set<std::pair<LaneKey, LaneKey>> lights;
     int turns = 0;
-    for (const model::Conflict& conflict : network->rights.conflicts()) {
-      if (conflict.why == model::Yielding::LIGHTS) {
+    for (const traffic::Conflict& conflict : network->rights.conflicts()) {
+      if (conflict.why == traffic::Yielding::LIGHTS) {
         lights.emplace(conflict.lane, conflict.foe);
       } else {
-        CHECK(conflict.why == model::Yielding::TURN);
+        CHECK(conflict.why == traffic::Yielding::TURN);
         ++turns;
       }
     }

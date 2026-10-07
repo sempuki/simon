@@ -41,23 +41,23 @@ using ProjectedWorld = framework::ProjectedWorld<SystemType, World>;
 // The lane's length, from its section's start to its end.
 inline auto find_lane_length(const Network& network, const LaneKey& lane)
     -> double {
-  return model::find_lane_length(network.roads, lane);
+  return road::find_lane_length(network.roads, lane);
 }
 
 // How far along its lane, in the direction of travel, `s` is.
 inline auto along_lane(const Network& network, const LaneKey& lane, Length s)
     -> double {
   double at = s.numerical_value_in(meter);
-  return model::runs_with_s(lane)
+  return road::runs_with_s(lane)
              ? at -
                    network.roads.roads[lane.road].lane_sections[lane.section].s0
-             : model::find_section_end(network.roads, lane) - at;
+             : road::find_section_end(network.roads, lane) - at;
 }
 
 // The s of `along` meters along `lane`, in the direction of travel.
 inline auto find_s_along(const Network& network, const LaneKey& lane,
                          double along) -> Length {
-  return model::find_s_along(network.roads, lane, along) * meter;
+  return road::find_s_along(network.roads, lane, along) * meter;
 }
 
 // The driving lane a vehicle enters from `lane`, its `turns`th: at a fork,
@@ -86,13 +86,13 @@ inline auto find_neighbor(const Network& network, const LaneKey& lane,
   int outward = lane.lane > 0 ? 1 : -1;
   LaneKey beside = lane;
   beside.lane += right ? outward : -outward;
-  const model::LaneSection& section =
+  const road::LaneSection& section =
       network.roads.roads[lane.road].lane_sections[lane.section];
-  const std::vector<model::Lane>& side =
+  const std::vector<road::Lane>& side =
       beside.lane > 0 ? section.left : section.right;
   if (beside.lane == 0 ||
       static_cast<std::size_t>(std::abs(beside.lane)) > side.size() ||
-      model::find_lane(network.roads, beside).type != "driving") {
+      road::find_lane(network.roads, beside).type != "driving") {
     return std::nullopt;
   }
   return beside;
@@ -157,8 +157,8 @@ class LaneOccupancy final {
     });
     numbering_ = &network.graph.numbering();
     lanes_ =
-        model::LaneRanges{*numbering_, occupants_.size(),
-                          [&](std::size_t i) { return occupants_[i].lane; }};
+        road::LaneRanges{*numbering_, occupants_.size(),
+                         [&](std::size_t i) { return occupants_[i].lane; }};
     places_.assign(places_.size(), NOWHERE);
     for (std::uint32_t i = 0; i < occupants_.size(); ++i) {
       std::uint32_t index = occupants_[i].entity.index;
@@ -268,8 +268,8 @@ class LaneOccupancy final {
   }
 
   std::vector<Occupant> occupants_;  // By lane, then along it.
-  const model::LaneNumbering* numbering_ = nullptr;
-  model::LaneRanges lanes_;            // Into occupants_, by lane number.
+  const road::LaneNumbering* numbering_ = nullptr;
+  road::LaneRanges lanes_;             // Into occupants_, by lane number.
   std::vector<std::uint32_t> places_;  // Each entity's place, by its index.
   std::vector<Stop> stops_;            // Each entity's stop, by its index.
 };
@@ -279,12 +279,12 @@ class LaneOccupancy final {
 // Each step, each signal group shows what its plan gives for the step's time.
 struct RunSignals final    //
     : System<SignalState,  //
-             const model::SignalPlan> {
+             const traffic::SignalPlan> {
   using SystemWorld = ProjectedWorld<RunSignals>;
 
-  auto operator()(SystemWorld&, Entity,           //
-                  SignalState& state,             //
-                  const model::SignalPlan* plan,  //
+  auto operator()(SystemWorld&, Entity,             //
+                  SignalState& state,               //
+                  const traffic::SignalPlan* plan,  //
                   Step step) const -> void {
     if (plan) {
       state.aspect = plan->aspect_at(step.time.time_since_epoch());
@@ -334,7 +334,7 @@ struct Decide final            //
                        *network_,
                        yields_ ? &world.store_of<Stopped>() : nullptr);
     changing_ = gate_.fire(step).has_value();
-    aspects_.assign(network_->control.groups().size(), model::Aspect::GREEN);
+    aspects_.assign(network_->control.groups().size(), traffic::Aspect::GREEN);
     world.store_of<SignalState>().for_each(
         [&](Entity, const SignalState& signal) {
           if (signal.group < aspects_.size()) {
@@ -370,14 +370,14 @@ struct Decide final            //
     }
     auto obey = [&](AccelerationMagnitude acceleration) {
       return light ? std::min(acceleration,
-                              model::compute_stop_acceleration(
+                              traffic::compute_stop_acceleration(
                                   driver->following, state->speed, *light))
                    : acceleration;
     };
-    std::optional<model::Leader> leader =
+    std::optional<traffic::Leader> leader =
         find_leader(state->lane, along, state->turns, driver->seed, self);
-    auto now = model::compute_idm_acceleration(driver->following, state->speed,
-                                               leader);
+    auto now = traffic::compute_idm_acceleration(driver->following,
+                                                 state->speed, leader);
     command = DriveCommand{.acceleration = obey(now)};
     if (!changing_ || state->speed < 1.0 * meter_per_second) {
       return;
@@ -388,7 +388,7 @@ struct Decide final            //
       if (target && worth_changing(*state, *driver, self, along, now, leader,
                                    *target, right)) {
         command.change = target;
-        command.acceleration = obey(model::compute_idm_acceleration(
+        command.acceleration = obey(traffic::compute_idm_acceleration(
             driver->following, state->speed,
             find_leader(*target, along, state->turns, driver->seed, self)));
         return;
@@ -409,7 +409,7 @@ struct Decide final            //
                                    double along, Entity self,
                                    Tactical& tactical) const
       -> std::optional<Length> {
-    const model::RightOfWay& rights = network_->rights;
+    const traffic::RightOfWay& rights = network_->rights;
     double before = -along;  // From the vehicle to the lane's start.
     LaneKey key = state.lane;
     std::uint32_t turns = state.turns;
@@ -443,9 +443,9 @@ struct Decide final            //
         before - tactical.braking.line_gap.numerical_value_in(meter), 0.0);
     // s, at the soonest, to where it waits.
     double arriving =
-        model::compute_soonest_arrival(to_wait * meter, state.speed,
-                                       driver.following.acceleration,
-                                       driver.following.desired_speed)
+        traffic::compute_soonest_arrival(to_wait * meter, state.speed,
+                                         driver.following.acceleration,
+                                         driver.following.desired_speed)
             .numerical_value_in(second);
     const LaneOccupancy::Occupant* me = occupancy_.find(self, state.lane);
     LaneOccupancy::Stop my_stop =
@@ -457,12 +457,12 @@ struct Decide final            //
     // and has not cleared where their ways meet, or waits to enter it,
     // having stopped first, as that one then goes.
     for (std::uint32_t index : rights.conflicts_against(key)) {
-      const model::Conflict& conflict = rights.conflicts()[index];
+      const traffic::Conflict& conflict = rights.conflicts()[index];
       for (const LaneOccupancy::Occupant& other :
            occupancy_.occupants_of(conflict.lane)) {
         clear = clear && !(other.along - other.length < conflict.along);
       }
-      if (!waiting || conflict.why == model::Yielding::LIGHTS) {
+      if (!waiting || conflict.why == traffic::Yielding::LIGHTS) {
         continue;
       }
       for (const LaneKey& before_lane :
@@ -487,14 +487,15 @@ struct Decide final            //
         clear = clear && !(first && waits && heading);
       }
     }
-    for (const model::Conflict& conflict : rights.conflicts_on(key)) {
-      if (conflict.why == model::Yielding::LIGHTS) {
+    for (const traffic::Conflict& conflict : rights.conflicts_on(key)) {
+      if (conflict.why == traffic::Yielding::LIGHTS) {
         continue;  // Kept apart by lights: only who is in the junction.
       }
       auto index =
           static_cast<std::uint32_t>(&conflict - rights.conflicts().data());
-      std::span<const model::Approach> approaches = rights.approaches_of(index);
-      for (const model::Approach& approach : approaches) {
+      std::span<const traffic::Approach> approaches =
+          rights.approaches_of(index);
+      for (const traffic::Approach& approach : approaches) {
         if (const LaneOccupancy::Occupant* foe =
                 find_foe(approaches, approach, self)) {
           TimePoint foe_since = occupancy_.stop_of(*foe).since;
@@ -503,7 +504,7 @@ struct Decide final            //
                   std::tie(foe_since, foe->entity)) {
             continue;  // It stopped first.
           }
-          double time = model::compute_soonest_arrival(
+          double time = traffic::compute_soonest_arrival(
                             (approach.to_conflict - foe->along) * meter,
                             foe->speed * meter_per_second,
                             foe->driver->following.acceleration,
@@ -533,8 +534,8 @@ struct Decide final            //
   // The nearest vehicle in `approach`'s lane, but `self`, whose way leads to
   // the conflict and that has not passed it, unless one going elsewhere
   // stands still before it.
-  auto find_foe(std::span<const model::Approach> approaches,
-                const model::Approach& approach, Entity self) const
+  auto find_foe(std::span<const traffic::Approach> approaches,
+                const traffic::Approach& approach, Entity self) const
       -> const LaneOccupancy::Occupant* {
     std::span<const LaneOccupancy::Occupant> in =
         occupancy_.occupants_of(approach.lane);
@@ -547,7 +548,7 @@ struct Decide final            //
       std::uint32_t turns = it->turns;
       std::uint32_t toward = approach.toward;
       bool heading = true;
-      while (heading && toward != model::Approach::NONE) {
+      while (heading && toward != traffic::Approach::NONE) {
         std::optional<LaneKey> next =
             choose_next_lane(*network_, key, it->driver->seed, turns++);
         heading = next == approaches[toward].lane;
@@ -566,7 +567,7 @@ struct Decide final            //
 
   // Whether `foe` stands waiting at its own way into the junction, at the end
   // of the lane leading into the conflict's foe lane.
-  auto waits_at_entry(const model::Approach& approach,
+  auto waits_at_entry(const traffic::Approach& approach,
                       const LaneOccupancy::Occupant& foe,
                       const Tactical& tactical) const -> bool {
     double line_gap = tactical.braking.line_gap.numerical_value_in(meter);
@@ -593,7 +594,7 @@ struct Decide final            //
         tactical.braking.maximum.numerical_value_in(meter_per_second_squared);
     double line_gap = tactical.braking.line_gap.numerical_value_in(meter);
     while (before < LOOKAHEAD) {
-      for (const model::CrosswalkZone& zone : network_->walking.zones_on(key)) {
+      for (const road::CrosswalkZone& zone : network_->walking.zones_on(key)) {
         double distance = before + zone.near;
         if (distance <= 0.0 || distance >= LOOKAHEAD) {
           continue;
@@ -633,14 +634,15 @@ struct Decide final            //
                                     const Driver& driver, double along,
                                     Tactical& tactical) const
       -> std::optional<Length> {
-    std::span<const model::StopLine> all = network_->control.stop_lines();
+    std::span<const traffic::StopLine> all = network_->control.stop_lines();
     bool held = false;
     std::optional<Length> light;
     double before = -along;  // From the vehicle to the lane's start.
     LaneKey key = state.lane;
     std::uint32_t turns = state.turns;
     while (!light && before < LOOKAHEAD) {
-      for (const model::StopLine& line : network_->control.stop_lines_on(key)) {
+      for (const traffic::StopLine& line :
+           network_->control.stop_lines_on(key)) {
         double distance = before + line.along;
         if (distance <= 0.0 || distance >= LOOKAHEAD) {
           continue;
@@ -650,15 +652,15 @@ struct Decide final            //
           held = true;
           continue;
         }
-        model::Aspect aspect = aspects_[line.group];
-        if (aspect == model::Aspect::GREEN) {
+        traffic::Aspect aspect = aspects_[line.group];
+        if (aspect == traffic::Aspect::GREEN) {
           continue;
         }
         // Where it stops, its line gap short of the line.
         Length to_stop =
             std::max(distance * meter - tactical.braking.line_gap, 0.0 * meter);
-        if (model::stops_at_light(driver.following, tactical.braking, aspect,
-                                  state.speed, to_stop)) {
+        if (traffic::stops_at_light(driver.following, tactical.braking, aspect,
+                                    state.speed, to_stop)) {
           light = to_stop;
           break;
         }
@@ -684,7 +686,7 @@ struct Decide final            //
   // the lookahead.
   auto find_leader(const LaneKey& lane, double along, std::uint32_t turns,
                    std::uint64_t seed, Entity self) const
-      -> std::optional<model::Leader> {
+      -> std::optional<traffic::Leader> {
     if (yields_) {
       return find_leader_near_junctions(lane, along, turns, seed, self);
     }
@@ -698,8 +700,8 @@ struct Decide final            //
       std::optional<LaneKey> next =
           choose_next_lane(*network_, key, seed, turns++);
       if (!next) {
-        return model::Leader{.gap = distance * meter,
-                             .speed = 0.0 * meter_per_second};
+        return traffic::Leader{.gap = distance * meter,
+                               .speed = 0.0 * meter_per_second};
       }
       key = *next;
       if (const LaneOccupancy::Occupant* first = occupancy_.find_first(key)) {
@@ -714,13 +716,13 @@ struct Decide final            //
   // lanes merging into or parting from the driver's way lead it too.
   [[gnu::noinline]] auto find_leader_near_junctions(
       const LaneKey& lane, double along, std::uint32_t turns,
-      std::uint64_t seed, Entity self) const -> std::optional<model::Leader> {
-    auto nearer = [](std::optional<model::Leader> a,
-                     std::optional<model::Leader> b) {
+      std::uint64_t seed, Entity self) const -> std::optional<traffic::Leader> {
+    auto nearer = [](std::optional<traffic::Leader> a,
+                     std::optional<traffic::Leader> b) {
       return !a || (b && b->gap < a->gap) ? b : a;
     };
     // Where lanes part, those leaving the same lane share it at first.
-    std::optional<model::Leader> parting;
+    std::optional<traffic::Leader> parting;
     if (yields_) {
       for (const LaneKey& before : network_->graph.predecessors_of(lane)) {
         for (const LaneKey& sibling : network_->graph.successors_of(before)) {
@@ -740,8 +742,9 @@ struct Decide final            //
       std::optional<LaneKey> next =
           choose_next_lane(*network_, key, seed, turns++);
       if (!next) {
-        return nearer(parting, model::Leader{.gap = distance * meter,
-                                             .speed = 0.0 * meter_per_second});
+        return nearer(parting,
+                      traffic::Leader{.gap = distance * meter,
+                                      .speed = 0.0 * meter_per_second});
       }
       LaneKey from = key;
       key = *next;
@@ -768,7 +771,7 @@ struct Decide final            //
   // where the two share the road: a leader `distance` plus its place along
   // `lane` ahead of the driver, if that is ahead.
   auto find_parting(const LaneKey& lane, double distance, Entity self) const
-      -> std::optional<model::Leader> {
+      -> std::optional<traffic::Leader> {
     std::optional<double> parts = network_->rights.find_parting(lane);
     if (!parts) {
       return std::nullopt;
@@ -789,7 +792,7 @@ struct Decide final            //
   // first comes within a car's width of another; ties go to the lower
   // entity.
   auto find_merging(const LaneKey& from, const LaneKey& into, double distance,
-                    Entity self) const -> std::optional<model::Leader> {
+                    Entity self) const -> std::optional<traffic::Leader> {
     std::span<const LaneKey> feeding = network_->graph.predecessors_of(into);
     if (feeding.size() < 2) {
       return std::nullopt;
@@ -799,7 +802,7 @@ struct Decide final            //
       return length - network_->rights.find_merge(lane).value_or(length);
     };
     double mine = distance - before_end(from);  // To where ways meet.
-    std::optional<model::Leader> nearest;
+    std::optional<traffic::Leader> nearest;
     for (const LaneKey& lane : feeding) {
       if (lane == from) {
         continue;
@@ -816,7 +819,7 @@ struct Decide final            //
             into) {
           continue;
         }
-        model::Leader leader = gap_to(*it, mine - theirs);
+        traffic::Leader leader = gap_to(*it, mine - theirs);
         if (!nearest || leader.gap < nearest->gap) {
           nearest = leader;
         }
@@ -828,9 +831,9 @@ struct Decide final            //
 
   // A leader `apart` meters ahead, front bumper to front bumper.
   static auto gap_to(const LaneOccupancy::Occupant& leader, double apart)
-      -> model::Leader {
-    return model::Leader{.gap = (apart - leader.length) * meter,
-                         .speed = leader.speed * meter_per_second};
+      -> traffic::Leader {
+    return traffic::Leader{.gap = (apart - leader.length) * meter,
+                           .speed = leader.speed * meter_per_second};
   }
 
   // MOBIL's accelerations for changing from `state`'s lane to `target`: this
@@ -838,16 +841,16 @@ struct Decide final            //
   // change onto a vehicle, or with one just behind, is never worth it.
   auto worth_changing(const LaneState& state, const Driver& driver, Entity self,
                       double along, AccelerationMagnitude now,
-                      const std::optional<model::Leader>& leader,
+                      const std::optional<traffic::Leader>& leader,
                       const LaneKey& target, bool right) const -> bool {
     double length = driver.length.numerical_value_in(meter);
-    model::LaneChangeAccelerations accelerations{.self_now = now};
-    std::optional<model::Leader> new_leader =
+    traffic::LaneChangeAccelerations accelerations{.self_now = now};
+    std::optional<traffic::Leader> new_leader =
         find_leader(target, along, state.turns, driver.seed, self);
     if (new_leader && new_leader->gap <= 0.0 * meter) {
       return false;
     }
-    accelerations.self_after = model::compute_idm_acceleration(
+    accelerations.self_after = traffic::compute_idm_acceleration(
         driver.following, state.speed, new_leader);
 
     if (const LaneOccupancy::Occupant* follower =
@@ -857,36 +860,36 @@ struct Decide final            //
         return false;
       }
       Speed speed = follower->speed * meter_per_second;
-      const model::IntelligentDriver& following = follower->driver->following;
-      accelerations.new_follower_now = model::compute_idm_acceleration(
+      const traffic::IntelligentDriver& following = follower->driver->following;
+      accelerations.new_follower_now = traffic::compute_idm_acceleration(
           following, speed,
           find_leader(target, follower->along, follower->turns,
                       follower->driver->seed, follower->entity));
-      accelerations.new_follower_after = model::compute_idm_acceleration(
+      accelerations.new_follower_after = traffic::compute_idm_acceleration(
           following, speed,
-          model::Leader{.gap = gap * meter, .speed = state.speed});
+          traffic::Leader{.gap = gap * meter, .speed = state.speed});
     }
     if (const LaneOccupancy::Occupant* follower =
             occupancy_.find_behind(state.lane, along, self)) {
       Speed speed = follower->speed * meter_per_second;
-      const model::IntelligentDriver& following = follower->driver->following;
-      accelerations.old_follower_now = model::compute_idm_acceleration(
+      const traffic::IntelligentDriver& following = follower->driver->following;
+      accelerations.old_follower_now = traffic::compute_idm_acceleration(
           following, speed,
-          model::Leader{.gap = (along - length - follower->along) * meter,
-                        .speed = state.speed});
-      std::optional<model::Leader> after = leader;
+          traffic::Leader{.gap = (along - length - follower->along) * meter,
+                          .speed = state.speed});
+      std::optional<traffic::Leader> after = leader;
       if (after) {
         after->gap += (along - follower->along) * meter;
       }
       accelerations.old_follower_after =
-          model::compute_idm_acceleration(following, speed, after);
+          traffic::compute_idm_acceleration(following, speed, after);
     }
-    return model::decide_lane_change(driver.changing, accelerations, right);
+    return traffic::decide_lane_change(driver.changing, accelerations, right);
   }
 
   const Network* network_ = nullptr;
   LaneOccupancy occupancy_;
-  std::vector<model::Aspect> aspects_;  // By signal group.
+  std::vector<traffic::Aspect> aspects_;  // By signal group.
   engine::RateGate gate_{1s};
   bool changing_ = false;
   bool lights_ = false;  // Whether the network has any.
@@ -992,16 +995,16 @@ struct FollowLane final  //
   // The pose of a vehicle in `state`.
   static auto locate_vehicle(const Network& network, const LaneState& state)
       -> RoadPose {
-    const model::Road& road = network.roads.roads[state.lane.road];
+    const road::Road& road = network.roads.roads[state.lane.road];
     Length middle =
-        model::compute_lane_middle(network.roads, state.lane, state.s);
-    model::PlanPoint point = model::compute_plan_point(road, state.s);
+        road::compute_lane_middle(network.roads, state.lane, state.s);
+    road::PlanPoint point = road::compute_plan_point(road, state.s);
     double heading = point.heading;
-    if (!model::runs_with_s(state.lane)) {
+    if (!road::runs_with_s(state.lane)) {
       heading += std::numbers::pi;
     }
     return RoadPose{
-        .position = model::compute_road_position(road, point, state.s, middle),
+        .position = road::compute_road_position(road, point, state.s, middle),
         .heading = heading * radian};
   }
 
@@ -1013,8 +1016,8 @@ struct FollowLane final  //
 
 // The node a pedestrian on `legs` reaches at their end.
 inline auto find_route_end(const Network& network,
-                           std::span<const model::Leg> legs) -> std::uint32_t {
-  const model::WalkEdge& edge = network.walking.edges()[legs.back().edge];
+                           std::span<const road::Leg> legs) -> std::uint32_t {
+  const road::WalkEdge& edge = network.walking.edges()[legs.back().edge];
   return legs.back().forward ? edge.to : edge.from;
 }
 
@@ -1022,7 +1025,7 @@ inline auto find_route_end(const Network& network,
 // `node` can reach; none if it can reach none.
 inline auto plan_walk(const Network& network, std::uint32_t node,
                       std::uint64_t seed, std::uint32_t trip)
-    -> std::vector<model::Leg> {
+    -> std::vector<road::Leg> {
   // SplitMix64 of the seed and the trip (see model/REFERENCES.md).
   std::uint64_t z = seed + (std::uint64_t{trip} + 1) * 0x9e3779b97f4a7c15ULL;
   z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
@@ -1062,7 +1065,7 @@ class WalkOccupancy final {
       if (!route || state.leg >= route->legs.size()) {
         return;
       }
-      const model::Leg& leg = route->legs[state.leg];
+      const road::Leg& leg = route->legs[state.leg];
       walking_.push_back(
           Walking{.edge = leg.edge,
                   .forward = leg.forward,
@@ -1077,7 +1080,7 @@ class WalkOccupancy final {
   }
 
   // The first pedestrian walking `leg` ahead of `along`, but `self`.
-  auto find_ahead(const model::Leg& leg, double along, Entity self) const
+  auto find_ahead(const road::Leg& leg, double along, Entity self) const
       -> const Walking* {
     auto first = std::ranges::lower_bound(
         walking_, std::tuple{leg.edge, leg.forward, along}, {},
@@ -1116,7 +1119,7 @@ struct Pace final              //
              const WalkRoute> {
   using SystemWorld = ProjectedWorld<Pace>;
   using AllowComponentList = TypeList<WalkState, WalkRoute, LaneState, Driver,
-                                      SignalState, model::SignalPlan>;
+                                      SignalState, traffic::SignalPlan>;
 
   static constexpr double SPACE = 0.5;      // m kept to the one ahead.
   static constexpr double HEADWAY = 1.0;    // s to close the rest.
@@ -1129,7 +1132,7 @@ struct Pace final              //
   explicit Pace(const Network& network) : network_{&network} {
     // Each zone's lanes, back up the road: a lane and how far its start is
     // from the zone's near edge.
-    std::span<const model::CrosswalkZone> zones = network.walking.zones();
+    std::span<const road::CrosswalkZone> zones = network.walking.zones();
     for (std::uint32_t z = 0; z < zones.size(); ++z) {
       first_.push_back(static_cast<std::uint32_t>(upstream_.size()));
       upstream_.emplace_back(zones[z].lane, zones[z].near);
@@ -1139,7 +1142,7 @@ struct Pace final              //
           continue;
         }
         for (const LaneKey& before : network.graph.predecessors_of(lane)) {
-          if (model::find_lane(network.roads, before).type == "driving" &&
+          if (road::find_lane(network.roads, before).type == "driving" &&
               std::none_of(upstream_.begin() + first_.back(), upstream_.end(),
                            [&](const auto& u) { return u.first == before; })) {
             upstream_.emplace_back(before,
@@ -1162,9 +1165,9 @@ struct Pace final              //
                         *network_);
       now_ = step.time.time_since_epoch();
       std::size_t groups = network_->control.groups().size();
-      aspects_.assign(groups, model::Aspect::GREEN);
+      aspects_.assign(groups, traffic::Aspect::GREEN);
       plans_.assign(groups, nullptr);
-      const auto& plans = world.store_of<model::SignalPlan>();
+      const auto& plans = world.store_of<traffic::SignalPlan>();
       world.store_of<SignalState>().for_each(
           [&](Entity owner, const SignalState& signal) {
             if (signal.group < groups) {
@@ -1184,9 +1187,9 @@ struct Pace final              //
     if (!state || !walker || !route || state->leg >= route->legs.size()) {
       return;
     }
-    std::span<const model::WalkEdge> edges = network_->walking.edges();
+    std::span<const road::WalkEdge> edges = network_->walking.edges();
     double along = state->along.numerical_value_in(meter);
-    const model::Leg& leg = route->legs[state->leg];
+    const road::Leg& leg = route->legs[state->leg];
     double left = edges[leg.edge].length() - along;
     std::optional<double> gap;
     const WalkOccupancy::Walking* ahead =
@@ -1205,14 +1208,14 @@ struct Pace final              //
 
     std::uint32_t decided = command.crossing;
     command = WalkCommand{};
-    if (edges[leg.edge].kind == model::WalkEdge::Kind::CROSSING) {
+    if (edges[leg.edge].kind == road::WalkEdge::Kind::CROSSING) {
       command.crossing = edges[leg.edge].crosswalk;
       command.on = true;
       command.clear = left / desired * second;
     } else if (crossings_ && state->leg + 1 < route->legs.size() &&
                edges[route->legs[state->leg + 1].edge].kind ==
-                   model::WalkEdge::Kind::CROSSING) {
-      const model::WalkEdge& crossing = edges[route->legs[state->leg + 1].edge];
+                   road::WalkEdge::Kind::CROSSING) {
+      const road::WalkEdge& crossing = edges[route->legs[state->leg + 1].edge];
       // One waiting close behind another goes with it as it steps on.
       bool go = decided == crossing.crosswalk ||
                 (ahead && *gap <= GROUP &&
@@ -1234,15 +1237,15 @@ struct Pace final              //
 
  private:
   // Whether a pedestrian may step onto `crossing` now.
-  auto may_cross(const model::WalkEdge& crossing, const Walker& walker) const
+  auto may_cross(const road::WalkEdge& crossing, const Walker& walker) const
       -> bool {
     double speed = walker.desired_speed.numerical_value_in(meter_per_second);
     double across = crossing.length() / speed;  // s.
     const std::optional<std::uint32_t>& group =
         network_->crosswalk_groups[crossing.crosswalk];
     if (group && walker.complies) {
-      const model::SignalPlan* plan = plans_[*group];
-      return aspects_[*group] == model::Aspect::RED && plan &&
+      const traffic::SignalPlan* plan = plans_[*group];
+      return aspects_[*group] == traffic::Aspect::RED && plan &&
              std::chrono::duration<double>(plan->keeps_aspect(now_)).count() >=
                  across;
     }
@@ -1251,7 +1254,7 @@ struct Pace final              //
         by_crosswalk_, crossing.crosswalk, {},
         &std::pair<std::uint32_t, std::uint32_t>::first);
     for (auto it = first; it != last; ++it) {
-      const model::CrosswalkZone& zone = network_->walking.zones()[it->second];
+      const road::CrosswalkZone& zone = network_->walking.zones()[it->second];
       for (std::uint32_t k = first_[it->second]; k < first_[it->second + 1];
            ++k) {
         auto [lane, to] = upstream_[k];
@@ -1264,9 +1267,9 @@ struct Pace final              //
             }
             continue;  // Past it.
           }
-          const model::IntelligentDriver& driver = vehicle.driver->following;
+          const traffic::IntelligentDriver& driver = vehicle.driver->following;
           double arrival =
-              model::compute_soonest_arrival(
+              traffic::compute_soonest_arrival(
                   distance * meter, vehicle.speed * meter_per_second,
                   driver.acceleration, driver.desired_speed)
                   .numerical_value_in(second);
@@ -1287,8 +1290,8 @@ struct Pace final              //
   const Network* network_ = nullptr;
   WalkOccupancy occupancy_;
   LaneOccupancy vehicles_;
-  std::vector<model::Aspect> aspects_;  // By signal group.
-  std::vector<const model::SignalPlan*> plans_;
+  std::vector<traffic::Aspect> aspects_;  // By signal group.
+  std::vector<const traffic::SignalPlan*> plans_;
   std::vector<std::pair<LaneKey, double>> upstream_;  // By zone.
   std::vector<std::uint32_t> first_;                  // Each zone's start.
   std::vector<std::pair<std::uint32_t, std::uint32_t>> by_crosswalk_;
@@ -1321,7 +1324,7 @@ struct Walk final                //
     state.speed = command->speed;
     double along = state.along.numerical_value_in(meter) +
                    command->speed.numerical_value_in(meter_per_second) * dt;
-    std::span<const model::WalkEdge> edges = network_->walking.edges();
+    std::span<const road::WalkEdge> edges = network_->walking.edges();
     while (along >= edges[route->legs[state.leg].edge].length()) {
       along -= edges[route->legs[state.leg].edge].length();
       if (++state.leg < route->legs.size()) {
@@ -1329,7 +1332,7 @@ struct Walk final                //
       }
       // There: on to somewhere new, from where it stands.
       std::uint32_t node = find_route_end(*network_, route->legs);
-      std::vector<model::Leg> next =
+      std::vector<road::Leg> next =
           plan_walk(*network_, node, walker->seed, ++route->trips);
       state.leg = 0;
       if (next.empty()) {
@@ -1427,7 +1430,7 @@ struct RunStoryboard final    //
           }
           context.states[actor.entity] = scenario::EntityState{
               .placement = motion->placement,
-              .pose = motion->pose.value_or(model::compute_placement_pose(
+              .pose = motion->pose.value_or(road::compute_placement_pose(
                   *context.roads, motion->placement)),
               .speed = speed->speed,
               .acceleration = speed->acceleration,
@@ -1474,13 +1477,13 @@ struct RunStoryboard final    //
       orders_[order.entity].starts.push_back(order);
       if (const auto* teleport =
               std::get_if<scenario::TeleportAction>(order.action)) {
-        model::RoadPlacement placement =
+        road::RoadPlacement placement =
             context.player->locate(teleport->position, context.states);
         orders_[order.entity].teleports.push_back(placement);
         orders_[order.entity].held = orders_[order.entity].held || holding;
         context.states[order.entity].placement = placement;
         context.states[order.entity].pose =
-            model::compute_placement_pose(*context.roads, placement);
+            road::compute_placement_pose(*context.roads, placement);
       }
     }
   }
@@ -1557,8 +1560,8 @@ struct PlaceOnRoad final  //
     if (motion == nullptr) {
       return;
     }
-    model::PlacementPose at = motion->pose.value_or(
-        model::compute_placement_pose(*context_->roads, motion->placement));
+    road::PlacementPose at = motion->pose.value_or(
+        road::compute_placement_pose(*context_->roads, motion->placement));
     pose = RoadPose{.position = meters(at.x, at.y, at.z),
                     .heading = at.heading * radian};
   }

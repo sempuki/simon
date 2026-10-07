@@ -8,7 +8,7 @@
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 
-namespace simon::model {
+namespace simon::road {
 
 namespace {
 
@@ -205,4 +205,4 @@ TEST_CASE("Road") {
   }
 }
 
-}  // namespace simon::model
+}  // namespace simon::road

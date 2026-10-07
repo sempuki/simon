@@ -28,16 +28,16 @@
 namespace simon::galactic {
 namespace {
 
-using model::KILOPARSEC;
-using model::SOLAR_MASS;
+using gravity::KILOPARSEC;
+using gravity::SOLAR_MASS;
 
 auto make_plummer_scenario(std::size_t bodies, GravityMethod gravity)
     -> Scenario {
   Scenario scenario{
       .softening = 0.01 * KILOPARSEC, .gravity = gravity, .opening_angle = 0.5};
   Random random{1};
-  model::append_plummer(
-      model::Plummer{.mass = 1e10 * SOLAR_MASS, .scale = KILOPARSEC}, bodies,
+  gravity::append_plummer(
+      gravity::Plummer{.mass = 1e10 * SOLAR_MASS, .scale = KILOPARSEC}, bodies,
       InOut(random), InOut(scenario.bodies));
   return scenario;
 }
@@ -46,19 +46,19 @@ auto make_plummer_scenario(std::size_t bodies, GravityMethod gravity)
 // evenly over rings from 2 to 20 kpc about it, on circular orbits.
 auto make_restricted_scenario(std::size_t particles) -> Scenario {
   Scenario scenario{.softening = 0.1 * KILOPARSEC};
-  model::BodyStart center{.mass = 1e11 * SOLAR_MASS};
+  gravity::BodyStart center{.mass = 1e11 * SOLAR_MASS};
   scenario.bodies = {
-      center, model::BodyStart{
+      center, gravity::BodyStart{
                   .position = meters(
                       50.0 * KILOPARSEC.numerical_value_in(meter), 0.0, 0.0),
                   .mass = 1e11 * SOLAR_MASS}};
-  model::RingDisk disk{.softening = scenario.softening};
+  gravity::RingDisk disk{.softening = scenario.softening};
   constexpr int RINGS = 100;
   for (int ring = 0; ring < RINGS; ++ring) {
     disk.radii.push_back((2.0 + 18.0 * ring / (RINGS - 1)) * KILOPARSEC);
     disk.counts.push_back(static_cast<int>(particles / RINGS));
   }
-  model::append_ring_disk(disk, center, InOut(scenario.test_particles));
+  gravity::append_ring_disk(disk, center, InOut(scenario.test_particles));
   return scenario;
 }
 

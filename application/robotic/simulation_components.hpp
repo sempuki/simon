@@ -22,38 +22,38 @@
 // a model, its state and its dynamics sized by its archetype's capacity.
 namespace simon::robotic {
 
-using SingleCapacity = model::TreeCapacity<1, 6>;
-using SmallCapacity = model::TreeCapacity<4, 8>;
-using LargeCapacity = model::TreeCapacity<16, 32>;
-using HugeCapacity = model::TreeCapacity<32, 64>;
+using SingleCapacity = articulated::TreeCapacity<1, 6>;
+using SmallCapacity = articulated::TreeCapacity<4, 8>;
+using LargeCapacity = articulated::TreeCapacity<16, 32>;
+using HugeCapacity = articulated::TreeCapacity<32, 64>;
 
 template <typename Capacity>
-using TreeState = model::TreeState<Capacity>;
+using TreeState = articulated::TreeState<Capacity>;
 template <typename Capacity>
-using TreeControl = model::TreeControl<Capacity>;
+using TreeControl = articulated::TreeControl<Capacity>;
 template <typename Capacity>
-using TreeDynamics = model::TreeDynamics<Capacity>;
+using TreeDynamics = articulated::TreeDynamics<Capacity>;
 
 // The model and its trees, each with its kernel, read once and shared by
 // the systems. It outlives the world and never moves.
 class Mechanics final {
  public:
-  explicit Mechanics(model::ArticulatedModel model);
+  explicit Mechanics(articulated::ArticulatedModel model);
 
-  auto model() const -> const model::ArticulatedModel& { return model_; }
-  auto trees() const -> const std::vector<model::Tree>& { return trees_; }
+  auto model() const -> const articulated::ArticulatedModel& { return model_; }
+  auto trees() const -> const std::vector<articulated::Tree>& { return trees_; }
 
   // Whether tree `tree` fits a capacity.
   template <typename Capacity>
   auto fits(std::uint32_t tree) const -> bool {
-    const model::Tree& t = trees_[tree];
+    const articulated::Tree& t = trees_[tree];
     return t.bodies <= Capacity::bodies && t.dofs <= Capacity::dofs &&
            t.qpos <= Capacity::qpos;
   }
 
   // Which bodies may touch, each geom's bounding radius, and the geoms no
   // sphere bounds: planes, on the world or on bodies that cannot move.
-  auto filter() const -> const model::BodyFilter& { return filter_; }
+  auto filter() const -> const articulated::BodyFilter& { return filter_; }
   auto radii() const -> const std::vector<double>& { return radii_; }
   auto unbounded() const -> const std::vector<std::uint32_t>& {
     return unbounded_;
@@ -79,7 +79,8 @@ class Mechanics final {
   auto mean_inertia() const -> double { return mean_inertia_; }
 
   template <typename Capacity>
-  auto kernel(std::uint32_t tree) const -> const model::TreeKernel<Capacity>& {
+  auto kernel(std::uint32_t tree) const
+      -> const articulated::TreeKernel<Capacity>& {
     if constexpr (std::is_same_v<Capacity, SingleCapacity>) {
       return *single_[tree];
     } else if constexpr (std::is_same_v<Capacity, SmallCapacity>) {
@@ -92,9 +93,9 @@ class Mechanics final {
   }
 
  private:
-  model::ArticulatedModel model_;
-  std::vector<model::Tree> trees_;
-  model::BodyFilter filter_;
+  articulated::ArticulatedModel model_;
+  std::vector<articulated::Tree> trees_;
+  articulated::BodyFilter filter_;
   std::vector<double> radii_;
   std::vector<std::uint32_t> unbounded_;
   std::vector<double> body_weight_;  // 2 by body.
@@ -102,10 +103,10 @@ class Mechanics final {
   std::vector<double> tendon_weight_;
   double mean_inertia_ = 1.0;
   // Each tree's kernel at each capacity it fits, else none.
-  std::vector<std::unique_ptr<model::TreeKernel<SingleCapacity>>> single_;
-  std::vector<std::unique_ptr<model::TreeKernel<SmallCapacity>>> small_;
-  std::vector<std::unique_ptr<model::TreeKernel<LargeCapacity>>> large_;
-  std::vector<std::unique_ptr<model::TreeKernel<HugeCapacity>>> huge_;
+  std::vector<std::unique_ptr<articulated::TreeKernel<SingleCapacity>>> single_;
+  std::vector<std::unique_ptr<articulated::TreeKernel<SmallCapacity>>> small_;
+  std::vector<std::unique_ptr<articulated::TreeKernel<LargeCapacity>>> large_;
+  std::vector<std::unique_ptr<articulated::TreeKernel<HugeCapacity>>> huge_;
 };
 
 // A linear state feedback on the model's actuators: each control
@@ -121,7 +122,7 @@ struct Feedback final {
 // The contacts a step finds, ordered by their bodies, shared by the systems
 // that find and resolve them. It outlives the world and never moves.
 struct ContactSet final {
-  std::vector<model::Contact> contacts;
+  std::vector<articulated::Contact> contacts;
 };
 
 // The step's constraint solution, shared by Solve, which finds it, and

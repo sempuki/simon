@@ -35,7 +35,7 @@
 namespace simon::galactic {
 namespace {
 
-using model::KILOPARSEC;
+using gravity::KILOPARSEC;
 
 const double KPC = KILOPARSEC.numerical_value_in(meter);
 
@@ -136,7 +136,7 @@ auto run_collision(std::size_t disk_bodies, int million_years, Year step,
 }
 
 auto run_disk(std::size_t disk_bodies, int million_years) -> int {
-  model::DiskGalaxy galaxy = make_standard_galaxy(disk_bodies);
+  gravity::DiskGalaxy galaxy = make_standard_galaxy(disk_bodies);
   Simulation simulation{make_standard_disk_scenario(disk_bodies)};
   engine::Driver driver{Timing{.max_step = Year{2000000}}, Depend(simulation)};
   if (auto started = driver.start(); !started) {

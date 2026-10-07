@@ -2141,7 +2141,8 @@ simon/
   framework/     Entity, ComponentStore, World, Spatial, names, builders, commands, System, schedules, and this design
   engine/        Lifecycle, drivers, RateGate, EventQueue
   model/         Reusable physics and maths, as free functions, and the data they work on. Kinematics,
-                 rigid bodies, control, guidance and planar collision at the top; then by domain:
+                 rigid bodies, control, guidance and planar collision at the top, in simon::model; then by
+                 domain, each folder its own namespace (simon::aircraft, simon::road, ...):
     aircraft/    Aerodynamics, flight controls, engines, frames, mass balance, sensing, trim
     earth/       The Earth, the atmosphere and the wind
     road/        Roads, lanes, placement, polylines, walking graphs

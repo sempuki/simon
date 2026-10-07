@@ -24,20 +24,20 @@
 // turbulence.
 namespace simon::aeronautic {
 
+using aircraft::Airframe;
+using aircraft::AirState;
+using aircraft::AirStateRate;
+using aircraft::BodyAcceleration;
+using aircraft::Engines;
+using aircraft::FlightControls;
+using aircraft::FlightSignals;
+using aircraft::FuelTanks;
+using aircraft::MassBalance;
+using earth::Gusts;
+using earth::Wind;
 using framework::Entity;
-using model::Airframe;
-using model::AirState;
-using model::AirStateRate;
-using model::BodyAcceleration;
-using model::Engines;
-using model::FlightControls;
-using model::FlightSignals;
-using model::FuelTanks;
-using model::Gusts;
-using model::MassBalance;
 using model::RigidBody;
 using model::RigidBodyRate;
-using model::Wind;
 
 // The autopilot's commands, which the airframe follows with lags and limits
 // (see Handling).
@@ -106,7 +106,7 @@ struct SurfaceAutopilot final {
 // The data a rigid aircraft flies by, which every aircraft of its type
 // shares. It outlives the world.
 struct AircraftType final {
-  const model::AircraftData* data = nullptr;
+  const aircraft::AircraftData* data = nullptr;
 };
 
 namespace archetype {

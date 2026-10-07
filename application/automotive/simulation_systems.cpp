@@ -185,9 +185,9 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
     return;
   }
   const ScenarioContext& context = *context_;
-  const model::RoadNetwork& roads = *context.roads;
+  const road::RoadNetwork& roads = *context.roads;
   double dt = convert_to_seconds(step);
-  model::RoadPlacement& placement = motion.placement;
+  road::RoadPlacement& placement = motion.placement;
 
   if (motion.change && stopped(orders, motion.change->handle)) {
     motion.change.reset();
@@ -202,9 +202,9 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
   // The lateral offset from `lane`'s middle, positive to the left of the
   // lane's travel: esmini's offset agnostic of the side of the road.
   auto agnostic_offset = [&](int lane) {
-    const model::Road& road = roads.roads[placement.road];
-    return sign(lane) * (model::compute_placement_t(road, placement) -
-                         model::compute_lane_center(road, placement.s, lane));
+    const road::Road& road = roads.roads[placement.road];
+    return sign(lane) * (road::compute_placement_t(road, placement) -
+                         road::compute_lane_center(road, placement.s, lane));
   };
 
   if (orders != nullptr) {
@@ -222,11 +222,11 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
         } else {
           const auto& relative =
               std::get<osc::RelativeTargetLane>(change->target);
-          const model::RoadPlacement& reference =
+          const road::RoadPlacement& reference =
               context.states[context.player->find_entity(relative.entity)]
                   .placement;
           lane = reference.lane +
-                 relative.lanes * (model::runs_forward(reference) ? 1 : -1);
+                 relative.lanes * (road::runs_forward(reference) ? 1 : -1);
           if (lane == 0 || (lane > 0) != (reference.lane > 0)) {
             lane = static_cast<int>(sign(lane - reference.lane)) *
                    (std::abs(lane) + 1);
@@ -235,7 +235,7 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
         // The heading turns back to the road's, and the offset counts from
         // the target lane's middle.
         placement.heading =
-            model::runs_forward(placement) ? 0.0 : std::numbers::pi;
+            road::runs_forward(placement) ? 0.0 : std::numbers::pi;
         LateralChange lateral{.handle = order.handle,
                               .lane_change = true,
                               .lane = lane,
@@ -258,14 +258,14 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
         lateral.transition.start = agnostic_offset(placement.lane);
         double target = offset->value;
         if (offset->relative_to) {
-          const model::RoadPlacement& reference =
+          const road::RoadPlacement& reference =
               context.states[context.player->find_entity(*offset->relative_to)]
                   .placement;
-          const model::Road& road = roads.roads[placement.road];
+          const road::Road& road = roads.roads[placement.road];
           target =
-              model::compute_placement_t(road, reference) +
-              offset->value * (model::runs_forward(reference) ? 1.0 : -1.0) -
-              model::compute_lane_center(road, placement.s, placement.lane);
+              road::compute_placement_t(road, reference) +
+              offset->value * (road::runs_forward(reference) ? 1.0 : -1.0) -
+              road::compute_lane_center(road, placement.s, placement.lane);
         }
         lateral.transition.target = sign(placement.lane) * target;
         // The time a shape takes to move b at the given peak lateral
@@ -282,17 +282,17 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
         motion.change = lateral;
       } else if (const auto* assign =
                      std::get_if<osc::AssignRouteAction>(order.action)) {
-        std::vector<model::RoadPlacement> waypoints;
+        std::vector<road::RoadPlacement> waypoints;
         for (const osc::Waypoint& waypoint : assign->route.waypoints) {
           waypoints.push_back(
               context.player->locate(waypoint.position, context.states));
         }
-        motion.route = model::find_route(roads, *context.lanes, waypoints);
+        motion.route = road::find_route(roads, *context.lanes, waypoints);
       } else if (const auto* follow =
                      std::get_if<osc::FollowTrajectoryAction>(order.action)) {
-        std::vector<model::PolylinePoint> points;
+        std::vector<road::PolylinePoint> points;
         for (const osc::Vertex& vertex : follow->vertices) {
-          model::PlacementPose at = model::compute_placement_pose(
+          road::PlacementPose at = road::compute_placement_pose(
               roads, context.player->locate(vertex.position, context.states));
           points.push_back({.x = at.x, .y = at.y});
         }
@@ -300,7 +300,7 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
         // (esmini's FollowTrajectoryAction::Start).
         motion.trajectory =
             TrajectoryRun{.handle = order.handle,
-                          .polyline = model::Polyline{std::move(points)},
+                          .polyline = road::Polyline{std::move(points)},
                           .along = follow->initial_distance_offset,
                           .backward = speed->unstepped < 0.0};
       }
@@ -318,7 +318,7 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
       *speed->stepped_by > *lateral_handle) {
     v = speed->unstepped;
   }
-  model::RoadMove moved = model::RoadMove::ALONG;
+  road::RoadMove moved = road::RoadMove::ALONG;
   if (motion.trajectory) {
     // esmini's FollowTrajectoryAction::Step without timing: along the
     // polyline at the speed, the way it faced as it started.
@@ -327,7 +327,7 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
     double direction = (v < 0.0 ? -1.0 : 1.0) * (run.backward ? -1.0 : 1.0);
     double length = run.polyline.length();
     run.along = std::clamp(before + direction * std::abs(v) * dt, 0.0, length);
-    model::PolylinePoint at = run.polyline.evaluate(run.along);
+    road::PolylinePoint at = run.polyline.evaluate(run.along);
     double moving = direction * std::abs(v);
     bool ended = dt > 0.0 && ((moving > 0.0 && run.along > length - 1e-6) ||
                               (moving < 0.0 && run.along < 1e-6));
@@ -338,13 +338,12 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
       motion.finished.push_back(run.handle);
     }
     double heading = at.heading + (run.backward ? std::numbers::pi : 0.0);
-    placement =
-        model::find_placement(roads, at.x, at.y, heading, placement.road)
-            .value_or(placement);
-    motion.pose = model::PlacementPose{
+    placement = road::find_placement(roads, at.x, at.y, heading, placement.road)
+                    .value_or(placement);
+    motion.pose = road::PlacementPose{
         .x = at.x,
         .y = at.y,
-        .z = model::compute_placement_pose(roads, placement).z,
+        .z = road::compute_placement_pose(roads, placement).z,
         .heading = std::remainder(heading, 2.0 * std::numbers::pi)};
     if (ended) {
       motion.trajectory.reset();
@@ -387,19 +386,18 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
       along = length;
     }
     // Into the target lane at the new offset, then along the road.
-    bool forward = model::runs_forward(placement);
+    bool forward = road::runs_forward(placement);
     placement.lane = change.lane;
     placement.offset = offset * sign(change.lane);
-    double ds =
-        model::convert_distance_to_ds(roads, placement, sign(v) * along);
-    moved = model::move_along_road(roads, InOut(placement), ds, motion.route);
-    forward = model::runs_forward(placement);
+    double ds = road::convert_distance_to_ds(roads, placement, sign(v) * along);
+    moved = road::move_along_road(roads, InOut(placement), ds, motion.route);
+    forward = road::runs_forward(placement);
     bool ended = change.transition.done() ||
                  std::abs(offset - change.transition.target) < SMALL ||
                  (change.transition.parameter > 0.0 &&
                   sign(offset - change.transition.target) !=
                       sign(change.transition.start - change.transition.target));
-    if (ended || moved == model::RoadMove::END_OF_ROAD) {
+    if (ended || moved == road::RoadMove::END_OF_ROAD) {
       placement.heading = forward ? 0.0 : std::numbers::pi;
       motion.finished.push_back(change.handle);
       motion.change.reset();
@@ -408,11 +406,11 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
                           (forward ? 1.0 : -1.0) * sign(change.lane) * heading;
     }
   } else if (std::abs(v) > SMALL && !(orders != nullptr && orders->held)) {
-    double ds = model::convert_distance_to_ds(roads, placement, v * dt);
-    moved = model::move_along_road(roads, InOut(placement), ds, motion.route);
+    double ds = road::convert_distance_to_ds(roads, placement, v * dt);
+    moved = road::move_along_road(roads, InOut(placement), ds, motion.route);
   }
 
-  if (moved == model::RoadMove::END_OF_ROAD) {
+  if (moved == road::RoadMove::END_OF_ROAD) {
     motion.end_of_road =
         motion.end_of_road < 0.0 ? 0.0 : motion.end_of_road + dt;
   } else if (std::abs(v) > SMALL) {

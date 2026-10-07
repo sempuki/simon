@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace simon::model {
+namespace simon::vehicle {
 namespace {
 
 constexpr double GRAVITY = 9.81;  // m/s^2, as CommonRoad has it.
@@ -339,4 +339,4 @@ auto compute_drift_single_track_rate(const DriftSingleTrack& state,
   };
 }
 
-}  // namespace simon::model
+}  // namespace simon::vehicle

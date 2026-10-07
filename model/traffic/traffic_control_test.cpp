@@ -7,7 +7,7 @@
 
 #include "base/testing.hpp"
 
-namespace simon::model {
+namespace simon::traffic {
 
 namespace {
 
@@ -16,28 +16,32 @@ using namespace std::chrono_literals;
 // A straight road, 100 m, two lanes each way, with a traffic light at
 // s = 90 for the right lanes, lane -1 only, and a static sign; a controller
 // groups the light, and a junction lists the controller.
-auto network_with_light() -> RoadNetwork {
+auto network_with_light() -> road::RoadNetwork {
   auto lane = [](int id) {
-    return Lane{.id = id, .type = "driving", .widths = {{.cubic = {.a = 3.5}}}};
+    return road::Lane{
+        .id = id, .type = "driving", .widths = {{.cubic = {.a = 3.5}}}};
   };
-  Road road{.id = "1",
-            .junction = "-1",
-            .length = 100.0,
-            .plan = {PlanGeometry{.length = 100.0, .shape = LineGeometry{}}},
-            .lane_sections = {LaneSection{.left = {lane(1), lane(2)},
+  road::Road road{
+      .id = "1",
+      .junction = "-1",
+      .length = 100.0,
+      .plan = {road::PlanGeometry{.length = 100.0,
+                                  .shape = road::LineGeometry{}}},
+      .lane_sections = {road::LaneSection{.left = {lane(1), lane(2)},
                                           .right = {lane(-1), lane(-2)}}}};
-  road.signals.push_back(Signal{.id = "light",
-                                .validities = {{.from = -1, .to = -1}},
-                                .s = 90.0,
-                                .orientation = RoadDirection::POSITIVE,
-                                .dynamic = true});
-  road.signals.push_back(Signal{.id = "sign", .s = 50.0});
-  return RoadNetwork{
+  road.signals.push_back(
+      road::Signal{.id = "light",
+                   .validities = {{.from = -1, .to = -1}},
+                   .s = 90.0,
+                   .orientation = road::RoadDirection::POSITIVE,
+                   .dynamic = true});
+  road.signals.push_back(road::Signal{.id = "sign", .s = 50.0});
+  return road::RoadNetwork{
       .roads = {road},
-      .junctions = {Junction{.id = "9",
-                             .controllers = {{.id = "c", .sequence = 3}}}},
-      .controllers = {
-          SignalController{.id = "c", .controls = {{.signal = "light"}}}}};
+      .junctions = {road::Junction{
+          .id = "9", .controllers = {{.id = "c", .sequence = 3}}}},
+      .controllers = {road::SignalController{
+          .id = "c", .controls = {{.signal = "light"}}}}};
 }
 
 }  // namespace
@@ -81,23 +85,23 @@ TEST_CASE("TrafficControl") {
   }
 
   SECTION("ShouldPutStopLinesOnLanesTheLightHoldsFor") {
-    RoadNetwork network = network_with_light();
+    road::RoadNetwork network = network_with_light();
     TrafficControl control = build_traffic_control(network);
     REQUIRE(control.groups().size() == 1);
     CHECK(control.groups()[0].junction == "9");
     CHECK(control.groups()[0].sequence == 3);
     REQUIRE(control.stop_lines().size() == 1);  // Not -2, nor the sign.
     const StopLine& line = control.stop_lines()[0];
-    CHECK(line.lane == LaneKey{.road = 0, .section = 0, .lane = -1});
+    CHECK(line.lane == road::LaneKey{.road = 0, .section = 0, .lane = -1});
     CHECK(line.along == 90.0);
     CHECK(control.stop_lines_on(line.lane).size() == 1);
     CHECK(control.stop_lines_on({.lane = 1}).empty());
   }
 
   SECTION("ShouldPutStopLinesAgainstSGivenNegativeOrientation") {
-    RoadNetwork network = network_with_light();
-    Signal& light = network.roads[0].signals[0];
-    light.orientation = RoadDirection::NEGATIVE;
+    road::RoadNetwork network = network_with_light();
+    road::Signal& light = network.roads[0].signals[0];
+    light.orientation = road::RoadDirection::NEGATIVE;
     light.validities.clear();
     TrafficControl control = build_traffic_control(network);
     REQUIRE(control.stop_lines().size() == 2);
@@ -151,4 +155,4 @@ TEST_CASE("TrafficControl") {
   }
 }
 
-}  // namespace simon::model
+}  // namespace simon::traffic

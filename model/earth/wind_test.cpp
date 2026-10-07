@@ -9,7 +9,7 @@
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 
-namespace simon::model {
+namespace simon::earth {
 
 namespace {
 
@@ -177,4 +177,4 @@ TEST_CASE("Wind") {
   }
 }
 
-}  // namespace simon::model
+}  // namespace simon::earth

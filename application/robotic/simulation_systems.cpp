@@ -12,19 +12,20 @@
 namespace simon::robotic {
 
 auto Collide::prepare(SystemWorld& world) -> bool {
-  const model::ArticulatedModel& m = mechanics_->model();
-  const std::vector<model::Tree>& trees = mechanics_->trees();
-  std::vector<model::Contact>& contacts = contacts_->contacts;
+  const articulated::ArticulatedModel& m = mechanics_->model();
+  const std::vector<articulated::Tree>& trees = mechanics_->trees();
+  std::vector<articulated::Contact>& contacts = contacts_->contacts;
   if (frames_.size() != m.geoms.size()) {
     frames_.assign(m.geoms.size(), {});
     unbounded_.assign(m.geoms.size(), 0);
     for (std::uint32_t g : mechanics_->unbounded()) {
       unbounded_[g] = 1;
     }
-    const model::ArticulatedBody& ground = m.bodies[0];
+    const articulated::ArticulatedBody& ground = m.bodies[0];
     for (std::uint32_t g = ground.first_geom;
          g < ground.first_geom + ground.geoms; ++g) {
-      frames_[g] = model::compute_geom_frame(m.geoms[g], model::BodyFrame{});
+      frames_[g] =
+          articulated::compute_geom_frame(m.geoms[g], articulated::BodyFrame{});
     }
     tree_of_.assign(m.bodies.size(), NO_TREE);
     for (std::uint32_t t = 0; t < trees.size(); ++t) {
@@ -48,20 +49,21 @@ auto Collide::prepare(SystemWorld& world) -> bool {
           mechanics_->excludes(owner, b)) {
         continue;
       }
-      const model::ArticulatedBody& body = m.bodies[b];
+      const articulated::ArticulatedBody& body = m.bodies[b];
       for (std::uint32_t other = body.first_geom;
            other < body.first_geom + body.geoms; ++other) {
         if (unbounded_[other] == 0) {
           bool first = owner < b;
-          model::append_contacts(m, first ? g : other, first ? other : g,
-                                 frames_, mechanics_->radii(), InOut(contacts));
+          articulated::append_contacts(m, first ? g : other, first ? other : g,
+                                       frames_, mechanics_->radii(),
+                                       InOut(contacts));
         }
       }
     }
   }
 
   // A tree's bodies with each other.
-  for (const model::Tree& tree : trees) {
+  for (const articulated::Tree& tree : trees) {
     for (std::uint32_t b1 = tree.first_body; b1 < tree.first_body + tree.bodies;
          ++b1) {
       for (std::uint32_t b2 = b1 + 1; b2 < tree.first_body + tree.bodies;
@@ -91,13 +93,13 @@ auto Collide::prepare(SystemWorld& world) -> bool {
   });
 
   // In order of their bodies, as MuJoCo orders its body pairs.
-  auto bodies_of = [&](const model::Contact& contact) {
+  auto bodies_of = [&](const articulated::Contact& contact) {
     std::uint32_t a = m.geoms[contact.geom[0]].body;
     std::uint32_t b = m.geoms[contact.geom[1]].body;
     return std::pair{std::min(a, b), std::max(a, b)};
   };
   std::ranges::stable_sort(contacts, {}, bodies_of);
-  for (const model::Contact& contact : contacts) {
+  for (const articulated::Contact& contact : contacts) {
     std::uint32_t a = tree_of_[m.geoms[contact.geom[0]].body];
     std::uint32_t b = tree_of_[m.geoms[contact.geom[1]].body];
     if (a != NO_TREE) {
@@ -112,29 +114,29 @@ auto Collide::prepare(SystemWorld& world) -> bool {
 
 auto Collide::collide_bodies(std::uint32_t first, std::uint32_t second)
     -> void {
-  const model::ArticulatedModel& m = mechanics_->model();
+  const articulated::ArticulatedModel& m = mechanics_->model();
   if (mechanics_->filter().discards(first, second) ||
       mechanics_->excludes(first, second)) {
     return;
   }
-  const model::ArticulatedBody& a = m.bodies[first];
-  const model::ArticulatedBody& b = m.bodies[second];
+  const articulated::ArticulatedBody& a = m.bodies[first];
+  const articulated::ArticulatedBody& b = m.bodies[second];
   for (std::uint32_t g1 = a.first_geom; g1 < a.first_geom + a.geoms; ++g1) {
     if (unbounded_[g1] != 0) {
       continue;
     }
     for (std::uint32_t g2 = b.first_geom; g2 < b.first_geom + b.geoms; ++g2) {
       if (unbounded_[g2] == 0) {
-        model::append_contacts(m, g1, g2, frames_, mechanics_->radii(),
-                               InOut(contacts_->contacts));
+        articulated::append_contacts(m, g1, g2, frames_, mechanics_->radii(),
+                                     InOut(contacts_->contacts));
       }
     }
   }
 }
 
 auto Collide::collide_trees(std::uint32_t first, std::uint32_t second) -> void {
-  const model::Tree& a = mechanics_->trees()[first];
-  const model::Tree& b = mechanics_->trees()[second];
+  const articulated::Tree& a = mechanics_->trees()[first];
+  const articulated::Tree& b = mechanics_->trees()[second];
   for (std::uint32_t b1 = a.first_body; b1 < a.first_body + a.bodies; ++b1) {
     for (std::uint32_t b2 = b.first_body; b2 < b.first_body + b.bodies; ++b2) {
       collide_bodies(b1, b2);
@@ -169,13 +171,14 @@ auto Solve::find_root(std::uint32_t tree) -> std::uint32_t {
 }
 
 auto Solve::tree_of_geom(std::uint32_t geom) const -> std::uint32_t {
-  const model::ArticulatedModel& m = mechanics_->model();
+  const articulated::ArticulatedModel& m = mechanics_->model();
   std::uint32_t body = m.geoms[geom].body;
   if (body == 0) {
     return NO_TREE;
   }
-  const std::vector<model::Tree>& trees = mechanics_->trees();
-  auto it = std::ranges::upper_bound(trees, body, {}, &model::Tree::first_body);
+  const std::vector<articulated::Tree>& trees = mechanics_->trees();
+  auto it =
+      std::ranges::upper_bound(trees, body, {}, &articulated::Tree::first_body);
   std::uint32_t t = static_cast<std::uint32_t>(it - trees.begin()) - 1;
   return trees[t].dofs > 0 ? t : NO_TREE;
 }
@@ -185,13 +188,13 @@ auto Solve::tree_of_joint(std::uint32_t joint) const -> std::uint32_t {
 }
 
 auto Solve::tendon_length(std::uint32_t k) const -> double {
-  const model::ArticulatedModel& m = mechanics_->model();
-  const model::Tendon& tendon = m.tendons[k];
+  const articulated::ArticulatedModel& m = mechanics_->model();
+  const articulated::Tendon& tendon = m.tendons[k];
   double length = 0.0;
   for (std::size_t i = 0; i < tendon.joints.size(); ++i) {
-    const model::Joint& joint = m.joints[tendon.joints[i]];
+    const articulated::Joint& joint = m.joints[tendon.joints[i]];
     std::uint32_t t = tree_of_joint(tendon.joints[i]);
-    const model::Tree& tree = mechanics_->trees()[t];
+    const articulated::Tree& tree = mechanics_->trees()[t];
     length +=
         tendon.coefficients[i] * data_[t].qpos[joint.qpos - tree.first_qpos];
   }
@@ -199,7 +202,7 @@ auto Solve::tendon_length(std::uint32_t k) const -> double {
 }
 
 auto Solve::tendon_reached(std::uint32_t k) const -> bool {
-  const model::Tendon& tendon = mechanics_->model().tendons[k];
+  const articulated::Tendon& tendon = mechanics_->model().tendons[k];
   if (!tendon.limited) {
     return false;
   }
@@ -209,8 +212,8 @@ auto Solve::tendon_reached(std::uint32_t k) const -> bool {
 }
 
 auto Solve::prepare(SystemWorld& world) -> bool {
-  const model::ArticulatedModel& m = mechanics_->model();
-  const std::vector<model::Tree>& trees = mechanics_->trees();
+  const articulated::ArticulatedModel& m = mechanics_->model();
+  const std::vector<articulated::Tree>& trees = mechanics_->trees();
   std::size_t count = trees.size();
   if (data_.size() != count) {
     data_.resize(count);
@@ -229,17 +232,17 @@ auto Solve::prepare(SystemWorld& world) -> bool {
       tree_tendons_[joint_tree_[m.tendons[k].joints.front()]].push_back(k);
     }
     for (std::uint32_t t = 0; t < count; ++t) {
-      const model::Tree& tree = trees[t];
+      const articulated::Tree& tree = trees[t];
       for (std::uint32_t d = tree.first_dof; d < tree.first_dof + tree.dofs;
            ++d) {
         rubs_[t] |= m.dofs[d].friction_loss != 0 ? 1 : 0;
       }
       for (std::uint32_t j = tree.first_joint;
            j < tree.first_joint + tree.joints; ++j) {
-        limited_[t] |=
-            m.joints[j].limited && m.joints[j].type != model::JointType::FREE
-                ? 1
-                : 0;
+        limited_[t] |= m.joints[j].limited &&
+                               m.joints[j].type != articulated::JointType::FREE
+                           ? 1
+                           : 0;
       }
     }
   }
@@ -269,18 +272,18 @@ auto Solve::prepare(SystemWorld& world) -> bool {
     if (limited_[t] == 0) {
       continue;
     }
-    const model::Tree& tree = trees[t];
+    const articulated::Tree& tree = trees[t];
     for (std::uint32_t j = tree.first_joint;
          j < tree.first_joint + tree.joints && marked[t] == 0; ++j) {
-      const model::Joint& joint = m.joints[j];
-      if (!joint.limited || joint.type == model::JointType::FREE) {
+      const articulated::Joint& joint = m.joints[j];
+      if (!joint.limited || joint.type == articulated::JointType::FREE) {
         continue;
       }
       const double* qpos = data_[t].qpos;
       std::uint32_t q = joint.qpos - tree.first_qpos;
-      if (joint.type == model::JointType::BALL) {
+      if (joint.type == articulated::JointType::BALL) {
         Vector3 r = convert_to_rotation(&qpos[q]);
-        double angle = model::articulated::normalize(InOut(r));
+        double angle = articulated::normalize(InOut(r));
         marked[t] =
             std::max(joint.range[0], joint.range[1]) - angle < joint.margin;
       } else {
@@ -296,7 +299,7 @@ auto Solve::prepare(SystemWorld& world) -> bool {
     parent_[t] = t;
   }
   for (std::uint32_t k = 0; k < m.tendons.size(); ++k) {
-    const model::Tendon& tendon = m.tendons[k];
+    const articulated::Tendon& tendon = m.tendons[k];
     if (tendon.friction_loss == 0 && !tendon_reached(k)) {
       continue;
     }
@@ -313,8 +316,8 @@ auto Solve::prepare(SystemWorld& world) -> bool {
       }
     }
   }
-  const std::vector<model::Contact>& contacts = contacts_->contacts;
-  for (const model::Contact& contact : contacts) {
+  const std::vector<articulated::Contact>& contacts = contacts_->contacts;
+  for (const articulated::Contact& contact : contacts) {
     if (contact.exclude) {
       continue;
     }
@@ -370,12 +373,12 @@ auto Solve::prepare(SystemWorld& world) -> bool {
 auto Solve::solve_island(std::span<const std::uint32_t> members,
                          std::span<const std::uint32_t> joined)
     -> std::uint32_t {
-  const model::ArticulatedModel& m = mechanics_->model();
-  const std::vector<model::Tree>& trees = mechanics_->trees();
+  const articulated::ArticulatedModel& m = mechanics_->model();
+  const std::vector<articulated::Tree>& trees = mechanics_->trees();
   const std::vector<double>& body_weight = mechanics_->body_weight();
   const std::vector<double>& dof_weight = mechanics_->dof_weight();
   const std::vector<double>& tendon_weight = mechanics_->tendon_weight();
-  model::ConstraintProblem& p = problem_;
+  articulated::ConstraintProblem& p = problem_;
 
   // The island's dofs, its trees' in order.
   std::vector<std::uint32_t>& offset = offset_;
@@ -422,10 +425,10 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
 
   std::vector<double>& row = scratch_.row;
   row.assign(n, 0.0);
-  auto append = [&](model::ConstraintKind kind, std::uint32_t group, double pos,
-                    double margin, double loss, double diagonal,
+  auto append = [&](articulated::ConstraintKind kind, std::uint32_t group,
+                    double pos, double margin, double loss, double diagonal,
                     const std::array<double, 5>& friction,
-                    const model::SoftConstraint& soft) {
+                    const articulated::SoftConstraint& soft) {
     p.jacobian.insert(p.jacobian.end(), row.begin(), row.end());
     p.kind.push_back(kind);
     p.group.push_back(group);
@@ -444,26 +447,26 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
 
   // Dry friction, by dof.
   for (std::uint32_t t : members) {
-    const model::Tree& tree = trees[t];
+    const articulated::Tree& tree = trees[t];
     for (std::uint32_t d = tree.first_dof; d < tree.first_dof + tree.dofs;
          ++d) {
-      const model::Dof& dof = m.dofs[d];
+      const articulated::Dof& dof = m.dofs[d];
       if (dof.friction_loss == 0) {
         continue;
       }
       std::ranges::fill(row, 0.0);
       row[offset[t] + d - tree.first_dof] = 1;
-      append(model::ConstraintKind::FRICTION, p.rows(), 0.0, 0.0,
+      append(articulated::ConstraintKind::FRICTION, p.rows(), 0.0, 0.0,
              dof.friction_loss, dof_weight[d], NO_FRICTION,
              m.joints[dof.joint].friction);
     }
   }
 
   // A tendon's row: its coefficients on its joints' dofs.
-  auto tendon_row = [&](const model::Tendon& tendon, double scale) {
+  auto tendon_row = [&](const articulated::Tendon& tendon, double scale) {
     std::ranges::fill(row, 0.0);
     for (std::size_t i = 0; i < tendon.joints.size(); ++i) {
-      const model::Joint& joint = m.joints[tendon.joints[i]];
+      const articulated::Joint& joint = m.joints[tendon.joints[i]];
       std::uint32_t t = tree_of_joint(tendon.joints[i]);
       row[offset[t] + joint.dof - trees[t].first_dof] +=
           scale * tendon.coefficients[i];
@@ -478,12 +481,12 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
   }
   std::ranges::sort(tendons);
   for (std::uint32_t k : tendons) {
-    const model::Tendon& tendon = m.tendons[k];
+    const articulated::Tendon& tendon = m.tendons[k];
     if (tendon.friction_loss == 0) {
       continue;
     }
     tendon_row(tendon, 1.0);
-    append(model::ConstraintKind::FRICTION, p.rows(), 0.0, 0.0,
+    append(articulated::ConstraintKind::FRICTION, p.rows(), 0.0, 0.0,
            tendon.friction_loss, tendon_weight[k], NO_FRICTION,
            tendon.friction);
   }
@@ -491,27 +494,28 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
   // Limits, by joint: each side a hinge or slide is within its margin of,
   // and a ball's angle past its largest (mj_instantiateLimit).
   for (std::uint32_t t : members) {
-    const model::Tree& tree = trees[t];
+    const articulated::Tree& tree = trees[t];
     const double* qpos = data_[t].qpos;
     for (std::uint32_t j = tree.first_joint; j < tree.first_joint + tree.joints;
          ++j) {
-      const model::Joint& joint = m.joints[j];
-      if (!joint.limited || joint.type == model::JointType::FREE) {
+      const articulated::Joint& joint = m.joints[j];
+      if (!joint.limited || joint.type == articulated::JointType::FREE) {
         continue;
       }
       std::uint32_t q = joint.qpos - tree.first_qpos;
       std::uint32_t c = offset[t] + joint.dof - tree.first_dof;
-      if (joint.type == model::JointType::BALL) {
+      if (joint.type == articulated::JointType::BALL) {
         Vector3 r = convert_to_rotation(&qpos[q]);
-        double angle = model::articulated::normalize(InOut(r));
+        double angle = articulated::normalize(InOut(r));
         double dist = std::max(joint.range[0], joint.range[1]) - angle;
         if (dist < joint.margin) {
           std::ranges::fill(row, 0.0);
           for (std::uint32_t k = 0; k < 3; ++k) {
             row[c + k] = -r[k];
           }
-          append(model::ConstraintKind::LIMIT, p.rows(), dist, joint.margin,
-                 0.0, dof_weight[joint.dof], NO_FRICTION, joint.limit);
+          append(articulated::ConstraintKind::LIMIT, p.rows(), dist,
+                 joint.margin, 0.0, dof_weight[joint.dof], NO_FRICTION,
+                 joint.limit);
         }
         continue;
       }
@@ -520,8 +524,9 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
         if (dist < joint.margin) {
           std::ranges::fill(row, 0.0);
           row[c] = -static_cast<double>(side);
-          append(model::ConstraintKind::LIMIT, p.rows(), dist, joint.margin,
-                 0.0, dof_weight[joint.dof], NO_FRICTION, joint.limit);
+          append(articulated::ConstraintKind::LIMIT, p.rows(), dist,
+                 joint.margin, 0.0, dof_weight[joint.dof], NO_FRICTION,
+                 joint.limit);
         }
       }
     }
@@ -529,7 +534,7 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
 
   // Then by tendon, each side its length is within its margin of.
   for (std::uint32_t k : tendons) {
-    const model::Tendon& tendon = m.tendons[k];
+    const articulated::Tendon& tendon = m.tendons[k];
     if (!tendon.limited) {
       continue;
     }
@@ -538,8 +543,8 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
       double dist = side * (tendon.range[(side + 1) / 2] - length);
       if (dist < tendon.margin) {
         tendon_row(tendon, -static_cast<double>(side));
-        append(model::ConstraintKind::LIMIT, p.rows(), dist, tendon.margin, 0.0,
-               tendon_weight[k], NO_FRICTION, tendon.limit);
+        append(articulated::ConstraintKind::LIMIT, p.rows(), dist,
+               tendon.margin, 0.0, tendon_weight[k], NO_FRICTION, tendon.limit);
       }
     }
   }
@@ -552,7 +557,7 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
   translation.resize(3 * std::size_t{n});
   rotation.resize(3 * std::size_t{n});
   for (std::uint32_t c : joined) {
-    const model::Contact& contact = contacts_->contacts[c];
+    const articulated::Contact& contact = contacts_->contacts[c];
     std::ranges::fill(translation, 0.0);
     std::ranges::fill(rotation, 0.0);
     double moved = 0.0;
@@ -565,14 +570,15 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
       if (t == NO_TREE) {
         continue;
       }
-      const model::Tree& tree = trees[t];
+      const articulated::Tree& tree = trees[t];
       std::uint32_t k = tree.dofs;
       std::vector<double>& jp = scratch_.jp;
       std::vector<double>& jr = scratch_.jr;
       jp.resize(3 * std::size_t{k});
       jr.resize(3 * std::size_t{k});
-      model::compute_point_jacobian(m, tree, {data_[t].cdof, k}, *data_[t].com,
-                                    body, contact.pos, jp, jr);
+      articulated::compute_point_jacobian(m, tree, {data_[t].cdof, k},
+                                          *data_[t].com, body, contact.pos, jp,
+                                          jr);
       double sign = side == 0 ? -1.0 : 1.0;
       for (std::uint32_t r = 0; r < 3; ++r) {
         for (std::uint32_t i = 0; i < k; ++i) {
@@ -598,16 +604,16 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
     std::uint32_t group = p.rows();
     if (dim == 1) {
       std::copy_n(framed.begin(), n, row.begin());
-      append(model::ConstraintKind::FRICTIONLESS, group, contact.dist,
+      append(articulated::ConstraintKind::FRICTIONLESS, group, contact.dist,
              contact.include_margin, 0.0, moved, contact.friction,
              contact.soft);
       continue;
     }
-    if (m.physics.cone == model::Physics::Cone::ELLIPTIC) {
+    if (m.physics.cone == articulated::Physics::Cone::ELLIPTIC) {
       // The normal, then the tangents, torsion and rolling, each its row.
       for (std::uint32_t k = 0; k < dim; ++k) {
         std::copy_n(framed.begin() + std::size_t{k} * n, n, row.begin());
-        append(model::ConstraintKind::ELLIPTIC, group,
+        append(articulated::ConstraintKind::ELLIPTIC, group,
                k == 0 ? contact.dist : 0.0,
                k == 0 ? contact.include_margin : 0.0, 0.0,
                k < 3 ? moved : turned, contact.friction, contact.soft);
@@ -621,15 +627,15 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
         for (std::uint32_t i = 0; i < n; ++i) {
           row[i] = framed[i] + sign * mu * framed[k * n + i];
         }
-        append(model::ConstraintKind::PYRAMIDAL, group, contact.dist,
+        append(articulated::ConstraintKind::PYRAMIDAL, group, contact.dist,
                contact.include_margin, 0.0, diagonal, contact.friction,
                contact.soft);
       }
     }
   }
 
-  const model::Physics& physics = m.physics;
-  model::ConstraintSettings settings{
+  const articulated::Physics& physics = m.physics;
+  articulated::ConstraintSettings settings{
       .timestep = physics.timestep,
       .solver = physics.solver,
       .iterations = physics.iterations,
@@ -637,10 +643,10 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
       .mean_inertia = mechanics_->mean_inertia(),
       .model_dofs = static_cast<std::uint32_t>(m.dofs.size()),
       .impratio = physics.impratio};
-  model::solve_constraints(p, settings, Out(answer_));
+  articulated::solve_constraints(p, settings, Out(answer_));
   ConstraintSolution& out = *solution_;
   for (std::uint32_t t : members) {
-    const model::Tree& tree = trees[t];
+    const articulated::Tree& tree = trees[t];
     for (std::uint32_t i = 0; i < tree.dofs; ++i) {
       out.qacc[tree.first_dof + i] = answer_.qacc[offset[t] + i];
       out.qfrc_constraint[tree.first_dof + i] =

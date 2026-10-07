@@ -38,9 +38,10 @@ struct Scenario final {
   std::string roads = "application/automotive/roads/ring.xodr";
   int vehicles = 40;
   Speed starting_speed = 10.0 * meter_per_second;
-  model::IntelligentDriver following{.desired_speed = 20.0 * meter_per_second};
-  model::LaneChanger changing;
-  model::LightBraking braking;
+  traffic::IntelligentDriver following{.desired_speed =
+                                           20.0 * meter_per_second};
+  traffic::LaneChanger changing;
+  traffic::LightBraking braking;
   Time critical_gap = 6.0 * second;
   Length length = 4.5 * meter;
   int pedestrians = 0;
@@ -73,7 +74,7 @@ auto build_world(const Scenario& scenario, const Network& network,
 
 // The fixed-time plan of each of `network`'s signal groups, by group.
 auto plan_signals(const Scenario& scenario, const Network& network)
-    -> std::vector<model::SignalPlan>;
+    -> std::vector<traffic::SignalPlan>;
 
 // Creates every vehicle of a scenario on `network`, and a controller for each
 // signal group.

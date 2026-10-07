@@ -19,7 +19,7 @@ namespace simon::robotic {
 
 namespace {
 
-using model::ArticulatedModel;
+using articulated::ArticulatedModel;
 
 using namespace testing;
 
@@ -94,7 +94,7 @@ auto find_value(const ArticulatedModel& m, const Row& row)
   const std::string& f = row.field;
   std::size_t i = row.index;
   if (row.element == "option") {
-    const model::Physics& p = m.physics;
+    const articulated::Physics& p = m.physics;
     if (f == "timestep") return number(p.timestep);
     if (f == "gravity") return doubles(p.gravity);
     if (f == "integrator") return number(static_cast<double>(p.integrator));
@@ -108,7 +108,7 @@ auto find_value(const ArticulatedModel& m, const Row& row)
   } else if (row.element == "qpos_spring") {
     return m.qpos_spring;
   } else if (row.element == "body") {
-    const model::ArticulatedBody& b = m.bodies.at(i);
+    const articulated::ArticulatedBody& b = m.bodies.at(i);
     if (f == "parentid") return number(b.parent);
     if (f == "rootid") return number(b.root);
     if (f == "pos") return doubles(b.pos);
@@ -127,7 +127,7 @@ auto find_value(const ArticulatedModel& m, const Row& row)
       return number(static_cast<double>(b.inertial_frame));
     }
   } else if (row.element == "jnt") {
-    const model::Joint& j = m.joints.at(i);
+    const articulated::Joint& j = m.joints.at(i);
     if (f == "type") return number(static_cast<double>(j.type));
     if (f == "bodyid") return number(j.body);
     if (f == "pos") return doubles(j.pos);
@@ -141,11 +141,11 @@ auto find_value(const ArticulatedModel& m, const Row& row)
     if (f == "solimp") return doubles(j.limit.impedance);
     if (f == "margin") return number(j.margin);
   } else if (row.element == "dof") {
-    const model::Dof& d = m.dofs.at(i);
+    const articulated::Dof& d = m.dofs.at(i);
     if (f == "bodyid") return number(d.body);
     if (f == "jntid") return number(d.joint);
     if (f == "parentid") {
-      return number(d.parent == model::Dof::NONE ? -1.0 : d.parent);
+      return number(d.parent == articulated::Dof::NONE ? -1.0 : d.parent);
     }
     if (f == "armature") return number(d.armature);
     if (f == "damping") return number(d.damping);
@@ -153,10 +153,10 @@ auto find_value(const ArticulatedModel& m, const Row& row)
     if (f == "solref") return doubles(m.joints.at(d.joint).friction.reference);
     if (f == "solimp") return doubles(m.joints.at(d.joint).friction.impedance);
   } else if (row.element == "geom") {
-    const model::Geom& g = m.geoms.at(i);
+    const articulated::Geom& g = m.geoms.at(i);
     // A mesh's frame and size come from its shape, which is not read; it
     // only shows the model.
-    if (g.type == model::GeomType::MESH &&
+    if (g.type == articulated::GeomType::MESH &&
         (f == "size" || f == "pos" || f == "quat" || f == "sameframe")) {
       return row.values;
     }
@@ -176,7 +176,7 @@ auto find_value(const ArticulatedModel& m, const Row& row)
     if (f == "priority") return number(g.priority);
     if (f == "sameframe") return number(static_cast<double>(g.frame));
   } else if (row.element == "tendon") {
-    const model::Tendon& t = m.tendons.at(i);
+    const articulated::Tendon& t = m.tendons.at(i);
     if (f == "limited") return number(t.limited ? 1 : 0);
     if (f == "range") return doubles(t.range);
     if (f == "margin") return number(t.margin);
@@ -190,7 +190,7 @@ auto find_value(const ArticulatedModel& m, const Row& row)
   } else if (row.element == "exclude") {
     return doubles(m.excludes.at(i));
   } else if (row.element == "actuator") {
-    const model::Actuator& a = m.actuators.at(i);
+    const articulated::Actuator& a = m.actuators.at(i);
     if (f == "trntype") return number(0);  // A joint.
     if (f == "trnid") return {static_cast<double>(a.joint), -1.0};
     if (f == "gear") return doubles(a.gear);
@@ -202,7 +202,7 @@ auto find_value(const ArticulatedModel& m, const Row& row)
     if (f == "dyntype") return number(0);   // None.
     if (f == "gaintype") return number(0);  // Fixed.
     if (f == "biastype") {
-      return number(a.bias_type == model::Actuator::Bias::AFFINE ? 1 : 0);
+      return number(a.bias_type == articulated::Actuator::Bias::AFFINE ? 1 : 0);
     }
     if (f == "gainprm" || f == "biasprm") {
       std::vector<double> prm(10, 0.0);
@@ -250,7 +250,7 @@ TEST_CASE("ModelAgainstMuJoCo") {
       if (row.element == "body" && row.field == "iquat") {
         // Principal axes are defined only up to their signs, and where
         // moments are equal not at all: compare the inertia they give.
-        const model::ArticulatedBody& b =
+        const articulated::ArticulatedBody& b =
             models.at(row.model).bodies.at(row.index);
         std::vector<double> moments{b.inertia[0], b.inertia[1], b.inertia[2]};
         ours = find_tensor(moments, ours);

@@ -21,7 +21,7 @@
 // turbulence's variance and correlation are the specification's at any step.
 // JSBSim's MIL-F-8785C and Tustin turbulence discretize the filters, so theirs
 // change with the frame.
-namespace simon::model {
+namespace simon::earth {
 
 // The air's motion at an aircraft relative to the Earth, in the local
 // north-east-down frame: its velocity, and the rotation turbulence gives it.
@@ -110,4 +110,4 @@ auto compute_wind(const WindField& field, const Gusts& gusts, Angle heading)
 // The steady wind alone.
 auto compute_wind(const WindField& field) -> Wind;
 
-}  // namespace simon::model
+}  // namespace simon::earth

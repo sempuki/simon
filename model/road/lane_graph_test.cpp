@@ -6,7 +6,7 @@
 
 #include "base/testing.hpp"
 
-namespace simon::model {
+namespace simon::road {
 
 namespace {
 
@@ -80,4 +80,4 @@ TEST_CASE("LaneGraph") {
   }
 }
 
-}  // namespace simon::model
+}  // namespace simon::road

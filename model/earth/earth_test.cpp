@@ -8,7 +8,7 @@
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 
-namespace simon::model::wgs84 {
+namespace simon::earth::wgs84 {
 
 using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
@@ -95,4 +95,4 @@ TEST_CASE("Gravitation") {
   }
 }
 
-}  // namespace simon::model::wgs84
+}  // namespace simon::earth::wgs84

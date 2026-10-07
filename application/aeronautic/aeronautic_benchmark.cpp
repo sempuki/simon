@@ -43,7 +43,7 @@ constexpr int DEFAULT_STEPS = 500;  // 10 s simulated.
 enum class Fidelity { SINGLE_PASS, RUNGE_KUTTA, MIXED };
 
 auto measure(int aircraft, Fidelity fidelity, int steps,
-             const model::AircraftData& rigid) -> void {
+             const aircraft::AircraftData& rigid) -> void {
   Scenario scenario{.aircraft = aircraft};
   if (fidelity == Fidelity::RUNGE_KUTTA) {
     scenario.precise = aircraft;

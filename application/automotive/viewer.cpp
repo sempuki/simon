@@ -100,9 +100,9 @@ class RoadMap final {
   auto ready() const -> bool { return ready_; }
 
   // Draws `network`'s roads from now on, the map fitted to them.
-  auto set_roads(const model::RoadNetwork& network) -> void {
+  auto set_roads(const road::RoadNetwork& network) -> void {
     double length = 0.0;
-    for (const model::Road& road : network.roads) {
+    for (const road::Road& road : network.roads) {
       length += road.length;
     }
     spacing_ = std::clamp(length / MOST_SAMPLES, 0.5, 20.0);
@@ -453,29 +453,29 @@ class TrafficViewer final {
   // never move.
   auto set_furniture(const Network& network) -> void {
     stop_lines_.clear();
-    for (const model::StopLine& line : network.control.stop_lines()) {
-      const model::Road& road = network.roads.roads[line.lane.road];
-      const model::LaneSection& section = road.lane_sections[line.lane.section];
+    for (const traffic::StopLine& line : network.control.stop_lines()) {
+      const road::Road& road = network.roads.roads[line.lane.road];
+      const road::LaneSection& section = road.lane_sections[line.lane.section];
       Length s = find_s_along(network, line.lane, line.along);
       int inner = line.lane.lane > 0 ? line.lane.lane - 1 : line.lane.lane + 1;
       auto at = [&](int id) {
-        Vector3 p = eigen(model::compute_road_position(
-            road, s, model::compute_lane_border(road, section, s, id)));
+        Vector3 p = eigen(road::compute_road_position(
+            road, s, road::compute_lane_border(road, section, s, id)));
         return model::Point2{.x = p.x(), .y = p.y()};
       };
       stop_lines_.push_back(
           {.from = at(line.lane.lane), .to = at(inner), .group = line.group});
     }
     crosswalks_.clear();
-    for (const model::Crosswalk& crosswalk : network.walking.crosswalks()) {
-      const model::Road& road = network.roads.roads[crosswalk.road];
-      const model::RoadObject& object = road.objects[crosswalk.object];
+    for (const road::Crosswalk& crosswalk : network.walking.crosswalks()) {
+      const road::Road& road = network.roads.roads[crosswalk.road];
+      const road::RoadObject& object = road.objects[crosswalk.object];
       if (object.outlines.empty()) {
         continue;
       }
       std::vector<model::Point2> corners;
       for (const Position& corner :
-           model::compute_outline(road, object, object.outlines.front())) {
+           road::compute_outline(road, object, object.outlines.front())) {
         Vector3 p = eigen(corner);
         corners.push_back({.x = p.x(), .y = p.y()});
       }
@@ -490,9 +490,9 @@ class TrafficViewer final {
     for (const std::vector<model::Point2>& corners : crosswalks_) {
       map_.draw_polygon(corners, zebra);
     }
-    std::vector<model::Aspect> aspects(
+    std::vector<traffic::Aspect> aspects(
         session_->simulation().network().control.groups().size(),
-        model::Aspect::GREEN);
+        traffic::Aspect::GREEN);
     world.store_of<SignalState>().for_each(
         [&](Entity, const SignalState& signal) {
           if (signal.group < aspects.size()) {
@@ -500,10 +500,10 @@ class TrafficViewer final {
           }
         });
     for (const StopLineDrawing& line : stop_lines_) {
-      model::Aspect aspect = aspects[line.group];
-      ImVec4 color = aspect == model::Aspect::GREEN    ? GREEN
-                     : aspect == model::Aspect::YELLOW ? YELLOW
-                                                       : RED;
+      traffic::Aspect aspect = aspects[line.group];
+      ImVec4 color = aspect == traffic::Aspect::GREEN    ? GREEN
+                     : aspect == traffic::Aspect::YELLOW ? YELLOW
+                                                         : RED;
       map_.draw_line(line.from, line.to, convert_color(color), 0.5);
     }
     const auto& commands = world.store_of<WalkCommand>();

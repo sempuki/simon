@@ -21,7 +21,7 @@
 // world's frame is the map's: x east, y north, z up. The data is in plain SI
 // numbers, meters and radians, since a cubic's coefficients carry different
 // units; the functions take and give quantities.
-namespace simon::model {
+namespace simon::road {
 
 // a + b ds + c ds^2 + d ds^3, in the distance ds from where it starts.
 struct Cubic final {
@@ -334,4 +334,4 @@ struct RoadCoordinates final {
 auto find_road_coordinates(const Road& road, Length x, Length y)
     -> RoadCoordinates;
 
-}  // namespace simon::model
+}  // namespace simon::road

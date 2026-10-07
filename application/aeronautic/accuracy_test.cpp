@@ -112,10 +112,11 @@ struct Replay final  //
 struct Drift final {
   auto add(const AirState& state, const Sample& sample) -> void {
     AirState expected = sample.state();
-    position = std::max(
-        position, model::distance(state, expected).numerical_value_in(meter));
-    altitude = std::max(altitude, std::abs((model::altitude_of(state) -
-                                            model::altitude_of(expected))
+    position =
+        std::max(position,
+                 aircraft::distance(state, expected).numerical_value_in(meter));
+    altitude = std::max(altitude, std::abs((aircraft::altitude_of(state) -
+                                            aircraft::altitude_of(expected))
                                                .numerical_value_in(meter)));
     speed =
         std::max(speed, std::abs((state.speed - expected.speed)

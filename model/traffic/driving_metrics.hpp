@@ -13,7 +13,7 @@
 // Measures of a vehicle's run, as nuPlan defines them (see
 // model/REFERENCES.md): how comfortable its ride is, and its time to
 // collision with the vehicles ahead. Plain SI numbers.
-namespace simon::model {
+namespace simon::traffic {
 
 // A Savitzky-Golay filter, as SciPy's savgol_filter computes it with its
 // default edges: each sample the `derivative`th derivative, over `delta`
@@ -73,12 +73,12 @@ auto check_comfort(const ComfortSignals& signals,
 
 // Whether `to` lies within `tolerance` radians either side of the heading
 // from (`x`, `y`): ahead of it, as nuPlan's TTC counts a vehicle ahead.
-auto check_ahead(double x, double y, double heading, Point2 to,
+auto check_ahead(double x, double y, double heading, model::Point2 to,
                  double tolerance) -> bool;
 
 // A box moving along its heading at `speed`.
 struct MovingBox final {
-  OrientedBox box;
+  model::OrientedBox box;
   double speed = 0.0;
 };
 
@@ -91,4 +91,4 @@ auto compute_time_to_collision(const MovingBox& ego,
                                double step = 0.1, double horizon = 3.0)
     -> std::optional<double>;
 
-}  // namespace simon::model
+}  // namespace simon::traffic

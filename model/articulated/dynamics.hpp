@@ -26,7 +26,7 @@
 // tree's capacity, so a tree's state and work lie inline. Motions and forces
 // are twists and wrenches, rotation first (core/lie.hpp); the mass matrix and
 // its factor lie row by row.
-namespace simon::model {
+namespace simon::articulated {
 
 // A body's inertia about a point, in the world's axes: its rotational inertia
 // about that point, its first moment (its mass times its center of mass's
@@ -111,8 +111,6 @@ struct TreeDynamics final {
   std::array<double, V> acceleration{};    // M⁻¹ smooth.
 };
 
-namespace articulated {
-
 constexpr std::uint32_t NONE = ~std::uint32_t{0};
 
 // A body's inertia about a point `offset` from its center of mass, its
@@ -159,8 +157,6 @@ inline auto integrate_quaternion(const Quaternion& q, const Vector3& rate,
                                  double dt) -> Quaternion {
   return q.normalized() * so3::exp(rate * dt);
 }
-
-}  // namespace articulated
 
 // The Jacobian of `point` on body `body` of `tree`, its translation and
 // rotation each 3 rows by the tree's dofs, from each dof's motion at the
@@ -552,7 +548,6 @@ class TreeKernel final {
 
   // mj_comPos.
   auto compute_com(Out<Dynamics> out) const -> void {
-    using namespace articulated;
     const ArticulatedModel& m = *model_;
     // Each subtree's first moment about the world's origin.
     std::array<Vector3, Capacity::bodies> subtree;
@@ -628,7 +623,6 @@ class TreeKernel final {
   auto factor(const std::array<double, V * V>& mass,
               Out<std::array<double, V * V>> factor_out,
               Out<std::array<double, V>> inverse_out) const -> void {
-    using namespace articulated;
     std::array<double, V * V>& f = *factor_out;
     std::array<double, V>& inverse = *inverse_out;
     f = mass;
@@ -652,7 +646,6 @@ class TreeKernel final {
 
   // mj_comVel.
   auto compute_velocities(const State& state, Out<Dynamics> out) const -> void {
-    using namespace articulated;
     const ArticulatedModel& m = *model_;
     for (std::uint32_t b = 0; b < tree_->bodies; ++b) {
       const ArticulatedBody& body = m.bodies[tree_->first_body + b];
@@ -692,7 +685,6 @@ class TreeKernel final {
 
   // mj_rne without accelerations: gravity and velocity products.
   auto compute_bias(const State& state, Out<Dynamics> out) const -> void {
-    using namespace articulated;
     const ArticulatedModel& m = *model_;
     // Gravity, as the world accelerating the other way.
     Vector6 world;
@@ -811,4 +803,4 @@ class TreeKernel final {
   std::array<double, V> damping_{};  // By dof, with its actuators'.
 };
 
-}  // namespace simon::model
+}  // namespace simon::articulated

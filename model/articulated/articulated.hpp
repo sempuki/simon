@@ -20,9 +20,7 @@
 // relative to the parent body's frame. A ball or free joint's quaternion lies
 // among the positions w, x, y, z. Plain SI numbers, as MuJoCo's are, read once
 // and shared, never changed.
-namespace simon::model {
-
-namespace articulated {
+namespace simon::articulated {
 
 // Below this, MuJoCo takes a length, a pivot or a determinant as zero
 // (mjMINVAL).
@@ -39,8 +37,6 @@ inline auto normalize(InOut<Vector3> v) -> double {
   }
   return length;
 }
-
-}  // namespace articulated
 
 // Joint and shape types, numbered as MuJoCo numbers them.
 enum class JointType : std::uint8_t { FREE, BALL, SLIDE, HINGE };
@@ -234,4 +230,4 @@ struct ArticulatedModel final {
 // Each kinematic tree of `model`, in order.
 auto find_trees(const ArticulatedModel& model) -> std::vector<Tree>;
 
-}  // namespace simon::model
+}  // namespace simon::articulated

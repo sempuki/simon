@@ -35,26 +35,26 @@ struct Room final {
 auto driving_lanes(const Network& network, double margin) -> std::vector<Room> {
   std::vector<Room> lanes;
   for (std::uint32_t r = 0; r < network.roads.roads.size(); ++r) {
-    const model::Road& road = network.roads.roads[r];
+    const road::Road& road = network.roads.roads[r];
     if (road.junction != "-1") {
       continue;
     }
-    bool before = road.predecessor.kind == model::RoadLink::Kind::JUNCTION;
-    bool after = road.successor.kind == model::RoadLink::Kind::JUNCTION;
+    bool before = road.predecessor.kind == road::RoadLink::Kind::JUNCTION;
+    bool after = road.successor.kind == road::RoadLink::Kind::JUNCTION;
     for (std::uint32_t k = 0; k < road.lane_sections.size(); ++k) {
-      const model::LaneSection& section = road.lane_sections[k];
+      const road::LaneSection& section = road.lane_sections[k];
       // Whether this section's start, in s, is at the junction before the
       // road, and its end at the one after it.
       bool start = before && k == 0;
       bool end = after && k + 1 == road.lane_sections.size();
-      for (const std::vector<model::Lane>* side :
+      for (const std::vector<road::Lane>* side :
            {&section.left, &section.right}) {
-        for (const model::Lane& lane : *side) {
+        for (const road::Lane& lane : *side) {
           LaneKey key{.road = r, .section = k, .lane = lane.id};
           if (lane.type != "driving") {
             continue;
           }
-          bool with_s = model::runs_with_s(key);
+          bool with_s = road::runs_with_s(key);
           double length = find_lane_length(network, key);
           double from = (with_s ? start : end) ? margin : 0.0;
           double to = length - ((with_s ? end : start) ? margin : 0.0);
@@ -72,17 +72,18 @@ auto driving_lanes(const Network& network, double margin) -> std::vector<Room> {
 
 auto load_network(const std::string& path)
     -> std::expected<Network, framework::Status> {
-  RETURN_OR_ASSIGN(model::RoadNetwork roads, format::load_opendrive(path));
-  model::LaneGraph graph = model::build_lane_graph(roads);
-  model::LaneGraph driving = model::build_lane_graph(roads, "driving");
-  model::TrafficControl control = model::build_traffic_control(roads);
-  model::RightOfWay rights = model::build_right_of_way(roads, graph, control);
-  model::WalkingGraph walking = model::build_walking_graph(roads);
+  RETURN_OR_ASSIGN(road::RoadNetwork roads, format::load_opendrive(path));
+  road::LaneGraph graph = road::build_lane_graph(roads);
+  road::LaneGraph driving = road::build_lane_graph(roads, "driving");
+  traffic::TrafficControl control = traffic::build_traffic_control(roads);
+  traffic::RightOfWay rights =
+      traffic::build_right_of_way(roads, graph, control);
+  road::WalkingGraph walking = road::build_walking_graph(roads);
   std::vector<std::uint32_t> components = walking.find_components();
   // A crosswalk's light: one on a lane it crosses, within 15 m before it.
   std::vector<std::optional<std::uint32_t>> groups(walking.crosswalks().size());
-  for (const model::CrosswalkZone& zone : walking.zones()) {
-    for (const model::StopLine& line : control.stop_lines_on(zone.lane)) {
+  for (const road::CrosswalkZone& zone : walking.zones()) {
+    for (const traffic::StopLine& line : control.stop_lines_on(zone.lane)) {
       if (line.along <= zone.near && line.along >= zone.near - 15.0) {
         groups[zone.crosswalk] = line.group;
       }
@@ -118,9 +119,9 @@ auto build_world(const Scenario& scenario, const Network& network,
 }
 
 auto plan_signals(const Scenario& scenario, const Network& network)
-    -> std::vector<model::SignalPlan> {
-  std::span<const model::SignalGroup> groups = network.control.groups();
-  std::vector<model::SignalPlan> plans(groups.size());
+    -> std::vector<traffic::SignalPlan> {
+  std::span<const traffic::SignalGroup> groups = network.control.groups();
+  std::vector<traffic::SignalPlan> plans(groups.size());
   // Each junction's groups in its order; a group in none, alone.
   std::map<std::string, std::vector<std::uint32_t>> turns;
   for (std::uint32_t g = 0; g < groups.size(); ++g) {
@@ -132,7 +133,7 @@ auto plan_signals(const Scenario& scenario, const Network& network)
   for (auto& [junction, members] : turns) {
     std::ranges::stable_sort(
         members, {}, [&](std::uint32_t g) { return groups[g].sequence; });
-    std::vector<model::SignalPlan> in_turn = model::plan_in_turn(
+    std::vector<traffic::SignalPlan> in_turn = traffic::plan_in_turn(
         members.size(), scenario.green, scenario.yellow, scenario.all_red);
     for (std::size_t k = 0; k < members.size(); ++k) {
       plans[members[k]] = std::move(in_turn[k]);
@@ -181,7 +182,7 @@ auto build_scenario(const Scenario& scenario, const Network& network,
     }
     taken[lane].push_back(along);
 
-    model::IntelligentDriver following = scenario.following;
+    traffic::IntelligentDriver following = scenario.following;
     following.desired_speed *=
         1.0 + random.uniform(-scenario.speed_spread, scenario.speed_spread);
     LaneState state{.lane = lane,
@@ -220,7 +221,7 @@ auto build_scenario(const Scenario& scenario, const Network& network,
   std::vector<std::uint32_t> sidewalks;
   double walkable = 0.0;
   for (std::uint32_t e = 0; e < network.walking.edges().size(); ++e) {
-    if (network.walking.edges()[e].kind == model::WalkEdge::Kind::SIDEWALK) {
+    if (network.walking.edges()[e].kind == road::WalkEdge::Kind::SIDEWALK) {
       sidewalks.push_back(e);
       walkable += network.walking.edges()[e].length();
     }
@@ -249,8 +250,8 @@ auto build_scenario(const Scenario& scenario, const Network& network,
     }
     walking[edge].push_back(at);
     auto seed = static_cast<std::uint64_t>(random.uniform(0.0, 0x1.0p53));
-    WalkRoute route{.legs = {model::Leg{.edge = edge, .forward = true}}};
-    std::vector<model::Leg> onward =
+    WalkRoute route{.legs = {road::Leg{.edge = edge, .forward = true}}};
+    std::vector<road::Leg> onward =
         plan_walk(network, network.walking.edges()[edge].to, seed, 0);
     route.legs.insert(route.legs.end(), onward.begin(), onward.end());
     WalkState state{.along = at * meter};
@@ -271,7 +272,7 @@ auto build_scenario(const Scenario& scenario, const Network& network,
             .with(WalkCommand{})
             .build());
   }
-  std::vector<model::SignalPlan> plans = plan_signals(scenario, network);
+  std::vector<traffic::SignalPlan> plans = plan_signals(scenario, network);
   for (std::uint32_t g = 0; g < plans.size(); ++g) {
     RETURN_IF_UNEXPECTED(world->create<archetype::SignalController>()
                              .with(std::move(plans[g]))
@@ -283,7 +284,7 @@ auto build_scenario(const Scenario& scenario, const Network& network,
 }
 
 auto keep_road_order(const Network& network, InOut<World> world) -> void {
-  const model::LaneNumbering& numbering = network.graph.numbering();
+  const road::LaneNumbering& numbering = network.graph.numbering();
   auto road_order = [&](Entity entity) {
     const LaneState& state = world->store_of<LaneState>().component_of(entity);
     return std::pair{numbering.number_of(state.lane),
@@ -296,7 +297,7 @@ auto keep_road_order(const Network& network, InOut<World> world) -> void {
     const WalkRoute& route = world->store_of<WalkRoute>().component_of(entity);
     std::uint32_t edge = state.leg < route.legs.size()
                              ? route.legs[state.leg].edge
-                             : model::WalkEdge::NONE;
+                             : road::WalkEdge::NONE;
     return std::pair{edge, state.along.numerical_value_in(meter)};
   });
 }

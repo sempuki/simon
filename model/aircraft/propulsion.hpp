@@ -18,7 +18,7 @@
 
 // A rigid aircraft's engines: the air they breathe, their spools and thrust
 // at their throttles, and the fuel they burn from its tanks.
-namespace simon::model {
+namespace simon::aircraft {
 
 // Each engine's state, in the aircraft data's order.
 struct Engines final {
@@ -32,9 +32,9 @@ auto compute_settled_engines(const AircraftData& aircraft,
 
 // The air the engines breathe at `body`, moving as `wind` has it. Over the
 // standard atmosphere the density altitude is the altitude.
-auto compute_engine_air(const RigidBody& body, const Earth& earth,
-                        const StandardAirTable& air, const Wind& wind,
-                        Time time) -> EngineAir;
+auto compute_engine_air(const model::RigidBody& body, const Earth& earth,
+                        const earth::StandardAirTable& air,
+                        const earth::Wind& wind, Time time) -> EngineAir;
 
 // Advances each engine by `dt` at its throttle in `signals`. An engine whose
 // tanks are empty makes no thrust and burns nothing.
@@ -47,4 +47,4 @@ auto run_engines(const AircraftData& aircraft, InOut<Engines> engines,
 auto burn_fuel(const AircraftData& aircraft, const Engines& engines,
                InOut<FuelTanks> tanks, Time dt) -> void;
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

@@ -34,10 +34,10 @@ struct Census final {
 
 auto take_census(const Network& network) -> Census {
   Census census;
-  for (const model::WalkEdge& edge : network.walking.edges()) {
-    census.sidewalks += edge.kind == model::WalkEdge::Kind::SIDEWALK ? 1 : 0;
-    census.crossings += edge.kind == model::WalkEdge::Kind::CROSSING ? 1 : 0;
-    census.corners += edge.kind == model::WalkEdge::Kind::CORNER ? 1 : 0;
+  for (const road::WalkEdge& edge : network.walking.edges()) {
+    census.sidewalks += edge.kind == road::WalkEdge::Kind::SIDEWALK ? 1 : 0;
+    census.crossings += edge.kind == road::WalkEdge::Kind::CROSSING ? 1 : 0;
+    census.corners += edge.kind == road::WalkEdge::Kind::CORNER ? 1 : 0;
   }
   census.components =
       std::set<std::uint32_t>(network.walking_components.begin(),
@@ -46,10 +46,10 @@ auto take_census(const Network& network) -> Census {
   return census;
 }
 
-auto route_length(const Network& network, const std::vector<model::Leg>& legs)
+auto route_length(const Network& network, const std::vector<road::Leg>& legs)
     -> double {
   double length = 0.0;
-  for (const model::Leg& leg : legs) {
+  for (const road::Leg& leg : legs) {
     length += network.walking.edges()[leg.edge].length();
   }
   return length;
@@ -95,7 +95,7 @@ TEST_CASE("Walking") {
       for (std::size_t i = 0; i < n; ++i) {
         best[i][i] = 0.0;
       }
-      for (const model::WalkEdge& edge : network.walking.edges()) {
+      for (const road::WalkEdge& edge : network.walking.edges()) {
         best[edge.from][edge.to] =
             std::min(best[edge.from][edge.to], edge.length());
         best[edge.to][edge.from] = best[edge.from][edge.to];
@@ -111,7 +111,7 @@ TEST_CASE("Walking") {
       int routes = 0;
       for (std::uint32_t i = 0; i < n; ++i) {
         for (std::uint32_t j = 0; j < n; ++j) {
-          std::vector<model::Leg> legs = network.walking.find_route(i, j);
+          std::vector<road::Leg> legs = network.walking.find_route(i, j);
           if (best[i][j] == FAR || i == j) {
             CHECK(legs.empty());
             continue;
@@ -121,8 +121,8 @@ TEST_CASE("Walking") {
                            std::abs(route_length(network, legs) - best[i][j]));
           // Leg after leg, each starting where the last ended.
           std::uint32_t at = i;
-          for (const model::Leg& leg : legs) {
-            const model::WalkEdge& edge = network.walking.edges()[leg.edge];
+          for (const road::Leg& leg : legs) {
+            const road::WalkEdge& edge = network.walking.edges()[leg.edge];
             CHECK((leg.forward ? edge.from : edge.to) == at);
             at = leg.forward ? edge.to : edge.from;
           }
@@ -145,13 +145,13 @@ TEST_CASE("Walking") {
         Out(world)));
     std::uint32_t edge = 0;
     while (network.walking.edges()[edge].kind !=
-               model::WalkEdge::Kind::SIDEWALK ||
+               road::WalkEdge::Kind::SIDEWALK ||
            network.walking.edges()[edge].length() < 35.0) {
       ++edge;
     }
     std::vector<Entity> walkers;
     for (auto [along, speed] : {std::pair{10.0, 0.8}, std::pair{0.0, 1.6}}) {
-      WalkRoute route{.legs = {model::Leg{.edge = edge, .forward = true}}};
+      WalkRoute route{.legs = {road::Leg{.edge = edge, .forward = true}}};
       WalkState state{.along = along * meter};
       walkers.push_back(
           *world.create<archetype::Pedestrian>()
@@ -227,7 +227,7 @@ TEST_CASE("Walking") {
       const World& world = simulation.world();
       world.store_of<WalkState>().for_each(
           [&](Entity owner, const WalkState& state) {
-            const model::Leg& leg =
+            const road::Leg& leg =
                 world.store_of<WalkRoute>().component_of(owner).legs[state.leg];
             ways[{leg.edge, leg.forward}].emplace_back(
                 state.along.numerical_value_in(meter), owner);

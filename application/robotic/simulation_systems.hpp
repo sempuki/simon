@@ -135,10 +135,10 @@ struct Collide final    //
 
   const Mechanics* mechanics_ = nullptr;
   ContactSet* contacts_ = nullptr;
-  std::vector<model::GeomFrame> frames_;  // By geom.
-  std::vector<std::uint8_t> unbounded_;   // By geom.
-  std::vector<std::uint32_t> tree_of_;    // By body, none for the world.
-  std::vector<std::uint32_t> touching_;   // By tree.
+  std::vector<articulated::GeomFrame> frames_;  // By geom.
+  std::vector<std::uint8_t> unbounded_;         // By geom.
+  std::vector<std::uint32_t> tree_of_;          // By body, none for the world.
+  std::vector<std::uint32_t> touching_;         // By tree.
 };
 
 // After Collide, the constraints of every tree, as rows: its dofs' and
@@ -213,8 +213,8 @@ struct Solve final    //
   std::vector<std::vector<std::uint32_t>> tree_tendons_;
   std::vector<Island> islands_;        // By tree.
   std::vector<std::uint32_t> parent_;  // By tree, for union and find.
-  model::ConstraintProblem problem_;
-  model::ConstraintSolution answer_;
+  articulated::ConstraintProblem problem_;
+  articulated::ConstraintSolution answer_;
   // Vectors an island's rows are built in, kept from island to island.
   struct Scratch final {
     std::vector<double> qvel;
@@ -248,7 +248,7 @@ struct Integrate final                      //
     if (!dynamics || !mechanism) {
       return;
     }
-    const model::Tree& tree = mechanics_->trees()[mechanism->tree];
+    const articulated::Tree& tree = mechanics_->trees()[mechanism->tree];
     const auto& kernel = mechanics_->kernel<Capacity>(mechanism->tree);
     if (solution_->constrained.empty() ||
         solution_->constrained[mechanism->tree] == 0) {
@@ -313,8 +313,8 @@ auto Control<Capacity>::operator()(SystemWorld&, Entity,              //
   if (law.gains.empty() || !state || !mechanism) {
     return;
   }
-  const model::ArticulatedModel& m = mechanics_->model();
-  const model::Tree& tree = mechanics_->trees()[mechanism->tree];
+  const articulated::ArticulatedModel& m = mechanics_->model();
+  const articulated::Tree& tree = mechanics_->trees()[mechanism->tree];
   std::size_t nq = m.qpos0.size();
   std::size_t width = nq + m.dofs.size();
   for (std::size_t a = 0; a < tree.actuators.size(); ++a) {
@@ -342,19 +342,19 @@ auto Bound<Capacity>::operator()(SystemWorld&, Entity,                    //
   if (!dynamics || !mechanism) {
     return;
   }
-  const model::ArticulatedModel& m = mechanics_->model();
-  const model::Tree& tree = mechanics_->trees()[mechanism->tree];
+  const articulated::ArticulatedModel& m = mechanics_->model();
+  const articulated::Tree& tree = mechanics_->trees()[mechanism->tree];
   bound.center = dynamics->com;
   bound.radius = 0.0;
   for (std::uint32_t g = tree.first_geom; g < tree.first_geom + tree.geoms;
        ++g) {
-    const model::Geom& geom = m.geoms[g];
-    if (geom.type == model::GeomType::PLANE) {
+    const articulated::Geom& geom = m.geoms[g];
+    if (geom.type == articulated::GeomType::PLANE) {
       continue;
     }
     std::uint32_t b = geom.body - tree.first_body;
     Vector3 at = dynamics->xipos[b];
-    if (geom.frame != model::SameFrame::INERTIA) {
+    if (geom.frame != articulated::SameFrame::INERTIA) {
       at = dynamics->xmat[b] * geom.pos + dynamics->xpos[b];
     }
     double reach = mechanics_->radii()[g] + geom.margin + geom.gap;
@@ -387,15 +387,16 @@ auto Solve::gather(SystemWorld& world) -> void {
 
 template <typename Capacity>
 auto Collide::place_geoms(SystemWorld& world) -> void {
-  const model::ArticulatedModel& m = mechanics_->model();
+  const articulated::ArticulatedModel& m = mechanics_->model();
   const auto& mechanisms = world.store_of<Mechanism>();
   world.store_of<TreeDynamics<Capacity>>().for_each(
       [&](Entity owner, const TreeDynamics<Capacity>& dynamics) {
-        const model::Tree& tree =
+        const articulated::Tree& tree =
             mechanics_->trees()[mechanisms.component_of(owner).tree];
         for (std::uint32_t b = 0; b < tree.bodies; ++b) {
-          const model::ArticulatedBody& body = m.bodies[tree.first_body + b];
-          model::BodyFrame frame{
+          const articulated::ArticulatedBody& body =
+              m.bodies[tree.first_body + b];
+          articulated::BodyFrame frame{
               .xpos = dynamics.xpos[b],
               .xquat = dynamics.xquat[b],
               .xmat = dynamics.xmat[b],
@@ -404,7 +405,7 @@ auto Collide::place_geoms(SystemWorld& world) -> void {
           };
           for (std::uint32_t g = body.first_geom;
                g < body.first_geom + body.geoms; ++g) {
-            frames_[g] = model::compute_geom_frame(m.geoms[g], frame);
+            frames_[g] = articulated::compute_geom_frame(m.geoms[g], frame);
           }
         }
       });

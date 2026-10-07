@@ -5,7 +5,7 @@
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 
-namespace simon::model {
+namespace simon::earth {
 
 using Catch::Matchers::WithinRel;
 
@@ -96,4 +96,4 @@ TEST_CASE("CalibratedAirspeed") {
   }
 }
 
-}  // namespace simon::model
+}  // namespace simon::earth

@@ -19,7 +19,7 @@
 // Traffic lights (see model/REFERENCES.md): fixed-time plans for groups of
 // signals, the stop lines their signals put on lanes, and what a driver does
 // at a light that is not green, by the rule of Treiber and Kesting's movsim.
-namespace simon::model {
+namespace simon::traffic {
 
 // What a signal group shows.
 enum class Aspect : std::uint8_t { RED, YELLOW, GREEN };
@@ -66,7 +66,7 @@ struct SignalGroup final {
 // Where a lane's traffic stops for a signal group: `along` meters into the
 // lane in its direction of travel.
 struct StopLine final {
-  LaneKey lane;
+  road::LaneKey lane;
   double along = 0.0;
   std::uint32_t group = 0;
 };
@@ -80,23 +80,24 @@ class TrafficControl final {
   auto stop_lines() const -> std::span<const StopLine> { return stop_lines_; }
 
   // `lane`'s stop lines, in order along it.
-  auto stop_lines_on(const LaneKey& lane) const -> std::span<const StopLine>;
+  auto stop_lines_on(const road::LaneKey& lane) const
+      -> std::span<const StopLine>;
 
  private:
-  friend auto build_traffic_control(const RoadNetwork& network)
+  friend auto build_traffic_control(const road::RoadNetwork& network)
       -> TrafficControl;
 
   std::vector<SignalGroup> groups_;
   std::vector<StopLine> stop_lines_;
-  LaneNumbering numbering_;
-  LaneRanges lines_;  // Into stop_lines_, by lane number.
+  road::LaneNumbering numbering_;
+  road::LaneRanges lines_;  // Into stop_lines_, by lane number.
 };
 
 // The signal groups of `network`, one per controller, in its order, and a
 // stop line for each driving lane each controlled traffic light holds for:
 // the lanes its orientation runs on, those its validities name if it has any.
 // A light no controller lists stops no one.
-auto build_traffic_control(const RoadNetwork& network) -> TrafficControl;
+auto build_traffic_control(const road::RoadNetwork& network) -> TrafficControl;
 
 // How hard a driver will brake for a light: up to `yellow` to stop at a
 // yellow one, if it could stop at all at `kinematic`; and at a red one, up to
@@ -126,4 +127,4 @@ auto stops_at_light(const IntelligentDriver& driver,
                     const LightBraking& braking, Aspect aspect, Speed speed,
                     Length distance) -> bool;
 
-}  // namespace simon::model
+}  // namespace simon::traffic

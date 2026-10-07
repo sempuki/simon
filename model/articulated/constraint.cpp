@@ -9,7 +9,7 @@
 #include <cmath>
 #include <span>
 
-namespace simon::model {
+namespace simon::articulated {
 
 namespace {
 
@@ -1315,4 +1315,4 @@ auto solve_constraints(const ConstraintProblem& problem,
   }
 }
 
-}  // namespace simon::model
+}  // namespace simon::articulated

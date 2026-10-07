@@ -26,7 +26,7 @@ namespace {
 using namespace aeronautic::testing;
 
 struct Compared final {
-  Trim simon;
+  aircraft::Trim simon;
   // JSBSim's trim.
   double alpha = 0.0;
   double bank = 0.0;
@@ -43,11 +43,11 @@ auto compare(std::string_view path, std::string_view initial) -> Compared {
   REQUIRE(rows.size() == 1);
   const Row& trimmed = rows[0];
 
-  Earth earth = Earth::round(wgs84::Geodetic{});
-  StandardAirTable air;
+  aircraft::Earth earth = aircraft::Earth::round(earth::wgs84::Geodetic{});
+  earth::StandardAirTable air;
   RigidBody body = read_body(trimmed);
-  AirState state = earth.air_state(body, 0.0 * second);
-  FlightCondition condition{
+  aircraft::AirState state = earth.air_state(body, 0.0 * second);
+  aircraft::FlightCondition condition{
       .position = state.position,
       .speed = state.speed,
       .heading = state.heading,

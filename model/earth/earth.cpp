@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-namespace simon::model::wgs84 {
+namespace simon::earth::wgs84 {
 
 auto convert_geodetic_to_fixed(const Geodetic& where) -> Position {
   double sin_latitude = sin(where.latitude);
@@ -28,4 +28,4 @@ auto convert_fixed_to_geodetic(const Position& fixed) -> Geodetic {
   };
 }
 
-}  // namespace simon::model::wgs84
+}  // namespace simon::earth::wgs84

@@ -12,6 +12,7 @@
 namespace simon::format {
 
 using namespace model;
+using namespace aircraft;
 
 using Catch::Matchers::ContainsSubstring;
 using Catch::Matchers::WithinAbs;

@@ -23,7 +23,7 @@
 //
 // Thrust is held for a step, as JSBSim holds it for a frame. Starting,
 // stalling and water injection are left out.
-namespace simon::model {
+namespace simon::aircraft {
 
 // The air a turbine breathes.
 struct EngineAir final {
@@ -51,4 +51,4 @@ auto run_turbine(const TurbineData& turbine, const TurbineState& state,
                  double throttle, const EngineAir& air, Time dt)
     -> TurbineState;
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

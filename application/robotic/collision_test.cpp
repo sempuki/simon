@@ -29,7 +29,7 @@ using namespace testing;
 // dimension, friction, solref, solimp, included margin, excluded.
 using Row = std::vector<double>;
 
-auto flatten(const model::Contact& c) -> Row {
+auto flatten(const articulated::Contact& c) -> Row {
   Row row{static_cast<double>(c.geom[0]), static_cast<double>(c.geom[1]),
           c.dist};
   row.insert(row.end(), c.pos.begin(), c.pos.end());
@@ -135,7 +135,7 @@ auto compare_poses(std::string_view model, std::string_view table)
     }
     step_once(InOut(simulation), 0);
     std::vector<Row> found;
-    for (const model::Contact& contact : simulation.contacts()) {
+    for (const articulated::Contact& contact : simulation.contacts()) {
       found.push_back(flatten(contact));
     }
     std::vector<Row> expected = poses[p].contacts;
@@ -222,12 +222,12 @@ TEST_CASE("CollisionAgainstMuJoCo") {
     Simulation simulation{scenario};
     REQUIRE(simulation.configure());
     step_once(InOut(simulation), 0);
-    const model::ArticulatedModel& m = simulation.mechanics().model();
+    const articulated::ArticulatedModel& m = simulation.mechanics().model();
     std::uint32_t arm =
         static_cast<std::uint32_t>(simulation.mechanics().trees().size() - 1);
     std::uint32_t first = simulation.mechanics().trees()[arm].first_geom;
     std::uint32_t expected = 0;
-    for (const model::Contact& contact : simulation.contacts()) {
+    for (const articulated::Contact& contact : simulation.contacts()) {
       expected += contact.geom[0] >= first || contact.geom[1] >= first;
     }
     std::uint32_t counted = 0;

@@ -10,7 +10,7 @@
 // (see model/REFERENCES.md): straight between its vertices, heading along
 // each segment, and turning only within 2 m of a corner, or half the
 // segment if shorter. Plain SI numbers in the plane.
-namespace simon::model {
+namespace simon::road {
 
 struct PolylinePoint final {
   double x = 0.0;
@@ -35,4 +35,4 @@ class Polyline final {
   std::vector<double> distance_;  // To each vertex.
 };
 
-}  // namespace simon::model
+}  // namespace simon::road

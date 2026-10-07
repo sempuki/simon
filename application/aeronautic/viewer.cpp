@@ -100,10 +100,10 @@ class Viewer final {
   auto restart() -> void {
     // The wind blows from `wind_from_`, so the air moves the other way.
     double from = wind_from_ / RAD_TO_DEG;
-    scenario_.wind = model::WindField{
+    scenario_.wind = earth::WindField{
         .north_east_down = meters_per_second(
             -wind_speed_ * std::cos(from), -wind_speed_ * std::sin(from), 0.0),
-        .turbulence = static_cast<model::Turbulence>(turbulence_),
+        .turbulence = static_cast<earth::Turbulence>(turbulence_),
     };
     session_.reset();  // Finish the old run before starting the new one.
     session_ = std::make_unique<Session>(
@@ -144,7 +144,7 @@ class Viewer final {
       }
       history.times.push_back(time);
       history.altitudes.push_back(
-          model::altitude_of(*state).numerical_value_in(meter));
+          aircraft::altitude_of(*state).numerical_value_in(meter));
       history.speeds.push_back(
           state->speed.numerical_value_in(meter_per_second));
       while (!history.times.empty() &&
@@ -244,22 +244,22 @@ class Viewer final {
         !felt) {
       return;
     }
-    const model::AircraftData& data = *type->data;
-    model::Earth earth = model::Earth::flat();
+    const aircraft::AircraftData& data = *type->data;
+    aircraft::Earth earth = aircraft::Earth::flat();
     Matrix3 attitude =
         earth.convert_body_to_north_east_down(*body, seconds(0.0s));
-    Vector3 uvw = model::compute_air_velocity(*body, earth,
-                                              earth.place(*body, seconds(0.0s)),
-                                              wind ? *wind : Wind{})
+    Vector3 uvw = aircraft::compute_air_velocity(
+                      *body, earth, earth.place(*body, seconds(0.0s)),
+                      wind ? *wind : Wind{})
                       .numerical_value_in(meter_per_second)
                       .eigen();
     Vector3 ground =
         body->velocity.numerical_value_in(meter_per_second).eigen();
     double g =
-        model::STANDARD_GRAVITY.numerical_value_in(meter_per_second_squared);
+        earth::STANDARD_GRAVITY.numerical_value_in(meter_per_second_squared);
     auto signal = [&](std::string_view name) -> std::optional<double> {
       std::optional<std::size_t> found =
-          model::find_signal(data.flight_controls, name);
+          aircraft::find_signal(data.flight_controls, name);
       if (!found) {
         return std::nullopt;
       }
@@ -267,7 +267,7 @@ class Viewer final {
     };
 
     ImGui::Text("Altitude      %7.0f m",
-                model::altitude_of(*state).numerical_value_in(meter));
+                aircraft::altitude_of(*state).numerical_value_in(meter));
     ImGui::Text("Airspeed      %7.1f m/s",
                 state->speed.numerical_value_in(meter_per_second));
     ImGui::Text("Ground speed  %7.1f m/s", std::hypot(ground.x(), ground.y()));
@@ -432,7 +432,7 @@ class Viewer final {
   Scenario scenario_;
   float wind_from_ = 270.0f;  // Degrees from north.
   float wind_speed_ = 0.0f;   // m/s.
-  int turbulence_ = 0;        // A model::Turbulence.
+  int turbulence_ = 0;        // A earth::Turbulence.
   float speed_ = 10.0f;
   float scale_ = 1.0f;
   std::unique_ptr<Session> session_;

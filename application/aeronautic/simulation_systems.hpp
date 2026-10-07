@@ -41,7 +41,7 @@ struct MoveAir final          //
              const AircraftType> {
   using SystemWorld = ProjectedWorld<MoveAir>;
 
-  explicit MoveAir(model::WindField field = {}) : field_{field} {}
+  explicit MoveAir(earth::WindField field = {}) : field_{field} {}
 
   auto operator()(SystemWorld&, Entity,      //
                   Wind& wind,                //
@@ -50,17 +50,17 @@ struct MoveAir final          //
                   const AircraftType* type,  //
                   Step step) const -> void {
     if (!gusts || !state || !type || !type->data) {
-      wind = model::compute_wind(field_);
+      wind = earth::compute_wind(field_);
       return;
     }
-    model::advance_gusts(field_.turbulence, model::altitude_of(*state),
+    earth::advance_gusts(field_.turbulence, aircraft::altitude_of(*state),
                          state->speed, type->data->wing_span, seconds(step.dt),
                          InOut(*gusts));
-    wind = model::compute_wind(field_, *gusts, state->heading);
+    wind = earth::compute_wind(field_, *gusts, state->heading);
   }
 
  private:
-  model::WindField field_;
+  earth::WindField field_;
 };
 
 //-- Guidance and control: discrete, at their own rates ------------------------
@@ -86,14 +86,14 @@ struct FollowRoute final      //
     if (!state || !autopilot) {
       return;
     }
-    if (model::ground_distance(state->position, route.waypoints[route.next]) <
-        CAPTURE) {
+    if (aircraft::ground_distance(state->position,
+                                  route.waypoints[route.next]) < CAPTURE) {
       route.next = (route.next + 1) % Route::SIZE;
       ++route.reached;
     }
     const Position& waypoint = route.waypoints[route.next];
-    autopilot->heading = model::compute_bearing(state->position, waypoint);
-    autopilot->altitude = model::altitude_of(waypoint);
+    autopilot->heading = aircraft::compute_bearing(state->position, waypoint);
+    autopilot->altitude = aircraft::altitude_of(waypoint);
     autopilot->speed = route.speed;
   }
 
@@ -146,18 +146,18 @@ struct FlyAutopilot final           //
       return;
     }
     Speed speed_error = autopilot->speed - state->speed;
-    commands.bank = model::compute_bank_command(
+    commands.bank = aircraft::compute_bank_command(
         *state, autopilot->heading, gains_.heading, handling->max_bank);
 
     // Speed comes first: a slow aircraft climbs less steeply, or not at all.
-    Angle climb = model::compute_climb_command(
+    Angle climb = aircraft::compute_climb_command(
         *state, autopilot->altitude, gains_.altitude, gains_.steepest_climb);
     double slow = std::clamp(1.0 - number_of(speed_error / gains_.speed_margin),
                              0.0, 1.0);
     climb = min(climb, gains_.steepest_climb * slow);
 
     commands.load_factor =
-        std::clamp(model::compute_load_factor_command(
+        std::clamp(aircraft::compute_load_factor_command(
                        *state, climb, controls->bank, gains_.climb),
                    handling->min_load_factor, handling->max_load_factor);
     commands.throttle = model::pi_control(speed_error, gains_.speed, elapsed_,
@@ -204,9 +204,9 @@ struct Actuate final          //
 // altitude.
 inline auto compute_rate(const AirState& state, const FlightControls& controls,
                          const Airframe& airframe,
-                         const model::StandardAirTable& air) -> AirStateRate {
-  return model::compute_point_mass_rate(state, controls, airframe,
-                                        air(model::altitude_of(state)));
+                         const earth::StandardAirTable& air) -> AirStateRate {
+  return aircraft::compute_point_mass_rate(state, controls, airframe,
+                                           air(aircraft::altitude_of(state)));
 }
 
 // The default: each aircraft advances in one semi-implicit pass per step.
@@ -229,12 +229,12 @@ struct Fly final                    //
     if (!controls || !airframe) {
       return;
     }
-    state = model::fly(state, compute_rate(state, *controls, *airframe, air_),
-                       step.dt);
+    state = aircraft::fly(
+        state, compute_rate(state, *controls, *airframe, air_), step.dt);
   }
 
  private:
-  model::StandardAirTable air_;
+  earth::StandardAirTable air_;
 };
 
 // The opt-in: the rate of each precise aircraft's AirState, for Continuous.
@@ -257,7 +257,7 @@ struct PointMassRates final         //
   }
 
  private:
-  model::StandardAirTable air_;
+  earth::StandardAirTable air_;
 };
 
 using Precise =
@@ -304,7 +304,7 @@ struct FlySurfaces final       //
   using SystemWorld = ProjectedWorld<FlySurfaces>;
   using SequenceAfterSystemList = SystemList<FollowRoute>;
 
-  explicit FlySurfaces(model::Earth earth = model::Earth::flat())
+  explicit FlySurfaces(aircraft::Earth earth = aircraft::Earth::flat())
       : earth_{earth} {}
 
   auto operator()(SystemWorld&, Entity,        //
@@ -325,8 +325,8 @@ struct FlySurfaces final       //
         earth_.air_rate(*body).numerical_value_in(radian_per_second).eigen();
 
     double bank_error =
-        radians(model::compute_bank_command(*state, autopilot->heading,
-                                            0.5 * per_second, gains.max_bank)) -
+        radians(aircraft::compute_bank_command(
+            *state, autopilot->heading, 0.5 * per_second, gains.max_bank)) -
         bank;
     // Speed comes first, as it does for point-mass aircraft: a slow
     // aircraft climbs less steeply, or not at all.
@@ -335,7 +335,7 @@ struct FlySurfaces final       //
     double steepest = 0.08 * std::clamp(1.0 - speed_error / 20.0, 0.0, 1.0);
     double climb_error =
         std::min(
-            radians(model::compute_climb_command(
+            radians(aircraft::compute_climb_command(
                 *state, autopilot->altitude, 0.05 * per_second, 0.08 * radian)),
             steepest) -
         radians(state->flight_path_angle);
@@ -346,11 +346,11 @@ struct FlySurfaces final       //
     // A turn needs a pitch rate of g/V sin(bank) tan(bank) to hold its
     // flight path.
     double turn =
-        model::STANDARD_GRAVITY.numerical_value_in(meter_per_second_squared) /
+        earth::STANDARD_GRAVITY.numerical_value_in(meter_per_second_squared) /
         state->speed.numerical_value_in(meter_per_second) * std::sin(bank) *
         std::tan(bank);
 
-    using enum model::FlightSignal;
+    using enum aircraft::FlightSignal;
     // The 737's elevator command is positive nose down.
     signals[AILERON_COMMAND] =
         std::clamp(gains.bank * bank_error - gains.roll * rates.x(), -1.0, 1.0);
@@ -361,13 +361,13 @@ struct FlySurfaces final       //
     signals[PITCH_TRIM_COMMAND] = trim->pitch_trim;
     double throttle =
         std::clamp(trim->throttle_trim + gains.speed * speed_error, 0.0, 1.0);
-    for (std::size_t i = 0; i < model::MAX_ENGINES; ++i) {
-      signals.values[model::index_of(THROTTLE_COMMAND_0) + i] = throttle;
+    for (std::size_t i = 0; i < aircraft::MAX_ENGINES; ++i) {
+      signals.values[aircraft::index_of(THROTTLE_COMMAND_0) + i] = throttle;
     }
   }
 
  private:
-  model::Earth earth_;
+  aircraft::Earth earth_;
 };
 
 // Each rigid aircraft's flight controls read its state and its pilot's
@@ -384,7 +384,7 @@ struct RunFlightControls final        //
              const Wind> {
   using SystemWorld = ProjectedWorld<RunFlightControls>;
 
-  explicit RunFlightControls(model::Earth earth = model::Earth::flat(),
+  explicit RunFlightControls(aircraft::Earth earth = aircraft::Earth::flat(),
                              std::optional<Duration> period = std::nullopt)
       : earth_{earth} {
     if (period) {
@@ -412,16 +412,16 @@ struct RunFlightControls final        //
     if (!body || !felt || !mass || !type || !type->data) {
       return;
     }
-    model::sense_flight_state(
+    aircraft::sense_flight_state(
         *body, *felt, *mass, *type->data, earth_, air_, wind ? *wind : still_,
         seconds(step.time.time_since_epoch()), InOut(signals));
-    model::run_flight_controls(type->data->flight_controls, InOut(signals),
-                               dt_);
+    aircraft::run_flight_controls(type->data->flight_controls, InOut(signals),
+                                  dt_);
   }
 
  private:
-  model::Earth earth_;
-  model::StandardAirTable air_;
+  aircraft::Earth earth_;
+  earth::StandardAirTable air_;
   Wind still_;
   std::optional<engine::RateGate> gate_;
   Time dt_ = 0.0 * second;  // The blocks' step.
@@ -439,7 +439,7 @@ struct RunEngines final            //
   using SystemWorld = ProjectedWorld<RunEngines>;
   using SequenceAfterSystemList = SystemList<RunFlightControls>;
 
-  explicit RunEngines(model::Earth earth = model::Earth::flat())
+  explicit RunEngines(aircraft::Earth earth = aircraft::Earth::flat())
       : earth_{earth} {}
 
   auto operator()(SystemWorld&, Entity,          //
@@ -453,16 +453,16 @@ struct RunEngines final            //
     if (!body || !signals || !tanks || !type || !type->data) {
       return;
     }
-    model::EngineAir air =
-        model::compute_engine_air(*body, earth_, air_, wind ? *wind : still_,
-                                  seconds(step.time.time_since_epoch()));
-    model::run_engines(*type->data, InOut(engines), *signals, *tanks, air,
-                       seconds(step.dt));
+    aircraft::EngineAir air =
+        aircraft::compute_engine_air(*body, earth_, air_, wind ? *wind : still_,
+                                     seconds(step.time.time_since_epoch()));
+    aircraft::run_engines(*type->data, InOut(engines), *signals, *tanks, air,
+                          seconds(step.dt));
   }
 
  private:
-  model::Earth earth_;
-  model::StandardAirTable air_;
+  aircraft::Earth earth_;
+  earth::StandardAirTable air_;
   Wind still_;
 };
 
@@ -481,7 +481,7 @@ struct RigidAircraftRates final    //
              const Wind> {
   using SystemWorld = ProjectedWorld<RigidAircraftRates>;
 
-  explicit RigidAircraftRates(model::Earth earth = model::Earth::flat())
+  explicit RigidAircraftRates(aircraft::Earth earth = aircraft::Earth::flat())
       : earth_{earth} {}
 
   auto operator()(SystemWorld&, Entity,          //
@@ -498,15 +498,15 @@ struct RigidAircraftRates final    //
         !felt) {
       return;
     }
-    rate = model::compute_rigid_aircraft_rate(
+    rate = aircraft::compute_rigid_aircraft_rate(
         *body, *signals, *engines, *mass, *type->data, earth_, air_,
         wind ? *wind : still_, seconds(step.time.time_since_epoch()),
         Out(*felt));
   }
 
  private:
-  model::Earth earth_;
-  model::StandardAirTable air_;
+  aircraft::Earth earth_;
+  earth::StandardAirTable air_;
   Wind still_;
 };
 
@@ -532,8 +532,8 @@ struct BurnFuel final             //
     if (!engines || !type || !type->data || !mass) {
       return;
     }
-    model::burn_fuel(*type->data, *engines, InOut(tanks), seconds(step.dt));
-    *mass = model::compute_mass_balance(*type->data, tanks);
+    aircraft::burn_fuel(*type->data, *engines, InOut(tanks), seconds(step.dt));
+    *mass = aircraft::compute_mass_balance(*type->data, tanks);
   }
 };
 
@@ -549,7 +549,7 @@ struct FollowRigidBody final   //
   using SequenceAfterSystemList = SystemList<Rigid>;
   using ExcludeComponentList = TypeList<FlightControls>;
 
-  explicit FollowRigidBody(model::Earth earth = model::Earth::flat())
+  explicit FollowRigidBody(aircraft::Earth earth = aircraft::Earth::flat())
       : earth_{earth} {}
 
   auto operator()(SystemWorld&, Entity,   //
@@ -567,7 +567,7 @@ struct FollowRigidBody final   //
   }
 
  private:
-  model::Earth earth_;
+  aircraft::Earth earth_;
   Wind still_;
 };
 

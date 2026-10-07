@@ -13,7 +13,7 @@
 
 // Galaxies and star clusters as bodies: the mass distributions galaxy codes
 // start from, sampled body by body (see model/REFERENCES.md).
-namespace simon::model {
+namespace simon::gravity {
 
 // A body as a run starts it.
 struct BodyStart final {
@@ -136,4 +136,4 @@ auto make_toomre_disk(Length pericenter, Length softening) -> RingDisk;
 auto append_ring_disk(const RingDisk& disk, const BodyStart& center,
                       InOut<std::vector<BodyStart>> bodies) -> void;
 
-}  // namespace simon::model
+}  // namespace simon::gravity

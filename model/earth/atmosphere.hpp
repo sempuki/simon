@@ -18,7 +18,7 @@
 // height by the work done against gravity as it weakens with height, so
 // geometric altitudes are converted first, as the 1976 standard (see
 // model/REFERENCES.md) and JSBSim do.
-namespace simon::model {
+namespace simon::earth {
 
 struct Air final {
   Density density = 0.0 * kilogram_per_cubic_meter;
@@ -190,4 +190,4 @@ inline auto compute_calibrated_airspeed(double mach, const Air& air) -> Speed {
          internal::compute_air_at_geopotential(0.0 * meter).speed_of_sound;
 }
 
-}  // namespace simon::model
+}  // namespace simon::earth

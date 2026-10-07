@@ -21,7 +21,7 @@
 // for the pairs those leave out its general convex collider
 // (model/articulated/convex), and each contact's parameters mixed from its
 // two geoms.
-namespace simon::model {
+namespace simon::articulated {
 
 // A geom's pose in the world.
 struct GeomFrame final {
@@ -108,4 +108,4 @@ auto append_contacts(const ArticulatedModel& model, std::uint32_t first,
                      std::span<const double> radii,
                      InOut<std::vector<Contact>> out) -> void;
 
-}  // namespace simon::model
+}  // namespace simon::articulated

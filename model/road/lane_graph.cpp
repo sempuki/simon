@@ -10,7 +10,7 @@
 
 #include "base/core.hpp"
 
-namespace simon::model {
+namespace simon::road {
 
 namespace {
 
@@ -286,4 +286,4 @@ auto build_graph(const LaneNumbering& numbering,
   return graph;
 }
 
-}  // namespace simon::model
+}  // namespace simon::road

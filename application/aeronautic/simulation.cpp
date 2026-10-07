@@ -44,9 +44,9 @@ auto split_fleet(const Scenario& scenario) -> Fleet {
 
 // Builds `builder`'s entity with a Wind if `field` is not still.
 template <typename BuilderType>
-auto build_in(BuilderType builder, const model::WindField& field)
+auto build_in(BuilderType builder, const earth::WindField& field)
     -> std::expected<Entity, framework::Status> {
-  if (model::is_still(field)) {
+  if (earth::is_still(field)) {
     return std::move(builder).build();
   }
   return std::move(builder).with(Wind{}).build();
@@ -65,7 +65,7 @@ auto create_aircraft(const Scenario& scenario, const AirState& state,
           .with(Commands{.load_factor = 1.0, .throttle = TRIM_THROTTLE})
           .with(scenario.airframe)
           .with(scenario.handling)
-          .with(Autopilot{.altitude = model::altitude_of(state),
+          .with(Autopilot{.altitude = aircraft::altitude_of(state),
                           .heading = state.heading,
                           .speed = route.speed,
                           .throttle_integral = TRIM_THROTTLE})
@@ -93,22 +93,23 @@ Simulation::Simulation(Scenario scenario)
           Fly{}, Precise{}, DriftWithWind{}, FlySurfaces{}, RunFlightControls{},
           RunEngines{}, Rigid{}, BurnFuel{}, FollowRigidBody{}}} {}
 
-auto trim_in_cruise(const model::AircraftData& data, const model::Earth& earth,
-                    Length altitude, Speed speed)
-    -> std::expected<model::Trim, framework::Status> {
-  model::FlightCondition condition{
+auto trim_in_cruise(const aircraft::AircraftData& data,
+                    const aircraft::Earth& earth, Length altitude, Speed speed)
+    -> std::expected<aircraft::Trim, framework::Status> {
+  aircraft::FlightCondition condition{
       .position = meters(0.0, 0.0, altitude.numerical_value_in(meter)),
       .speed = speed,
-      .tanks = model::fill_fuel_tanks(data),
+      .tanks = aircraft::fill_fuel_tanks(data),
   };
-  return model::trim(data, condition, earth, model::StandardAirTable{});
+  return aircraft::trim(data, condition, earth, earth::StandardAirTable{});
 }
 
-auto create_rigid_aircraft(const model::AircraftData& data,
-                           const model::Earth& earth, const model::Trim& trim,
+auto create_rigid_aircraft(const aircraft::AircraftData& data,
+                           const aircraft::Earth& earth,
+                           const aircraft::Trim& trim,
                            const SurfaceGains& gains, Length x, Length y,
                            Angle heading, const Route& route,
-                           InOut<World> world, const model::WindField& wind,
+                           InOut<World> world, const earth::WindField& wind,
                            std::uint64_t seed)
     -> std::expected<Entity, framework::Status> {
   Time start = 0.0 * second;
@@ -127,7 +128,7 @@ auto create_rigid_aircraft(const model::AircraftData& data,
   RigidBody body = body_at(QuantityVector{} * radian_per_second);
   body = body_at(earth.level_rate(body, start));
   // Moving with the air.
-  model::Wind steady = model::compute_wind(wind);
+  earth::Wind steady = earth::compute_wind(wind);
   body.velocity +=
       QuantityVector{
           earth.place(body, start).north_east_down *
@@ -142,7 +143,7 @@ auto create_rigid_aircraft(const model::AircraftData& data,
         .with(trim.felt)
         .with(trim.signals)
         .with(trim.engines)
-        .with(model::fill_fuel_tanks(data))
+        .with(aircraft::fill_fuel_tanks(data))
         .with(trim.mass)
         .with(AircraftType{.data = &data})
         .with(
@@ -152,12 +153,12 @@ auto create_rigid_aircraft(const model::AircraftData& data,
                                .pitch_trim = trim.pitch_trim,
                                .throttle_trim = trim.throttle});
   };
-  if (model::is_still(wind)) {
+  if (earth::is_still(wind)) {
     return create.template operator()<archetype::RigidAircraft>().build();
   }
   auto windy =
       create.template operator()<archetype::RigidAircraftInWind>().with(steady);
-  if (wind.turbulence != model::Turbulence::NONE) {
+  if (wind.turbulence != earth::Turbulence::NONE) {
     return std::move(windy).with(Gusts{.seed = seed}).build();
   }
   return std::move(windy).build();
@@ -166,7 +167,7 @@ auto create_rigid_aircraft(const model::AircraftData& data,
 auto build_world(const Scenario& scenario, Out<World> world)
     -> std::expected<void, framework::Status> {
   auto [simple, precise, airliners, fighters] = split_fleet(scenario);
-  bool still = model::is_still(scenario.wind);
+  bool still = earth::is_still(scenario.wind);
   return World::set_up()
       .numbered(1)
       .holding<archetype::Aircraft>(simple)
@@ -182,7 +183,7 @@ auto build_scenario(const Scenario& scenario, const RigidTypes& types,
   auto [simple, precise, airliners, fighters] = split_fleet(scenario);
   CHECK_PRECONDITION(airliners == 0 || types.airliner);
   CHECK_PRECONDITION(fighters == 0 || types.fighter);
-  model::Earth earth = model::Earth::flat();
+  aircraft::Earth earth = aircraft::Earth::flat();
   Random random{scenario.seed};
   double side = scenario.spacing.numerical_value_in(meter) *
                 std::sqrt(static_cast<double>(simple + precise));
@@ -192,11 +193,11 @@ auto build_scenario(const Scenario& scenario, const RigidTypes& types,
 
   // One trim serves every rigid aircraft of a type: over a flat Earth it
   // holds anywhere, on any heading.
-  std::optional<model::Trim> airliner_trim;
+  std::optional<aircraft::Trim> airliner_trim;
   if (airliners > 0) {
     RETURN_OR_ASSIGN(airliner_trim, trim_in_cruise(*types.airliner, earth));
   }
-  std::optional<model::Trim> fighter_trim;
+  std::optional<aircraft::Trim> fighter_trim;
   if (fighters > 0) {
     RETURN_OR_ASSIGN(fighter_trim, trim_in_cruise(*types.fighter, earth));
   }
@@ -220,7 +221,7 @@ auto build_scenario(const Scenario& scenario, const RigidTypes& types,
     AirState state{
         .position = start,
         .speed = route.speed,
-        .heading = model::compute_bearing(start, route.waypoints[0])};
+        .heading = aircraft::compute_bearing(start, route.waypoints[0])};
     if (i < simple) {
       RETURN_IF_UNEXPECTED(
           create_aircraft<archetype::Aircraft>(scenario, state, route, world));
@@ -245,14 +246,14 @@ auto build_scenario(const Scenario& scenario, const RigidTypes& types,
 
 auto Simulation::configure() -> engine::PhaseResult {
   if (scenario_.rigid > 0) {
-    RETURN_OR_ASSIGN(model::AircraftData loaded,
+    RETURN_OR_ASSIGN(aircraft::AircraftData loaded,
                      format::load_aircraft(scenario_.rigid_aircraft));
-    airliner_ = std::make_unique<model::AircraftData>(std::move(loaded));
+    airliner_ = std::make_unique<aircraft::AircraftData>(std::move(loaded));
   }
   if (scenario_.fighters > 0) {
-    RETURN_OR_ASSIGN(model::AircraftData loaded,
+    RETURN_OR_ASSIGN(aircraft::AircraftData loaded,
                      format::load_aircraft(scenario_.fighter_aircraft));
-    fighter_ = std::make_unique<model::AircraftData>(std::move(loaded));
+    fighter_ = std::make_unique<aircraft::AircraftData>(std::move(loaded));
   }
   RETURN_IF_UNEXPECTED(build_world(scenario_, Out(world_)));
   RETURN_IF_UNEXPECTED(build_scenario(

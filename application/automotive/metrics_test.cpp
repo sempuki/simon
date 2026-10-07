@@ -36,7 +36,7 @@ TEST_CASE("MetricsAgainstNuPlan") {
   SECTION("ShouldMatchComfortSignals") {
     double largest = 0.0;
     for (const auto& [scenario, rows] : runs) {
-      std::vector<model::DrivingSample> samples;
+      std::vector<traffic::DrivingSample> samples;
       for (const Row& row : rows) {
         samples.push_back({.time = number(row, "time"),
                            .x = number(row, "x"),
@@ -46,7 +46,8 @@ TEST_CASE("MetricsAgainstNuPlan") {
                            .acceleration_x = number(row, "acceleration_x"),
                            .acceleration_y = number(row, "acceleration_y")});
       }
-      model::ComfortSignals signals = model::compute_comfort_signals(samples);
+      traffic::ComfortSignals signals =
+          traffic::compute_comfort_signals(samples);
       for (std::size_t i = 0; i < rows.size(); ++i) {
         for (auto [ours, column] :
              {std::pair{signals.lon_acceleration[i], "lon_acceleration"},
@@ -87,18 +88,18 @@ TEST_CASE("MetricsAgainstNuPlan") {
                                .y = cy + CENTER * std::sin(h)};
         };
         model::Point2 ego_center = center(x, y, heading);
-        model::MovingBox ego{.box = {.x = ego_center.x,
-                                     .y = ego_center.y,
-                                     .heading = heading,
-                                     .length = 5.04,
-                                     .width = 2.0},
-                             .speed = number(row, "speed")};
-        std::vector<model::MovingBox> tracks;
+        traffic::MovingBox ego{.box = {.x = ego_center.x,
+                                       .y = ego_center.y,
+                                       .heading = heading,
+                                       .length = 5.04,
+                                       .width = 2.0},
+                               .speed = number(row, "speed")};
+        std::vector<traffic::MovingBox> tracks;
         for (const Row& other : others[row.find("time")->second]) {
           double h = number(other, "heading");
           model::Point2 c = center(number(other, "x"), number(other, "y"), h);
-          if (model::check_ahead(x, y, heading, c,
-                                 30.0 * std::numbers::pi / 180.0)) {
+          if (traffic::check_ahead(x, y, heading, c,
+                                   30.0 * std::numbers::pi / 180.0)) {
             tracks.push_back({.box = {.x = c.x,
                                       .y = c.y,
                                       .heading = h,
@@ -109,7 +110,7 @@ TEST_CASE("MetricsAgainstNuPlan") {
         }
         std::optional<double> ours =
             tracks.empty() ? std::nullopt
-                           : model::compute_time_to_collision(ego, tracks);
+                           : traffic::compute_time_to_collision(ego, tracks);
         const std::string& theirs = row.find("ttc")->second;
         ++compared;
         if ((!ours && theirs.empty()) ||

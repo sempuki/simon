@@ -29,11 +29,13 @@ using namespace aeronautic::testing;
 
 // The inputs `row` records, by simon's names: the variables, and the
 // aircraft's flight control signals.
-auto read_inputs(const Row& row, const AircraftData& aircraft) -> AeroInputs {
-  AeroInputs inputs;
-  FlightSignals signals;
+auto read_inputs(const Row& row, const aircraft::AircraftData& aircraft)
+    -> aircraft::AeroInputs {
+  aircraft::AeroInputs inputs;
+  aircraft::FlightSignals signals;
   for (const auto& [name, value] : row) {
-    if (std::optional<AeroVariable> variable = find_aero_variable(name)) {
+    if (std::optional<aircraft::AeroVariable> variable =
+            aircraft::find_aero_variable(name)) {
       inputs[*variable] = value;
     } else if (std::optional<std::size_t> signal =
                    find_signal(aircraft.flight_controls, name)) {
@@ -61,7 +63,7 @@ auto check_against_jsbsim(std::string_view path, std::string_view reference)
   SECTION("ShouldMatchJsbsimGivenWindAxisForces") {
     double worst = 0.0;
     for (const Row& row : rows) {
-      AeroSums sums = aircraft->aero(read_inputs(row, *aircraft));
+      aircraft::AeroSums sums = aircraft->aero(read_inputs(row, *aircraft));
       double scale = std::max(std::abs(row.at("lift")), 1.0);
       worst = worse(worst, sums[0], row.at("drag"), scale);
       worst = worse(worst, sums[1], row.at("side"), scale);
@@ -75,7 +77,7 @@ auto check_against_jsbsim(std::string_view path, std::string_view reference)
     double worst_force = 0.0;
     double worst_moment = 0.0;
     for (const Row& row : rows) {
-      AeroSums sums = aircraft->aero(read_inputs(row, *aircraft));
+      aircraft::AeroSums sums = aircraft->aero(read_inputs(row, *aircraft));
 
       // The reference point from the center of mass, from the structural
       // frame (x aft, z up) to body axes (x forward, z down).
@@ -86,8 +88,8 @@ auto check_against_jsbsim(std::string_view path, std::string_view reference)
           QuantityVector{-apart.eigen().x(), apart.eigen().y(),
                          -apart.eigen().z()} *
           meter;
-      AeroLoads loads = compute_aero_loads(sums, row.at("alpha") * radian,
-                                           row.at("beta") * radian, reference);
+      aircraft::AeroLoads loads = aircraft::compute_aero_loads(
+          sums, row.at("alpha") * radian, row.at("beta") * radian, reference);
 
       QuantityVector force = loads.force.numerical_value_in(newton);
       QuantityVector moment = loads.moment.numerical_value_in(newton_meter);

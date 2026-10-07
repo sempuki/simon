@@ -17,7 +17,7 @@
 // s along the road, its offset from the lane's middle, and its heading
 // relative to the road's direction at s. It may drive either way in any lane.
 // Plain SI numbers, as the road's data are.
-namespace simon::model {
+namespace simon::road {
 
 struct RoadPlacement final {
   std::size_t road = 0;  // Index into the network's roads.
@@ -86,4 +86,4 @@ auto find_placement(const RoadNetwork& network, double x, double y,
                     std::optional<std::size_t> staying = std::nullopt)
     -> std::optional<RoadPlacement>;
 
-}  // namespace simon::model
+}  // namespace simon::road

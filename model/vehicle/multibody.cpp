@@ -11,7 +11,7 @@
 
 #include "model/vehicle/tire.hpp"
 
-namespace simon::model {
+namespace simon::vehicle {
 namespace {
 
 constexpr double GRAVITY = 9.81;  // m/s^2, as CommonRoad has it.
@@ -590,4 +590,4 @@ auto compute_rate_numbers(const MultibodyNumbers& x, double u0, double u1,
 }
 
 }  // namespace
-}  // namespace simon::model
+}  // namespace simon::vehicle

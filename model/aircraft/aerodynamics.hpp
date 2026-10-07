@@ -26,7 +26,7 @@
 // Everything here is a plain number in SI units, because the terms are data:
 // a term in a force axis yields newtons, a term in a moment axis newton
 // meters. compute_aero_loads turns the sums into typed forces and moments.
-namespace simon::model {
+namespace simon::aircraft {
 
 // The aerodynamic state's variables. Each is in SI units, or a plain number.
 enum class AeroVariable : std::uint8_t {
@@ -110,7 +110,7 @@ struct AeroTable final {
 
   AeroInput row = aero_input(AeroVariable::ALPHA);
   std::optional<AeroInput> column;
-  std::variant<Table1<>, Table2<>> table;
+  std::variant<model::Table1<>, model::Table2<>> table;
 };
 
 // A constant, times its factors, times its tables.
@@ -188,4 +188,4 @@ auto compute_aero_loads(const AeroSums& sums, const WindAngles& wind,
 auto compute_aero_loads(const AeroSums& sums, Angle alpha, Angle beta,
                         const Displacement& reference) -> AeroLoads;
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

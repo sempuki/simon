@@ -16,7 +16,7 @@
 // distance and expanding polytope (see model/REFERENCES.md), then, where
 // two faces meet, by clipping one against the other for up to four
 // contacts, or by turning the geoms a little to find more.
-namespace simon::model {
+namespace simon::articulated {
 
 // The contacts of two geoms within `margin` by MuJoCo's general convex
 // collider, the first's type no later than the second's, their bounding
@@ -28,4 +28,4 @@ auto collide_convex(const Geom& first, const GeomFrame& first_frame,
                     double margin, std::span<PreContact, MAX_PAIR_CONTACTS> out)
     -> std::uint32_t;
 
-}  // namespace simon::model
+}  // namespace simon::articulated

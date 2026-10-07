@@ -19,29 +19,30 @@ namespace {
 
 // Whether MuJoCo takes dampers implicitly: if any dof is damped or
 // actuated, every dof's (mj_EulerSkip).
-auto is_implicit(const model::ArticulatedModel& m) -> bool {
+auto is_implicit(const articulated::ArticulatedModel& m) -> bool {
   return !m.actuators.empty() ||
-         std::ranges::any_of(m.dofs,
-                             [](const model::Dof& d) { return d.damping > 0; });
+         std::ranges::any_of(
+             m.dofs, [](const articulated::Dof& d) { return d.damping > 0; });
 }
 
 // The inverse inertia each body and dof of a tree sees at its rest
 // positions, averaged over translation and rotation, and the sum of its
 // mass matrix's diagonal (mj_setConst).
 template <typename Capacity>
-auto weigh(const model::ArticulatedModel& m, const model::Tree& tree,
-           const model::TreeKernel<Capacity>& kernel,
+auto weigh(const articulated::ArticulatedModel& m,
+           const articulated::Tree& tree,
+           const articulated::TreeKernel<Capacity>& kernel,
            InOut<std::vector<double>> body_weight,
            InOut<std::vector<double>> dof_weight,
            InOut<std::vector<double>> tendon_weight, InOut<double> inertia)
     -> void {
   constexpr std::size_t V = Capacity::dofs;
-  model::TreeState<Capacity> state;
+  articulated::TreeState<Capacity> state;
   for (std::uint32_t q = 0; q < tree.qpos; ++q) {
     state.qpos[q] = m.qpos0[tree.first_qpos + q];
   }
-  auto dynamics = std::make_unique<model::TreeDynamics<Capacity>>();
-  kernel.forward(state, model::TreeControl<Capacity>{}, Out(*dynamics));
+  auto dynamics = std::make_unique<articulated::TreeDynamics<Capacity>>();
+  kernel.forward(state, articulated::TreeControl<Capacity>{}, Out(*dynamics));
   std::uint32_t n = tree.dofs;
   if (n == 0) {
     return;  // A tree that cannot move weighs nothing.
@@ -65,8 +66,9 @@ auto weigh(const model::ArticulatedModel& m, const model::Tree& tree,
   std::span<const Vector6> cdof{dynamics->cdof.data(), n};
   for (std::uint32_t b = 0; b < tree.bodies; ++b) {
     std::uint32_t body = tree.first_body + b;
-    model::compute_point_jacobian(m, tree, cdof, dynamics->com, body,
-                                  dynamics->xipos[b], translation, rotation);
+    articulated::compute_point_jacobian(m, tree, cdof, dynamics->com, body,
+                                        dynamics->xipos[b], translation,
+                                        rotation);
     double moved = 0.0;
     double turned = 0.0;
     for (std::uint32_t k = 0; k < 3; ++k) {
@@ -78,7 +80,7 @@ auto weigh(const model::ArticulatedModel& m, const model::Tree& tree,
   }
   // A tendon's share on this tree; trees' inertia is block diagonal.
   for (std::uint32_t k = 0; k < m.tendons.size(); ++k) {
-    const model::Tendon& tendon = m.tendons[k];
+    const articulated::Tendon& tendon = m.tendons[k];
     std::vector<double> row(n, 0.0);
     bool touches = false;
     for (std::size_t i = 0; i < tendon.joints.size(); ++i) {
@@ -100,11 +102,11 @@ auto weigh(const model::ArticulatedModel& m, const model::Tree& tree,
   };
   for (std::uint32_t j = tree.first_joint; j < tree.first_joint + tree.joints;
        ++j) {
-    const model::Joint& joint = m.joints[j];
+    const articulated::Joint& joint = m.joints[j];
     std::uint32_t d = joint.dof;
     std::uint32_t c = d - tree.first_dof;
     switch (joint.type) {
-      case model::JointType::FREE: {
+      case articulated::JointType::FREE: {
         double moved = (diagonal(c) + diagonal(c + 1) + diagonal(c + 2)) / 3;
         double turned =
             (diagonal(c + 3) + diagonal(c + 4) + diagonal(c + 5)) / 3;
@@ -114,7 +116,7 @@ auto weigh(const model::ArticulatedModel& m, const model::Tree& tree,
         }
         break;
       }
-      case model::JointType::BALL: {
+      case articulated::JointType::BALL: {
         double turned = (diagonal(c) + diagonal(c + 1) + diagonal(c + 2)) / 3;
         for (std::uint32_t k = 0; k < 3; ++k) {
           (*dof_weight)[d + k] = turned;
@@ -130,14 +132,14 @@ auto weigh(const model::ArticulatedModel& m, const model::Tree& tree,
 
 }  // namespace
 
-Mechanics::Mechanics(model::ArticulatedModel model)
+Mechanics::Mechanics(articulated::ArticulatedModel model)
     : model_{std::move(model)},
-      trees_{model::find_trees(model_)},
+      trees_{articulated::find_trees(model_)},
       filter_{model_} {
   for (std::uint32_t g = 0; g < model_.geoms.size(); ++g) {
-    const model::Geom& geom = model_.geoms[g];
-    radii_.push_back(model::compute_bounding_radius(geom));
-    if (geom.body == 0 || geom.type == model::GeomType::PLANE) {
+    const articulated::Geom& geom = model_.geoms[g];
+    radii_.push_back(articulated::compute_bounding_radius(geom));
+    if (geom.body == 0 || geom.type == articulated::GeomType::PLANE) {
       unbounded_.push_back(g);
     }
   }
@@ -147,22 +149,26 @@ Mechanics::Mechanics(model::ArticulatedModel model)
   tendon_weight_.assign(model_.tendons.size(), 0.0);
   double inertia = 0.0;
   for (std::uint32_t t = 0; t < trees_.size(); ++t) {
-    single_.push_back(fits<SingleCapacity>(t)
-                          ? std::make_unique<model::TreeKernel<SingleCapacity>>(
-                                model_, trees_[t], implicit)
-                          : nullptr);
-    small_.push_back(fits<SmallCapacity>(t)
-                         ? std::make_unique<model::TreeKernel<SmallCapacity>>(
-                               model_, trees_[t], implicit)
-                         : nullptr);
-    large_.push_back(fits<LargeCapacity>(t)
-                         ? std::make_unique<model::TreeKernel<LargeCapacity>>(
-                               model_, trees_[t], implicit)
-                         : nullptr);
-    huge_.push_back(fits<HugeCapacity>(t)
-                        ? std::make_unique<model::TreeKernel<HugeCapacity>>(
-                              model_, trees_[t], implicit)
-                        : nullptr);
+    single_.push_back(
+        fits<SingleCapacity>(t)
+            ? std::make_unique<articulated::TreeKernel<SingleCapacity>>(
+                  model_, trees_[t], implicit)
+            : nullptr);
+    small_.push_back(
+        fits<SmallCapacity>(t)
+            ? std::make_unique<articulated::TreeKernel<SmallCapacity>>(
+                  model_, trees_[t], implicit)
+            : nullptr);
+    large_.push_back(
+        fits<LargeCapacity>(t)
+            ? std::make_unique<articulated::TreeKernel<LargeCapacity>>(
+                  model_, trees_[t], implicit)
+            : nullptr);
+    huge_.push_back(
+        fits<HugeCapacity>(t)
+            ? std::make_unique<articulated::TreeKernel<HugeCapacity>>(
+                  model_, trees_[t], implicit)
+            : nullptr);
     if (single_.back()) {
       weigh(model_, trees_[t], *single_.back(), InOut(body_weight_),
             InOut(dof_weight_), InOut(tendon_weight_), InOut(inertia));
@@ -190,8 +196,8 @@ namespace {
 template <typename Capacity>
 auto start(const Mechanics& mechanics, std::uint32_t t,
            const Scenario& scenario) -> TreeState<Capacity> {
-  const model::ArticulatedModel& m = mechanics.model();
-  const model::Tree& tree = mechanics.trees()[t];
+  const articulated::ArticulatedModel& m = mechanics.model();
+  const articulated::Tree& tree = mechanics.trees()[t];
   TreeState<Capacity> state;
   for (std::uint32_t q = 0; q < tree.qpos; ++q) {
     state.qpos[q] = m.qpos0[tree.first_qpos + q];
@@ -212,7 +218,7 @@ auto start(const Mechanics& mechanics, std::uint32_t t,
 template <typename Capacity>
 auto start_control(const Mechanics& mechanics, std::uint32_t t,
                    const Scenario& scenario) -> TreeControl<Capacity> {
-  const model::Tree& tree = mechanics.trees()[t];
+  const articulated::Tree& tree = mechanics.trees()[t];
   TreeControl<Capacity> control;
   for (std::size_t a = 0; a < tree.actuators.size(); ++a) {
     if (tree.actuators[a] < scenario.control.size()) {
@@ -225,7 +231,7 @@ auto start_control(const Mechanics& mechanics, std::uint32_t t,
 }  // namespace
 
 auto Simulation::configure() -> engine::PhaseResult {
-  RETURN_OR_ASSIGN(model::ArticulatedModel model,
+  RETURN_OR_ASSIGN(articulated::ArticulatedModel model,
                    format::load_mjcf(scenario_.model));
   if (scenario_.solver) {
     model.physics.solver = *scenario_.solver;
@@ -236,14 +242,15 @@ auto Simulation::configure() -> engine::PhaseResult {
   if (scenario_.integrator) {
     model.physics.integrator = *scenario_.integrator;
   }
-  if (model.physics.integrator != model::Physics::Integrator::EULER &&
-      model.physics.integrator != model::Physics::Integrator::IMPLICIT_FAST) {
+  if (model.physics.integrator != articulated::Physics::Integrator::EULER &&
+      model.physics.integrator !=
+          articulated::Physics::Integrator::IMPLICIT_FAST) {
     return std::unexpected(
         lib::raise(format::FormatError::UNSUPPORTED,
                    "integrators other than Euler and implicitfast"));
   }
   if (scenario_.constrained &&
-      model.physics.solver == model::Physics::Solver::CG) {
+      model.physics.solver == articulated::Physics::Solver::CG) {
     return std::unexpected(
         lib::raise(format::FormatError::UNSUPPORTED, "the CG solver"));
   }
@@ -336,7 +343,7 @@ auto gather(const World& world, const Mechanics& mechanics, Field field,
   const auto& mechanisms = world.store_of<Mechanism>();
   world.store_of<TreeState<Capacity>>().for_each(
       [&](Entity owner, const TreeState<Capacity>& state) {
-        const model::Tree& tree =
+        const articulated::Tree& tree =
             mechanics.trees()[mechanisms.component_of(owner).tree];
         std::uint32_t first = velocities ? tree.first_dof : tree.first_qpos;
         std::uint32_t count = velocities ? tree.dofs : tree.qpos;
@@ -348,23 +355,24 @@ auto gather(const World& world, const Mechanics& mechanics, Field field,
 
 template <typename Capacity>
 auto place(const World& world, const Mechanics& mechanics,
-           InOut<std::vector<model::GeomFrame>> frames) -> void {
-  const model::ArticulatedModel& m = mechanics.model();
+           InOut<std::vector<articulated::GeomFrame>> frames) -> void {
+  const articulated::ArticulatedModel& m = mechanics.model();
   const auto& mechanisms = world.store_of<Mechanism>();
   world.store_of<TreeDynamics<Capacity>>().for_each(
       [&](Entity owner, const TreeDynamics<Capacity>& dynamics) {
-        const model::Tree& tree =
+        const articulated::Tree& tree =
             mechanics.trees()[mechanisms.component_of(owner).tree];
         for (std::uint32_t b = 0; b < tree.bodies; ++b) {
-          const model::ArticulatedBody& body = m.bodies[tree.first_body + b];
-          model::BodyFrame frame{.xpos = dynamics.xpos[b],
-                                 .xquat = dynamics.xquat[b],
-                                 .xmat = dynamics.xmat[b],
-                                 .xipos = dynamics.xipos[b],
-                                 .ximat = dynamics.ximat[b]};
+          const articulated::ArticulatedBody& body =
+              m.bodies[tree.first_body + b];
+          articulated::BodyFrame frame{.xpos = dynamics.xpos[b],
+                                       .xquat = dynamics.xquat[b],
+                                       .xmat = dynamics.xmat[b],
+                                       .xipos = dynamics.xipos[b],
+                                       .ximat = dynamics.ximat[b]};
           for (std::uint32_t g = body.first_geom;
                g < body.first_geom + body.geoms; ++g) {
-            (*frames)[g] = model::compute_geom_frame(m.geoms[g], frame);
+            (*frames)[g] = articulated::compute_geom_frame(m.geoms[g], frame);
           }
         }
       });
@@ -372,13 +380,15 @@ auto place(const World& world, const Mechanics& mechanics,
 
 }  // namespace
 
-auto Simulation::read_geom_frames() const -> std::vector<model::GeomFrame> {
-  const model::ArticulatedModel& m = mechanics_->model();
-  std::vector<model::GeomFrame> frames(m.geoms.size());
-  const model::ArticulatedBody& ground = m.bodies[0];
+auto Simulation::read_geom_frames() const
+    -> std::vector<articulated::GeomFrame> {
+  const articulated::ArticulatedModel& m = mechanics_->model();
+  std::vector<articulated::GeomFrame> frames(m.geoms.size());
+  const articulated::ArticulatedBody& ground = m.bodies[0];
   for (std::uint32_t g = ground.first_geom;
        g < ground.first_geom + ground.geoms; ++g) {
-    frames[g] = model::compute_geom_frame(m.geoms[g], model::BodyFrame{});
+    frames[g] =
+        articulated::compute_geom_frame(m.geoms[g], articulated::BodyFrame{});
   }
   place<SingleCapacity>(world_, *mechanics_, InOut(frames));
   place<SmallCapacity>(world_, *mechanics_, InOut(frames));

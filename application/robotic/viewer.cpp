@@ -34,9 +34,9 @@ namespace {
 
 using namespace std::chrono_literals;
 using Session = viewing::Session<Simulation, Scenario>;
+using articulated::GeomFrame;
+using articulated::GeomType;
 using framework::Entity;
-using model::GeomFrame;
-using model::GeomType;
 
 constexpr std::string_view HUMANOID = "3rd_party/mujoco/humanoid.xml";
 
@@ -210,7 +210,7 @@ class Viewer final {
       Projection projection{camera_, origin, size};
       draw_geoms(simulation, projection, draw);
       if (show_contacts_) {
-        for (const model::Contact& contact : simulation.contacts()) {
+        for (const articulated::Contact& contact : simulation.contacts()) {
           if (projection.visible(contact.pos)) {
             draw->AddCircleFilled(projection.at(contact.pos), 3.0f * scale_,
                                   IM_COL32(240, 70, 60, 255));
@@ -242,7 +242,7 @@ class Viewer final {
   // nearest, its faces lit from above.
   auto draw_geoms(const Simulation& simulation, const Projection& projection,
                   ImDrawList* draw) const -> void {
-    const model::ArticulatedModel& m = simulation.mechanics().model();
+    const articulated::ArticulatedModel& m = simulation.mechanics().model();
     std::vector<GeomFrame> frames = simulation.read_geom_frames();
     std::vector<std::uint32_t> order;
     for (std::uint32_t g = 0; g < m.geoms.size(); ++g) {
@@ -255,12 +255,13 @@ class Viewer final {
     std::ranges::sort(order, [&](std::uint32_t a, std::uint32_t b) {
       return projection.depth(frames[a].pos) > projection.depth(frames[b].pos);
     });
-    const std::vector<model::Tree>& trees = simulation.mechanics().trees();
+    const std::vector<articulated::Tree>& trees =
+        simulation.mechanics().trees();
     for (std::uint32_t g : order) {
-      const model::Geom& geom = m.geoms[g];
+      const articulated::Geom& geom = m.geoms[g];
       auto tree = static_cast<std::uint32_t>(
           std::ranges::upper_bound(trees, geom.body, {},
-                                   &model::Tree::first_body) -
+                                   &articulated::Tree::first_body) -
           trees.begin() - 1);
       draw_geom(geom, frames[g], tree_color(geom.body == 0 ? 5 : tree),
                 projection, draw);
@@ -309,7 +310,7 @@ class Viewer final {
                   thickness * scale_);
   }
 
-  auto draw_geom(const model::Geom& geom, const GeomFrame& frame,
+  auto draw_geom(const articulated::Geom& geom, const GeomFrame& frame,
                  const std::array<float, 3>& color,
                  const Projection& projection, ImDrawList* draw) const -> void {
     const Vector3& s = geom.size;

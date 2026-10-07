@@ -13,7 +13,7 @@
 
 // An aircraft's fuel and mass balance: its mass, center of mass and inertia,
 // from the empty aircraft, its point masses and the fuel in its tanks.
-namespace simon::model {
+namespace simon::aircraft {
 
 // The fuel in each tank, in the aircraft data's order.
 struct FuelTanks final {
@@ -27,7 +27,7 @@ auto fill_fuel_tanks(const AircraftData& aircraft) -> FuelTanks;
 // center of mass in body axes, and where that center is, in the structural
 // frame (x aft, y right, z up).
 struct MassBalance final {
-  MassProperties properties;
+  model::MassProperties properties;
   Displacement center_of_mass = meters(0.0, 0.0, 0.0);
 };
 
@@ -50,4 +50,4 @@ auto compute_mass_balance(const AircraftData& aircraft, const FuelTanks& tanks)
 auto compute_body_offset(const Displacement& structural,
                          const Displacement& center_of_mass) -> Displacement;
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

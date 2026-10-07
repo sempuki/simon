@@ -22,7 +22,7 @@
 //
 // The frame is local Cartesian: x east, y north, z up, so z is altitude.
 // Headings are measured from north toward east.
-namespace simon::model {
+namespace simon::aircraft {
 
 struct AirStateRate;
 
@@ -93,18 +93,18 @@ inline auto distance(const AirState& a, const AirState& b) -> Length {
   return norm(a.position - b.position);
 }
 inline auto coordinates(const AirState& state) -> Coordinates {
-  return coordinates(state.position);
+  return model::coordinates(state.position);
 }
 inline auto coordinate_length(const AirState&, Length length) -> double {
   return length.numerical_value_in(meter);
 }
 // Pointing along the velocity, with no bank.
-inline auto pose(const AirState& state) -> Pose {
+inline auto pose(const AirState& state) -> model::Pose {
   double yaw = std::numbers::pi / 2.0 - radians(state.heading);
   double pitch = radians(state.flight_path_angle);
   Quaternion orientation = Quaternion{AngleAxis{yaw, Vector3::UnitZ()}} *
                            Quaternion{AngleAxis{-pitch, Vector3::UnitY()}};
-  return Pose{.position = state.position, .orientation = orientation};
+  return model::Pose{.position = state.position, .orientation = orientation};
 }
 
 //-- Dynamics -----------------------------------------------------------------
@@ -143,10 +143,10 @@ struct Airframe final {
 // ratio. Speed and cos(gamma) are kept away from zero in the divisions.
 inline auto compute_point_mass_rate(const AirState& state,
                                     const FlightControls& controls,
-                                    const Airframe& airframe, const Air& air)
-    -> AirStateRate {
+                                    const Airframe& airframe,
+                                    const earth::Air& air) -> AirStateRate {
   constexpr Density SEA_LEVEL_DENSITY = 1.225 * kilogram_per_cubic_meter;
-  constexpr AccelerationMagnitude g = STANDARD_GRAVITY;
+  constexpr AccelerationMagnitude g = earth::STANDARD_GRAVITY;
   Speed v = max(state.speed, 1.0 * meter_per_second);  // To divide by.
 
   // Each sine and cosine once: they are most of this function's cost.
@@ -248,7 +248,7 @@ inline auto compute_load_factor_command(const AirState& state, Angle commanded,
                                         Angle bank, Rate response) -> double {
   Speed v = max(state.speed, 1.0 * meter_per_second);
   AngularRate climb = response * (commanded - state.flight_path_angle);
-  double pull_up = number_of(v / STANDARD_GRAVITY * (climb / radian));
+  double pull_up = number_of(v / earth::STANDARD_GRAVITY * (climb / radian));
   double cos_mu = std::max(cos(bank), 0.1);
   return (cos(state.flight_path_angle) + pull_up) / cos_mu;
 }
@@ -258,8 +258,8 @@ inline auto compute_load_factor_command(const AirState& state, Angle commanded,
 inline auto compute_bank_command(const AirState& state, Angle heading,
                                  Rate response, Angle steepest) -> Angle {
   AngularRate turn = response * wrap(heading - state.heading);
-  Angle bank =
-      arctan(number_of(state.speed * (turn / radian) / STANDARD_GRAVITY));
+  Angle bank = arctan(
+      number_of(state.speed * (turn / radian) / earth::STANDARD_GRAVITY));
   return clamp(bank, -steepest, steepest);
 }
 
@@ -277,4 +277,4 @@ inline auto ground_distance(const Position& from, const Position& to)
   return std::hypot(apart.x(), apart.y()) * meter;
 }
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

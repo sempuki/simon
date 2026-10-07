@@ -14,7 +14,7 @@
 
 namespace simon::scenario {
 
-using namespace model;
+using namespace road;
 
 namespace {
 

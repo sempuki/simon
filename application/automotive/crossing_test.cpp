@@ -35,26 +35,26 @@ constexpr double WALK = 1.34;  // m/s, every pedestrian's here.
 // the east (lower s) and away from its other end to the east.
 struct Crossing final {
   std::uint32_t crossing = 0;
-  model::Leg to_kerb;
-  model::Leg across;
-  model::Leg away;
+  road::Leg to_kerb;
+  road::Leg across;
+  road::Leg away;
   double approach = 0.0;  // m, the leading piece's length.
 };
 
 auto find_crossing(const Network& network) -> Crossing {
-  std::span<const model::WalkEdge> edges = network.walking.edges();
+  std::span<const road::WalkEdge> edges = network.walking.edges();
   Crossing found;
   for (std::uint32_t e = 0; e < edges.size(); ++e) {
-    if (edges[e].kind == model::WalkEdge::Kind::CROSSING) {
+    if (edges[e].kind == road::WalkEdge::Kind::CROSSING) {
       found.crossing = e;
     }
   }
-  const model::WalkEdge& crossing = edges[found.crossing];
-  found.across = model::Leg{.edge = found.crossing, .forward = true};
+  const road::WalkEdge& crossing = edges[found.crossing];
+  found.across = road::Leg{.edge = found.crossing, .forward = true};
   // A sidewalk piece ending at the crossing's start, coming from lower x.
   for (std::uint32_t e = 0; e < edges.size(); ++e) {
-    const model::WalkEdge& edge = edges[e];
-    if (edge.kind != model::WalkEdge::Kind::SIDEWALK) {
+    const road::WalkEdge& edge = edges[e];
+    if (edge.kind != road::WalkEdge::Kind::SIDEWALK) {
       continue;
     }
     bool lower = std::min(edge.path.front().x, edge.path.back().x) < 199.0;
@@ -131,10 +131,10 @@ TEST_CASE("Crossing") {
                 .build(Out(world)));
     REQUIRE(
         world.create<archetype::SignalController>()
-            .with(model::SignalPlan{
-                .phases = {{.duration = 30s, .aspect = model::Aspect::GREEN},
-                           {.duration = 3s, .aspect = model::Aspect::YELLOW},
-                           {.duration = 27s, .aspect = model::Aspect::RED}}})
+            .with(traffic::SignalPlan{
+                .phases = {{.duration = 30s, .aspect = traffic::Aspect::GREEN},
+                           {.duration = 3s, .aspect = traffic::Aspect::YELLOW},
+                           {.duration = 27s, .aspect = traffic::Aspect::RED}}})
             .with(SignalState{})
             .build());
     world.sync();
@@ -247,8 +247,8 @@ TEST_CASE("Crossing") {
                   .build());
     };
     // Where each lane meets the crosswalk.
-    std::map<int, model::CrosswalkZone> zones;
-    for (const model::CrosswalkZone& zone : network.walking.zones()) {
+    std::map<int, road::CrosswalkZone> zones;
+    for (const road::CrosswalkZone& zone : network.walking.zones()) {
       zones[zone.lane.lane] = zone;
     }
     REQUIRE(zones.size() == 2);
@@ -284,7 +284,7 @@ TEST_CASE("Crossing") {
       std::vector<Entity> done;
       world.store_of<LaneState>().for_each(
           [&](Entity owner, const LaneState& state) {
-            const model::CrosswalkZone& zone = zones.at(state.lane.lane);
+            const road::CrosswalkZone& zone = zones.at(state.lane.lane);
             double along = along_lane(network, state.lane, state.s);
             double back = along - before.at(owner);
             double length = world.store_of<Driver>()

@@ -29,11 +29,11 @@ namespace {
 
 using namespace std::chrono_literals;
 using namespace testing;
-using model::DriftSingleTrack;
-using model::DynamicSingleTrack;
-using model::MultibodyVehicle;
-using model::VehicleInput;
-using model::VehicleParameters;
+using vehicle::DriftSingleTrack;
+using vehicle::DynamicSingleTrack;
+using vehicle::MultibodyVehicle;
+using vehicle::VehicleInput;
+using vehicle::VehicleParameters;
 
 using Numbers = std::vector<double>;
 
@@ -60,8 +60,8 @@ struct DynamicModel final {
   }
   static auto rate_numbers(const Numbers& x, const VehicleInput& input,
                            const VehicleParameters& vehicle) -> Numbers {
-    model::DynamicSingleTrackRate f =
-        model::compute_dynamic_single_track_rate(state_of(x), input, vehicle);
+    vehicle::DynamicSingleTrackRate f =
+        vehicle::compute_dynamic_single_track_rate(state_of(x), input, vehicle);
     return {f.x.numerical_value_in(meter_per_second),
             f.y.numerical_value_in(meter_per_second),
             f.steering.numerical_value_in(radian_per_second),
@@ -100,8 +100,8 @@ struct DriftModel final {
   }
   static auto rate_numbers(const Numbers& x, const VehicleInput& input,
                            const VehicleParameters& vehicle) -> Numbers {
-    model::DriftSingleTrackRate f =
-        model::compute_drift_single_track_rate(state_of(x), input, vehicle);
+    vehicle::DriftSingleTrackRate f =
+        vehicle::compute_drift_single_track_rate(state_of(x), input, vehicle);
     return {f.x.numerical_value_in(meter_per_second),
             f.y.numerical_value_in(meter_per_second),
             f.steering.numerical_value_in(radian_per_second),
@@ -114,25 +114,25 @@ struct DriftModel final {
   }
   static auto start(const VehicleParameters& vehicle) -> Numbers {
     return numbers_of(
-        model::start_drift_single_track(20.0 * meter_per_second, vehicle));
+        vehicle::start_drift_single_track(20.0 * meter_per_second, vehicle));
   }
 };
 
 struct MultibodyModel final {
   static auto state_of(const Numbers& x) -> MultibodyVehicle {
-    model::MultibodyNumbers numbers{};
+    vehicle::MultibodyNumbers numbers{};
     std::ranges::copy(x, numbers.begin());
-    return model::convert_numbers_to_multibody(numbers);
+    return vehicle::convert_numbers_to_multibody(numbers);
   }
   static auto rate_numbers(const Numbers& x, const VehicleInput& input,
                            const VehicleParameters& vehicle) -> Numbers {
-    model::MultibodyNumbers f = model::convert_multibody_rate_to_numbers(
-        model::compute_multibody_rate(state_of(x), input, vehicle));
+    vehicle::MultibodyNumbers f = vehicle::convert_multibody_rate_to_numbers(
+        vehicle::compute_multibody_rate(state_of(x), input, vehicle));
     return {f.begin(), f.end()};
   }
   static auto start(const VehicleParameters& vehicle) -> Numbers {
-    model::MultibodyNumbers x = model::convert_multibody_to_numbers(
-        model::start_multibody(20.0 * meter_per_second, vehicle));
+    vehicle::MultibodyNumbers x = vehicle::convert_multibody_to_numbers(
+        vehicle::start_multibody(20.0 * meter_per_second, vehicle));
     return {x.begin(), x.end()};
   }
 };
@@ -263,8 +263,8 @@ auto compare_paths(std::string_view name, int id,
 }  // namespace
 
 TEST_CASE("TireAgainstCommonRoad") {
-  model::CommonRoadTire tire =
-      std::get<model::CommonRoadTire>(load_commonroad_vehicles().at(1).tire);
+  vehicle::CommonRoadTire tire =
+      std::get<vehicle::CommonRoadTire>(load_commonroad_vehicles().at(1).tire);
 
   SECTION("ShouldMatchCorrectedMagicFormulaGivenSlipsAndLoads") {
     // simon's forces agree with CommonRoad's, corrected, to rounding.
@@ -277,12 +277,12 @@ TEST_CASE("TireAgainstCommonRoad") {
     double original_y = 0.0;
     std::size_t rows = 0;
     for (const Row& row : load_rows("commonroad_tires.csv")) {
-      model::TireForce force =
-          model::compute_tire_force(tire,
-                                    {.longitudinal = number(row, "kappa"),
-                                     .lateral = number(row, "alpha") * radian,
-                                     .camber = number(row, "gamma") * radian},
-                                    number(row, "load") * newton);
+      vehicle::TireForce force =
+          vehicle::compute_tire_force(tire,
+                                      {.longitudinal = number(row, "kappa"),
+                                       .lateral = number(row, "alpha") * radian,
+                                       .camber = number(row, "gamma") * radian},
+                                      number(row, "load") * newton);
       double fx = force.longitudinal.numerical_value_in(newton);
       double fy = force.lateral.numerical_value_in(newton);
       largest = std::max({largest,
@@ -305,7 +305,7 @@ TEST_CASE("TireAgainstCommonRoad") {
 
   SECTION("ShouldPushNothingGivenNoLoad") {
     for (double load : {0.0, -500.0}) {
-      model::TireForce force = model::compute_tire_force(
+      vehicle::TireForce force = vehicle::compute_tire_force(
           tire, {.longitudinal = 0.1, .lateral = 0.05 * radian}, load * newton);
       CHECK(force.longitudinal == 0.0 * newton);
       CHECK(force.lateral == 0.0 * newton);

@@ -35,9 +35,9 @@ TEST_CASE("ConstraintsAgainstMuJoCo") {
     // and the spread it measures says how far.
     std::map<std::string, Run, std::less<>> runs =
         load_runs("mujoco_constraints.csv");
-    using Solver = model::Physics::Solver;
-    using Cone = model::Physics::Cone;
-    using Integrator = model::Physics::Integrator;
+    using Solver = articulated::Physics::Solver;
+    using Cone = articulated::Physics::Cone;
+    using Integrator = articulated::Physics::Integrator;
     std::vector<double> driven;
     for (int k = 0; k < 21; ++k) {
       driven.push_back(0.3 * ((7 * k) % 11 - 5) / 5);
@@ -108,7 +108,7 @@ TEST_CASE("ConstraintsAgainstMuJoCo") {
 }
 
 TEST_CASE("ConstraintsAgainstPhysics") {
-  using Solver = model::Physics::Solver;
+  using Solver = articulated::Physics::Solver;
   const std::vector<Solver> solvers{Solver::NEWTON, Solver::PGS};
 
   SECTION("ShouldSolveTreesApartGivenNoContactBetweenThem") {

@@ -19,10 +19,10 @@ namespace simon::automotive {
 namespace {
 
 using namespace testing;
-using model::IntelligentDriver;
-using model::LaneChangeAccelerations;
-using model::LaneChanger;
-using model::Leader;
+using traffic::IntelligentDriver;
+using traffic::LaneChangeAccelerations;
+using traffic::LaneChanger;
+using traffic::Leader;
 
 constexpr double LENGTH = 5.0;  // Each vehicle's, in m.
 constexpr int FOLLOWERS = 5;
@@ -82,7 +82,7 @@ auto platoon_rate(const IntelligentDriver& driver, const Platoon& platoon,
     double ahead_speed = i == 0 ? leader_speed(t) : platoon.speed[i - 1];
     rate.position[i] = platoon.speed[i];
     rate.speed[i] =
-        model::compute_idm_acceleration(
+        traffic::compute_idm_acceleration(
             driver, platoon.speed[i] * meter_per_second,
             Leader{.gap = (ahead - LENGTH - platoon.position[i]) * meter,
                    .speed = ahead_speed * meter_per_second})
@@ -180,7 +180,7 @@ TEST_CASE("TrafficAgainstMovsimAndSumo") {
           .acceleration = number(row, "a") * meter_per_second_squared,
           .deceleration = number(row, "b") * meter_per_second_squared};
       double ours =
-          model::compute_idm_acceleration(
+          traffic::compute_idm_acceleration(
               driver, number(row, "speed") * meter_per_second,
               Leader{.gap = number(row, "gap") * meter,
                      .speed = number(row, "leader_speed") * meter_per_second})
@@ -210,8 +210,8 @@ TEST_CASE("TrafficAgainstMovsimAndSumo") {
           .self_after = number(row, "self_after") * meter_per_second_squared,
           .new_follower_after =
               number(row, "new_follower_after") * meter_per_second_squared};
-      bool ours = model::decide_lane_change(changer, accelerations,
-                                            number(row, "to_right") == 1.0);
+      bool ours = traffic::decide_lane_change(changer, accelerations,
+                                              number(row, "to_right") == 1.0);
       bool theirs = number(row, "change") == 1.0;
       differ += ours != theirs ? 1 : 0;
       changes += theirs ? 1 : 0;

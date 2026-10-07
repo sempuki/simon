@@ -10,7 +10,7 @@
 #include <numbers>
 #include <variant>
 
-namespace simon::model {
+namespace simon::vehicle {
 namespace {
 
 // The Magic Formula's curve, C atan(B x - E (B x - atan(B x))).
@@ -246,4 +246,4 @@ auto compute_linear_tire(const Tire& tire) -> LinearTire {
   return std::visit(Linearize{}, tire);
 }
 
-}  // namespace simon::model
+}  // namespace simon::vehicle

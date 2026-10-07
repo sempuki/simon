@@ -25,8 +25,8 @@ namespace simon::automotive {
 namespace {
 
 using namespace testing;
-using model::DriftSingleTrack;
-using model::VehicleParameters;
+using vehicle::DriftSingleTrack;
+using vehicle::VehicleParameters;
 
 constexpr double GRAVITY = 9.81;
 constexpr double SAMPLE = 0.01;  // s, Chrono's samples.
@@ -80,17 +80,17 @@ auto load_sedan() -> VehicleParameters {
   REQUIRE(tire.has_value());
   // Chrono's Pac02 holds camber at zero whatever the wheel's lean, so the
   // tire here has no camber terms.
-  for (double model::MagicFormulaTire::* camber :
-       {&model::MagicFormulaTire::pdx3, &model::MagicFormulaTire::pdy3,
-        &model::MagicFormulaTire::pey4, &model::MagicFormulaTire::pky3,
-        &model::MagicFormulaTire::phy3, &model::MagicFormulaTire::pvy3,
-        &model::MagicFormulaTire::pvy4, &model::MagicFormulaTire::rvy3,
-        &model::MagicFormulaTire::qbz4, &model::MagicFormulaTire::qbz5,
-        &model::MagicFormulaTire::qdz3, &model::MagicFormulaTire::qdz4,
-        &model::MagicFormulaTire::qdz8, &model::MagicFormulaTire::qdz9,
-        &model::MagicFormulaTire::qhz3, &model::MagicFormulaTire::qhz4,
-        &model::MagicFormulaTire::qez5, &model::MagicFormulaTire::ssz3,
-        &model::MagicFormulaTire::ssz4}) {
+  for (double vehicle::MagicFormulaTire::* camber :
+       {&vehicle::MagicFormulaTire::pdx3, &vehicle::MagicFormulaTire::pdy3,
+        &vehicle::MagicFormulaTire::pey4, &vehicle::MagicFormulaTire::pky3,
+        &vehicle::MagicFormulaTire::phy3, &vehicle::MagicFormulaTire::pvy3,
+        &vehicle::MagicFormulaTire::pvy4, &vehicle::MagicFormulaTire::rvy3,
+        &vehicle::MagicFormulaTire::qbz4, &vehicle::MagicFormulaTire::qbz5,
+        &vehicle::MagicFormulaTire::qdz3, &vehicle::MagicFormulaTire::qdz4,
+        &vehicle::MagicFormulaTire::qdz8, &vehicle::MagicFormulaTire::qdz9,
+        &vehicle::MagicFormulaTire::qhz3, &vehicle::MagicFormulaTire::qhz4,
+        &vehicle::MagicFormulaTire::qez5, &vehicle::MagicFormulaTire::ssz3,
+        &vehicle::MagicFormulaTire::ssz4}) {
     (*tire).*camber = 0.0;
   }
   double com = value.at("com_x");
@@ -172,16 +172,17 @@ struct DriftModel final {
 
   static auto start(const Sample& at, const VehicleParameters& vehicle)
       -> State {
-    State state = model::start_drift_single_track(
+    State state = vehicle::start_drift_single_track(
         std::hypot(at.speed, at.lateral) * meter_per_second, vehicle);
     state.steering = at.steering * radian;
     state.yaw_rate = at.yaw_rate * radian_per_second;
     state.slip_angle = std::atan2(at.lateral, at.speed) * radian;
     return state;
   }
-  static auto compute_rate(const State& state, const model::VehicleInput& input,
+  static auto compute_rate(const State& state,
+                           const vehicle::VehicleInput& input,
                            const VehicleParameters& vehicle, const Sample&) {
-    return model::compute_drift_single_track_rate(state, input, vehicle);
+    return vehicle::compute_drift_single_track_rate(state, input, vehicle);
   }
   static auto steering_of(const Sample& sample) -> double {
     return sample.steering;
@@ -206,27 +207,29 @@ struct DriftModel final {
 // steers it, beyond the front wheels' mean.
 template <bool TOE>
 struct MultibodyModel final {
-  using State = model::MultibodyVehicle;
+  using State = vehicle::MultibodyVehicle;
 
   static auto start(const Sample& at, const VehicleParameters& vehicle)
       -> State {
-    State state = model::start_multibody(at.speed * meter_per_second, vehicle);
+    State state =
+        vehicle::start_multibody(at.speed * meter_per_second, vehicle);
     state.steering = -at.steering * radian;
     state.yaw_rate = -at.yaw_rate * radian_per_second;
     state.body.lateral_speed = -at.lateral * meter_per_second;
     return state;
   }
-  static auto compute_rate(const State& state, const model::VehicleInput& input,
+  static auto compute_rate(const State& state,
+                           const vehicle::VehicleInput& input,
                            const VehicleParameters& vehicle,
                            const Sample& chrono) {
-    model::WheelSteer toe;
+    vehicle::WheelSteer toe;
     if (TOE) {
       toe = {.left_front = -(chrono.wheels[0] - chrono.steering) * radian,
              .right_front = -(chrono.wheels[1] - chrono.steering) * radian,
              .left_rear = -chrono.wheels[2] * radian,
              .right_rear = -chrono.wheels[3] * radian};
     }
-    return model::compute_multibody_rate(state, input, vehicle, toe);
+    return vehicle::compute_multibody_rate(state, input, vehicle, toe);
   }
   static auto steering_of(const Sample& sample) -> double {
     return -sample.steering;
@@ -265,7 +268,7 @@ auto drive(const VehicleParameters& vehicle, const std::vector<Sample>& chrono,
     for (int k = 0; k < SUBSTEPS; ++k) {
       double ours = Model::read(state, 0.0).speed;
       double target = now.speed + (next.speed - now.speed) * k / SUBSTEPS;
-      model::VehicleInput input{
+      vehicle::VehicleInput input{
           .steering_rate = steering_rate * radian_per_second,
           .acceleration =
               (wanted + 2.0 * (target - ours)) * meter_per_second_squared};
@@ -273,11 +276,11 @@ auto drive(const VehicleParameters& vehicle, const std::vector<Sample>& chrono,
         return Model::compute_rate(at, input, vehicle, now);
       };
       auto k1 = rate(state);
-      auto k2 = rate(model::advance(state, 0.5 * k1, dt));
-      auto k3 = rate(model::advance(state, 0.5 * k2, dt));
-      auto k4 = rate(model::advance(state, k3, dt));
-      state = model::advance(state,
-                             (1.0 / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4), dt);
+      auto k2 = rate(vehicle::advance(state, 0.5 * k1, dt));
+      auto k3 = rate(vehicle::advance(state, 0.5 * k2, dt));
+      auto k4 = rate(vehicle::advance(state, k3, dt));
+      state = vehicle::advance(
+          state, (1.0 / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4), dt);
     }
     path.push_back(Model::read(state, next.time));
   }

@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace simon::model {
+namespace simon::aircraft {
 
 namespace {
 
@@ -153,4 +153,4 @@ auto run_turbine(const TurbineData& turbine, const TurbineState& state,
   };
 }
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

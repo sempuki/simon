@@ -13,7 +13,7 @@
 
 // Newtonian gravity between point masses, softened so that close passes stay
 // finite, and the astronomical scales it works at (see model/REFERENCES.md).
-namespace simon::model {
+namespace simon::gravity {
 
 //-- Constants -----------------------------------------------------------------
 
@@ -100,4 +100,4 @@ class GravityTree final {
   std::vector<Cell> cells_;
 };
 
-}  // namespace simon::model
+}  // namespace simon::gravity

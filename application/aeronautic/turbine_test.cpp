@@ -29,8 +29,8 @@ constexpr std::string_view REFERENCE =
     "application/aeronautic/reference/jsbsim_737_turbine.csv";
 constexpr double DT = 1.0 / 60.0;  // The reference's frame, seconds.
 
-auto read_air(const Row& row) -> EngineAir {
-  return EngineAir{
+auto read_air(const Row& row) -> aircraft::EngineAir {
+  return aircraft::EngineAir{
       .mach = row.at("mach"),
       .density_altitude = row.at("density_altitude") * meter,
       .density_ratio = row.at("density_ratio"),
@@ -52,10 +52,10 @@ auto check_against_jsbsim(std::string_view path, std::string_view reference,
   REQUIRE(rows.size() > 1000);
 
   for (std::size_t engine = 0; engine < aircraft->engines.size(); ++engine) {
-    const TurbineData& turbine = aircraft->engines[engine];
+    const aircraft::TurbineData& turbine = aircraft->engines[engine];
     int column_engine = static_cast<int>(engine);
     // From where JSBSim's first frame left the engine.
-    TurbineState state{
+    aircraft::TurbineState state{
         .n1 = rows[0].at(column("n1", column_engine)),
         .n2 = rows[0].at(column("n2", column_engine)),
         .fuel_flow = rows[0].at(column("fuel_flow", column_engine)),
@@ -66,9 +66,9 @@ auto check_against_jsbsim(std::string_view path, std::string_view reference,
     double worst_flow = 0.0;    // kg/s.
     for (std::size_t i = 1; i < rows.size(); ++i) {
       const Row& row = rows[i];
-      state =
-          run_turbine(turbine, state, row.at(column("throttle", column_engine)),
-                      read_air(row), dt * second);
+      state = aircraft::run_turbine(turbine, state,
+                                    row.at(column("throttle", column_engine)),
+                                    read_air(row), dt * second);
       worst_speed =
           std::max({worst_speed,
                     std::abs(state.n1 - row.at(column("n1", column_engine))),
@@ -101,7 +101,7 @@ TEST_CASE("Turbine737") {
     // By the end, the second engine has held 0.9 for 13 s.
     std::vector<Row> rows = load_rows(REFERENCE);
     const Row& last = rows.back();
-    TurbineState steady =
+    aircraft::TurbineState steady =
         compute_steady_turbine(aircraft->engines[1], 0.9, read_air(last));
     CHECK(std::abs(steady.n2 - last.at("n2_1")) < 1e-9);
     CHECK(std::abs(steady.thrust.numerical_value_in(newton) -

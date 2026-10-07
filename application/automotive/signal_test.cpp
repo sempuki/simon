@@ -58,9 +58,10 @@ struct Queue final {
     }
     REQUIRE(
         world.create<archetype::SignalController>()
-            .with(model::SignalPlan{
-                .phases = {{.duration = 30s, .aspect = model::Aspect::RED},
-                           {.duration = 1000s, .aspect = model::Aspect::GREEN}},
+            .with(traffic::SignalPlan{
+                .phases = {{.duration = 30s, .aspect = traffic::Aspect::RED},
+                           {.duration = 1000s,
+                            .aspect = traffic::Aspect::GREEN}},
                 .offset = offset})
             .with(SignalState{})
             .build());
@@ -145,13 +146,13 @@ TEST_CASE("SignalAgainstSumo") {
                .with(Tactical{})
                .with(Stopped{})
                .build();
-      REQUIRE(
-          world.create<archetype::SignalController>()
-              .with(model::SignalPlan{
-                  .phases = {{.duration = 3s, .aspect = model::Aspect::YELLOW},
-                             {.duration = 100s, .aspect = model::Aspect::RED}}})
-              .with(SignalState{})
-              .build());
+      REQUIRE(world.create<archetype::SignalController>()
+                  .with(traffic::SignalPlan{
+                      .phases =
+                          {{.duration = 3s, .aspect = traffic::Aspect::YELLOW},
+                           {.duration = 100s, .aspect = traffic::Aspect::RED}}})
+                  .with(SignalState{})
+                  .build());
       world.sync();
       Scheduler scheduler{make_schedule(network)};
       for (long k = 0; k < 300; ++k) {
@@ -181,7 +182,7 @@ TEST_CASE("SignalAgainstSumo") {
                  .green = 15s}};
     REQUIRE(simulation.configure());
     const Network& network = simulation.network();
-    std::span<const model::StopLine> lines = network.control.stop_lines();
+    std::span<const traffic::StopLine> lines = network.control.stop_lines();
     REQUIRE(lines.size() == 4);
     std::map<Entity, LaneState> before;
     std::map<Entity, std::uint32_t> committed;
@@ -194,7 +195,7 @@ TEST_CASE("SignalAgainstSumo") {
           [&](Entity owner, const Tactical& tactical) {
             committed[owner] = tactical.committed;
           });
-      std::vector<model::Aspect> aspects(network.control.groups().size());
+      std::vector<traffic::Aspect> aspects(network.control.groups().size());
       simulation.world().store_of<SignalState>().for_each(
           [&](Entity, const SignalState& signal) {
             aspects[signal.group] = signal.aspect;
@@ -208,12 +209,12 @@ TEST_CASE("SignalAgainstSumo") {
             double to = state.lane == was.lane
                             ? along_lane(network, state.lane, state.s)
                             : find_lane_length(network, was.lane);
-            for (const model::StopLine& line :
+            for (const traffic::StopLine& line :
                  network.control.stop_lines_on(was.lane)) {
               if (from < line.along && line.along <= to) {
                 ++crossings;
                 auto index = static_cast<std::uint32_t>(&line - lines.data());
-                if (aspects[line.group] == model::Aspect::RED) {
+                if (aspects[line.group] == traffic::Aspect::RED) {
                   ++on_red;
                   CHECK(committed.at(owner) == index);
                 }

@@ -56,12 +56,12 @@ TEST_CASE("Collision") {
   REQUIRE(scenario.bodies.size() == 2 * (500 + 2000));
 
   SECTION("ShouldPlaceGalaxiesOnTheirOrbitGivenStandardCollision") {
-    const model::DiskGalaxy& galaxy = collision.galaxy;
+    const gravity::DiskGalaxy& galaxy = collision.galaxy;
     double cut = number_of(galaxy.halo_cutoff /
                            (galaxy.halo_cutoff + galaxy.halo_scale));
     Mass mass = galaxy.disk_mass + galaxy.halo_mass * cut * cut;
-    model::Separation separation = model::compute_parabolic_separation(
-        model::ParabolicOrbit{
+    gravity::Separation separation = gravity::compute_parabolic_separation(
+        gravity::ParabolicOrbit{
             .first = mass, .second = mass, .pericenter = collision.pericenter},
         -collision.before);
     Vector3 expected = separation.position.numerical_value_in(meter).eigen();
@@ -96,13 +96,13 @@ TEST_CASE("Collision") {
     REQUIRE(simulation.configure());
     double separation =
         (compute_group_center(simulation.world(), simulation.bodies(),
-                              scenario.groups[0], 10.0 * model::KILOPARSEC) -
+                              scenario.groups[0], 10.0 * gravity::KILOPARSEC) -
          compute_group_center(simulation.world(), simulation.bodies(),
-                              scenario.groups[2], 10.0 * model::KILOPARSEC))
+                              scenario.groups[2], 10.0 * gravity::KILOPARSEC))
             .numerical_value_in(meter)
             .eigen()
             .norm() /
-        model::KILOPARSEC.numerical_value_in(meter);
+        gravity::KILOPARSEC.numerical_value_in(meter);
     CHECK(separation > 170.0);
     CHECK(separation < 180.0);
   }

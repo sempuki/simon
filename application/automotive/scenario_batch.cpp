@@ -73,16 +73,16 @@ auto measure_sample(std::span<const RunSample> samples,
   }
   const RunSample& own = samples[0];
   model::OrientedBox own_box = convert_sample_to_box(own, boxes[0]);
-  std::vector<model::MovingBox> tracks;
+  std::vector<traffic::MovingBox> tracks;
   for (std::size_t i = 1; i < samples.size(); ++i) {
     model::OrientedBox box = convert_sample_to_box(samples[i], boxes[i]);
     measures.gap = std::min(measures.gap, model::compute_gap(own_box, box));
-    if (model::check_ahead(own.x, own.y, own.heading, {.x = box.x, .y = box.y},
-                           AHEAD)) {
+    if (traffic::check_ahead(own.x, own.y, own.heading,
+                             {.x = box.x, .y = box.y}, AHEAD)) {
       tracks.push_back({.box = box, .speed = samples[i].speed});
     }
   }
-  measures.time_to_collision = model::compute_time_to_collision(
+  measures.time_to_collision = traffic::compute_time_to_collision(
       {.box = own_box, .speed = own.speed}, tracks);
   return measures;
 }
@@ -116,14 +116,14 @@ auto measure_run(const RunRecord& run) -> RunMeasures {
     measures.time_to_collision_within_bound = true;
     return measures;
   }
-  std::vector<model::DrivingSample> ego;
+  std::vector<traffic::DrivingSample> ego;
   for (std::size_t k = 0; k < run.samples.size(); ++k) {
     const RunSample& now = run.samples[k][0];
-    model::DrivingSample sample{.time = run.step * static_cast<double>(k),
-                                .x = now.x,
-                                .y = now.y,
-                                .heading = now.heading,
-                                .speed = now.speed};
+    traffic::DrivingSample sample{.time = run.step * static_cast<double>(k),
+                                  .x = now.x,
+                                  .y = now.y,
+                                  .heading = now.heading,
+                                  .speed = now.speed};
     if (k > 0) {
       const RunSample& before = run.samples[k - 1][0];
       double turn =
@@ -134,7 +134,7 @@ auto measure_run(const RunRecord& run) -> RunMeasures {
     ego.push_back(sample);
   }
   measures.comfortable =
-      model::check_comfort(model::compute_comfort_signals(ego));
+      traffic::check_comfort(traffic::compute_comfort_signals(ego));
 
   measures.time_to_collision_within_bound = true;
   for (const std::vector<RunSample>& samples : run.samples) {

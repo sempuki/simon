@@ -28,7 +28,7 @@
 // surface positions the aerodynamics read. A signal keeps its value from step
 // to step, so a block that reads one a later block writes reads the step
 // before's.
-namespace simon::model {
+namespace simon::aircraft {
 
 // The signals every flight control system has, in a fixed place: those the
 // aircraft is given.
@@ -203,7 +203,7 @@ struct FlightBlock final {
   double bias = 0.0;
   double gain = 1.0;
   std::size_t schedule_signal = 0;
-  std::optional<Table1<>> schedule;
+  std::optional<model::Table1<>> schedule;
   std::pair<double, double> domain{-1.0, 1.0};
   std::pair<double, double> range{-1.0, 1.0};
   std::vector<double> detents;
@@ -257,4 +257,4 @@ auto run_flight_controls(const FlightControlData& controls,
 auto settle_flight_controls(const FlightControlData& controls,
                             InOut<FlightSignals> signals) -> void;
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

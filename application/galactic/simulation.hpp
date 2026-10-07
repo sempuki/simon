@@ -27,7 +27,7 @@ using Year = std::chrono::duration<std::int64_t, std::ratio<31557600>>;
 using Step = BasicStep<Year>;
 using Timing = engine::BasicTiming<Year>;
 
-using model::BodyStart;
+using gravity::BodyStart;
 
 // How a run computes gravity: by summing every pair, exactly, or by Barnes
 // and Hut's tree, opening cells by `opening_angle`.
@@ -80,7 +80,7 @@ auto make_encounter_scenario(const Encounter& encounter) -> Scenario;
 // axis, tilted from z about x by its inclination, so that 0 is a direct
 // passage. The groups are each galaxy's disk and halo.
 struct Collision final {
-  model::DiskGalaxy galaxy;
+  gravity::DiskGalaxy galaxy;
   Length pericenter = 0.0 * meter;
   Time before = 0.0 * second;
   Angle first_inclination = 0.0 * radian;
@@ -98,7 +98,7 @@ auto make_collision_scenario(const Collision& collision) -> Scenario;
 // of 10 kpc, cut off at 100 kpc, with Q = 1.5 at 2.5 scale lengths.
 // Hernquist's (1993) proportions of thickness to scale, and a halo that
 // outweighs the disk at every radius but its center, keep it in shape.
-auto make_standard_galaxy(std::size_t disk_bodies) -> model::DiskGalaxy;
+auto make_standard_galaxy(std::size_t disk_bodies) -> gravity::DiskGalaxy;
 
 // The collision galactic's runner and viewer show: two standard galaxies of
 // `disk_bodies` each, passing within 15 kpc 600 million years after the

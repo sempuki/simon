@@ -22,8 +22,8 @@
 namespace simon::galactic {
 namespace {
 
-using model::KILOPARSEC;
-using model::SOLAR_MASS;
+using gravity::KILOPARSEC;
+using gravity::SOLAR_MASS;
 
 constexpr std::string_view TREE =
     "application/galactic/reference/rebound_tree.csv";
@@ -86,7 +86,7 @@ TEST_CASE("Tree") {
                    meter};
   std::vector<Vector3> direct;
   for (const std::vector<std::string>& line : table.lines) {
-    scenario.bodies.push_back(model::BodyStart{
+    scenario.bodies.push_back(gravity::BodyStart{
         .position = QuantityVector{read_vector(table, line, "x")} * meter,
         .mass =
             testing::parse_number(line[find_column(table, "m")]) * kilogram});
@@ -141,13 +141,14 @@ TEST_CASE("Tree") {
 // 256 bodies of a Plummer sphere on the tree at an opening angle of 0.5, for
 // ten crossing times of 128 steps.
 TEST_CASE("TreeMomentum") {
-  const model::Plummer plummer{.mass = 1e10 * SOLAR_MASS, .scale = KILOPARSEC};
+  const gravity::Plummer plummer{.mass = 1e10 * SOLAR_MASS,
+                                 .scale = KILOPARSEC};
   Scenario scenario{.softening = 0.05 * KILOPARSEC,
                     .gravity = GravityMethod::TREE};
   Random random{7};
-  model::append_plummer(plummer, 256, InOut(random), InOut(scenario.bodies));
-  Time crossing = model::compute_crossing_time(
-      plummer.mass, model::compute_plummer_energy(plummer));
+  gravity::append_plummer(plummer, 256, InOut(random), InOut(scenario.bodies));
+  Time crossing = gravity::compute_crossing_time(
+      plummer.mass, gravity::compute_plummer_energy(plummer));
   Year step = std::chrono::round<Year>(std::chrono::duration<double>(
       crossing.numerical_value_in(second) / 128.0));
 
@@ -161,7 +162,7 @@ TEST_CASE("TreeMomentum") {
 
   Mechanics after = measure_mechanics(simulation.world(), scenario.softening);
   double scale_momentum = plummer.mass.numerical_value_in(kilogram) *
-                          std::sqrt(model::GRAVITATIONAL_CONSTANT *
+                          std::sqrt(gravity::GRAVITATIONAL_CONSTANT *
                                     plummer.mass.numerical_value_in(kilogram) /
                                     plummer.scale.numerical_value_in(meter));
   // Measured: energy to 9.4e-4 and momentum to 9.3e-4, where direct

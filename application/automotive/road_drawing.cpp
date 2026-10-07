@@ -10,9 +10,9 @@ namespace simon::automotive {
 
 namespace {
 
-auto convert_to_point(const model::Road& road, const model::PlanPoint& plan,
+auto convert_to_point(const road::Road& road, const road::PlanPoint& plan,
                       double s, double t) -> model::Point2 {
-  Vector3 at = model::compute_road_position(road, plan, s * meter, t * meter)
+  Vector3 at = road::compute_road_position(road, plan, s * meter, t * meter)
                    .numerical_value_in(meter)
                    .eigen();
   return {.x = at.x(), .y = at.y()};
@@ -20,12 +20,12 @@ auto convert_to_point(const model::Road& road, const model::PlanPoint& plan,
 
 }  // namespace
 
-auto draw_roads(const model::RoadNetwork& network, double spacing)
+auto draw_roads(const road::RoadNetwork& network, double spacing)
     -> RoadDrawing {
   RoadDrawing drawing;
-  for (const model::Road& road : network.roads) {
+  for (const road::Road& road : network.roads) {
     for (std::size_t k = 0; k < road.lane_sections.size(); ++k) {
-      const model::LaneSection& section = road.lane_sections[k];
+      const road::LaneSection& section = road.lane_sections[k];
       double start = section.s0;
       double end = k + 1 < road.lane_sections.size()
                        ? road.lane_sections[k + 1].s0
@@ -37,7 +37,7 @@ auto draw_roads(const model::RoadNetwork& network, double spacing)
           std::max(1.0, std::ceil((end - start) / spacing)));
       std::size_t first = drawing.lanes.size();
       for (const auto* side : {&section.left, &section.right}) {
-        for (const model::Lane& lane : *side) {
+        for (const road::Lane& lane : *side) {
           drawing.lanes.push_back({.type = lane.type, .lane = lane.id});
         }
       }
@@ -48,9 +48,9 @@ auto draw_roads(const model::RoadNetwork& network, double spacing)
       for (std::size_t i = 0; i <= count; ++i) {
         double s = start + (end - start) * static_cast<double>(i) /
                                static_cast<double>(count);
-        model::PlanPoint plan = model::compute_plan_point(road, s * meter);
+        road::PlanPoint plan = road::compute_plan_point(road, s * meter);
         auto border = [&](int id) {
-          return model::compute_lane_border(road, section, s * meter, id)
+          return road::compute_lane_border(road, section, s * meter, id)
               .numerical_value_in(meter);
         };
         for (std::size_t j = first; j < drawing.lanes.size(); ++j) {

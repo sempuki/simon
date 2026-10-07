@@ -25,18 +25,18 @@ namespace simon::format {
 
 namespace {
 
-using model::Actuator;
-using model::ArticulatedBody;
-using model::ArticulatedModel;
-using model::Dof;
-using model::Geom;
-using model::GeomType;
-using model::Joint;
-using model::JointType;
-using model::Physics;
-using model::SameFrame;
-using model::SoftConstraint;
-using model::Tendon;
+using articulated::Actuator;
+using articulated::ArticulatedBody;
+using articulated::ArticulatedModel;
+using articulated::Dof;
+using articulated::Geom;
+using articulated::GeomType;
+using articulated::Joint;
+using articulated::JointType;
+using articulated::Physics;
+using articulated::SameFrame;
+using articulated::SoftConstraint;
+using articulated::Tendon;
 
 using lib::InOut;
 using lib::Out;
@@ -1520,7 +1520,7 @@ class Reader final {
 }  // namespace
 
 auto parse_mjcf(std::string_view text)
-    -> std::expected<model::ArticulatedModel, lib::Status> {
+    -> std::expected<articulated::ArticulatedModel, lib::Status> {
   return Reader{}.read(text);
 }
 
@@ -1565,7 +1565,7 @@ auto expand_includes(pugi::xml_node node, const std::filesystem::path& folder,
 }  // namespace
 
 auto load_mjcf(const std::string& path)
-    -> std::expected<model::ArticulatedModel, lib::Status> {
+    -> std::expected<articulated::ArticulatedModel, lib::Status> {
   pugi::xml_document document;
   if (!document.load_file(path.c_str())) {
     return Failure{lib::raise(FormatError::UNREADABLE, "cannot open " + path)};

@@ -8,7 +8,7 @@
 #include <array>
 #include <cmath>
 
-namespace simon::model {
+namespace simon::gravity {
 
 auto sum_gravity(std::span<const GravitySource> sources, std::uint32_t self,
                  const Vector3& position, double softening) -> Vector3 {
@@ -187,4 +187,4 @@ auto GravityTree::compute_acceleration(std::uint32_t self,
   return acceleration;
 }
 
-}  // namespace simon::model
+}  // namespace simon::gravity

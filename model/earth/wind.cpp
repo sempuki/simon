@@ -7,7 +7,7 @@
 #include <cstddef>
 #include <numbers>
 
-namespace simon::model {
+namespace simon::earth {
 
 namespace {
 
@@ -286,4 +286,4 @@ auto compute_wind(const WindField& field) -> Wind {
   return Wind{.north_east_down = field.north_east_down};
 }
 
-}  // namespace simon::model
+}  // namespace simon::earth

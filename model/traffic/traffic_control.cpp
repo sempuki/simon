@@ -12,29 +12,31 @@
 
 #include "base/core.hpp"
 
-namespace simon::model {
+namespace simon::traffic {
 
 namespace {
 
 // How far into `lane`, in its direction of travel, `s` is.
-auto along_lane(const RoadNetwork& network, const LaneKey& lane, double s)
-    -> double {
-  return runs_with_s(lane)
+auto along_lane(const road::RoadNetwork& network, const road::LaneKey& lane,
+                double s) -> double {
+  return road::runs_with_s(lane)
              ? s - network.roads[lane.road].lane_sections[lane.section].s0
-             : find_section_end(network, lane) - s;
+             : road::find_section_end(network, lane) - s;
 }
 
 // Whether `signal` holds for traffic in lane `id`.
-auto holds_for(const Signal& signal, int id) -> bool {
-  bool direction = signal.orientation == RoadDirection::BOTH ||
-                   (signal.orientation == RoadDirection::POSITIVE) == (id < 0);
+auto holds_for(const road::Signal& signal, int id) -> bool {
+  bool direction =
+      signal.orientation == road::RoadDirection::BOTH ||
+      (signal.orientation == road::RoadDirection::POSITIVE) == (id < 0);
   if (!direction) {
     return false;
   }
   return signal.validities.empty() ||
-         std::ranges::any_of(signal.validities, [&](const LaneValidity& valid) {
-           return valid.from <= id && id <= valid.to;
-         });
+         std::ranges::any_of(signal.validities,
+                             [&](const road::LaneValidity& valid) {
+                               return valid.from <= id && id <= valid.to;
+                             });
 }
 
 }  // namespace
@@ -106,21 +108,21 @@ auto plan_in_turn(std::size_t groups, std::chrono::nanoseconds green,
   return plans;
 }
 
-auto TrafficControl::stop_lines_on(const LaneKey& lane) const
+auto TrafficControl::stop_lines_on(const road::LaneKey& lane) const
     -> std::span<const StopLine> {
   auto [first, last] = lines_.range_of(numbering_.number_of(lane));
   return std::span{stop_lines_}.subspan(first, last - first);
 }
 
-auto build_traffic_control(const RoadNetwork& network) -> TrafficControl {
+auto build_traffic_control(const road::RoadNetwork& network) -> TrafficControl {
   TrafficControl control;
   std::map<std::string, std::uint32_t, std::less<>> group_of_signal;
-  for (const SignalController& controller : network.controllers) {
+  for (const road::SignalController& controller : network.controllers) {
     SignalGroup group{.controller = controller.id,
                       .sequence = controller.sequence};
-    for (const Junction& junction : network.junctions) {
+    for (const road::Junction& junction : network.junctions) {
       auto listed = std::ranges::find(junction.controllers, controller.id,
-                                      &JunctionController::id);
+                                      &road::JunctionController::id);
       if (listed != junction.controllers.end()) {
         group.junction = junction.id;
         group.sequence = listed->sequence;
@@ -128,27 +130,30 @@ auto build_traffic_control(const RoadNetwork& network) -> TrafficControl {
       }
     }
     auto index = static_cast<std::uint32_t>(control.groups_.size());
-    for (const SignalController::Control& controlled : controller.controls) {
+    for (const road::SignalController::Control& controlled :
+         controller.controls) {
       group_of_signal.emplace(controlled.signal, index);
     }
     control.groups_.push_back(std::move(group));
   }
 
   for (std::uint32_t r = 0; r < network.roads.size(); ++r) {
-    const Road& road = network.roads[r];
-    for (const Signal& signal : road.signals) {
+    const road::Road& road = network.roads[r];
+    for (const road::Signal& signal : road.signals) {
       auto group = group_of_signal.find(signal.id);
       if (!signal.dynamic || group == group_of_signal.end()) {
         continue;
       }
-      const LaneSection& section = find_lane_section(road, signal.s * meter);
+      const road::LaneSection& section =
+          find_lane_section(road, signal.s * meter);
       auto k = static_cast<std::uint32_t>(&section - road.lane_sections.data());
-      for (const std::vector<Lane>* side : {&section.left, &section.right}) {
-        for (const Lane& lane : *side) {
+      for (const std::vector<road::Lane>* side :
+           {&section.left, &section.right}) {
+        for (const road::Lane& lane : *side) {
           if (lane.type != "driving" || !holds_for(signal, lane.id)) {
             continue;
           }
-          LaneKey key{.road = r, .section = k, .lane = lane.id};
+          road::LaneKey key{.road = r, .section = k, .lane = lane.id};
           control.stop_lines_.push_back(
               StopLine{.lane = key,
                        .along = along_lane(network, key, signal.s),
@@ -162,10 +167,10 @@ auto build_traffic_control(const RoadNetwork& network) -> TrafficControl {
                       return std::tie(a.lane, a.along, a.group) <
                              std::tie(b.lane, b.along, b.group);
                     });
-  control.numbering_ = LaneNumbering{network};
-  control.lines_ =
-      LaneRanges{control.numbering_, control.stop_lines_.size(),
-                 [&](std::size_t i) { return control.stop_lines_[i].lane; }};
+  control.numbering_ = road::LaneNumbering{network};
+  control.lines_ = road::LaneRanges{
+      control.numbering_, control.stop_lines_.size(),
+      [&](std::size_t i) { return control.stop_lines_[i].lane; }};
   return control;
 }
 
@@ -216,4 +221,4 @@ auto stops_at_light(const IntelligentDriver& driver,
   return !too_hard && !too_close;
 }
 
-}  // namespace simon::model
+}  // namespace simon::traffic

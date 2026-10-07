@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-namespace simon::model {
+namespace simon::aircraft {
 
 namespace {
 
@@ -20,7 +20,8 @@ auto convert_north_east_down_to_fixed(double sin_lat, double cos_lat,
   return basis;
 }
 
-auto convert_north_east_down_to_fixed(const wgs84::Location& where) -> Matrix3 {
+auto convert_north_east_down_to_fixed(const earth::wgs84::Location& where)
+    -> Matrix3 {
   return convert_north_east_down_to_fixed(
       where.sin_latitude, where.cos_latitude, where.sin_longitude,
       where.cos_longitude);
@@ -28,10 +29,10 @@ auto convert_north_east_down_to_fixed(const wgs84::Location& where) -> Matrix3 {
 
 }  // namespace
 
-auto Earth::round(const wgs84::Geodetic& origin) -> Earth {
+auto Earth::round(const earth::wgs84::Geodetic& origin) -> Earth {
   Earth earth;
   earth.round_ = true;
-  earth.origin_fixed_ = wgs84::convert_geodetic_to_fixed(origin);
+  earth.origin_fixed_ = earth::wgs84::convert_geodetic_to_fixed(origin);
   // East, north and up, as rows.
   Matrix3 ned = convert_north_east_down_to_fixed(
       sin(origin.latitude), cos(origin.latitude), sin(origin.longitude),
@@ -43,21 +44,22 @@ auto Earth::round(const wgs84::Geodetic& origin) -> Earth {
 }
 
 auto Earth::angle(Time time) const -> Angle {
-  return round_
-             ? wgs84::ROTATION_RATE * time.numerical_value_in(second) * radian
-             : 0.0 * radian;
+  return round_ ? earth::wgs84::ROTATION_RATE *
+                      time.numerical_value_in(second) * radian
+                : 0.0 * radian;
 }
 
-auto Earth::find_fixed(const RigidBody& body, Time time) const -> Position {
+auto Earth::find_fixed(const model::RigidBody& body, Time time) const
+    -> Position {
   if (!round_) {
     return body.position;
   }
-  return QuantityVector{wgs84::convert_inertial_to_fixed(angle(time)) *
+  return QuantityVector{earth::wgs84::convert_inertial_to_fixed(angle(time)) *
                         eigen(body.position)} *
          meter;
 }
 
-auto Earth::place(const RigidBody& body, Time time) const -> Place {
+auto Earth::place(const model::RigidBody& body, Time time) const -> Place {
   if (!round_) {
     Place flat{
         .fixed = body.position,
@@ -69,9 +71,9 @@ auto Earth::place(const RigidBody& body, Time time) const -> Place {
         0.0, 0.0, -1.0;
     return flat;
   }
-  Matrix3 to_fixed = wgs84::convert_inertial_to_fixed(angle(time));
+  Matrix3 to_fixed = earth::wgs84::convert_inertial_to_fixed(angle(time));
   Position fixed = QuantityVector{to_fixed * eigen(body.position)} * meter;
-  wgs84::Location where = wgs84::locate(fixed);
+  earth::wgs84::Location where = earth::wgs84::locate(fixed);
   return Place{
       .convert_inertial_to_fixed = to_fixed,
       .fixed = fixed,
@@ -83,7 +85,8 @@ auto Earth::place(const RigidBody& body, Time time) const -> Place {
   };
 }
 
-auto Earth::gravity(const RigidBody& body, Time time) const -> Acceleration {
+auto Earth::gravity(const model::RigidBody& body, Time time) const
+    -> Acceleration {
   return gravity(place(body, time));
 }
 
@@ -91,20 +94,20 @@ auto Earth::gravity(const Place& place) const -> Acceleration {
   if (!round_) {
     return meters_per_second_squared(
         0.0, 0.0,
-        -STANDARD_GRAVITY.numerical_value_in(meter_per_second_squared));
+        -earth::STANDARD_GRAVITY.numerical_value_in(meter_per_second_squared));
   }
   return QuantityVector{place.convert_inertial_to_fixed.transpose() *
-                        eigen(wgs84::compute_gravitation(place.fixed))} *
+                        eigen(earth::wgs84::compute_gravitation(place.fixed))} *
          meter_per_second_squared;
 }
-auto Earth::air_velocity(const RigidBody& body) const -> Velocity {
+auto Earth::air_velocity(const model::RigidBody& body) const -> Velocity {
   Vector3 relative =
       eigen(body.velocity) - spin(*this).cross(eigen(body.position));
   return QuantityVector{body.attitude.conjugate() * relative} *
          meter_per_second;
 }
 
-auto Earth::air_acceleration(const RigidBody& body,
+auto Earth::air_acceleration(const model::RigidBody& body,
                              const Acceleration& acceleration) const
     -> Acceleration {
   // d/dt R^T (v - W x r) = R^T (a - W x v) - w x R^T (v - W x r).
@@ -116,17 +119,17 @@ auto Earth::air_acceleration(const RigidBody& body,
          meter_per_second_squared;
 }
 
-auto Earth::air_rate(const RigidBody& body) const -> AngularVelocity {
+auto Earth::air_rate(const model::RigidBody& body) const -> AngularVelocity {
   return QuantityVector{eigen(body.rate) -
                         body.attitude.conjugate() * spin(*this)} *
          radian_per_second;
 }
 
-auto Earth::altitude(const RigidBody& body, Time time) const -> Length {
+auto Earth::altitude(const model::RigidBody& body, Time time) const -> Length {
   if (!round_) {
     return altitude_of(body.position);
   }
-  return wgs84::locate(find_fixed(body, time)).altitude;
+  return earth::wgs84::locate(find_fixed(body, time)).altitude;
 }
 
 auto Earth::north_east_down(const Position& fixed, Time time) const -> Matrix3 {
@@ -138,11 +141,11 @@ auto Earth::north_east_down(const Position& fixed, Time time) const -> Matrix3 {
         0.0, 0.0, -1.0;
     return basis;
   }
-  return wgs84::convert_inertial_to_fixed(angle(time)).transpose() *
-         convert_north_east_down_to_fixed(wgs84::locate(fixed));
+  return earth::wgs84::convert_inertial_to_fixed(angle(time)).transpose() *
+         convert_north_east_down_to_fixed(earth::wgs84::locate(fixed));
 }
 
-auto Earth::level_rate(const RigidBody& body, Time time) const
+auto Earth::level_rate(const model::RigidBody& body, Time time) const
     -> AngularVelocity {
   if (!round_) {
     return QuantityVector{} * radian_per_second;
@@ -155,11 +158,11 @@ auto Earth::level_rate(const RigidBody& body, Time time) const
   // The ellipsoid's radii of curvature: in the prime vertical, and along
   // the meridian.
   double sin_lat = here.sin_latitude;
-  double w = 1.0 - wgs84::ECCENTRICITY_SQUARED * sin_lat * sin_lat;
+  double w = 1.0 - earth::wgs84::ECCENTRICITY_SQUARED * sin_lat * sin_lat;
   double height = here.altitude.numerical_value_in(meter);
-  double prime = wgs84::SEMIMAJOR_AXIS / std::sqrt(w) + height;
-  double meridian = wgs84::SEMIMAJOR_AXIS *
-                        (1.0 - wgs84::ECCENTRICITY_SQUARED) /
+  double prime = earth::wgs84::SEMIMAJOR_AXIS / std::sqrt(w) + height;
+  double meridian = earth::wgs84::SEMIMAJOR_AXIS *
+                        (1.0 - earth::wgs84::ECCENTRICITY_SQUARED) /
                         (w * std::sqrt(w)) +
                     height;
   Vector3 turning{velocity.y() / prime, -velocity.x() / meridian,
@@ -168,14 +171,14 @@ auto Earth::level_rate(const RigidBody& body, Time time) const
          radian_per_second;
 }
 
-auto Earth::convert_body_to_north_east_down(const RigidBody& body,
+auto Earth::convert_body_to_north_east_down(const model::RigidBody& body,
                                             Time time) const -> Matrix3 {
   return north_east_down(find_fixed(body, time), time).transpose() *
          body.attitude.toRotationMatrix();
 }
 
-auto Earth::air_state(const RigidBody& body, Time time, const Wind& wind) const
-    -> AirState {
+auto Earth::air_state(const model::RigidBody& body, Time time,
+                      const earth::Wind& wind) const -> AirState {
   Position fixed = find_fixed(body, time);
   Position local = round_
                        ? QuantityVector{fixed_to_local_ *
@@ -200,17 +203,18 @@ auto Earth::air_state(const RigidBody& body, Time time, const Wind& wind) const
 auto Earth::body_at(const Position& position, Angle roll, Angle pitch,
                     Angle yaw, const Velocity& air_velocity,
                     const AngularVelocity& air_rate, Time time) const
-    -> RigidBody {
+    -> model::RigidBody {
   Vector3 inertial = eigen(position);
   if (round_) {
     Vector3 fixed =
         eigen(origin_fixed_) + fixed_to_local_.transpose() * eigen(position);
     inertial =
-        wgs84::convert_inertial_to_fixed(angle(time)).transpose() * fixed;
+        earth::wgs84::convert_inertial_to_fixed(angle(time)).transpose() *
+        fixed;
   }
   Position where = QuantityVector{inertial} * meter;
   Position fixed =
-      round_ ? find_fixed(RigidBody{.position = where}, time) : where;
+      round_ ? find_fixed(model::RigidBody{.position = where}, time) : where;
 
   Quaternion body_to_local =
       Quaternion{AngleAxis{radians(yaw), Vector3::UnitZ()}} *
@@ -220,7 +224,7 @@ auto Earth::body_at(const Position& position, Angle roll, Angle pitch,
       Quaternion{north_east_down(fixed, time)} * body_to_local;
   attitude.normalize();
 
-  return RigidBody{
+  return model::RigidBody{
       .position = where,
       .velocity = QuantityVector{attitude * eigen(air_velocity) +
                                  spin(*this).cross(inertial)} *
@@ -232,15 +236,16 @@ auto Earth::body_at(const Position& position, Angle roll, Angle pitch,
   };
 }
 
-auto compute_air_velocity(const RigidBody& body, const Earth& earth,
-                          const Place& place, const Wind& wind) -> Velocity {
+auto compute_air_velocity(const model::RigidBody& body, const Earth& earth,
+                          const Place& place, const earth::Wind& wind)
+    -> Velocity {
   return QuantityVector{
              compute_body_motion<true>(body, earth, place, wind).air_velocity} *
          meter_per_second;
 }
 
-auto compute_air_acceleration(const RigidBody& body, const Earth& earth,
-                              const Place& place, const Wind& wind,
+auto compute_air_acceleration(const model::RigidBody& body, const Earth& earth,
+                              const Place& place, const earth::Wind& wind,
                               const Acceleration& specific_force,
                               const Acceleration& gravity) -> Acceleration {
   return QuantityVector{compute_air_acceleration<true>(
@@ -249,4 +254,4 @@ auto compute_air_acceleration(const RigidBody& body, const Earth& earth,
          meter_per_second_squared;
 }
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

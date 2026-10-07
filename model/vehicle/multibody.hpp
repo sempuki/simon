@@ -25,7 +25,7 @@
 // wheels at -y; positive steering and yaw turn it right. Below 0.1 m/s the body
 // moves as the kinematic model about its center of gravity, as the single-track
 // models do.
-namespace simon::model {
+namespace simon::vehicle {
 
 // The sprung body's motion beyond the plane.
 struct SprungBody final {
@@ -146,4 +146,4 @@ auto compute_multibody_rate(const MultibodyVehicle& state,
                             const VehicleParameters& vehicle,
                             const WheelSteer& toe = {}) -> MultibodyVehicleRate;
 
-}  // namespace simon::model
+}  // namespace simon::vehicle

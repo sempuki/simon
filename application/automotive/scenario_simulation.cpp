@@ -17,10 +17,10 @@ auto ScenarioSimulation::configure() -> engine::PhaseResult {
   RETURN_OR_ASSIGN(scenario::Scenario scenario,
                    format::load_openscenario(path_, assignments_));
   scenario_ = std::make_unique<scenario::Scenario>(std::move(scenario));
-  RETURN_OR_ASSIGN(model::RoadNetwork roads,
+  RETURN_OR_ASSIGN(road::RoadNetwork roads,
                    format::load_opendrive(scenario_->road_network));
-  roads_ = std::make_unique<model::RoadNetwork>(std::move(roads));
-  lanes_ = std::make_unique<model::LaneGraph>(model::build_lane_graph(*roads_));
+  roads_ = std::make_unique<road::RoadNetwork>(std::move(roads));
+  lanes_ = std::make_unique<road::LaneGraph>(road::build_lane_graph(*roads_));
   player_ = std::make_unique<scenario::StoryboardPlayer>(*scenario_, *roads_);
   context_ = std::make_unique<ScenarioContext>(
       ScenarioContext{.roads = roads_.get(),

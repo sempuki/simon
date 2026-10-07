@@ -33,7 +33,7 @@
 // stand as they do when their inputs hold still, and read the state and the
 // accelerations the pilot feels, which their surfaces set, until the two
 // agree.
-namespace simon::model {
+namespace simon::aircraft {
 
 // A steady, straight flight: where, how fast through the air, heading where,
 // and climbing at what angle, with what fuel and the pilot's other commands,
@@ -50,7 +50,7 @@ struct FlightCondition final {
 
 // A trimmed aircraft: what it starts flying with, and the trim found.
 struct Trim final {
-  RigidBody body;
+  model::RigidBody body;
   FlightSignals signals;
   Engines engines;
   MassBalance mass;
@@ -81,13 +81,14 @@ inline constexpr std::size_t TRIM_ERROR_COUNT =
 
 // Trims `aircraft` for `condition` over `earth`, at time zero.
 auto trim(const AircraftData& aircraft, const FlightCondition& condition,
-          const Earth& earth, const StandardAirTable& air)
+          const Earth& earth, const earth::StandardAirTable& air)
     -> std::expected<Trim, lib::Status>;
 
-}  // namespace simon::model
+}  // namespace simon::aircraft
 
 // Messages for each TrimError, defined in trim.cpp.
 template <>
-const std::array<lib::StatusConditionEntry, simon::model::TRIM_ERROR_COUNT>
+const std::array<lib::StatusConditionEntry, simon::aircraft::TRIM_ERROR_COUNT>
     lib::EnumStatusKindConditionMixin<
-        simon::model::TrimError, simon::model::TRIM_ERROR_COUNT>::conditions_;
+        simon::aircraft::TrimError,
+        simon::aircraft::TRIM_ERROR_COUNT>::conditions_;

@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace simon::model {
+namespace simon::aircraft {
 
 namespace {
 
@@ -356,4 +356,4 @@ auto settle_flight_controls(const FlightControlData& controls,
   run_blocks(controls, signals, 0.0, true);
 }
 
-}  // namespace simon::model
+}  // namespace simon::aircraft

@@ -121,12 +121,12 @@ struct Pilot final  //
                             step.time.time_since_epoch())
                             .count();
     Offset more = offset(*checked_, flown_, microseconds);
-    using enum model::FlightSignal;
+    using enum aircraft::FlightSignal;
     signals[ELEVATOR_COMMAND] = trim_->at("elevator") + more.elevator;
     signals[AILERON_COMMAND] = trim_->at("aileron") + more.aileron;
     signals[RUDDER_COMMAND] = trim_->at("rudder") + more.rudder;
     for (std::size_t i = 0; i < engines_; ++i) {
-      signals.values[model::index_of(THROTTLE_COMMAND_0) + i] =
+      signals.values[aircraft::index_of(THROTTLE_COMMAND_0) + i] =
           trim_->at("throttle_" + std::to_string(i)) + more.throttle;
     }
   }
@@ -186,11 +186,12 @@ struct Apart final {
 // The flight controls as the trim leaves them: as JSBSim recorded them in
 // `recorded`, if it did, with each PID's last input its input now; or else
 // settled from the trimmed commands.
-auto trimmed_flight_controls(const model::AircraftData& data, const Row& trim,
-                             const Row* recorded) -> FlightSignals {
-  const model::FlightControlData& controls = data.flight_controls;
+auto trimmed_flight_controls(const aircraft::AircraftData& data,
+                             const Row& trim, const Row* recorded)
+    -> FlightSignals {
+  const aircraft::FlightControlData& controls = data.flight_controls;
   FlightSignals signals;
-  using enum model::FlightSignal;
+  using enum aircraft::FlightSignal;
   signals[ELEVATOR_COMMAND] = trim.at("elevator");
   signals[AILERON_COMMAND] = trim.at("aileron");
   signals[RUDDER_COMMAND] = trim.at("rudder");
@@ -198,24 +199,24 @@ auto trimmed_flight_controls(const model::AircraftData& data, const Row& trim,
   signals[ROLL_TRIM_COMMAND] = trim.at("roll_trim");
   signals[YAW_TRIM_COMMAND] = trim.at("yaw_trim");
   for (std::size_t i = 0; i < data.engines.size(); ++i) {
-    signals.values[model::index_of(THROTTLE_COMMAND_0) + i] =
+    signals.values[aircraft::index_of(THROTTLE_COMMAND_0) + i] =
         trim.at("throttle_" + std::to_string(i));
   }
 
   if (!recorded) {
-    model::settle_flight_controls(controls, InOut(signals));
+    aircraft::settle_flight_controls(controls, InOut(signals));
     return signals;
   }
-  for (std::size_t s = model::FLIGHT_SIGNAL_COUNT; s < controls.signals.size();
-       ++s) {
+  for (std::size_t s = aircraft::FLIGHT_SIGNAL_COUNT;
+       s < controls.signals.size(); ++s) {
     if (auto found = recorded->find(controls.signals[s]);
         found != recorded->end()) {
       signals.values[s] = found->second;
     }
   }
-  for (const model::FlightBlock& block : controls.blocks) {
-    if (block.kind == model::FlightBlock::Kind::PID) {
-      const model::FlightBlock::Input& input = block.inputs.front();
+  for (const aircraft::FlightBlock& block : controls.blocks) {
+    if (block.kind == aircraft::FlightBlock::Kind::PID) {
+      const aircraft::FlightBlock::Input& input = block.inputs.front();
       double value = signals.values[input.signal] * input.scale;
       signals.values[block.state + 1] = input.negated ? -value : value;
     }
@@ -224,7 +225,7 @@ auto trimmed_flight_controls(const model::AircraftData& data, const Row& trim,
 }
 
 // The fuel the trim leaves in each tank.
-auto trimmed_tanks(const model::AircraftData& data, const Row& trim)
+auto trimmed_tanks(const aircraft::AircraftData& data, const Row& trim)
     -> FuelTanks {
   FuelTanks tanks;
   for (std::size_t i = 0; i < data.tanks.size(); ++i) {
@@ -236,26 +237,27 @@ auto trimmed_tanks(const model::AircraftData& data, const Row& trim)
 // Flies `flown` from the trim at steps of `dt`, and returns the body every
 // 0.2 s.
 auto fly(const Checked& checked, Case flown, Duration dt,
-         const model::AircraftData& data, const Row& trim, const Row* recorded)
-    -> std::vector<RigidBody> {
+         const aircraft::AircraftData& data, const Row& trim,
+         const Row* recorded) -> std::vector<RigidBody> {
   World world;
   REQUIRE(World::set_up()
               .numbered(1)
               .holding<archetype::RigidAircraftInWind>(1)
               .build(Out(world)));
-  model::Earth earth = model::Earth::round(model::wgs84::Geodetic{});
+  aircraft::Earth earth = aircraft::Earth::round(earth::wgs84::Geodetic{});
   RigidBody body = read_body(trim);
-  model::StandardAirTable air;
+  earth::StandardAirTable air;
 
   FlightSignals signals = trimmed_flight_controls(data, trim, recorded);
-  Engines engines = model::compute_settled_engines(
+  Engines engines = aircraft::compute_settled_engines(
       data, signals,
-      model::compute_engine_air(body, earth, air, Wind{}, 0.0 * second));
+      aircraft::compute_engine_air(body, earth, air, Wind{}, 0.0 * second));
   FuelTanks tanks = trimmed_tanks(data, trim);
-  MassBalance mass = model::compute_mass_balance(data, tanks);
+  MassBalance mass = aircraft::compute_mass_balance(data, tanks);
   BodyAcceleration felt;
-  model::compute_rigid_aircraft_rate(body, signals, engines, mass, data, earth,
-                                     air, Wind{}, 0.0 * second, Out(felt));
+  aircraft::compute_rigid_aircraft_rate(body, signals, engines, mass, data,
+                                        earth, air, Wind{}, 0.0 * second,
+                                        Out(felt));
   auto aircraft = world.create<archetype::RigidAircraftInWind>()
                       .with(earth.air_state(body, 0.0 * second))
                       .with(body)
@@ -381,7 +383,7 @@ TEST_CASE("CheckCases737InWind") {
   // The 737's pitching moment reads the rate of angle of attack, which
   // JSBSim takes from the velocity over the ground. That leaves out the
   // wind turning in body axes as the 737 pitches (see
-  // model::compute_air_acceleration and its test), so in wind simon's 737
+  // aircraft::compute_air_acceleration and its test), so in wind simon's 737
   // parts from JSBSim's by 92 cm in 30 s. With JSBSim's rate it agrees to
   // 1.7 cm.
   CHECK(physics.position < 1.0);
@@ -397,7 +399,7 @@ TEST_CASE("CheckCasesF16") {
     REQUIRE(initial.size() == 1);
     const Row& trim = initial[0];
     MassBalance mass =
-        model::compute_mass_balance(*data, trimmed_tanks(*data, trim));
+        aircraft::compute_mass_balance(*data, trimmed_tanks(*data, trim));
     // JSBSim turns pounds into slugs by a rounded factor, 1.4e-8 off.
     CHECK_THAT(mass.properties.mass.numerical_value_in(kilogram),
                Catch::Matchers::WithinRel(trim.at("mass"), 2e-8));
@@ -448,7 +450,7 @@ TEST_CASE("CheckCasesF16InWind") {
 // How far a trimmed aircraft wanders in 30 s: in altitude and in airspeed.
 struct Wander final {
   // Widens by `body` at `time`, against `start` at time zero, over `earth`.
-  auto widen(const model::Earth& earth, const RigidBody& start,
+  auto widen(const aircraft::Earth& earth, const RigidBody& start,
              const RigidBody& body, Time time) -> void {
     auto height = [&](const RigidBody& b, Time t) {
       return earth.altitude(b, t).numerical_value_in(meter);
@@ -481,18 +483,18 @@ auto hold(const Checked& checked) -> std::pair<Wander, Wander> {
   REQUIRE(data);
   std::vector<Row> initial = load_rows(checked.initial);
   REQUIRE(initial.size() == 1);
-  model::Earth earth = model::Earth::round(model::wgs84::Geodetic{});
-  model::StandardAirTable air;
+  aircraft::Earth earth = aircraft::Earth::round(earth::wgs84::Geodetic{});
+  earth::StandardAirTable air;
   AirState start = earth.air_state(read_body(initial[0]), 0.0 * second);
 
-  model::FlightCondition condition{
+  aircraft::FlightCondition condition{
       .position = start.position,
       .speed = start.speed,
       .heading = start.heading,
       .flight_path_angle = start.flight_path_angle,
       .tanks = trimmed_tanks(*data, initial[0]),
   };
-  auto trim = model::trim(*data, condition, earth, air);
+  auto trim = aircraft::trim(*data, condition, earth, air);
   REQUIRE(trim);
 
   World world;
@@ -515,7 +517,7 @@ auto hold(const Checked& checked) -> std::pair<Wander, Wander> {
                       .build();
   REQUIRE(aircraft);
   world.sync();
-  model::Earth fixed = earth;
+  aircraft::Earth fixed = earth;
   auto systems = [&] {
     if constexpr (std::same_as<ScheduleType, HoldSchedule>) {
       return HoldSchedule{

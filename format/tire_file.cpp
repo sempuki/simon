@@ -12,7 +12,7 @@
 
 namespace simon::format {
 
-using namespace model;
+using namespace vehicle;
 
 namespace {
 

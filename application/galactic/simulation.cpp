@@ -50,10 +50,10 @@ auto build_bodies(const Scenario& scenario, Out<World> world,
 }
 
 auto make_encounter_scenario(const Encounter& encounter) -> Scenario {
-  model::Separation separation = model::compute_parabolic_separation(
-      model::ParabolicOrbit{.first = encounter.victim,
-                            .second = encounter.companion,
-                            .pericenter = encounter.pericenter},
+  gravity::Separation separation = gravity::compute_parabolic_separation(
+      gravity::ParabolicOrbit{.first = encounter.victim,
+                              .second = encounter.companion,
+                              .pericenter = encounter.pericenter},
       -encounter.before);
   double total =
       (encounter.victim + encounter.companion).numerical_value_in(kilogram);
@@ -70,19 +70,19 @@ auto make_encounter_scenario(const Encounter& encounter) -> Scenario {
                       .mass = encounter.companion};
   Scenario scenario{.bodies = {victim, companion},
                     .softening = encounter.softening};
-  model::append_ring_disk(
-      model::make_toomre_disk(encounter.pericenter, encounter.softening),
+  gravity::append_ring_disk(
+      gravity::make_toomre_disk(encounter.pericenter, encounter.softening),
       victim, InOut(scenario.test_particles));
   return scenario;
 }
 
 auto make_collision_scenario(const Collision& collision) -> Scenario {
-  const model::DiskGalaxy& galaxy = collision.galaxy;
+  const gravity::DiskGalaxy& galaxy = collision.galaxy;
   double cut =
       number_of(galaxy.halo_cutoff / (galaxy.halo_cutoff + galaxy.halo_scale));
   Mass mass = galaxy.disk_mass + galaxy.halo_mass * cut * cut;
-  model::Separation separation = model::compute_parabolic_separation(
-      model::ParabolicOrbit{
+  gravity::Separation separation = gravity::compute_parabolic_separation(
+      gravity::ParabolicOrbit{
           .first = mass, .second = mass, .pericenter = collision.pericenter},
       -collision.before);
 
@@ -93,11 +93,11 @@ auto make_collision_scenario(const Collision& collision) -> Scenario {
   auto append_galaxy = [&](std::string_view name, double share,
                            Angle inclination) {
     std::size_t first = scenario.bodies.size();
-    model::append_disk_galaxy(galaxy, InOut(random), InOut(scenario.bodies));
+    gravity::append_disk_galaxy(galaxy, InOut(random), InOut(scenario.bodies));
     Matrix3 tilt = Eigen::AngleAxisd(radians(inclination), Vector3::UnitX())
                        .toRotationMatrix();
-    model::place_bodies(first, tilt, share * separation.position,
-                        share * separation.velocity, InOut(scenario.bodies));
+    gravity::place_bodies(first, tilt, share * separation.position,
+                          share * separation.velocity, InOut(scenario.bodies));
     scenario.groups.push_back(BodyGroup{.name = std::format("{} disk", name),
                                         .first = first,
                                         .count = galaxy.disk_bodies});
@@ -110,38 +110,38 @@ auto make_collision_scenario(const Collision& collision) -> Scenario {
   return scenario;
 }
 
-auto make_standard_galaxy(std::size_t disk_bodies) -> model::DiskGalaxy {
-  using model::KILOPARSEC;
-  using model::SOLAR_MASS;
-  return model::DiskGalaxy{.disk_mass = 5e10 * SOLAR_MASS,
-                           .disk_scale = 3.0 * KILOPARSEC,
-                           .disk_thickness = 0.6 * KILOPARSEC,
-                           .halo_mass = 5e11 * SOLAR_MASS,
-                           .halo_scale = 10.0 * KILOPARSEC,
-                           .halo_cutoff = 100.0 * KILOPARSEC,
-                           .stability = 1.5,
-                           .stability_radius = 7.5 * KILOPARSEC,
-                           .disk_bodies = disk_bodies,
-                           .halo_bodies = 4 * disk_bodies};
+auto make_standard_galaxy(std::size_t disk_bodies) -> gravity::DiskGalaxy {
+  using gravity::KILOPARSEC;
+  using gravity::SOLAR_MASS;
+  return gravity::DiskGalaxy{.disk_mass = 5e10 * SOLAR_MASS,
+                             .disk_scale = 3.0 * KILOPARSEC,
+                             .disk_thickness = 0.6 * KILOPARSEC,
+                             .halo_mass = 5e11 * SOLAR_MASS,
+                             .halo_scale = 10.0 * KILOPARSEC,
+                             .halo_cutoff = 100.0 * KILOPARSEC,
+                             .stability = 1.5,
+                             .stability_radius = 7.5 * KILOPARSEC,
+                             .disk_bodies = disk_bodies,
+                             .halo_bodies = 4 * disk_bodies};
 }
 
 auto make_standard_collision(std::size_t disk_bodies) -> Collision {
   return Collision{.galaxy = make_standard_galaxy(disk_bodies),
-                   .pericenter = 15.0 * model::KILOPARSEC,
-                   .before = 6e8 * model::JULIAN_YEAR,
+                   .pericenter = 15.0 * gravity::KILOPARSEC,
+                   .before = 6e8 * gravity::JULIAN_YEAR,
                    .first_inclination = 0.0 * radian,
                    .second_inclination = std::numbers::pi / 4.0 * radian,
-                   .softening = 0.24 * model::KILOPARSEC,
+                   .softening = 0.24 * gravity::KILOPARSEC,
                    .opening_angle = 0.6};
 }
 
 auto make_standard_disk_scenario(std::size_t disk_bodies) -> Scenario {
-  model::DiskGalaxy galaxy = make_standard_galaxy(disk_bodies);
-  Scenario scenario{.softening = 0.24 * model::KILOPARSEC,
+  gravity::DiskGalaxy galaxy = make_standard_galaxy(disk_bodies);
+  Scenario scenario{.softening = 0.24 * gravity::KILOPARSEC,
                     .gravity = GravityMethod::TREE,
                     .opening_angle = 0.6};
   Random random{3};
-  model::append_disk_galaxy(galaxy, InOut(random), InOut(scenario.bodies));
+  gravity::append_disk_galaxy(galaxy, InOut(random), InOut(scenario.bodies));
   scenario.groups = {
       BodyGroup{.name = "disk", .first = 0, .count = galaxy.disk_bodies},
       BodyGroup{.name = "halo",
@@ -151,11 +151,11 @@ auto make_standard_disk_scenario(std::size_t disk_bodies) -> Scenario {
 }
 
 auto make_toomre_encounter() -> Encounter {
-  return Encounter{.victim = 1e11 * model::SOLAR_MASS,
-                   .companion = 1e11 * model::SOLAR_MASS,
-                   .pericenter = 25.0 * model::KILOPARSEC,
-                   .before = 1e9 * model::JULIAN_YEAR,
-                   .softening = 0.1 * model::KILOPARSEC};
+  return Encounter{.victim = 1e11 * gravity::SOLAR_MASS,
+                   .companion = 1e11 * gravity::SOLAR_MASS,
+                   .pericenter = 25.0 * gravity::KILOPARSEC,
+                   .before = 1e9 * gravity::JULIAN_YEAR,
+                   .softening = 0.1 * gravity::KILOPARSEC};
 }
 
 auto compute_group_center(const World& world, std::span<const Entity> bodies,
@@ -186,7 +186,7 @@ namespace {
 
 // Every body's position, velocity and mass, in store order. SI.
 struct Sample final {
-  std::vector<model::GravitySource> sources;
+  std::vector<gravity::GravitySource> sources;
   std::vector<Vector3> velocities;
 };
 
@@ -196,7 +196,7 @@ auto collect_sample(const World& world) -> Sample {
       [&](Entity entity, const PointMass& point) {
         const Kinematics& kinematics =
             world.store_of<Kinematics>().component_of(entity);
-        sample.sources.push_back(model::GravitySource{
+        sample.sources.push_back(gravity::GravitySource{
             .position = kinematics.position.numerical_value_in(meter).eigen(),
             .mass = point.mass.numerical_value_in(kilogram),
             .id = entity.index});
@@ -213,7 +213,7 @@ auto measure_mechanics(const World& world, Length softening) -> Mechanics {
   Mechanics mechanics;
   double mass = 0.0;
   for (std::size_t i = 0; i < sample.sources.size(); ++i) {
-    const model::GravitySource& body = sample.sources[i];
+    const gravity::GravitySource& body = sample.sources[i];
     const Vector3& velocity = sample.velocities[i];
     mechanics.kinetic += 0.5 * body.mass * velocity.squaredNorm();
     mechanics.momentum += body.mass * velocity;
@@ -222,7 +222,7 @@ auto measure_mechanics(const World& world, Length softening) -> Mechanics {
     mass += body.mass;
   }
   mechanics.center /= mass;
-  mechanics.potential = model::compute_potential_energy(
+  mechanics.potential = gravity::compute_potential_energy(
       sample.sources, softening.numerical_value_in(meter));
   return mechanics;
 }
@@ -232,14 +232,14 @@ auto compute_mass_radii(const World& world, std::span<const double> fractions)
   Sample sample = collect_sample(world);
   Vector3 center = Vector3::Zero();
   double mass = 0.0;
-  for (const model::GravitySource& body : sample.sources) {
+  for (const gravity::GravitySource& body : sample.sources) {
     center += body.mass * body.position;
     mass += body.mass;
   }
   center /= mass;
 
   std::vector<std::pair<double, double>> radii;  // Radius, mass.
-  for (const model::GravitySource& body : sample.sources) {
+  for (const gravity::GravitySource& body : sample.sources) {
     radii.emplace_back((body.position - center).norm(), body.mass);
   }
   std::ranges::sort(radii);

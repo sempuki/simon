@@ -11,7 +11,7 @@
 
 #include "core/units.hpp"
 
-namespace simon::model {
+namespace simon::road {
 
 namespace {
 
@@ -243,4 +243,4 @@ auto find_placement(const RoadNetwork& network, double x, double y,
   return nearest;
 }
 
-}  // namespace simon::model
+}  // namespace simon::road

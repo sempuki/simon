@@ -19,10 +19,10 @@
 namespace simon::galactic {
 namespace {
 
-using model::KILOPARSEC;
-using model::SOLAR_MASS;
+using gravity::KILOPARSEC;
+using gravity::SOLAR_MASS;
 
-const model::DiskGalaxy GALAXY = make_standard_galaxy(2000);
+const gravity::DiskGalaxy GALAXY = make_standard_galaxy(2000);
 
 auto make_galaxy_scenario() -> Scenario {
   return make_standard_disk_scenario(GALAXY.disk_bodies);
@@ -86,7 +86,7 @@ TEST_CASE("DiskGalaxy") {
     }
     rotation /= count;
     double circular =
-        model::compute_circular_speed(GALAXY, 2.5 * GALAXY.disk_scale)
+        gravity::compute_circular_speed(GALAXY, 2.5 * GALAXY.disk_scale)
             .numerical_value_in(meter_per_second);
     Mechanics mechanics =
         measure_mechanics(simulation.world(), simulation.scenario().softening);
@@ -94,7 +94,7 @@ TEST_CASE("DiskGalaxy") {
     // Toomre's Q from the measured dispersion: sigma_R kappa / 3.36 G Sigma.
     double r = 2.5 * h;
     auto v2 = [&](double x) {
-      return std::pow(model::compute_circular_speed(GALAXY, x * meter)
+      return std::pow(gravity::compute_circular_speed(GALAXY, x * meter)
                           .numerical_value_in(meter_per_second),
                       2.0);
     };
@@ -104,7 +104,7 @@ TEST_CASE("DiskGalaxy") {
     double sigma = GALAXY.disk_mass.numerical_value_in(kilogram) /
                    (2.0 * std::numbers::pi * h * h) * std::exp(-2.5);
     double q = std::sqrt(radial2 / count) * kappa /
-               (3.36 * model::GRAVITATIONAL_CONSTANT * sigma);
+               (3.36 * gravity::GRAVITATIONAL_CONSTANT * sigma);
     // Measured: 1.661 h to the profile's 1.678 h, 0.557 kpc to a sech^2
     // layer's z_0 pi / 2 sqrt(3) = 0.544, rotation at 0.972 of circular
     // (asymmetric drift), Q 1.56 over 249 bodies, and a virial ratio of 0.953.

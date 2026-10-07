@@ -25,9 +25,9 @@ struct Scenario final {
   std::vector<double> control;  // By the model's actuators.
   Feedback feedback;            // Overrides the controls, if given.
   bool constrained = true;      // Contacts, limits and dry friction.
-  std::optional<model::Physics::Solver> solver;  // Overrides the model's.
-  std::optional<model::Physics::Cone> cone;      // Likewise.
-  std::optional<model::Physics::Integrator> integrator;
+  std::optional<articulated::Physics::Solver> solver;  // Overrides the model's.
+  std::optional<articulated::Physics::Cone> cone;      // Likewise.
+  std::optional<articulated::Physics::Integrator> integrator;
 };
 
 class Simulation final {
@@ -44,14 +44,14 @@ class Simulation final {
 
   auto world() const -> const World& { return world_; }
   auto mechanics() const -> const Mechanics& { return *mechanics_; }
-  auto contacts() const -> const std::vector<model::Contact>& {
+  auto contacts() const -> const std::vector<articulated::Contact>& {
     return contacts_->contacts;
   }
   auto constraints() const -> const ConstraintSolution& { return *solution_; }
 
   // Every geom's pose in the world, by the model's geoms, from each tree's
   // last poses.
-  auto read_geom_frames() const -> std::vector<model::GeomFrame>;
+  auto read_geom_frames() const -> std::vector<articulated::GeomFrame>;
 
   // The model's positions and velocities, gathered from every tree.
   auto read_qpos() const -> std::vector<double>;

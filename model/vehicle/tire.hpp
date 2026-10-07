@@ -26,7 +26,7 @@
 // mirrored by the camber's sign. The coefficients are named as Pacejka and
 // the property files name them, and are plain numbers, since each carries
 // its own unit.
-namespace simon::model {
+namespace simon::vehicle {
 
 // CommonRoad's subset. The defaults are CommonRoad's tire, from the ADAMS
 // handbook, which all its vehicles share.
@@ -240,4 +240,4 @@ struct LinearTire final {
 // and p_dy1, or the Magic Formula's at its nominal load.
 auto compute_linear_tire(const Tire& tire) -> LinearTire;
 
-}  // namespace simon::model
+}  // namespace simon::vehicle

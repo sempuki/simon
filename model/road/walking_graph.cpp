@@ -16,7 +16,7 @@
 
 #include "base/core.hpp"
 
-namespace simon::model {
+namespace simon::road {
 
 namespace {
 
@@ -455,4 +455,4 @@ auto build_walking_graph(const RoadNetwork& network, double corner_reach)
   return graph;
 }
 
-}  // namespace simon::model
+}  // namespace simon::road

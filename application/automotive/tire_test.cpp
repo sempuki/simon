@@ -28,7 +28,7 @@ namespace simon::automotive {
 namespace {
 
 using namespace testing;
-using model::MagicFormulaTire;
+using vehicle::MagicFormulaTire;
 
 auto load_sedan_tire() -> MagicFormulaTire {
   auto tire =
@@ -65,11 +65,12 @@ TEST_CASE("MagicFormulaTireAgainstChrono") {
   REQUIRE(rows.size() == 4 * 25 * 21 * 2);
 
   auto force_of = [&](const Row& row) {
-    return model::compute_tire_force(tire,
-                                     {.longitudinal = number(row, "kappa"),
-                                      .lateral = number(row, "alpha") * radian,
-                                      .camber = number(row, "gamma") * radian},
-                                     number(row, "load") * newton);
+    return vehicle::compute_tire_force(
+        tire,
+        {.longitudinal = number(row, "kappa"),
+         .lateral = number(row, "alpha") * radian,
+         .camber = number(row, "gamma") * radian},
+        number(row, "load") * newton);
   };
   auto relative = [](double ours, double theirs, double scale) {
     return std::abs(ours - theirs) / std::max(1.0, scale);
@@ -94,7 +95,7 @@ TEST_CASE("MagicFormulaTireAgainstChrono") {
       if (number(row, "gamma") != 0.0 || !unclamped(tire, row)) {
         continue;
       }
-      model::TireForce force = force_of(row);
+      vehicle::TireForce force = force_of(row);
       double load = number(row, "load");
       longitudinal = std::max(
           longitudinal, relative(force.longitudinal.numerical_value_in(newton),
@@ -129,7 +130,7 @@ TEST_CASE("MagicFormulaTireAgainstChrono") {
     double cambered = 0.0;
     double ellipsis = 0.0;
     for (const Row& row : rows) {
-      model::TireForce force = force_of(row);
+      vehicle::TireForce force = force_of(row);
       double load = number(row, "load");
       double fx = force.longitudinal.numerical_value_in(newton);
       double fy = force.lateral.numerical_value_in(newton);

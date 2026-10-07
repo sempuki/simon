@@ -51,14 +51,14 @@ TEST_CASE("RigidBody737") {
           compute_mass_properties(row.at("mass") * kilogram, inertia);
 
       // Gravitation, found where the body is on the turning Earth.
-      Matrix3 to_fixed =
-          wgs84::convert_inertial_to_fixed(row.at("earth_angle") * radian);
+      Matrix3 to_fixed = earth::wgs84::convert_inertial_to_fixed(
+          row.at("earth_angle") * radian);
       Position fixed =
           QuantityVector{to_fixed *
                          body.position.numerical_value_in(meter).eigen()} *
           meter;
       QuantityVector gravity{to_fixed.transpose() *
-                             wgs84::compute_gravitation(fixed)
+                             earth::wgs84::compute_gravitation(fixed)
                                  .numerical_value_in(meter_per_second_squared)
                                  .eigen()};
 
@@ -88,8 +88,8 @@ TEST_CASE("RigidBody737") {
 
   auto aircraft = format::load_aircraft(std::string{BOEING_737});
   REQUIRE(aircraft);
-  Earth earth = Earth::round(wgs84::Geodetic{});
-  StandardAirTable air;
+  aircraft::Earth earth = aircraft::Earth::round(earth::wgs84::Geodetic{});
+  earth::StandardAirTable air;
 
   SECTION("ShouldMatchJsbsimMassBalanceGivenRecordedFuel") {
     double worst_inertia = 0.0;
@@ -99,7 +99,7 @@ TEST_CASE("RigidBody737") {
       std::array<Mass, 3> fuel{row.at("fuel_0") * kilogram,
                                row.at("fuel_1") * kilogram,
                                row.at("fuel_2") * kilogram};
-      MassBalance balance = compute_mass_balance(*aircraft, fuel);
+      aircraft::MassBalance balance = compute_mass_balance(*aircraft, fuel);
       worst_mass = worse(worst_mass,
                          balance.properties.mass.numerical_value_in(kilogram),
                          row.at("mass"), row.at("mass"));
@@ -137,13 +137,14 @@ TEST_CASE("RigidBody737") {
       std::array<Mass, 3> fuel{row.at("fuel_0") * kilogram,
                                row.at("fuel_1") * kilogram,
                                row.at("fuel_2") * kilogram};
-      MassBalance balance = compute_mass_balance(*aircraft, fuel);
-      Displacement reference =
-          compute_body_offset(aircraft->aero_reference, balance.center_of_mass);
-      AeroInputs inputs = compute_aero_inputs(body, FlightSignals{}, *aircraft,
-                                              reference, earth, air, time);
+      aircraft::MassBalance balance = compute_mass_balance(*aircraft, fuel);
+      Displacement reference = aircraft::compute_body_offset(
+          aircraft->aero_reference, balance.center_of_mass);
+      aircraft::AeroInputs inputs =
+          compute_aero_inputs(body, aircraft::FlightSignals{}, *aircraft,
+                              reference, earth, air, time);
 
-      using enum AeroVariable;
+      using enum aircraft::AeroVariable;
       worst_angle = worse(worst_angle, inputs[ALPHA], row.at("alpha"), 1.0);
       worst_angle = worse(worst_angle, inputs[BETA], row.at("beta"), 1.0);
       double speed = magnitude(
