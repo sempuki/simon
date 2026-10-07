@@ -314,7 +314,7 @@ struct Decide final            //
   explicit Decide(const Network& network) : network_{&network} {}
 
   auto prepare(SystemWorld& world, Step step) -> bool {
-    lights_ = !network_->control.stop_lines().empty();
+    lights_ = !network_->signals.stop_lines().empty();
     walks_ = !network_->walking.zones().empty();
     if (walks_) {
       std::size_t crosswalks = network_->walking.crosswalks().size();
@@ -333,7 +333,7 @@ struct Decide final            //
                        *network_,
                        yields_ ? &world.store_of<Stopped>() : nullptr);
     changing_ = gate_.fire(step).has_value();
-    aspects_.assign(network_->control.groups().size(), traffic::Aspect::GREEN);
+    aspects_.assign(network_->signals.groups().size(), traffic::Aspect::GREEN);
     world.store_of<SignalState>().for_each(
         [&](Entity, const SignalState& signal) {
           if (signal.group < aspects_.size()) {
@@ -633,7 +633,7 @@ struct Decide final            //
                                     const Driver& driver, double along,
                                     Tactical& tactical) const
       -> std::optional<Length> {
-    std::span<const traffic::StopLine> all = network_->control.stop_lines();
+    std::span<const traffic::StopLine> all = network_->signals.stop_lines();
     bool held = false;
     std::optional<Length> light;
     double before = -along;  // From the vehicle to the lane's start.
@@ -641,7 +641,7 @@ struct Decide final            //
     std::uint32_t turns = state.turns;
     while (!light && before < LOOKAHEAD) {
       for (const traffic::StopLine& line :
-           network_->control.stop_lines_on(key)) {
+           network_->signals.stop_lines_on(key)) {
         double distance = before + line.along;
         if (distance <= 0.0 || distance >= LOOKAHEAD) {
           continue;
@@ -1162,7 +1162,7 @@ struct Pace final              //
       vehicles_.collect(world.store_of<LaneState>(), world.store_of<Driver>(),
                         *network_);
       now_ = step.time.time_since_epoch();
-      std::size_t groups = network_->control.groups().size();
+      std::size_t groups = network_->signals.groups().size();
       aspects_.assign(groups, traffic::Aspect::GREEN);
       plans_.assign(groups, nullptr);
       const auto& plans = world.store_of<traffic::SignalPlan>();

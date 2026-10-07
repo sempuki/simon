@@ -107,7 +107,7 @@ struct TreeGravity final          //
   double opening_angle = 0.5;
   Length softening = 0.0 * meter;
   std::vector<gravity::Source> sources;
-  gravity::Tree tree;
+  gravity::BarnesHutTree tree;
   bool enabled = false;
 };
 

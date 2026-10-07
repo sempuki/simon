@@ -198,16 +198,16 @@ class Parser final {
   }
 
   auto read_orientation(pugi::xml_node node) const
-      -> std::expected<road::Direction, lib::Status> {
+      -> std::expected<road::Orientation, lib::Status> {
     std::string_view word = node.attribute("orientation").as_string("none");
     if (word == "+") {
-      return road::Direction::POSITIVE;
+      return road::Orientation::POSITIVE;
     }
     if (word == "-") {
-      return road::Direction::NEGATIVE;
+      return road::Orientation::NEGATIVE;
     }
     if (word == "none") {
-      return road::Direction::BOTH;
+      return road::Orientation::BOTH;
     }
     return fail(node,
                 "orientation `" + std::string{word} + "` is not +, - or none");
@@ -264,15 +264,15 @@ class Parser final {
   }
 
   auto read_outline(pugi::xml_node node) const
-      -> std::expected<road::Object::Outline, lib::Status> {
-    road::Object::Outline outline;
+      -> std::expected<road::RoadObject::Outline, lib::Status> {
+    road::RoadObject::Outline outline;
     outline.closed =
         node.attribute("closed").as_string("true") != std::string_view{"false"};
     bool road = false;
     bool local = false;
     for (pugi::xml_node corner_node : node.children()) {
       std::string_view kind = corner_node.name();
-      road::Object::Corner corner;
+      road::RoadObject::Corner corner;
       if (kind == "cornerRoad") {
         road = true;
         RETURN_OR_ASSIGN(corner.first, read_number(corner_node, "s"));
@@ -292,14 +292,14 @@ class Parser final {
     if (road && local) {
       return fail(node, "mixes cornerRoad and cornerLocal");
     }
-    outline.frame = local ? road::Object::Outline::Frame::LOCAL
-                          : road::Object::Outline::Frame::ROAD;
+    outline.frame = local ? road::RoadObject::Outline::Frame::LOCAL
+                          : road::RoadObject::Outline::Frame::ROAD;
     return outline;
   }
 
   auto read_object(pugi::xml_node node) const
-      -> std::expected<road::Object, lib::Status> {
-    road::Object object;
+      -> std::expected<road::RoadObject, lib::Status> {
+    road::RoadObject object;
     object.id = node.attribute("id").as_string();
     if (object.id.empty()) {
       return fail(node, "needs id");
@@ -322,7 +322,7 @@ class Parser final {
     pugi::xml_node outlines =
         node.child("outlines") ? node.child("outlines") : node;
     for (pugi::xml_node outline_node : outlines.children("outline")) {
-      RETURN_OR_ASSIGN(road::Object::Outline outline,
+      RETURN_OR_ASSIGN(road::RoadObject::Outline outline,
                        read_outline(outline_node));
       object.outlines.push_back(std::move(outline));
     }
@@ -520,7 +520,7 @@ class Parser final {
     }
     for (pugi::xml_node object_node :
          node.child("objects").children("object")) {
-      RETURN_OR_ASSIGN(road::Object object, read_object(object_node));
+      RETURN_OR_ASSIGN(road::RoadObject object, read_object(object_node));
       road.objects.push_back(std::move(object));
     }
     return road;

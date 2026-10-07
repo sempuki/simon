@@ -84,7 +84,7 @@ class RightOfWay final {
  private:
   friend auto build_right_of_way(const road::Map& network,
                                  const road::LaneGraph& graph,
-                                 const Control& control, double reach)
+                                 const Signals& signals, double reach)
       -> RightOfWay;
 
   std::vector<Conflict> conflicts_;
@@ -109,7 +109,7 @@ class RightOfWay final {
 // stop signs, by a left turn giving way to oncoming traffic, and by giving
 // way to traffic from the right. Approaches reach back `reach` meters.
 auto build_right_of_way(const road::Map& network, const road::LaneGraph& graph,
-                        const Control& control, double reach = 200.0)
+                        const Signals& signals, double reach = 200.0)
     -> RightOfWay;
 
 // How long a vehicle at `speed`, able to accelerate at `acceleration` up to

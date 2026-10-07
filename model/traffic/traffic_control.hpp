@@ -72,7 +72,7 @@ struct StopLine final {
 };
 
 // A network's signal groups and their stop lines.
-class Control final {
+class Signals final {
  public:
   auto groups() const -> std::span<const SignalGroup> { return groups_; }
 
@@ -84,7 +84,7 @@ class Control final {
       -> std::span<const StopLine>;
 
  private:
-  friend auto build_control(const road::Map& network) -> Control;
+  friend auto build_signals(const road::Map& network) -> Signals;
 
   std::vector<SignalGroup> groups_;
   std::vector<StopLine> stop_lines_;
@@ -96,7 +96,7 @@ class Control final {
 // stop line for each driving lane each controlled traffic light holds for:
 // the lanes its orientation runs on, those its validities name if it has any.
 // A light no controller lists stops no one.
-auto build_control(const road::Map& network) -> Control;
+auto build_signals(const road::Map& network) -> Signals;
 
 // How hard a driver will brake for a light: up to `yellow` to stop at a
 // yellow one, if it could stop at all at `kinematic`; and at a red one, up to

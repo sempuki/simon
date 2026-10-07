@@ -66,7 +66,7 @@ auto compute_potential_energy(std::span<const Source> sources, double softening)
 // mass, after Barnes and Hut. A body far from a cell takes the cell's pull as
 // that of one point of its mass at its center of mass, so a body's
 // acceleration costs about log N cells instead of N sources.
-class Tree final {
+class BarnesHutTree final {
  public:
   // Rebuilds the tree over `sources`: a cube around them, split into octants
   // until each cell holds one source, or several that cannot be told apart.

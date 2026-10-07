@@ -272,7 +272,7 @@ auto build_walking_graph(const Map& network, double corner_reach)
   for (std::uint32_t r = 0; r < network.roads.size(); ++r) {
     const Road& road = network.roads[r];
     for (std::uint32_t o = 0; o < road.objects.size(); ++o) {
-      const Object& object = road.objects[o];
+      const RoadObject& object = road.objects[o];
       if (object.type != "crosswalk") {
         continue;
       }

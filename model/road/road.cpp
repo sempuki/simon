@@ -271,12 +271,13 @@ auto compute_position(const Road& road, const PlanPoint& point, Length s,
 // A local corner turns by the object's heading about e_h, then pitch, then
 // roll, z-y'-x'' as OpenDRIVE orders them, from the road's axes at the
 // object's origin.
-auto compute_outline(const Road& road, const Object& object,
-                     const Object::Outline& outline) -> std::vector<Position> {
+auto compute_outline(const Road& road, const RoadObject& object,
+                     const RoadObject::Outline& outline)
+    -> std::vector<Position> {
   std::vector<Position> corners;
   corners.reserve(outline.corners.size());
-  if (outline.frame == Object::Outline::Frame::ROAD) {
-    for (const Object::Corner& corner : outline.corners) {
+  if (outline.frame == RoadObject::Outline::Frame::ROAD) {
+    for (const RoadObject::Corner& corner : outline.corners) {
       corners.push_back(compute_position(road, corner.first * meter,
                                          corner.second * meter,
                                          corner.up * meter));
@@ -295,7 +296,7 @@ auto compute_outline(const Road& road, const Object& object,
                                     object.t * meter, object.z_offset * meter)
                        .numerical_value_in(meter)
                        .eigen();
-  for (const Object::Corner& corner : outline.corners) {
+  for (const RoadObject::Corner& corner : outline.corners) {
     Vector3 local{corner.first, corner.second, corner.up};
     corners.push_back(QuantityVector{origin + basis * (turn * local)} * meter);
   }

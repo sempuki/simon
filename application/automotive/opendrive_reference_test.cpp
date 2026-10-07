@@ -59,20 +59,21 @@ auto find_signal(const Row& row) -> const road::Signal& {
   return *found;
 }
 
-auto find_object(const Row& row) -> const road::Object& {
+auto find_object(const Row& row) -> const road::RoadObject& {
   const road::Road& road = find_road(row);
-  auto found = std::ranges::find(road.objects, row.at("id"), &road::Object::id);
+  auto found =
+      std::ranges::find(road.objects, row.at("id"), &road::RoadObject::id);
   REQUIRE(found != road.objects.end());
   return *found;
 }
 
-auto orientation_word(road::Direction orientation) -> std::string {
+auto orientation_word(road::Orientation orientation) -> std::string {
   switch (orientation) {
-    case road::Direction::POSITIVE:
+    case road::Orientation::POSITIVE:
       return "+";
-    case road::Direction::NEGATIVE:
+    case road::Orientation::NEGATIVE:
       return "-";
-    case road::Direction::BOTH:
+    case road::Orientation::BOTH:
       return "none";
   }
   return "";
@@ -239,7 +240,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
     std::set<std::string> objects;
     double farthest = 0.0;
     for (const Row& row : load_rows("libopendrive_objects.csv")) {
-      const road::Object& object = find_object(row);
+      const road::RoadObject& object = find_object(row);
       CAPTURE(row.at("file"), row.at("road"), row.at("id"));
       objects.insert(row.at("file") + "," + row.at("id"));
       CHECK(object.type == row.at("type"));
@@ -256,7 +257,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
                       std::to_string(validity.to);
       }
       CHECK(validities == row.at("validities"));
-      const road::Object::Outline& outline =
+      const road::RoadObject::Outline& outline =
           object.outlines.at(static_cast<std::size_t>(number(row, "outline")));
       std::vector<Position> corners =
           road::compute_outline(find_road(row), object, outline);

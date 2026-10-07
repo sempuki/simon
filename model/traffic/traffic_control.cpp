@@ -27,8 +27,8 @@ auto along_lane(const road::Map& network, const road::LaneKey& lane, double s)
 // Whether `signal` holds for traffic in lane `id`.
 auto holds_for(const road::Signal& signal, int id) -> bool {
   bool direction =
-      signal.orientation == road::Direction::BOTH ||
-      (signal.orientation == road::Direction::POSITIVE) == (id < 0);
+      signal.orientation == road::Orientation::BOTH ||
+      (signal.orientation == road::Orientation::POSITIVE) == (id < 0);
   if (!direction) {
     return false;
   }
@@ -108,14 +108,14 @@ auto plan_in_turn(std::size_t groups, std::chrono::nanoseconds green,
   return plans;
 }
 
-auto Control::stop_lines_on(const road::LaneKey& lane) const
+auto Signals::stop_lines_on(const road::LaneKey& lane) const
     -> std::span<const StopLine> {
   auto [first, last] = lines_.range_of(numbering_.number_of(lane));
   return std::span{stop_lines_}.subspan(first, last - first);
 }
 
-auto build_control(const road::Map& network) -> Control {
-  Control control;
+auto build_signals(const road::Map& network) -> Signals {
+  Signals signals;
   std::map<std::string, std::uint32_t, std::less<>> group_of_signal;
   for (const road::SignalController& controller : network.controllers) {
     SignalGroup group{.controller = controller.id,
@@ -129,12 +129,12 @@ auto build_control(const road::Map& network) -> Control {
         break;
       }
     }
-    auto index = static_cast<std::uint32_t>(control.groups_.size());
+    auto index = static_cast<std::uint32_t>(signals.groups_.size());
     for (const road::SignalController::Control& controlled :
          controller.controls) {
       group_of_signal.emplace(controlled.signal, index);
     }
-    control.groups_.push_back(std::move(group));
+    signals.groups_.push_back(std::move(group));
   }
 
   for (std::uint32_t r = 0; r < network.roads.size(); ++r) {
@@ -154,7 +154,7 @@ auto build_control(const road::Map& network) -> Control {
             continue;
           }
           road::LaneKey key{.road = r, .section = k, .lane = lane.id};
-          control.stop_lines_.push_back(
+          signals.stop_lines_.push_back(
               StopLine{.lane = key,
                        .along = along_lane(network, key, signal.s),
                        .group = group->second});
@@ -162,16 +162,16 @@ auto build_control(const road::Map& network) -> Control {
       }
     }
   }
-  std::ranges::sort(control.stop_lines_,
+  std::ranges::sort(signals.stop_lines_,
                     [](const StopLine& a, const StopLine& b) {
                       return std::tie(a.lane, a.along, a.group) <
                              std::tie(b.lane, b.along, b.group);
                     });
-  control.numbering_ = road::LaneNumbering{network};
-  control.lines_ = road::LaneRanges{
-      control.numbering_, control.stop_lines_.size(),
-      [&](std::size_t i) { return control.stop_lines_[i].lane; }};
-  return control;
+  signals.numbering_ = road::LaneNumbering{network};
+  signals.lines_ = road::LaneRanges{
+      signals.numbering_, signals.stop_lines_.size(),
+      [&](std::size_t i) { return signals.stop_lines_[i].lane; }};
+  return signals;
 }
 
 // SUMO's MSCFModel_IDM::stopSpeed, which leaves the minimum gap out of the

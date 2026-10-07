@@ -140,7 +140,7 @@ TEST_CASE("OpenDrive") {
     CHECK(light.t == -5.0);
     CHECK(light.z_offset == 2.0);
     CHECK(light.dynamic);
-    CHECK(light.orientation == road::Direction::POSITIVE);
+    CHECK(light.orientation == road::Orientation::POSITIVE);
     CHECK(light.country == "DE");
     CHECK(light.type == "1000001");
     CHECK(light.subtype == "-1");
@@ -150,7 +150,7 @@ TEST_CASE("OpenDrive") {
     CHECK(light.validities[0].to == -1);
     const Signal& limit = road.signals[1];
     CHECK_FALSE(limit.dynamic);
-    CHECK(limit.orientation == road::Direction::NEGATIVE);
+    CHECK(limit.orientation == road::Orientation::NEGATIVE);
     CHECK(limit.value == 50.0);
     CHECK(limit.unit == "km/h");
     CHECK(limit.validities.empty());  // Every lane in its orientation.
@@ -161,15 +161,15 @@ TEST_CASE("OpenDrive") {
     REQUIRE(network);
     const Road& road = *network->find_road("7");
     REQUIRE(road.objects.size() == 1);
-    const road::Object& walk = road.objects[0];
+    const road::RoadObject& walk = road.objects[0];
     CHECK(walk.type == "crosswalk");
     CHECK(walk.s == 95.0);
     CHECK(walk.t == 0.5);
     CHECK(walk.heading == 0.1);
-    CHECK(walk.orientation == road::Direction::BOTH);
+    CHECK(walk.orientation == road::Orientation::BOTH);
     REQUIRE(walk.outlines.size() == 1);
-    const road::Object::Outline& outline = walk.outlines[0];
-    CHECK(outline.frame == road::Object::Outline::Frame::LOCAL);
+    const road::RoadObject::Outline& outline = walk.outlines[0];
+    CHECK(outline.frame == road::RoadObject::Outline::Frame::LOCAL);
     CHECK(outline.closed);
     REQUIRE(outline.corners.size() == 3);
     CHECK(outline.corners[1].first == 2.0);

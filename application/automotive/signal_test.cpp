@@ -33,7 +33,7 @@ struct Queue final {
     auto loaded = load_network(find_road_path("light.xodr"));
     REQUIRE(loaded);
     network = std::move(*loaded);
-    REQUIRE(network.control.stop_lines().size() == 1);
+    REQUIRE(network.signals.stop_lines().size() == 1);
     REQUIRE(World::set_up()
                 .numbered(1)
                 .holding<archetype::TacticalVehicle>(VEHICLES)
@@ -182,7 +182,7 @@ TEST_CASE("SignalAgainstSumo") {
                  .green = 15s}};
     REQUIRE(simulation.configure());
     const Network& network = simulation.network();
-    std::span<const traffic::StopLine> lines = network.control.stop_lines();
+    std::span<const traffic::StopLine> lines = network.signals.stop_lines();
     REQUIRE(lines.size() == 4);
     std::map<Entity, LaneState> before;
     std::map<Entity, std::uint32_t> committed;
@@ -195,7 +195,7 @@ TEST_CASE("SignalAgainstSumo") {
           [&](Entity owner, const Tactical& tactical) {
             committed[owner] = tactical.committed;
           });
-      std::vector<traffic::Aspect> aspects(network.control.groups().size());
+      std::vector<traffic::Aspect> aspects(network.signals.groups().size());
       simulation.world().store_of<SignalState>().for_each(
           [&](Entity, const SignalState& signal) {
             aspects[signal.group] = signal.aspect;
@@ -210,7 +210,7 @@ TEST_CASE("SignalAgainstSumo") {
                             ? along_lane(network, state.lane, state.s)
                             : find_lane_length(network, was.lane);
             for (const traffic::StopLine& line :
-                 network.control.stop_lines_on(was.lane)) {
+                 network.signals.stop_lines_on(was.lane)) {
               if (from < line.along && line.along <= to) {
                 ++crossings;
                 auto index = static_cast<std::uint32_t>(&line - lines.data());

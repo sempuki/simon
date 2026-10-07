@@ -42,7 +42,7 @@ struct Network final {
   road::Map map;
   road::LaneGraph graph;
   road::LaneGraph driving;  // The driving lanes' graph alone.
-  traffic::Control control;
+  traffic::Signals signals;
   traffic::RightOfWay rights;
   road::WalkingGraph walking;
   std::vector<std::uint32_t> walking_components;  // Each node's.

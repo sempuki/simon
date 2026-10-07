@@ -453,7 +453,7 @@ class TrafficViewer final {
   // never move.
   auto set_furniture(const Network& network) -> void {
     stop_lines_.clear();
-    for (const traffic::StopLine& line : network.control.stop_lines()) {
+    for (const traffic::StopLine& line : network.signals.stop_lines()) {
       const road::Road& road = network.map.roads[line.lane.road];
       const road::LaneSection& section = road.lane_sections[line.lane.section];
       Length s = find_s_along(network, line.lane, line.along);
@@ -469,7 +469,7 @@ class TrafficViewer final {
     crosswalks_.clear();
     for (const road::Crosswalk& crosswalk : network.walking.crosswalks()) {
       const road::Road& road = network.map.roads[crosswalk.road];
-      const road::Object& object = road.objects[crosswalk.object];
+      const road::RoadObject& object = road.objects[crosswalk.object];
       if (object.outlines.empty()) {
         continue;
       }
@@ -491,7 +491,7 @@ class TrafficViewer final {
       map_.draw_polygon(corners, zebra);
     }
     std::vector<traffic::Aspect> aspects(
-        session_->simulation().network().control.groups().size(),
+        session_->simulation().network().signals.groups().size(),
         traffic::Aspect::GREEN);
     world.store_of<SignalState>().for_each(
         [&](Entity, const SignalState& signal) {

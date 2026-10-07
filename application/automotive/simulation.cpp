@@ -75,15 +75,15 @@ auto load_network(const std::string& path)
   RETURN_OR_ASSIGN(road::Map roads, format::load_opendrive(path));
   road::LaneGraph graph = road::build_lane_graph(roads);
   road::LaneGraph driving = road::build_lane_graph(roads, "driving");
-  traffic::Control control = traffic::build_control(roads);
+  traffic::Signals signals = traffic::build_signals(roads);
   traffic::RightOfWay rights =
-      traffic::build_right_of_way(roads, graph, control);
+      traffic::build_right_of_way(roads, graph, signals);
   road::WalkingGraph walking = road::build_walking_graph(roads);
   std::vector<std::uint32_t> components = walking.find_components();
   // A crosswalk's light: one on a lane it crosses, within 15 m before it.
   std::vector<std::optional<std::uint32_t>> groups(walking.crosswalks().size());
   for (const road::CrosswalkZone& zone : walking.zones()) {
-    for (const traffic::StopLine& line : control.stop_lines_on(zone.lane)) {
+    for (const traffic::StopLine& line : signals.stop_lines_on(zone.lane)) {
       if (line.along <= zone.near && line.along >= zone.near - 15.0) {
         groups[zone.crosswalk] = line.group;
       }
@@ -92,7 +92,7 @@ auto load_network(const std::string& path)
   return Network{.map = std::move(roads),
                  .graph = std::move(graph),
                  .driving = std::move(driving),
-                 .control = std::move(control),
+                 .signals = std::move(signals),
                  .rights = std::move(rights),
                  .walking = std::move(walking),
                  .walking_components = std::move(components),
@@ -100,7 +100,7 @@ auto load_network(const std::string& path)
 }
 
 auto is_tactical(const Network& network) -> bool {
-  return !network.control.stop_lines().empty() ||
+  return !network.signals.stop_lines().empty() ||
          !network.rights.conflicts().empty() ||
          !network.walking.zones().empty();
 }
@@ -114,13 +114,13 @@ auto build_world(const Scenario& scenario, const Network& network,
       .holding<archetype::Vehicle>(tactical ? 0 : vehicles)
       .holding<archetype::TacticalVehicle>(tactical ? vehicles : 0)
       .holding<archetype::Pedestrian>(count(scenario.pedestrians))
-      .holding<archetype::SignalController>(network.control.groups().size())
+      .holding<archetype::SignalController>(network.signals.groups().size())
       .build(world);
 }
 
 auto plan_signals(const Scenario& scenario, const Network& network)
     -> std::vector<traffic::SignalPlan> {
-  std::span<const traffic::SignalGroup> groups = network.control.groups();
+  std::span<const traffic::SignalGroup> groups = network.signals.groups();
   std::vector<traffic::SignalPlan> plans(groups.size());
   // Each junction's groups in its order; a group in none, alone.
   std::map<std::string, std::vector<std::uint32_t>> turns;

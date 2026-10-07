@@ -154,8 +154,8 @@ auto has_yield_sign(const road::Map& network, const road::LaneKey& lane)
       network.roads[lane.road].signals, [&](const road::Signal& signal) {
         bool kind =
             !signal.dynamic && (signal.type == "205" || signal.type == "206");
-        bool direction = signal.orientation == road::Direction::BOTH ||
-                         (signal.orientation == road::Direction::POSITIVE) ==
+        bool direction = signal.orientation == road::Orientation::BOTH ||
+                         (signal.orientation == road::Orientation::POSITIVE) ==
                              (lane.lane < 0);
         bool valid = signal.validities.empty() ||
                      std::ranges::any_of(
@@ -167,9 +167,9 @@ auto has_yield_sign(const road::Map& network, const road::LaneKey& lane)
 }
 
 // The signal group of the first stop line on `lane`, if it has one.
-auto find_group(const Control& control, const road::LaneKey& lane)
+auto find_group(const Signals& signals, const road::LaneKey& lane)
     -> std::optional<std::uint32_t> {
-  std::span<const StopLine> lines = control.stop_lines_on(lane);
+  std::span<const StopLine> lines = signals.stop_lines_on(lane);
   if (lines.empty()) {
     return std::nullopt;
   }
@@ -255,7 +255,7 @@ auto RightOfWay::approaches_of(std::uint32_t index) const
 }
 
 auto build_right_of_way(const road::Map& network, const road::LaneGraph& graph,
-                        const Control& control, double reach) -> RightOfWay {
+                        const Signals& signals, double reach) -> RightOfWay {
   std::vector<road::LaneGraph::Edge> edges = graph.edges();
   std::map<road::LaneKey, std::vector<road::LaneKey>> predecessors;
   for (const road::LaneGraph::Edge& edge : edges) {
@@ -301,8 +301,8 @@ auto build_right_of_way(const road::Map& network, const road::LaneGraph& graph,
           right.merges_.emplace_back(a.lane, at->first);
           right.merges_.emplace_back(b.lane, at->second);
         }
-        std::optional<std::uint32_t> group_a = find_group(control, a.incoming);
-        std::optional<std::uint32_t> group_b = find_group(control, b.incoming);
+        std::optional<std::uint32_t> group_a = find_group(signals, a.incoming);
+        std::optional<std::uint32_t> group_b = find_group(signals, b.incoming);
         if (group_a && group_b && *group_a != *group_b) {
           for (bool a_keeps : {true, false}) {
             right.conflicts_.push_back(

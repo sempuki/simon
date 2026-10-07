@@ -57,7 +57,7 @@ auto find_octant(const Vector3& position, const Vector3& middle) -> int {
 
 }  // namespace
 
-auto Tree::build(std::span<const Source> sources) -> void {
+auto BarnesHutTree::build(std::span<const Source> sources) -> void {
   sources_.assign(sources.begin(), sources.end());
   scratch_.resize(sources_.size());
   cells_.clear();
@@ -79,9 +79,9 @@ auto Tree::build(std::span<const Source> sources) -> void {
 // Sorts the cell's sources by octant, stably, so the tree depends only on
 // the sources' order, and builds a child for each octant that has any. A
 // cell's mass and center of mass are its children's, or its sources'.
-auto Tree::build_cell(std::uint32_t cell, std::uint32_t begin,
-                      std::uint32_t end, const Vector3& corner, double width,
-                      int depth) -> void {
+auto BarnesHutTree::build_cell(std::uint32_t cell, std::uint32_t begin,
+                               std::uint32_t end, const Vector3& corner,
+                               double width, int depth) -> void {
   cells_[cell].width = width;
   if (end - begin == 1 || depth == MOST_DEPTH) {
     double mass = 0.0;
@@ -147,9 +147,10 @@ auto Tree::build_cell(std::uint32_t cell, std::uint32_t begin,
   cells_[cell].center_of_mass = mass > 0.0 ? Vector3{moment / mass} : middle;
 }
 
-auto Tree::compute_acceleration(std::uint32_t self, const Vector3& position,
-                                double opening_angle, double softening) const
-    -> Vector3 {
+auto BarnesHutTree::compute_acceleration(std::uint32_t self,
+                                         const Vector3& position,
+                                         double opening_angle,
+                                         double softening) const -> Vector3 {
   Vector3 acceleration = Vector3::Zero();
   if (cells_.empty()) return acceleration;
   double softening2 = softening * softening;

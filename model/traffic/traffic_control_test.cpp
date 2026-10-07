@@ -29,11 +29,12 @@ auto network_with_light() -> road::Map {
                                   .shape = road::LineGeometry{}}},
       .lane_sections = {road::LaneSection{.left = {lane(1), lane(2)},
                                           .right = {lane(-1), lane(-2)}}}};
-  road.signals.push_back(road::Signal{.id = "light",
-                                      .validities = {{.from = -1, .to = -1}},
-                                      .s = 90.0,
-                                      .orientation = road::Direction::POSITIVE,
-                                      .dynamic = true});
+  road.signals.push_back(
+      road::Signal{.id = "light",
+                   .validities = {{.from = -1, .to = -1}},
+                   .s = 90.0,
+                   .orientation = road::Orientation::POSITIVE,
+                   .dynamic = true});
   road.signals.push_back(road::Signal{.id = "sign", .s = 50.0});
   return road::Map{.roads = {road},
                    .junctions = {road::Junction{
@@ -44,7 +45,7 @@ auto network_with_light() -> road::Map {
 
 }  // namespace
 
-TEST_CASE("traffic::Control") {
+TEST_CASE("traffic::Signals") {
   SECTION("ShouldCycleThroughPhasesGivenPlan") {
     SignalPlan plan{.phases = {{.duration = 20s, .aspect = Aspect::GREEN},
                                {.duration = 3s, .aspect = Aspect::YELLOW},
@@ -84,28 +85,28 @@ TEST_CASE("traffic::Control") {
 
   SECTION("ShouldPutStopLinesOnLanesTheLightHoldsFor") {
     road::Map network = network_with_light();
-    Control control = build_control(network);
-    REQUIRE(control.groups().size() == 1);
-    CHECK(control.groups()[0].junction == "9");
-    CHECK(control.groups()[0].sequence == 3);
-    REQUIRE(control.stop_lines().size() == 1);  // Not -2, nor the sign.
-    const StopLine& line = control.stop_lines()[0];
+    Signals signals = build_signals(network);
+    REQUIRE(signals.groups().size() == 1);
+    CHECK(signals.groups()[0].junction == "9");
+    CHECK(signals.groups()[0].sequence == 3);
+    REQUIRE(signals.stop_lines().size() == 1);  // Not -2, nor the sign.
+    const StopLine& line = signals.stop_lines()[0];
     CHECK(line.lane == road::LaneKey{.road = 0, .section = 0, .lane = -1});
     CHECK(line.along == 90.0);
-    CHECK(control.stop_lines_on(line.lane).size() == 1);
-    CHECK(control.stop_lines_on({.lane = 1}).empty());
+    CHECK(signals.stop_lines_on(line.lane).size() == 1);
+    CHECK(signals.stop_lines_on({.lane = 1}).empty());
   }
 
   SECTION("ShouldPutStopLinesAgainstSGivenNegativeOrientation") {
     road::Map network = network_with_light();
     road::Signal& light = network.roads[0].signals[0];
-    light.orientation = road::Direction::NEGATIVE;
+    light.orientation = road::Orientation::NEGATIVE;
     light.validities.clear();
-    Control control = build_control(network);
-    REQUIRE(control.stop_lines().size() == 2);
-    CHECK(control.stop_lines()[0].lane.lane == 1);
-    CHECK(control.stop_lines()[0].along == 10.0);  // Measured against s.
-    CHECK(control.stop_lines()[1].lane.lane == 2);
+    Signals signals = build_signals(network);
+    REQUIRE(signals.stop_lines().size() == 2);
+    CHECK(signals.stop_lines()[0].lane.lane == 1);
+    CHECK(signals.stop_lines()[0].along == 10.0);  // Measured against s.
+    CHECK(signals.stop_lines()[1].lane.lane == 2);
   }
 
   SECTION("ShouldStopForLightsAsMovsimDrivers") {
