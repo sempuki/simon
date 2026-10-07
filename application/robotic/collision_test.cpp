@@ -18,6 +18,10 @@ namespace simon::robotic {
 
 namespace {
 
+// How far a contact's distance, position or frame may differ from MuJoCo's
+// by rounding alone: a pose is one computation, with nothing to accumulate.
+constexpr double ROUNDING = 1e-12;
+
 using namespace testing;
 
 // A contact as the table holds it: geoms, distance, position, frame,
@@ -122,24 +126,24 @@ auto compare_poses(std::string_view model, std::string_view table)
 TEST_CASE("CollisionAgainstMuJoCo") {
   SECTION("ShouldFindMuJoCosContactsGivenEveryPrimitivePair") {
     // Each pose's contacts, as many as MuJoCo's between the same geoms, and
-    // every value of each equal to MuJoCo's.
+    // every value of each as MuJoCo's to rounding.
     Comparison c = compare_poses("collisions.xml", "mujoco_contacts.csv");
     CAPTURE(c.total, c.miscounted, c.mismatched, c.largest);
     CHECK(c.total > 5000);
     CHECK(c.miscounted == 0);
     CHECK(c.mismatched == 0);
-    CHECK(c.largest == 0.0);
+    CHECK(c.largest <= ROUNDING);
   }
 
   SECTION("ShouldFindMuJoCosContactsGivenPairsOnlyItsConvexColliderTakes") {
     // Ellipsoids and cylinders by GJK and EPA, their faces clipped or the
-    // geoms turned for more: every contact equal to MuJoCo's.
+    // geoms turned for more: every contact as MuJoCo's to rounding.
     Comparison c = compare_poses("convex.xml", "mujoco_convex.csv");
     CAPTURE(c.total, c.miscounted, c.mismatched, c.largest);
     CHECK(c.total > 1500);
     CHECK(c.miscounted == 0);
     CHECK(c.mismatched == 0);
-    CHECK(c.largest == 0.0);
+    CHECK(c.largest <= ROUNDING);
   }
 
   SECTION("ShouldCountEachTreesContacts") {

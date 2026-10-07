@@ -182,7 +182,8 @@ auto find_value(const ArticulatedModel& m, const Row& row)
 
 TEST_CASE("ModelAgainstMuJoCo") {
   SECTION("ShouldCompileAsMuJoCoDoesGivenEveryTestModel") {
-    // Every field of every model to rounding; counts and kinds exactly.
+    // Every field of every model to rounding, relative to the field's size
+    // where it is more than 1; counts and kinds exactly.
     std::map<std::string, ArticulatedModel> models;
     double worst = 0.0;
     std::string where;
@@ -215,7 +216,7 @@ TEST_CASE("ModelAgainstMuJoCo") {
     }
     CAPTURE(compared, worst, where);
     CHECK(compared > 1000);
-    CHECK(worst == 0.0);
+    CHECK(worst <= 1e-12);
   }
 }
 

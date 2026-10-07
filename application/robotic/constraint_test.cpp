@@ -22,18 +22,17 @@ struct Case final {
   std::string name;
   std::string file;
   Scenario scenario;
-  double position = 0.0;  // Bounds on the largest difference.
-  double velocity = 0.0;
-  std::size_t steps = 1500;
 };
 
 }  // namespace
 
 TEST_CASE("ConstraintsAgainstMuJoCo") {
   SECTION("ShouldStepAsMuJoCoDoesGivenContactsLimitsAndFriction") {
-    // Newton's method to 1e-11 m and 1e-10 m/s of MuJoCo's at every step;
-    // PGS likewise where it converges, else to its tolerance, its sweeps
-    // ending a step apart by rounding: a stack over its first 0.4 s.
+    // Newton's method and PGS, pyramidal and elliptic cones, Euler and
+    // implicitfast: each step from MuJoCo's states, and every step of every
+    // run, as MuJoCo's to rounding. Where a contact starts exactly touching,
+    // or a stack's boxes slip, rounding alone moves MuJoCo's own run far,
+    // and the spread it measures says how far.
     std::map<std::string, Run, std::less<>> runs =
         load_runs("mujoco_constraints.csv");
     using Solver = model::Physics::Solver;
@@ -45,75 +44,65 @@ TEST_CASE("ConstraintsAgainstMuJoCo") {
     }
     // clang-format off
     std::vector<Case> cases{
-        {"rolling", "rolling.xml", {.qvel = {{0, 2.0}}}, 1e-11, 1e-10},
-        {"sliding", "sliding.xml", {.qvel = {{0, 2.0}, {7, 1.0}}}, 1e-12,
-         1e-12},
-        {"stack", "boxes.xml", {}, 1e-12, 1e-12},
+        {"rolling", "rolling.xml", {.qvel = {{0, 2.0}}}},
+        {"sliding", "sliding.xml", {.qvel = {{0, 2.0}, {7, 1.0}}}},
+        {"stack", "boxes.xml", {}},
         {"limits", "limits.xml",
          {.qpos = {{0, 0.3}, {5, -0.1}},
-          .qvel = {{0, 3.0}, {1, 2.0}, {2, -1.0}, {4, 1.5}, {5, 2.0}}},
-         1e-12, 1e-12},
+          .qvel = {{0, 3.0}, {1, 2.0}, {2, -1.0}, {4, 1.5}, {5, 2.0}}}},
         {"rolling by PGS", "rolling.xml",
-         {.qvel = {{0, 2.0}}, .solver = Solver::PGS}, 1e-12, 1e-12},
+         {.qvel = {{0, 2.0}}, .solver = Solver::PGS}},
         {"sliding by PGS", "sliding.xml",
-         {.qvel = {{0, 2.0}, {7, 1.0}}, .solver = Solver::PGS}, 1e-6, 1e-4},
-        {"stack by PGS", "boxes.xml", {.solver = Solver::PGS}, 1e-7, 1e-5,
-         200},
+         {.qvel = {{0, 2.0}, {7, 1.0}}, .solver = Solver::PGS}},
+        {"stack by PGS", "boxes.xml", {.solver = Solver::PGS}},
         {"limits by PGS", "limits.xml",
          {.qpos = {{0, 0.3}, {5, -0.1}},
           .qvel = {{0, 3.0}, {1, 2.0}, {2, -1.0}, {4, 1.5}, {5, 2.0}},
-          .solver = Solver::PGS}, 1e-12, 1e-12},
-        {"humanoid falling", "humanoid", {}, 1e-12, 1e-10, 400},
-        {"humanoid driven", "humanoid", {.control = driven}, 1e-12, 1e-10,
-         400},
-        {"humanoid falling by PGS", "humanoid", {.solver = Solver::PGS}, 1e-12,
-         1e-10, 400},
+          .solver = Solver::PGS}},
+        {"humanoid falling", "humanoid", {}},
+        {"humanoid driven", "humanoid", {.control = driven}},
+        {"humanoid falling by PGS", "humanoid", {.solver = Solver::PGS}},
         {"rolling elliptic", "rolling.xml",
-         {.qvel = {{0, 2.0}}, .cone = Cone::ELLIPTIC}, 1e-12, 1e-12},
+         {.qvel = {{0, 2.0}}, .cone = Cone::ELLIPTIC}},
         {"sliding elliptic", "sliding.xml",
-         {.qvel = {{0, 2.0}, {7, 1.0}}, .cone = Cone::ELLIPTIC}, 1e-6, 1e-4},
-        {"stack elliptic", "boxes.xml", {.cone = Cone::ELLIPTIC}, 1e-12,
-         1e-12},
+         {.qvel = {{0, 2.0}, {7, 1.0}}, .cone = Cone::ELLIPTIC}},
+        {"stack elliptic", "boxes.xml", {.cone = Cone::ELLIPTIC}},
         {"humanoid driven elliptic", "humanoid",
-         {.control = driven, .cone = Cone::ELLIPTIC}, 1e-12, 1e-10, 400},
+         {.control = driven, .cone = Cone::ELLIPTIC}},
         {"rolling elliptic by PGS", "rolling.xml",
-         {.qvel = {{0, 2.0}}, .solver = Solver::PGS, .cone = Cone::ELLIPTIC},
-         1e-12, 1e-12},
+         {.qvel = {{0, 2.0}}, .solver = Solver::PGS, .cone = Cone::ELLIPTIC}},
         {"sliding elliptic by PGS", "sliding.xml",
          {.qvel = {{0, 2.0}, {7, 1.0}},
           .solver = Solver::PGS,
-          .cone = Cone::ELLIPTIC},
-         1e-6, 1e-4},        {"arm implicitfast", "arm.xml",
+          .cone = Cone::ELLIPTIC}},        {"arm implicitfast", "arm.xml",
          {.qpos = {{0, 0.3}, {1, -0.5}},
           .control = {0.8, -1.2, 2.0, 0.5},
-          .integrator = Integrator::IMPLICIT_FAST},
-         1e-15, 1e-15},
+          .integrator = Integrator::IMPLICIT_FAST}},
         {"free body implicitfast", "free_body.xml",
          {.qvel = {{0, 0.3}, {1, -0.1}, {2, 0.2}, {3, 4.0}, {4, 0.5}, {5, 1.5}},
-          .integrator = Integrator::IMPLICIT_FAST},
-         1e-14, 1e-14},
+          .integrator = Integrator::IMPLICIT_FAST}},
         {"rolling implicitfast", "rolling.xml",
-         {.qvel = {{0, 2.0}}, .integrator = Integrator::IMPLICIT_FAST}, 1e-12,
-         1e-12},
+         {.qvel = {{0, 2.0}}, .integrator = Integrator::IMPLICIT_FAST}},
         {"humanoid driven implicitfast", "humanoid",
-         {.control = driven, .integrator = Integrator::IMPLICIT_FAST}, 1e-12,
-         1e-10, 400},
+         {.control = driven, .integrator = Integrator::IMPLICIT_FAST}},
     };
     // clang-format on
+    auto local = load_local_steps();
+    auto spreads = load_spreads();
+    auto solved = load_solved_runs();
     for (Case& c : cases) {
       CAPTURE(c.name);
       c.scenario.model = c.file == "humanoid" ? std::string{HUMANOID}
                                               : std::string{MODELS} + c.file;
+      check_local_steps(c.scenario, local.at(c.name));
       Simulation simulation{c.scenario};
       auto configured = simulation.configure();
       if (!configured) {
         FAIL(configured.error().message());
       }
-      auto [position, velocity] =
-          compare_run(InOut(simulation), runs.at(c.name), c.steps);
-      CAPTURE(position, velocity);
-      CHECK(position < c.position);
-      CHECK(velocity < c.velocity);
+      const Run& theirs = runs.at(c.name);
+      check_run(record_run(InOut(simulation), theirs.qpos.size() - 1), theirs,
+                spreads.at(c.name), &solved.at(c.name));
     }
   }
 }

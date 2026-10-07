@@ -29,5 +29,7 @@ constraints against
 | `make_scenes.py` | `bodies_N.xml` and `humanoids_N.xml`: N loose bodies falling and N/10 humanoids, into a directory it is given | `robotic_benchmark` and `mujoco_benchmark.py` |
 | `mujoco_benchmark.py` | Nothing: prints MuJoCo's time a step on one thread for a scene | |
 | `mujoco_contacts.py` | `mujoco_contacts.csv` and `mujoco_convex.csv`: `collisions.xml` and `convex.xml` at 400 random poses each, and every contact MuJoCo finds at each | `collision_test` |
+| `mujoco_checks.py` | `mujoco_local.csv`: one step from fresh data at 50 states of every run, each with how far rounding moves it and, with constraints, solved to convergence; `mujoco_spread.csv`: how far rounding moves each run by each step; `mujoco_solved.csv`: each run with constraints solved to convergence, every fifth step; `mujoco_converged.csv`: each run without constraints by Runge-Kutta 4 at a fiftieth of its timestep | `dynamics_test`, `control_test`, `constraint_test`, `menagerie_test` |
 
-`pip install mujoco numpy` (MuJoCo 3.14.0) runs the scripts.
+`pip install mujoco numpy` (MuJoCo 3.14.0) runs the scripts; `mujoco_checks.py`
+replays the cases of the others, so run it after any of them.

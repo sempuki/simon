@@ -64,12 +64,22 @@ cc_library(
     ],
 )
 
+# MuJoCo's local steps and the spread rounding gives its runs, which every
+# test against MuJoCo's runs reads (reference/mujoco_checks.py).
+CHECKS = [
+    "reference/mujoco_local.csv",
+    "reference/mujoco_spread.csv",
+]
+
 cc_test(
     name = "dynamics_test",
     size = "small",
     srcs = ["dynamics_test.cpp"],
     copts = COPTS,
-    data = glob(["models/*.xml"]) + ["reference/mujoco_dynamics.csv"],
+    data = glob(["models/*.xml"]) + CHECKS + [
+        "reference/mujoco_converged.csv",
+        "reference/mujoco_dynamics.csv",
+    ],
     deps = [
         ":testing",
         ":robotic_library",
@@ -82,7 +92,7 @@ cc_test(
     size = "small",
     srcs = ["control_test.cpp"],
     copts = COPTS,
-    data = glob(["models/*.xml"]) + [
+    data = glob(["models/*.xml"]) + CHECKS + [
         "reference/mujoco_control.csv",
         "reference/mujoco_feedback.csv",
     ],
@@ -114,8 +124,9 @@ cc_test(
     size = "small",
     srcs = ["constraint_test.cpp"],
     copts = COPTS,
-    data = glob(["models/*.xml"]) + [
+    data = glob(["models/*.xml"]) + CHECKS + [
         "reference/mujoco_constraints.csv",
+        "reference/mujoco_solved.csv",
         "//3rd_party:mujoco",
     ],
     deps = [
@@ -186,8 +197,9 @@ cc_test(
     size = "small",
     srcs = ["menagerie_test.cpp"],
     copts = COPTS,
-    data = [
+    data = CHECKS + [
         "reference/mujoco_menagerie.csv",
+        "reference/mujoco_solved.csv",
         "//3rd_party:menagerie",
     ],
     deps = [
