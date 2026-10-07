@@ -18,14 +18,14 @@
 // contact type and affinity, a bounding sphere test, then the primitive
 // colliders of engine_collision_primitive.c and engine_collision_box.c, or
 // for the pairs those leave out its general convex collider
-// (model/articulated_convex), and each contact's parameters mixed from its
+// (model/articulated/convex), and each contact's parameters mixed from its
 // two geoms.
 namespace simon::model {
 
 // A geom's pose in the world.
 struct GeomFrame final {
   Vector3 pos = Vector3::Zero();
-  Matrix3 mat{1, 0, 0, 0, 1, 0, 0, 0, 1};
+  Matrix3 mat = Matrix3::Identity();
 };
 
 // What a collider returns: penetration (negative) or separation, the point
@@ -43,7 +43,7 @@ struct PreContact final {
 struct Contact final {
   double dist = 0.0;
   Vector3 pos = Vector3::Zero();
-  Matrix3 frame{};
+  Matrix3 frame = Matrix3::Identity();
   std::array<std::uint32_t, 2> geom{};
   std::uint32_t dim = 3;
   double include_margin = 0.0;
@@ -66,10 +66,10 @@ auto compute_bounding_radius(const Geom& geom) -> double;
 // A body's frame and inertial frame in the world.
 struct BodyFrame final {
   Vector3 xpos = Vector3::Zero();
-  Quaternion4 xquat{1.0, 0.0, 0.0, 0.0};
-  Matrix3 xmat{1, 0, 0, 0, 1, 0, 0, 0, 1};
+  Quaternion xquat = Quaternion::Identity();
+  Matrix3 xmat = Matrix3::Identity();
   Vector3 xipos = Vector3::Zero();
-  Matrix3 ximat{1, 0, 0, 0, 1, 0, 0, 0, 1};
+  Matrix3 ximat = Matrix3::Identity();
 };
 
 // A geom's pose from its body's, or the frame it is snapped to

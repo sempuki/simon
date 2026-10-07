@@ -15,10 +15,10 @@
 #include <utility>
 #include <vector>
 
+#include "Eigen/Eigenvalues"
 #include "base/core.hpp"
 #include "format/text.hpp"
 #include "format/xml.hpp"
-#include "model/articulated/arithmetic.hpp"
 #include "pugixml.hpp"
 
 namespace simon::format {
@@ -34,12 +34,9 @@ using model::GeomType;
 using model::Joint;
 using model::JointType;
 using model::Physics;
-using model::Quaternion4;
 using model::SameFrame;
 using model::SoftConstraint;
 using model::Tendon;
-using model::articulated::cross;
-using model::articulated::transpose;
 
 using lib::InOut;
 using lib::Out;
@@ -47,212 +44,66 @@ using lib::Out;
 constexpr double PI = std::numbers::pi;
 constexpr double EPS = 1e-14;  // MuJoCo's mjEPS.
 
-//-- MuJoCo's compiler arithmetic ----------------------------------------------
+//-- The compiler's geometry ---------------------------------------------------
 //
-// Each in the order of operations of MuJoCo 3.14.0's user_util.cc and
-// user_objects.cc (Apache-2.0), so that a compiled model matches MuJoCo's to
-// rounding.
+// After MuJoCo 3.14.0's user_util.cc and user_objects.cc (Apache-2.0).
 
-// Normalizes `n` numbers, unless their norm is within EPS of 1; the norm
-// before, 0 if below EPS (mjuu_normvec).
-auto normalize(std::span<double> v) -> double {
-  double norm = 0.0;
-  for (double x : v) {
-    norm += x * x;
-  }
-  if (norm < EPS) {
+// Normalizes `v` and returns its length; one shorter than EPS has no
+// direction, and is left as it was with length 0 (mjuu_normvec).
+auto normalize(InOut<Vector3> v) -> double {
+  double length = v->norm();
+  if (length < EPS) {
     return 0.0;
   }
-  norm = std::sqrt(norm);
-  if (std::abs(norm - 1.0) > EPS) {
-    for (double& x : v) {
-      x /= norm;
-    }
-  }
-  return norm;
+  *v /= length;
+  return length;
 }
 
-// The rotation matrix of `q`, row by row (mjuu_quat2mat).
-auto convert_to_matrix(const Quaternion4& q) -> std::array<double, 9> {
-  if (q[0] == 1.0 && q[1] == 0.0 && q[2] == 0.0 && q[3] == 0.0) {
-    return {1, 0, 0, 0, 1, 0, 0, 0, 1};
-  }
-  double q00 = q[0] * q[0];
-  double q01 = q[0] * q[1];
-  double q02 = q[0] * q[2];
-  double q03 = q[0] * q[3];
-  double q11 = q[1] * q[1];
-  double q12 = q[1] * q[2];
-  double q13 = q[1] * q[3];
-  double q22 = q[2] * q[2];
-  double q23 = q[2] * q[3];
-  double q33 = q[3] * q[3];
-  return {q00 + q11 - q22 - q33, 2 * (q12 - q03),       2 * (q13 + q02),
-          2 * (q12 + q03),       q00 - q11 + q22 - q33, 2 * (q23 - q01),
-          2 * (q13 - q02),       2 * (q23 + q01),       q00 - q11 - q22 + q33};
+// The quaternion of the numbers `q`, w, x, y, z, normalized.
+auto to_quaternion(const std::array<double, 4>& q) -> Quaternion {
+  return Quaternion{q[0], q[1], q[2], q[3]}.normalized();
 }
 
-// a b, normalized (mjuu_mulquat).
-auto multiply(const Quaternion4& a, const Quaternion4& b) -> Quaternion4 {
-  Quaternion4 r{a[0] * b[0] - a[1] * b[1] - a[2] * b[2] - a[3] * b[3],
-                a[0] * b[1] + a[1] * b[0] + a[2] * b[3] - a[3] * b[2],
-                a[0] * b[2] - a[1] * b[3] + a[2] * b[0] + a[3] * b[1],
-                a[0] * b[3] + a[1] * b[2] - a[2] * b[1] + a[3] * b[0]};
-  normalize(r);
-  return r;
-}
-
-auto multiply_matrices(const std::array<double, 9>& a,
-                       const std::array<double, 9>& b)
-    -> std::array<double, 9> {
-  std::array<double, 9> r{};
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 3; ++j) {
-      r[3 * i + j] =
-          a[3 * i] * b[j] + a[3 * i + 1] * b[3 + j] + a[3 * i + 2] * b[6 + j];
-    }
-  }
-  return r;
-}
-
-// The minimal rotation from z to `v` (mjuu_z2quat).
-auto rotate_z_to(const Vector3& v) -> Quaternion4 {
-  Vector3 axis = cross({0.0, 0.0, 1.0}, v);
-  double s = normalize(axis);
-  if (s < 1e-10) {
-    axis = {1.0, 0.0, 0.0};
-  }
-  double angle = std::atan2(s, v[2]);
-  return {std::cos(angle / 2), axis[0] * std::sin(angle / 2),
-          axis[1] * std::sin(angle / 2), axis[2] * std::sin(angle / 2)};
+// The least rotation that takes z to `v`, a unit vector; about x when `v`
+// is -z (mjuu_z2quat).
+auto rotate_z_to(const Vector3& v) -> Quaternion {
+  Vector3 axis = Vector3::UnitZ().cross(v);
+  double s = axis.norm();
+  axis = s < 1e-10 ? Vector3::UnitX() : Vector3{axis / s};
+  return Quaternion{AngleAxis{std::atan2(s, v.z()), axis}};
 }
 
 // The rotation whose columns are `x`, `y` and `z` (mjuu_frame2quat).
 auto convert_frame(const Vector3& x, const Vector3& y, const Vector3& z)
-    -> Quaternion4 {
-  const Vector3* m[3] = {&x, &y, &z};  // m[column][row].
-  auto at = [&](int c, int r) { return (*m[c])[r]; };
-  Quaternion4 q{};
-  if (at(0, 0) + at(1, 1) + at(2, 2) > 0) {
-    q[0] = 0.5 * std::sqrt(1 + at(0, 0) + at(1, 1) + at(2, 2));
-    q[1] = 0.25 * (at(1, 2) - at(2, 1)) / q[0];
-    q[2] = 0.25 * (at(2, 0) - at(0, 2)) / q[0];
-    q[3] = 0.25 * (at(0, 1) - at(1, 0)) / q[0];
-  } else if (at(0, 0) > at(1, 1) && at(0, 0) > at(2, 2)) {
-    q[1] = 0.5 * std::sqrt(1 + at(0, 0) - at(1, 1) - at(2, 2));
-    q[0] = 0.25 * (at(1, 2) - at(2, 1)) / q[1];
-    q[2] = 0.25 * (at(1, 0) + at(0, 1)) / q[1];
-    q[3] = 0.25 * (at(2, 0) + at(0, 2)) / q[1];
-  } else if (at(1, 1) > at(2, 2)) {
-    q[2] = 0.5 * std::sqrt(1 - at(0, 0) + at(1, 1) - at(2, 2));
-    q[0] = 0.25 * (at(2, 0) - at(0, 2)) / q[2];
-    q[1] = 0.25 * (at(1, 0) + at(0, 1)) / q[2];
-    q[3] = 0.25 * (at(2, 1) + at(1, 2)) / q[2];
-  } else {
-    q[3] = 0.5 * std::sqrt(1 - at(0, 0) - at(1, 1) + at(2, 2));
-    q[0] = 0.25 * (at(0, 1) - at(1, 0)) / q[3];
-    q[1] = 0.25 * (at(2, 0) + at(0, 2)) / q[3];
-    q[2] = 0.25 * (at(2, 1) + at(1, 2)) / q[3];
-  }
-  normalize(q);
-  return q;
+    -> Quaternion {
+  Matrix3 m;
+  m << x, y, z;
+  return Quaternion{m}.normalized();
 }
 
-// A diagonal inertia on axes turned by `q`, as the six entries xx, yy, zz,
-// xy, xz, yz of the turned tensor (mjuu_globalinertia).
-auto turn_inertia(const Vector3& local, const Quaternion4& q)
-    -> std::array<double, 6> {
-  std::array<double, 9> m = convert_to_matrix(q);
-  std::array<double, 9> t{m[0] * local[0], m[3] * local[0], m[6] * local[0],
-                          m[1] * local[1], m[4] * local[1], m[7] * local[1],
-                          m[2] * local[2], m[5] * local[2], m[8] * local[2]};
-  return {m[0] * t[0] + m[1] * t[3] + m[2] * t[6],
-          m[3] * t[1] + m[4] * t[4] + m[5] * t[7],
-          m[6] * t[2] + m[7] * t[5] + m[8] * t[8],
-          m[0] * t[1] + m[1] * t[4] + m[2] * t[7],
-          m[0] * t[2] + m[1] * t[5] + m[2] * t[8],
-          m[3] * t[2] + m[4] * t[5] + m[5] * t[8]};
+// A body's inertia about its center of mass from a geom's: its principal
+// moments `local` on axes turned by `q`, and its `mass` at `offset` from the
+// center (mjuu_globalinertia, mjuu_offcenter).
+auto place_inertia(const Vector3& local, const Quaternion& q, double mass,
+                   const Vector3& offset) -> Matrix3 {
+  Matrix3 r = q.toRotationMatrix();
+  return r * local.asDiagonal() * r.transpose() +
+         mass * (offset.squaredNorm() * Matrix3::Identity() -
+                 offset * offset.transpose());
 }
 
-// The parallel axis term of `mass` at `d` (mjuu_offcenter).
-auto offset_inertia(double mass, const Vector3& d) -> std::array<double, 6> {
-  return {mass * (d[1] * d[1] + d[2] * d[2]),
-          mass * (d[0] * d[0] + d[2] * d[2]),
-          mass * (d[0] * d[0] + d[1] * d[1]),
-          -mass * d[0] * d[1],
-          -mass * d[0] * d[2],
-          -mass * d[1] * d[2]};
-}
-
-// The eigenvalues of a symmetric 3x3 matrix, largest first, and the
-// rotation to its eigenvectors, by Jacobi rotations kept as a quaternion
-// (mjuu_eig3; G. H. Golub and C. F. Van Loan, Matrix Computations, 4th
-// edition, 2013, section 8.5, the symmetric Schur decomposition).
-auto decompose_symmetric(const std::array<double, 9>& mat)
-    -> std::pair<Vector3, Quaternion4> {
-  constexpr double REL_TOL = 4e-15;
-  constexpr double EIG_EPS = 1e-12;
-  double scale = 0.0;
-  for (double x : mat) {
-    scale = std::max(scale, std::abs(x));
+// The principal moments of a symmetric inertia, largest first, and the
+// rotation to their axes (mjuu_fullInertia, mjuu_eig3). Each axis is
+// defined only up to its sign, so the rotation is one of several.
+auto find_principal_axes(const Matrix3& inertia)
+    -> std::pair<Vector3, Quaternion> {
+  Eigen::SelfAdjointEigenSolver<Matrix3> solver{inertia};
+  Vector3 moments = solver.eigenvalues().reverse();
+  Matrix3 axes = solver.eigenvectors().rowwise().reverse();
+  if (axes.determinant() < 0) {
+    axes.col(2) = -axes.col(2);
   }
-  double tol = scale * REL_TOL;
-  Quaternion4 quat{1.0, 0.0, 0.0, 0.0};
-  Vector3 eigval = Vector3::Zero();
-  for (int iteration = 0; iteration < 500; ++iteration) {
-    std::array<double, 9> v = convert_to_matrix(quat);
-    std::array<double, 9> d =
-        multiply_matrices(multiply_matrices(transpose(v), mat), v);
-    eigval = {d[0], d[4], d[8]};
-    int rk = 0;
-    int ck = 0;
-    int rotk = 0;
-    if (std::abs(d[1]) > std::abs(d[2]) && std::abs(d[1]) > std::abs(d[5])) {
-      rk = 0;
-      ck = 1;
-      rotk = 2;
-    } else if (std::abs(d[2]) > std::abs(d[5])) {
-      rk = 0;
-      ck = 2;
-      rotk = 1;
-    } else {
-      rk = 1;
-      ck = 2;
-      rotk = 0;
-    }
-    if (std::abs(d[3 * rk + ck]) <= tol) {
-      break;
-    }
-    double tau = (d[4 * ck] - d[4 * rk]) / (2 * d[3 * rk + ck]);
-    double t = tau >= 0 ? 1.0 / (tau + std::sqrt(1 + tau * tau))
-                        : -1.0 / (-tau + std::sqrt(1 + tau * tau));
-    double h = t / (1 + std::sqrt(1 + t * t));
-    Quaternion4 turn{1 / std::sqrt(1 + h * h), 0.0, 0.0, 0.0};
-    turn[rotk + 1] = (rotk == 1 ? h : -h) * turn[0];
-    quat = multiply(quat, turn);
-    normalize(quat);
-  }
-  // Largest first, by bubble sort over 0, 1, 0.
-  double eps = scale * EIG_EPS;
-  for (int j = 0; j < 3; ++j) {
-    int lead = j % 2;
-    if (eigval[lead] + eps < eigval[lead + 1]) {
-      std::swap(eigval[lead], eigval[lead + 1]);
-      Quaternion4 turn{0.707106781186548, 0.0, 0.0, 0.0};
-      turn[(lead + 2) % 3 + 1] = turn[0];
-      quat = multiply(quat, turn);
-      normalize(quat);
-    }
-  }
-  return {eigval, quat};
-}
-
-// A tensor given as xx, yy, zz, xy, xz, yz on its principal axes: the
-// moments and the rotation to them (mjuu_fullInertia).
-auto find_principal_axes(const std::array<double, 6>& full)
-    -> std::pair<Vector3, Quaternion4> {
-  return decompose_symmetric({full[0], full[3], full[4], full[3], full[1],
-                              full[5], full[4], full[5], full[2]});
+  return {moments, Quaternion{axes}.normalized()};
 }
 
 //-- Specifications, as read ---------------------------------------------------
@@ -262,7 +113,7 @@ struct Orientation final {
   enum class Kind : std::uint8_t { QUAT, AXIS_ANGLE, XY_AXES, Z_AXIS, EULER };
 
   Kind kind = Kind::QUAT;
-  Quaternion4 quat{1.0, 0.0, 0.0, 0.0};
+  std::array<double, 4> quat{1.0, 0.0, 0.0, 0.0};  // w, x, y, z.
   std::array<double, 4> axis_angle{};
   std::array<double, 6> xy_axes{};
   Vector3 z_axis = Vector3::Zero();
@@ -564,74 +415,59 @@ class Reader final {
 
   // The quaternion an orientation gives (ResolveOrientation).
   auto resolve(const Orientation& orientation) const
-      -> std::expected<Quaternion4, lib::Status> {
+      -> std::expected<Quaternion, lib::Status> {
+    double degree = compiler_.degree ? PI / 180.0 : 1.0;
     switch (orientation.kind) {
-      case Orientation::Kind::QUAT: {
-        Quaternion4 q = orientation.quat;
-        normalize(q);
-        return q;
-      }
+      case Orientation::Kind::QUAT:
+        return to_quaternion(orientation.quat);
       case Orientation::Kind::AXIS_ANGLE: {
-        std::array<double, 4> a = orientation.axis_angle;
-        if (compiler_.degree) {
-          a[3] = a[3] / 180.0 * PI;
-        }
-        if (normalize(std::span{a}.first(3)) < EPS) {
+        const std::array<double, 4>& a = orientation.axis_angle;
+        Vector3 axis{a[0], a[1], a[2]};
+        if (normalize(InOut(axis)) < EPS) {
           return fail("axisangle too small");
         }
-        double half = a[3] / 2;
-        return Quaternion4{std::cos(half), std::sin(half) * a[0],
-                           std::sin(half) * a[1], std::sin(half) * a[2]};
+        return Quaternion{AngleAxis{a[3] * degree, axis}};
       }
       case Orientation::Kind::XY_AXES: {
-        std::array<double, 6> xy = orientation.xy_axes;
-        if (normalize(std::span{xy}.first(3)) < EPS) {
+        const std::array<double, 6>& xy = orientation.xy_axes;
+        Vector3 x{xy[0], xy[1], xy[2]};
+        if (normalize(InOut(x)) < EPS) {
           return fail("xaxis too small");
         }
-        double d = xy[0] * xy[3] + xy[1] * xy[4] + xy[2] * xy[5];
-        xy[3] -= xy[0] * d;
-        xy[4] -= xy[1] * d;
-        xy[5] -= xy[2] * d;
-        if (normalize(std::span{xy}.subspan(3, 3)) < EPS) {
+        Vector3 y{xy[3], xy[4], xy[5]};
+        y -= x * x.dot(y);
+        if (normalize(InOut(y)) < EPS) {
           return fail("yaxis too small");
         }
-        Vector3 x{xy[0], xy[1], xy[2]};
-        Vector3 y{xy[3], xy[4], xy[5]};
-        Vector3 z = cross(x, y);
-        if (normalize(z) < EPS) {
+        Vector3 z = x.cross(y);
+        if (normalize(InOut(z)) < EPS) {
           return fail("cross(xaxis, yaxis) too small");
         }
         return convert_frame(x, y, z);
       }
       case Orientation::Kind::Z_AXIS: {
         Vector3 z = orientation.z_axis;
-        if (normalize(z) < EPS) {
+        if (normalize(InOut(z)) < EPS) {
           return fail("zaxis too small");
         }
         return rotate_z_to(z);
       }
       case Orientation::Kind::EULER: {
-        Vector3 euler = orientation.euler;
-        if (compiler_.degree) {
-          for (double& angle : euler) {
-            angle = angle / 180.0 * PI;
-          }
-        }
-        Quaternion4 q{1.0, 0.0, 0.0, 0.0};
+        Quaternion q = Quaternion::Identity();
         for (int i = 0; i < 3; ++i) {
           char axis = compiler_.euler_sequence[static_cast<std::size_t>(i)];
-          Quaternion4 turn{std::cos(euler[i] / 2), 0.0, 0.0, 0.0};
-          double s = std::sin(euler[i] / 2);
           char lower = static_cast<char>(std::tolower(axis));
-          turn[lower == 'x' ? 1 : lower == 'y' ? 2 : 3] = s;
+          Quaternion turn{AngleAxis{orientation.euler[i] * degree,
+                                    Vector3::Unit(lower == 'x'   ? 0
+                                                  : lower == 'y' ? 1
+                                                                 : 2)}};
           // Moving axes post-multiply, fixed axes pre-multiply.
-          q = std::islower(axis) != 0 ? multiply(q, turn) : multiply(turn, q);
+          q = std::islower(axis) != 0 ? q * turn : turn * q;
         }
-        normalize(q);
-        return q;
+        return q.normalized();
       }
     }
-    return Quaternion4{1.0, 0.0, 0.0, 0.0};
+    return Quaternion::Identity();
   }
 
   auto read_compiler(pugi::xml_node node) -> std::expected<void, lib::Status> {
@@ -1270,7 +1106,7 @@ class Reader final {
       }
       const std::array<double, 6>& f = *spec.fromto;
       Vector3 v{f[0] - f[3], f[1] - f[4], f[2] - f[5]};
-      geom.size[1] = normalize(v) / 2;
+      geom.size[1] = normalize(InOut(v)) / 2;
       if (geom.size[1] < EPS) {
         return fail("fromto points too close in geom");
       }
@@ -1379,17 +1215,13 @@ class Reader final {
       return std::abs(a[0] - b[0]) < EPS && std::abs(a[1] - b[1]) < EPS &&
              std::abs(a[2] - b[2]) < EPS;
     };
-    auto same_quat = [&](const Quaternion4& a, const Quaternion4& b) {
-      bool minus = true;
-      bool plus = true;
-      for (int k = 0; k < 4; ++k) {
-        minus = minus && std::abs(a[k] - b[k]) < EPS;
-        plus = plus && std::abs(a[k] + b[k]) < EPS;
-      }
-      return minus || plus;
+    // Either sign of a quaternion is the same turn.
+    auto same_quat = [&](const Quaternion& a, const Quaternion& b) {
+      return (a.coeffs() - b.coeffs()).cwiseAbs().maxCoeff() < EPS ||
+             (a.coeffs() + b.coeffs()).cwiseAbs().maxCoeff() < EPS;
     };
     const Vector3 zero = Vector3::Zero();
-    const Quaternion4 unit{1.0, 0.0, 0.0, 0.0};
+    const Quaternion unit = Quaternion::Identity();
     for (ArticulatedBody& body : model->bodies) {
       body.inertial_frame = same_pos(body.inertial_pos, zero) &&
                                     same_quat(body.inertial_quat, unit)
@@ -1446,21 +1278,19 @@ class Reader final {
       body.inertial_pos = inertial.pos;
       body.mass = inertial.mass;
       body.inertia = inertial.diagonal;
-      Quaternion4 quat = inertial.orientation.quat;
-      normalize(quat);
+      Quaternion quat = to_quaternion(inertial.orientation.quat);
       if (inertial.full) {
         if (inertial.orientation.kind != Orientation::Kind::QUAT) {
           return fail(
               "fullinertia and inertial orientation cannot both be specified");
         }
-        std::array<double, 9> m = convert_to_matrix(quat);
+        Matrix3 m = quat.toRotationMatrix();
         const std::array<double, 6>& f = *inertial.full;
-        std::array<double, 9> full{f[0], f[3], f[4], f[3], f[1],
-                                   f[5], f[4], f[5], f[2]};
-        std::array<double, 9> turned =
-            multiply_matrices(multiply_matrices(m, full), transpose(m));
-        auto [moments, axes] = find_principal_axes(
-            {turned[0], turned[4], turned[8], turned[1], turned[2], turned[5]});
+        Matrix3 full;
+        full << f[0], f[3], f[4],  //
+            f[3], f[1], f[5],      //
+            f[4], f[5], f[2];
+        auto [moments, axes] = find_principal_axes(m * full * m.transpose());
         if (moments[2] < EPS) {
           return fail("inertia must have positive eigenvalues");
         }
@@ -1506,27 +1336,17 @@ class Reader final {
         for (std::size_t i : massive) {
           const auto& [geom, mass] = geoms[i];
           total += mass;
-          center[0] += mass * geom.pos[0];
-          center[1] += mass * geom.pos[1];
-          center[2] += mass * geom.pos[2];
+          center += mass * geom.pos;
         }
         if (total < EPS) {
           return fail("body mass is too small, cannot compute center of mass");
         }
-        body.inertial_pos = {center[0] / total, center[1] / total,
-                             center[2] / total};
-        std::array<double, 6> tensor{};
+        body.inertial_pos = center / total;
+        Matrix3 tensor = Matrix3::Zero();
         for (std::size_t i : massive) {
           const auto& [geom, mass] = geoms[i];
-          Vector3 d{geom.pos[0] - body.inertial_pos[0],
-                    geom.pos[1] - body.inertial_pos[1],
-                    geom.pos[2] - body.inertial_pos[2]};
-          std::array<double, 6> own =
-              turn_inertia(compute_inertia(geom, mass), geom.quat);
-          std::array<double, 6> shift = offset_inertia(mass, d);
-          for (std::size_t j = 0; j < 6; ++j) {
-            tensor[j] = tensor[j] + own[j] + shift[j];
-          }
+          tensor += place_inertia(compute_inertia(geom, mass), geom.quat, mass,
+                                  geom.pos - body.inertial_pos);
         }
         auto [moments, axes] = find_principal_axes(tensor);
         if (moments[2] < EPS) {
@@ -1606,7 +1426,7 @@ class Reader final {
       if (joint.type == JointType::FREE || joint.type == JointType::BALL) {
         joint.axis = {0.0, 0.0, 1.0};
       }
-      if (normalize(joint.axis) < EPS) {
+      if (normalize(InOut(joint.axis)) < EPS) {
         return fail("axis too small in joint " + joint.name);
       }
       if (joint.type == JointType::FREE) {
@@ -1625,7 +1445,8 @@ class Reader final {
           for (double x : body.pos) {
             model->qpos0.push_back(x);
           }
-          for (double x : body.quat) {
+          for (double x :
+               {body.quat.w(), body.quat.x(), body.quat.y(), body.quat.z()}) {
             model->qpos0.push_back(x);
           }
           for (std::size_t k = model->qpos0.size() - 7; k < model->qpos0.size();

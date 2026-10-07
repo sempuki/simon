@@ -8,13 +8,13 @@
 #include <array>
 #include <cfloat>
 #include <cmath>
+#include <numbers>
 #include <optional>
 #include <span>
 #include <utility>
 #include <vector>
 
 #include "core/vocabulary.hpp"
-#include "model/articulated/arithmetic.hpp"
 
 // A port of MuJoCo 3.14.0's native convex collision, engine_collision_gjk.c
 // and engine_collision_convex.c (Apache-2.0), for primitives, in its order
@@ -24,20 +24,9 @@ namespace simon::model {
 
 namespace {
 
-using articulated::add;
-using articulated::add_scaled;
-using articulated::add_to_scaled;
-using articulated::cross;
-using articulated::dot;
-using articulated::multiply;
-using articulated::multiply_transposed;
-using articulated::norm;
-using articulated::normalize3;
-using articulated::scale;
-using articulated::subtract;
-using articulated::transpose;
+using articulated::MINVAL;
+using articulated::normalize;
 
-constexpr double MINVAL = 1e-15;             // mjMINVAL.
 constexpr double MINVAL2 = MINVAL * MINVAL;  // mjMINVAL2.
 constexpr double MAXVAL = 1e10;              // mjMAXVAL.
 constexpr double MAXVAL2 = MAXVAL * MAXVAL;  // mjMAXVAL2.
@@ -62,15 +51,13 @@ using Polygon = std::array<Vector3, MAX_POLYGON>;
 // The determinant of the matrix with rows `a`, `b` and `c` (det3).
 inline auto compute_determinant(const Vector3& a, const Vector3& b,
                                 const Vector3& c) -> double {
-  return a[0] * (b[1] * c[2] - b[2] * c[1]) +
-         a[1] * (b[2] * c[0] - b[0] * c[2]) +
-         a[2] * (b[0] * c[1] - b[1] * c[0]);
+  return a.dot(b.cross(c));
 }
 
 // `local` turned by `mat` and moved to `pos` (localToGlobal, globalcoord).
 inline auto transform(const Matrix3& mat, const Vector3& pos,
                       const Vector3& local) -> Vector3 {
-  return add(multiply(mat, local), pos);
+  return mat * local + pos;
 }
 
 //-- Objects and their support functions (engine_collision_convex.c) ----------
@@ -83,7 +70,7 @@ using Support = auto (*)(InOut<Object> object, const Vector3& dir) -> Vector3;
 struct Object final {
   Vector3 size = Vector3::Zero();
   Vector3 pos = Vector3::Zero();
-  Matrix3 mat{};
+  Matrix3 mat = Matrix3::Identity();
   double margin = 0.0;
   Support support = nullptr;
   GeomType type = GeomType::SPHERE;
@@ -97,28 +84,23 @@ auto support_point(InOut<Object> object, const Vector3& /*dir*/) -> Vector3 {
 
 // mjc_sphereSupport.
 auto support_sphere(InOut<Object> object, const Vector3& dir) -> Vector3 {
-  double radius = object->size[0];
-  return {radius * dir[0] + object->pos[0], radius * dir[1] + object->pos[1],
-          radius * dir[2] + object->pos[2]};
+  return object->size[0] * dir + object->pos;
 }
 
 // A capsule's segment (mjc_lineSupport).
 auto support_line(InOut<Object> object, const Vector3& dir) -> Vector3 {
-  const Matrix3& mat = object->mat;
+  Vector3 axis = object->mat.col(2);
   double length = object->size[1];
-  double along = mat[2] * dir[0] + mat[5] * dir[1] + mat[8] * dir[2];
-  double scl = along >= 0 ? length : -length;
-  return {mat[2] * scl + object->pos[0], mat[5] * scl + object->pos[1],
-          mat[8] * scl + object->pos[2]};
+  double scl = axis.dot(dir) >= 0 ? length : -length;
+  return axis * scl + object->pos;
 }
 
 // mjc_capsuleSupport.
 auto support_capsule(InOut<Object> object, const Vector3& dir) -> Vector3 {
   double radius = object->size[0];
   double length = object->size[1];
-  Vector3 local_dir = multiply_transposed(object->mat, dir);
-  Vector3 local_supp{local_dir[0] * radius, local_dir[1] * radius,
-                     local_dir[2] * radius};
+  Vector3 local_dir = object->mat.transpose() * dir;
+  Vector3 local_supp = local_dir * radius;
   local_supp[2] += (local_dir[2] >= 0 ? length : -length);
   return transform(object->mat, object->pos, local_supp);
 }
@@ -127,27 +109,20 @@ auto support_capsule(InOut<Object> object, const Vector3& dir) -> Vector3 {
 auto support_ellipsoid(InOut<Object> object, const Vector3& dir) -> Vector3 {
   const Matrix3& mat = object->mat;
   const Vector3& size = object->size;
-  Vector3 local_dir = multiply_transposed(mat, dir);
-  Vector3 local_supp{local_dir[0] * size[0], local_dir[1] * size[1],
-                     local_dir[2] * size[2]};
-  double norm2 = local_supp[0] * local_supp[0] + local_supp[1] * local_supp[1] +
-                 local_supp[2] * local_supp[2];
+  Vector3 local_dir = mat.transpose() * dir;
+  Vector3 local_supp = local_dir.cwiseProduct(size);
+  double norm2 = local_supp.squaredNorm();
   if (norm2 < MINVAL2) {
-    return {mat[0] * size[0] + object->pos[0],
-            mat[3] * size[0] + object->pos[1],
-            mat[6] * size[0] + object->pos[2]};
+    return mat.col(0) * size[0] + object->pos;
   }
-  double norm_inv = 1 / std::sqrt(norm2);
-  local_supp[0] *= norm_inv * size[0];
-  local_supp[1] *= norm_inv * size[1];
-  local_supp[2] *= norm_inv * size[2];
+  local_supp = local_supp.cwiseProduct(size) / std::sqrt(norm2);
   return transform(mat, object->pos, local_supp);
 }
 
 // mjc_cylinderSupport.
 auto support_cylinder(InOut<Object> object, const Vector3& dir) -> Vector3 {
   const Vector3& size = object->size;
-  Vector3 local_dir = multiply_transposed(object->mat, dir);
+  Vector3 local_dir = object->mat.transpose() * dir;
   double n2 = local_dir[0] * local_dir[0] + local_dir[1] * local_dir[1];
   double scl = n2 >= MINVAL2 ? size[0] / std::sqrt(n2) : 0;
   Vector3 local_supp{scl * local_dir[0], scl * local_dir[1],
@@ -159,7 +134,7 @@ auto support_cylinder(InOut<Object> object, const Vector3& dir) -> Vector3 {
 // mjc_boxSupport.
 auto support_box(InOut<Object> object, const Vector3& dir) -> Vector3 {
   const Vector3& size = object->size;
-  Vector3 local_dir = multiply_transposed(object->mat, dir);
+  Vector3 local_dir = object->mat.transpose() * dir;
   Vector3 local_supp{local_dir[0] >= 0 ? size[0] : -size[0],
                      local_dir[1] >= 0 ? size[1] : -size[1],
                      local_dir[2] >= 0 ? size[2] : -size[2]};
@@ -291,8 +266,8 @@ auto are_discrete(const Object& first, const Object& second) -> bool {
 // The sum of the first `n` points weighted by `coef` (lincomb).
 inline auto combine_points(std::span<const double> coef, int n,
                            const Vector3& v1, const Vector3& v2,
-                           const Vector3& v3 = {}, const Vector3& v4 = {})
-    -> Vector3 {
+                           const Vector3& v3 = Vector3::Zero(),
+                           const Vector3& v4 = Vector3::Zero()) -> Vector3 {
   switch (n) {
     case 1:
       return {coef[0] * v1[0], coef[0] * v1[1], coef[0] * v1[2]};
@@ -319,39 +294,39 @@ inline auto combine_points(std::span<const double> coef, int n,
 // they lie on a line (projectOriginPlane).
 auto project_origin_plane(const Vector3& v1, const Vector3& v2,
                           const Vector3& v3) -> std::optional<Vector3> {
-  Vector3 diff21 = subtract(v2, v1);
-  Vector3 diff31 = subtract(v3, v1);
-  Vector3 diff32 = subtract(v3, v2);
-  Vector3 n = cross(diff32, diff21);
-  double nv = dot(n, v2);
-  double nn = dot(n, n);
+  Vector3 diff21 = v2 - v1;
+  Vector3 diff31 = v3 - v1;
+  Vector3 diff32 = v3 - v2;
+  Vector3 n = diff32.cross(diff21);
+  double nv = n.dot(v2);
+  double nn = n.dot(n);
   if (nn == 0) {
     return std::nullopt;
   }
   if (nv != 0 && nn > MINVAL) {
-    return scale(n, nv / nn);
+    return n * (nv / nn);
   }
-  n = cross(diff21, diff31);
-  nv = dot(n, v1);
-  nn = dot(n, n);
+  n = diff21.cross(diff31);
+  nv = n.dot(v1);
+  nn = n.dot(n);
   if (nn == 0) {
     return std::nullopt;
   }
   if (nv != 0 && nn > MINVAL) {
-    return scale(n, nv / nn);
+    return n * (nv / nn);
   }
-  n = cross(diff31, diff32);
-  nv = dot(n, v3);
-  nn = dot(n, n);
-  return scale(n, nv / nn);
+  n = diff31.cross(diff32);
+  nv = n.dot(v3);
+  nn = n.dot(n);
+  return n * (nv / nn);
 }
 
 // The origin projected onto the line through two points (projectOriginLine).
 inline auto project_origin_line(const Vector3& v1, const Vector3& v2)
     -> Vector3 {
-  Vector3 diff = subtract(v2, v1);
-  double scl = -(dot(v2, diff) / dot(diff, diff));
-  return add_scaled(v2, diff, scl);
+  Vector3 diff = v2 - v1;
+  double scl = -(v2.dot(diff) / diff.dot(diff));
+  return v2 + scl * diff;
 }
 
 // 1 if both are positive, -1 if both are negative, else 0 (sameSign2).
@@ -446,14 +421,14 @@ auto weigh_triangle(const Vector3& s1, const Vector3& s2, const Vector3& s3)
   if (!comp1) {
     std::array<double, 2> l = weigh_segment(s2, s3);
     Vector3 v = combine_points(l, 2, s2, s3);
-    double d = dot(v, v);
+    double d = v.dot(v);
     lambda = {0, l[0], l[1]};
     dmin = d;
   }
   if (!comp2) {
     std::array<double, 2> l = weigh_segment(s1, s3);
     Vector3 v = combine_points(l, 2, s1, s3);
-    double d = dot(v, v);
+    double d = v.dot(v);
     if (d < dmin) {
       lambda = {l[0], 0, l[1]};
       dmin = d;
@@ -462,7 +437,7 @@ auto weigh_triangle(const Vector3& s1, const Vector3& s2, const Vector3& s3)
   if (!comp3) {
     std::array<double, 2> l = weigh_segment(s1, s2);
     Vector3 v = combine_points(l, 2, s1, s2);
-    double d = dot(v, v);
+    double d = v.dot(v);
     if (d < dmin) {
       lambda = {l[0], l[1], 0};
     }
@@ -493,14 +468,14 @@ auto weigh_tetrahedron(const Vector3& s1, const Vector3& s2, const Vector3& s3,
   if (!comp1) {
     std::array<double, 3> l = weigh_triangle(s2, s3, s4);
     Vector3 x = combine_points(l, 3, s2, s3, s4);
-    double d = dot(x, x);
+    double d = x.dot(x);
     lambda = {0, l[0], l[1], l[2]};
     dmin = d;
   }
   if (!comp2) {
     std::array<double, 3> l = weigh_triangle(s1, s3, s4);
     Vector3 x = combine_points(l, 3, s1, s3, s4);
-    double d = dot(x, x);
+    double d = x.dot(x);
     if (d < dmin) {
       lambda = {l[0], 0, l[1], l[2]};
       dmin = d;
@@ -509,7 +484,7 @@ auto weigh_tetrahedron(const Vector3& s1, const Vector3& s2, const Vector3& s3,
   if (!comp3) {
     std::array<double, 3> l = weigh_triangle(s1, s2, s4);
     Vector3 x = combine_points(l, 3, s1, s2, s4);
-    double d = dot(x, x);
+    double d = x.dot(x);
     if (d < dmin) {
       lambda = {l[0], l[1], 0, l[2]};
       dmin = d;
@@ -518,7 +493,7 @@ auto weigh_tetrahedron(const Vector3& s1, const Vector3& s2, const Vector3& s3,
   if (!comp4) {
     std::array<double, 3> l = weigh_triangle(s1, s2, s3);
     Vector3 x = combine_points(l, 3, s1, s2, s3);
-    double d = dot(x, x);
+    double d = x.dot(x);
     if (d < dmin) {
       lambda = {l[0], l[1], l[2], 0};
     }
@@ -556,13 +531,13 @@ inline auto find_support(InOut<Object> first, InOut<Object> second,
   Vertex v;
   v.first = first->support(first, dir);
   if (first->margin > 0) {
-    add_to_scaled(InOut(v.first), dir, 0.5 * first->margin);
+    v.first += (0.5 * first->margin) * dir;
   }
   v.second = second->support(second, dir_neg);
   if (second->margin > 0) {
-    add_to_scaled(InOut(v.second), dir_neg, 0.5 * second->margin);
+    v.second += (0.5 * second->margin) * dir_neg;
   }
-  v.point = subtract(v.first, v.second);
+  v.point = v.first - v.second;
   v.first_index = first->vertex_index;
   v.second_index = second->vertex_index;
   return v;
@@ -571,8 +546,8 @@ inline auto find_support(InOut<Object> first, InOut<Object> second,
 // The support toward the origin from `x_k` (gjkSupport).
 inline auto find_gjk_support(InOut<Object> first, InOut<Object> second,
                              const Vector3& x_k, double x_norm) -> Vertex {
-  Vector3 dir_neg = scale(x_k, 1 / x_norm);
-  Vector3 dir = scale(dir_neg, -1);
+  Vector3 dir_neg = x_k * (1 / x_norm);
+  Vector3 dir = -dir_neg;
   return find_support(first, second, dir, dir_neg);
 }
 
@@ -585,7 +560,7 @@ auto append_epa_support(InOut<Polytope> polytope, InOut<Object> first,
   Vector3 dir_neg{-1, 0, 0};
   if (dnorm > MINVAL) {
     dir = {d[0] / dnorm, d[1] / dnorm, d[2] / dnorm};
-    dir_neg = scale(dir, -1);
+    dir_neg = -dir;
   }
   int n = polytope->vertex_count++;
   polytope->vertices[n] = find_support(first, second, dir, dir_neg);
@@ -597,13 +572,13 @@ auto append_epa_support(InOut<Polytope> polytope, InOut<Object> first,
 inline auto compute_signed_distance(Out<Vector3> normal, const Vertex& v1,
                                     const Vertex& v2, const Vertex& v3)
     -> double {
-  Vector3 diff1 = subtract(v3.point, v1.point);
-  Vector3 diff2 = subtract(v2.point, v1.point);
-  *normal = cross(diff1, diff2);
-  double norm2 = dot(*normal, *normal);
+  Vector3 diff1 = v3.point - v1.point;
+  Vector3 diff2 = v2.point - v1.point;
+  *normal = diff1.cross(diff2);
+  double norm2 = (*normal).dot(*normal);
   if (norm2 > MINVAL2 && norm2 < MAXVAL2) {
-    *normal = scale(*normal, 1 / std::sqrt(norm2));
-    return dot(*normal, v1.point);
+    *normal = (*normal) * (1 / std::sqrt(norm2));
+    return (*normal).dot(v1.point);
   }
   return MAX_LIMIT;
 }
@@ -645,7 +620,7 @@ auto intersect_gjk(InOut<CcdStatus> status, InOut<Object> first,
     const Vector3& dir = normals[index];
     simplex[s[index]] =
         find_support(first, second, dir, {-dir[0], -dir[1], -dir[2]});
-    if (dot(dir, simplex[s[index]].point) < 0) {
+    if (dir.dot(simplex[s[index]].point) < 0) {
       status->simplex_size = 0;
       status->gjk_iterations = k;
       return 0;
@@ -676,8 +651,8 @@ auto run_gjk(InOut<CcdStatus> status, InOut<Object> first, InOut<Object> second)
   bool discrete = are_discrete(*first, *second);
   double epsilon = discrete ? 0 : 0.5 * tol2;
   double min_norm = discrete ? MINVAL : status->tolerance;
-  Vector3 x_k = subtract(x1_k, x2_k);
-  double x_norm = norm(x_k);
+  Vector3 x_k = x1_k - x2_k;
+  double x_norm = x_k.norm();
   double x_norm_prev = 0;
 
   for (; k < kmax; k++) {
@@ -686,10 +661,10 @@ auto run_gjk(InOut<CcdStatus> status, InOut<Object> first, InOut<Object> second)
     }
     simplex[n] = find_gjk_support(first, second, x_k, x_norm);
     const Vector3& s_k = simplex[n].point;
-    if (dot(x_k, subtract(x_k, s_k)) < epsilon) {
+    if (x_k.dot(x_k - s_k) < epsilon) {
       break;
     }
-    double lower = dot(x_k, s_k);
+    double lower = x_k.dot(s_k);
     if (!get_dist) {
       if (lower > 0) {
         status->separated = true;
@@ -741,7 +716,7 @@ auto run_gjk(InOut<CcdStatus> status, InOut<Object> first, InOut<Object> second)
     x_k = combine_points(lambda, n, simplex[0].point, simplex[1].point,
                          simplex[2].point, simplex[3].point);
     x_norm_prev = x_norm;
-    x_norm = norm(x_k);
+    x_norm = x_k.norm();
     if (n == 4) {
       break;
     }
@@ -753,7 +728,7 @@ auto run_gjk(InOut<CcdStatus> status, InOut<Object> first, InOut<Object> second)
                           simplex[2].second, simplex[3].second);
   }
   Vertex tmp = find_gjk_support(first, second, x_k, x_norm);
-  if (dot(x_k, tmp.point) > 0) {
+  if (x_k.dot(tmp.point) > 0) {
     status->separated = true;
   }
   status->witness_count = 1;
@@ -778,13 +753,13 @@ inline auto replace_simplex(InOut<Polytope> polytope, InOut<CcdStatus> status,
 // other three (sameSide).
 auto lie_on_same_side(const Vector3& p0, const Vector3& p1, const Vector3& p2,
                       const Vector3& p3) -> bool {
-  Vector3 diff1 = subtract(p1, p0);
-  Vector3 diff2 = subtract(p2, p0);
-  Vector3 n = cross(diff1, diff2);
-  Vector3 diff3 = subtract(p3, p0);
-  double dot1 = dot(n, diff3);
-  Vector3 diff4 = scale(p0, -1);
-  double dot2 = dot(n, diff4);
+  Vector3 diff1 = p1 - p0;
+  Vector3 diff2 = p2 - p0;
+  Vector3 n = diff1.cross(diff2);
+  Vector3 diff3 = p3 - p0;
+  double dot1 = n.dot(diff3);
+  Vector3 diff4 = -p0;
+  double dot2 = n.dot(diff4);
   return (dot1 > 0 && dot2 > 0) || (dot1 < 0 && dot2 < 0);
 }
 
@@ -797,17 +772,8 @@ auto contains_origin(const Vector3& p0, const Vector3& p1, const Vector3& p2,
 
 // A turn by a third of a circle about `axis` (rotmat).
 auto compute_third_turn(const Vector3& axis) -> Matrix3 {
-  double n = norm(axis);
-  double u1 = axis[0] / n;
-  double u2 = axis[1] / n;
-  double u3 = axis[2] / n;
-  const double s = 0.86602540378;
-  const double c = -0.5;
-  return {c + u1 * u1 * (1 - c),      u1 * u2 * (1 - c) - u3 * s,
-          u1 * u3 * (1 - c) + u2 * s, u2 * u1 * (1 - c) + u3 * s,
-          c + u2 * u2 * (1 - c),      u2 * u3 * (1 - c) - u1 * s,
-          u1 * u3 * (1 - c) - u2 * s, u2 * u3 * (1 - c) + u1 * s,
-          c + u3 * u3 * (1 - c)};
+  return AngleAxis{2.0 * std::numbers::pi / 3.0, axis.normalized()}
+      .toRotationMatrix();
 }
 
 // Which way the segment from `v1` to `v2` passes the triangle of the other
@@ -815,10 +781,10 @@ auto compute_third_turn(const Vector3& axis) -> Matrix3 {
 inline auto cross_triangle(const Vector3& v1, const Vector3& v2,
                            const Vector3& v3, const Vector3& v4,
                            const Vector3& v5) -> int {
-  Vector3 diff12 = subtract(v2, v1);
-  Vector3 diff13 = subtract(v3, v1);
-  Vector3 diff14 = subtract(v4, v1);
-  Vector3 diff15 = subtract(v5, v1);
+  Vector3 diff12 = v2 - v1;
+  Vector3 diff13 = v3 - v1;
+  Vector3 diff14 = v4 - v1;
+  Vector3 diff15 = v5 - v1;
   double vol1 = compute_determinant(diff13, diff14, diff12);
   double vol2 = compute_determinant(diff14, diff15, diff12);
   double vol3 = compute_determinant(diff15, diff13, diff12);
@@ -866,11 +832,11 @@ inline auto attach_face(InOut<Polytope> polytope, int v1, int v2, int v3,
     return 0;
   }
   face.closest = *projected;
-  Vector3 outward = subtract(polytope->vertices[v1].point, polytope->center);
-  if (dot(face.closest, outward) < 0) {
-    face.closest = scale(face.closest, -1);
+  Vector3 outward = polytope->vertices[v1].point - polytope->center;
+  if (face.closest.dot(outward) < 0) {
+    face.closest = -face.closest;
   }
-  face.dist2 = dot(face.closest, face.closest);
+  face.dist2 = face.closest.dot(face.closest);
   face.index = -1;
   return face.dist2;
 }
@@ -923,7 +889,7 @@ auto lies_in_triangle(const Vector3& v1, const Vector3& v2, const Vector3& v3,
   Vector3 pr{v1[0] * lambda[0] + v2[0] * lambda[1] + v3[0] * lambda[2],
              v1[1] * lambda[0] + v2[1] * lambda[1] + v3[1] * lambda[2],
              v1[2] * lambda[0] + v2[2] * lambda[1] + v3[2] * lambda[2]};
-  return norm(subtract(pr, p)) < MINVAL;
+  return (pr - p).norm() < MINVAL;
 }
 
 // The first polytope from GJK's triangle: a bipyramid on it (polytope3).
@@ -935,18 +901,18 @@ auto build_triangle_polytope(InOut<Polytope> polytope, InOut<CcdStatus> status,
     const Vector3& s1 = status->simplex[0].point;
     const Vector3& s2 = status->simplex[1].point;
     const Vector3& s3 = status->simplex[2].point;
-    polytope->center = add(s1, s2);
-    polytope->center = add(polytope->center, s3);
-    polytope->center = scale(polytope->center, 1.0 / 3.0);
-    Vector3 diff1 = subtract(s2, s1);
-    Vector3 diff2 = subtract(s3, s1);
-    n = cross(diff1, diff2);
-    n_norm = norm(n);
+    polytope->center = s1 + s2;
+    polytope->center += s3;
+    polytope->center = polytope->center * (1.0 / 3.0);
+    Vector3 diff1 = s2 - s1;
+    Vector3 diff2 = s3 - s1;
+    n = diff1.cross(diff2);
+    n_norm = n.norm();
   }
   if (n_norm < MINVAL) {
     return EPA_P3_BAD_NORMAL;
   }
-  Vector3 n_neg = scale(n, -1);
+  Vector3 n_neg = -n;
   int v1i = append_vertex(polytope, status->simplex[0]);
   int v2i = append_vertex(polytope, status->simplex[1]);
   int v3i = append_vertex(polytope, status->simplex[2]);
@@ -1001,9 +967,9 @@ auto build_segment_polytope(InOut<Polytope> polytope, InOut<CcdStatus> status,
   {
     const Vector3& s1 = status->simplex[0].point;
     const Vector3& s2 = status->simplex[1].point;
-    polytope->center = add(s1, s2);
-    polytope->center = scale(polytope->center, 0.5);
-    diff = subtract(s2, s1);
+    polytope->center = s1 + s2;
+    polytope->center = polytope->center * 0.5;
+    diff = s2 - s1;
   }
   double value = MAX_LIMIT;
   int index = 0;
@@ -1015,15 +981,15 @@ auto build_segment_polytope(InOut<Polytope> polytope, InOut<CcdStatus> status,
   }
   Vector3 e{0, 0, 0};
   e[index] = 1;
-  Vector3 d1 = cross(e, diff);
+  Vector3 d1 = e.cross(diff);
   Matrix3 r = compute_third_turn(diff);
-  Vector3 d2 = multiply(r, d1);
-  Vector3 d3 = multiply(r, d2);
+  Vector3 d2 = r * d1;
+  Vector3 d3 = r * d2;
   int v1i = append_vertex(polytope, status->simplex[0]);
   int v2i = append_vertex(polytope, status->simplex[1]);
-  int v3i = append_epa_support(polytope, first, second, d1, norm(d1));
-  int v4i = append_epa_support(polytope, first, second, d2, norm(d2));
-  int v5i = append_epa_support(polytope, first, second, d3, norm(d3));
+  int v3i = append_epa_support(polytope, first, second, d1, d1.norm());
+  int v4i = append_epa_support(polytope, first, second, d2, d2.norm());
+  int v5i = append_epa_support(polytope, first, second, d3, d3.norm());
   if (attach_face(polytope, v1i, v3i, v4i, 1, 3, 2) < MINDIST2) {
     replace_simplex(polytope, status, v1i, v3i, v4i);
     return build_triangle_polytope(polytope, status, first, second);
@@ -1071,10 +1037,10 @@ auto build_tetrahedron_polytope(InOut<Polytope> polytope,
   int v3 = append_vertex(polytope, status->simplex[2]);
   int v4 = append_vertex(polytope, status->simplex[3]);
   polytope->center =
-      add(polytope->vertices[v1].point, polytope->vertices[v2].point);
-  polytope->center = add(polytope->center, polytope->vertices[v3].point);
-  polytope->center = add(polytope->center, polytope->vertices[v4].point);
-  polytope->center = scale(polytope->center, 0.25);
+      polytope->vertices[v1].point + polytope->vertices[v2].point;
+  polytope->center += polytope->vertices[v3].point;
+  polytope->center += polytope->vertices[v4].point;
+  polytope->center = polytope->center * 0.25;
   if (attach_face(polytope, v1, v2, v3, 1, 3, 2) < MINDIST4) {
     replace_simplex(polytope, status, v1, v2, v3);
     return build_triangle_polytope(polytope, status, first, second);
@@ -1126,7 +1092,7 @@ inline auto find_edge(const Face& face, int vertex) -> int {
 // Deletes `face` if the horizon point sees it, and walks on across its other
 // edges, keeping those whose far face it does not see (horizonRec).
 auto cut_horizon(InOut<Polytope> polytope, InOut<Face> face, int e) -> bool {
-  if (dot(face->closest, polytope->horizon_point) - face->dist2 > MINVAL) {
+  if (face->closest.dot(polytope->horizon_point) - face->dist2 > MINVAL) {
     Indices verts = unpack_vertices(face->verts);
     delete_face(polytope, face);
     for (int k = 1; k < 3; k++) {
@@ -1212,7 +1178,7 @@ auto run_epa(InOut<CcdStatus> status, InOut<Polytope> polytope,
     double lower = std::sqrt(lower2);
     int wi = append_epa_support(polytope, first, second, face->closest, lower);
     const Vertex& w = polytope->vertices[wi];
-    double upper_k = dot(face->closest, w.point) / lower;
+    double upper_k = face->closest.dot(w.point) / lower;
     if (upper_k < upper) {
       upper = upper_k;
       upper2 = upper * upper;
@@ -1308,9 +1274,9 @@ auto run_epa(InOut<CcdStatus> status, InOut<Polytope> polytope,
 // The area of the quadrilateral on four of `hull`'s points (area4).
 inline auto compute_quad_area(std::span<const Vector3> hull, int a, int b,
                               int c, int d) -> double {
-  Vector3 ca = subtract(hull[a], hull[c]);
-  Vector3 db = subtract(hull[b], hull[d]);
-  return 0.5 * norm(cross(ca, db));
+  Vector3 ca = hull[a] - hull[c];
+  Vector3 db = hull[b] - hull[d];
+  return 0.5 * ca.cross(db).norm();
 }
 
 // The four points of a convex polygon spanning the largest area (hull4).
@@ -1369,18 +1335,18 @@ inline auto find_largest_quad(std::span<const Vector3> hull)
 // and its offset (planeNormal).
 auto compute_side_plane(Out<Vector3> normal, const Vector3& v1,
                         const Vector3& v2, const Vector3& n) -> double {
-  Vector3 v3 = add(v1, n);
-  Vector3 diff1 = subtract(v2, v1);
-  Vector3 diff2 = subtract(v3, v1);
-  Vector3 res = cross(diff1, diff2);
-  normalize3(InOut(res));
+  Vector3 v3 = v1 + n;
+  Vector3 diff1 = v2 - v1;
+  Vector3 diff2 = v3 - v1;
+  Vector3 res = diff1.cross(diff2);
+  normalize(InOut(res));
   *normal = res;
-  return dot(res, v1);
+  return res.dot(v1);
 }
 
 // Whether `p` lies inside the plane through `a` with normal `n` (halfspace).
 auto lies_inside(const Vector3& a, const Vector3& n, const Vector3& p) -> bool {
-  return dot(subtract(p, a), n) > -MINVAL;
+  return (p - a).dot(n) > -MINVAL;
 }
 
 // The witness points of `v` on a face through `p` with normal `n`, moved
@@ -1388,8 +1354,8 @@ auto lies_inside(const Vector3& a, const Vector3& n, const Vector3& p) -> bool {
 inline auto place_witness(Out<Vector3> w1, Out<Vector3> w2, const Vector3& v,
                           const Vector3& p, const Vector3& n,
                           const Vector3& dir) -> double {
-  double dist = dot(subtract(v, p), n);
-  *w1 = add_scaled(v, dir, -std::abs(dist));
+  double dist = (v - p).dot(n);
+  *w1 = v + (-std::abs(dist)) * dir;
   *w2 = v;
   return dist;
 }
@@ -1427,7 +1393,7 @@ auto clip_polygon(InOut<CcdStatus> status, std::span<const Vector3> face1,
     for (int i = 0; i < npolygon; i++) {
       const Vector3& p = polygon[i];
       const Vector3& q = (i < npolygon - 1) ? polygon[i + 1] : polygon[0];
-      Vector3 pq = subtract(q, p);
+      Vector3 pq = q - p;
       bool inside1 = lies_inside(face1[e], pn[e], p);
       bool inside2 = lies_inside(face1[e], pn[e], q);
       if (!inside1 && !inside2) {
@@ -1437,11 +1403,11 @@ auto clip_polygon(InOut<CcdStatus> status, std::span<const Vector3> face1,
         clipped[nclipped++] = q;
         continue;
       }
-      double tmp = dot(pn[e], pq);
+      double tmp = pn[e].dot(pq);
       if (tmp != 0.0) {
-        double t = (pd[e] - dot(pn[e], p)) / tmp;
+        double t = (pd[e] - pn[e].dot(p)) / tmp;
         if (t >= 0.0 && t <= 1.0) {
-          clipped[nclipped++] = add_scaled(p, pq, t);
+          clipped[nclipped++] = p + t * pq;
         }
       }
       if (inside2) {
@@ -1458,7 +1424,7 @@ auto clip_polygon(InOut<CcdStatus> status, std::span<const Vector3> face1,
   int m = npolygon;
   npolygon = 0;
   for (int i = 0; i < m; i++) {
-    if (dot(subtract(polygon[i], face1[0]), n) <= 0) {
+    if ((polygon[i] - face1[0]).dot(n) <= 0) {
       if (npolygon != i) {
         polygon[npolygon] = polygon[i];
       }
@@ -1485,8 +1451,8 @@ auto clip_polygon(InOut<CcdStatus> status, std::span<const Vector3> face1,
     double d = 0;
     for (int i = 0; i < npolygon; i++) {
       for (int j = i + 1; j < npolygon; j++) {
-        Vector3 diff = subtract(polygon[j], polygon[i]);
-        double d2 = dot(diff, diff);
+        Vector3 diff = polygon[j] - polygon[i];
+        double d2 = diff.dot(diff);
         if (d2 > d) {
           d = d2;
           best1 = i;
@@ -1514,7 +1480,7 @@ auto clip_polygon(InOut<CcdStatus> status, std::span<const Vector3> face1,
 auto find_cylinder_normals(Out<Triple> normals, Out<Indices> indices, int dim,
                            const Object& object, const Indices& vi) -> int {
   if (dim == 1) {
-    (*normals)[0] = multiply(object.mat, Vector3{0, 0, vi[0] ? -1.0 : 1.0});
+    (*normals)[0] = object.mat * Vector3{0, 0, vi[0] ? -1.0 : 1.0};
     (*indices)[0] = vi[0];
     return 1;
   }
@@ -1526,11 +1492,11 @@ auto find_box_face_normal(Out<Triple> normals, Out<Indices> indices,
                           const Matrix3& mat, const Vector3& n) -> int {
   static const std::array<Vector3, 6> FACES{
       {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}};
-  Vector3 local_n = multiply_transposed(mat, n);
-  local_n = scale(local_n, 1 / std::sqrt(dot(local_n, local_n)));
+  Vector3 local_n = mat.transpose() * n;
+  local_n = local_n * (1 / std::sqrt(local_n.dot(local_n)));
   for (int i = 0; i < 6; i++) {
-    if (dot(local_n, FACES[i]) > FACE_TOL) {
-      (*normals)[0] = multiply(mat, FACES[i]);
+    if (local_n.dot(FACES[i]) > FACE_TOL) {
+      (*normals)[0] = mat * FACES[i];
       (*indices)[0] = i;
       return 1;
     }
@@ -1555,7 +1521,7 @@ auto find_box_normals(Out<Triple> normals, Out<Indices> indices, int dim,
             (!(v1 & 2) && !(v2 & 2) && !(v3 & 2));
     int z = ((v1 & 4) && (v2 & 4) && (v3 & 4)) -
             (!(v1 & 4) && !(v2 & 4) && !(v3 & 4));
-    (*normals)[0] = multiply(mat, Vector3{double(x), double(y), double(z)});
+    (*normals)[0] = mat * Vector3{double(x), double(y), double(z)};
     int sgn = x + y + z;
     if (x) {
       (*indices)[c++] = 0;
@@ -1577,16 +1543,16 @@ auto find_box_normals(Out<Triple> normals, Out<Indices> indices, int dim,
     int y = ((v1 & 2) && (v2 & 2)) - (!(v1 & 2) && !(v2 & 2));
     int z = ((v1 & 4) && (v2 & 4)) - (!(v1 & 4) && !(v2 & 4));
     if (x) {
-      (*normals)[0] = multiply(mat, Vector3{double(x), 0, 0});
+      (*normals)[0] = mat * Vector3{double(x), 0, 0};
       (*indices)[c++] = (x > 0) ? 0 : 1;
     }
     if (y) {
-      (*normals)[c] = multiply(mat, Vector3{0, double(y), 0});
+      (*normals)[c] = mat * Vector3{0, double(y), 0};
       (*indices)[c++] = (y > 0) ? 2 : 3;
     }
     if (z) {
       // MuJoCo writes the z normal second, wherever it falls.
-      (*normals)[1] = multiply(mat, Vector3{0, 0, double(z)});
+      (*normals)[1] = mat * Vector3{0, 0, double(z)};
       (*indices)[c++] = (z > 0) ? 4 : 5;
     }
     return c == 2 ? 2 : find_box_face_normal(normals, indices, mat, dir);
@@ -1595,9 +1561,9 @@ auto find_box_normals(Out<Triple> normals, Out<Indices> indices, int dim,
     double x = (v1 & 1) ? 1 : -1;
     double y = (v1 & 2) ? 1 : -1;
     double z = (v1 & 4) ? 1 : -1;
-    (*normals)[0] = multiply(mat, Vector3{x, 0, 0});
-    (*normals)[1] = multiply(mat, Vector3{0, y, 0});
-    (*normals)[2] = multiply(mat, Vector3{0, 0, z});
+    (*normals)[0] = mat * Vector3{x, 0, 0};
+    (*normals)[1] = mat * Vector3{0, y, 0};
+    (*normals)[2] = mat * Vector3{0, 0, z};
     (*indices)[0] = (x > 0) ? 0 : 1;
     (*indices)[1] = (y > 0) ? 2 : 3;
     (*indices)[2] = (z > 0) ? 4 : 5;
@@ -1618,8 +1584,8 @@ auto find_box_edge_normals(Out<Triple> normals, Out<Triple> ends, int dim,
   const Vector3& size = object.size;
   if (dim == 2) {
     (*ends)[0] = v2;
-    (*normals)[0] = subtract(v2, v1);
-    normalize3(InOut((*normals)[0]));
+    (*normals)[0] = v2 - v1;
+    normalize(InOut((*normals)[0]));
     return 1;
   }
   if (dim == 1) {
@@ -1627,14 +1593,14 @@ auto find_box_edge_normals(Out<Triple> normals, Out<Triple> ends, int dim,
     double y = (v1i & 2) ? size[1] : -size[1];
     double z = (v1i & 4) ? size[2] : -size[2];
     (*ends)[0] = transform(mat, pos, {-x, y, z});
-    (*normals)[0] = subtract((*ends)[0], v1);
-    normalize3(InOut((*normals)[0]));
+    (*normals)[0] = (*ends)[0] - v1;
+    normalize(InOut((*normals)[0]));
     (*ends)[1] = transform(mat, pos, {x, -y, z});
-    (*normals)[1] = subtract((*ends)[1], v1);
-    normalize3(InOut((*normals)[1]));
+    (*normals)[1] = (*ends)[1] - v1;
+    normalize(InOut((*normals)[1]));
     (*ends)[2] = transform(mat, pos, {x, y, -z});
-    (*normals)[2] = subtract((*ends)[2], v1);
-    normalize3(InOut((*normals)[2]));
+    (*normals)[2] = (*ends)[2] - v1;
+    normalize(InOut((*normals)[2]));
     return 3;
   }
   return 0;
@@ -1647,9 +1613,8 @@ auto find_cylinder_edge_normals(Out<Triple> normals, Out<Triple> ends, int dim,
     -> int {
   if (dim == 1 || dim == 2) {
     double sgn = v1i ? 1.0 : -1.0;
-    (*normals)[0] = {sgn * object.mat[2], sgn * object.mat[5],
-                     sgn * object.mat[8]};
-    (*ends)[0] = add_scaled(v[0], (*normals)[0], 2 * object.size[1]);
+    (*normals)[0] = sgn * object.mat.col(2);
+    (*ends)[0] = v[0] + (2 * object.size[1]) * (*normals)[0];
     return 1;
   }
   return 0;
@@ -1736,7 +1701,7 @@ inline auto find_aligned_faces(std::span<const Vector3> v,
     -> std::optional<std::array<int, 2>> {
   for (int i = 0; i < static_cast<int>(v.size()); i++) {
     for (int j = 0; j < static_cast<int>(w.size()); j++) {
-      if (dot(v[i], w[j]) < -FACE_TOL) {
+      if (v[i].dot(w[j]) < -FACE_TOL) {
         return std::array<int, 2>{i, j};
       }
     }
@@ -1750,11 +1715,11 @@ inline auto find_aligned_face_edge(std::span<const Vector3> edge,
                                    const Vector3& dir)
     -> std::optional<std::array<int, 2>> {
   for (int i = 0; i < static_cast<int>(face.size()); i++) {
-    if (dot(face[i], dir) <= MINVAL) {
+    if (face[i].dot(dir) <= MINVAL) {
       continue;
     }
     for (int j = 0; j < static_cast<int>(edge.size()); j++) {
-      if (std::abs(dot(edge[j], face[i])) < EDGE_TOL) {
+      if (std::abs(edge[j].dot(face[i])) < EDGE_TOL) {
         return std::array<int, 2>{j, i};
       }
     }
@@ -1837,8 +1802,8 @@ auto find_multicontact(const Polytope& polytope, const Face& face,
   Polygon face2{};
   int nface1 = reduce_simplex(InOut(v1i), InOut(v1));
   int nface2 = reduce_simplex(InOut(v2i), InOut(v2));
-  Vector3 dir = subtract(status->x2[0], status->x1[0]);
-  Vector3 dir_neg = subtract(status->x1[0], status->x2[0]);
+  Vector3 dir = status->x2[0] - status->x1[0];
+  Vector3 dir_neg = status->x1[0] - status->x2[0];
   int nnorms1 = find_normals(first, Out(n1), Out(idx1), nface1, v1i, dir_neg);
   int nnorms2 = find_normals(second, Out(n2), Out(idx2), nface2, v2i, dir);
   auto first_of = [](const Triple& normals, int count) {
@@ -1892,14 +1857,14 @@ auto find_multicontact(const Polytope& polytope, const Face& face,
   std::span<const Vector3> polygon2{face2.data(), std::size_t(nface2)};
 
   if (edgecon1) {
-    clip_polygon(status, polygon2, polygon1, n2[j], scale(n2[j], -1.0));
+    clip_polygon(status, polygon2, polygon1, n2[j], n2[j] * (-1.0));
     for (int k = 0; k < status->witness_count; k++) {
       std::swap(status->x1[k], status->x2[k]);
     }
     return;
   }
   if (edgecon2) {
-    clip_polygon(status, polygon1, polygon2, n1[j], scale(n1[j], -1.0));
+    clip_polygon(status, polygon1, polygon2, n1[j], n1[j] * (-1.0));
     return;
   }
   clip_polygon(status, polygon1, polygon2, n1[i], n2[j]);
@@ -1909,8 +1874,8 @@ auto find_multicontact(const Polytope& polytope, const Face& face,
 // (inflate).
 inline auto inflate(InOut<CcdStatus> status, double margin1, double margin2)
     -> void {
-  Vector3 n = subtract(status->x2[0], status->x1[0]);
-  normalize3(InOut(n));
+  Vector3 n = status->x2[0] - status->x1[0];
+  normalize(InOut(n));
   if (margin1 != 0) {
     status->x1[0][0] += margin1 * n[0];
     status->x1[0][1] += margin1 * n[1];
@@ -2029,9 +1994,9 @@ auto find_penetration(InOut<Object> first, InOut<Object> second,
   for (int i = 0; i < status.witness_count; i++) {
     PreContact& contact = out[i];
     contact.dist = margin + status.dist[i];
-    contact.pos = scale(add(status.x1[i], status.x2[i]), 0.5);
-    contact.normal = subtract(status.x1[i], status.x2[i]);
-    normalize3(InOut(contact.normal));
+    contact.pos = (status.x1[i] + status.x2[i]) * 0.5;
+    contact.normal = status.x1[i] - status.x2[i];
+    normalize(InOut(contact.normal));
     contact.tangent = {0, 0, 0};
   }
   return status.witness_count;
@@ -2055,18 +2020,10 @@ auto count_max_contacts(const Object& first, const Object& second) -> int {
 // Turns a frame by `rot` about `origin` (mju_rotateFrame).
 auto rotate_frame(const Vector3& origin, const Matrix3& rot, InOut<Matrix3> mat,
                   InOut<Vector3> pos) -> void {
-  Matrix3 turned{};
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 3; ++j) {
-      turned[3 * i + j] = rot[3 * i] * (*mat)[j] +
-                          rot[3 * i + 1] * (*mat)[3 + j] +
-                          rot[3 * i + 2] * (*mat)[6 + j];
-    }
-  }
-  *mat = turned;
-  Vector3 rel = subtract(origin, *pos);
-  Vector3 vec = subtract(multiply(rot, rel), rel);
-  *pos = subtract(*pos, vec);
+  *mat = rot * *mat;
+  Vector3 rel = origin - (*pos);
+  Vector3 vec = rot * rel - rel;
+  *pos -= vec;
 }
 
 }  // namespace
@@ -2081,18 +2038,16 @@ auto collide_convex(const Geom& first, const GeomFrame& first_frame,
   if (first.type == GeomType::PLANE) {
     Object object = make_object(second, second_frame, 0);
     const Matrix3& mat = first_frame.mat;
-    Vector3 normal{mat[2], mat[5], mat[8]};
-    Vector3 v = object.support(InOut(object), {-mat[2], -mat[5], -mat[8]});
-    double dist = dot(normal, subtract(v, first_frame.pos));
+    Vector3 normal = mat.col(2);
+    Vector3 v = object.support(InOut(object), -normal);
+    double dist = normal.dot(v - first_frame.pos);
     if (dist > margin) {
       return 0;
     }
     out[0].dist = dist;
-    for (int k = 0; k < 3; ++k) {
-      out[0].pos[k] = v[k] + normal[k] * (-0.5 * dist);
-    }
+    out[0].pos = v - 0.5 * dist * normal;
     out[0].normal = normal;
-    out[0].tangent = {0, 0, 0};
+    out[0].tangent = Vector3::Zero();
     return 1;
   }
 
@@ -2115,36 +2070,32 @@ auto collide_convex(const Geom& first, const GeomFrame& first_frame,
 
     // mju_makeFrame of the normal alone: its two tangents are the axes.
     Vector3 x = out[0].normal;
-    normalize3(InOut(x));
-    Vector3 y{0, 0, 0};
+    normalize(InOut(x));
+    Vector3 y = Vector3::Zero();
     if (x[1] < 0.5 && x[1] > -0.5) {
       y[1] = 1;
     } else {
       y[2] = 1;
     }
-    y = subtract(y, scale(x, dot(x, y)));
-    normalize3(InOut(y));
-    Vector3 z = cross(x, y);
+    y -= (x * x.dot(y));
+    normalize(InOut(y));
+    Vector3 z = x.cross(y);
 
     double tolerance =
         RELATIVE_TOLERANCE * std::min(first_radius, second_radius);
     for (const Vector3& axis : std::array<Vector3, 2>{y, z}) {
       for (double angle : {-PERTURBATION, PERTURBATION}) {
-        // mji_axisAngle2Quat, mju_quat2Mat.
-        double s = std::sin(angle * 0.5);
-        Quaternion4 quat{std::cos(angle * 0.5), axis[0] * s, axis[1] * s,
-                         axis[2] * s};
-        Matrix3 rot = articulated::convert_to_matrix(quat);
+        Matrix3 rot = AngleAxis{angle, axis}.toRotationMatrix();
         Vector3 origin = out[0].pos;
         rotate_frame(origin, rot, InOut(object1.mat), InOut(object1.pos));
-        rotate_frame(origin, transpose(rot), InOut(object2.mat),
+        rotate_frame(origin, rot.transpose(), InOut(object2.mat),
                      InOut(object2.pos));
         int n = find_penetration(InOut(object1), InOut(object2),
                                  out.subspan(ncon), 1, margin);
         if (n != 0 && ncon + 1 <= static_cast<int>(MAX_PAIR_CONTACTS)) {
           bool distinct = true;
           for (int i = 0; i < ncon; i++) {
-            if (norm(subtract(out[i].pos, out[ncon].pos)) <= tolerance) {
+            if ((out[i].pos - out[ncon].pos).norm() <= tolerance) {
               distinct = false;
               break;
             }

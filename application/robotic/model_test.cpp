@@ -52,6 +52,42 @@ auto doubles(const Array& values) -> std::vector<double> {
 
 auto number(double value) -> std::vector<double> { return {value}; }
 
+// A quaternion's w, x, y, z, its sign that of `theirs`: either sign is the
+// same turn.
+auto quaternion(const Quaternion& q, const std::vector<double>& theirs)
+    -> std::vector<double> {
+  std::vector<double> ours{q.w(), q.x(), q.y(), q.z()};
+  double agree = 0.0;
+  for (std::size_t k = 0; k < 4 && k < theirs.size(); ++k) {
+    agree += ours[k] * theirs[k];
+  }
+  if (agree < 0) {
+    for (double& x : ours) {
+      x = -x;
+    }
+  }
+  return ours;
+}
+
+// An inertia in its body's frame, row by row, from its principal moments and
+// the quaternion `quat`, w, x, y, z, that turns to their axes.
+auto find_tensor(const std::vector<double>& moments,
+                 const std::vector<double>& quat) -> std::vector<double> {
+  Matrix3 r = Quaternion{quat[0], quat[1], quat[2], quat[3]}
+                  .normalized()
+                  .toRotationMatrix();
+  Matrix3 tensor = r *
+                   Vector3{moments[0], moments[1], moments[2]}.asDiagonal() *
+                   r.transpose();
+  std::vector<double> rows;
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      rows.push_back(tensor(i, j));
+    }
+  }
+  return rows;
+}
+
 // simon's value for one row of the table, by MuJoCo's names.
 auto find_value(const ArticulatedModel& m, const Row& row)
     -> std::vector<double> {
@@ -76,9 +112,9 @@ auto find_value(const ArticulatedModel& m, const Row& row)
     if (f == "parentid") return number(b.parent);
     if (f == "rootid") return number(b.root);
     if (f == "pos") return doubles(b.pos);
-    if (f == "quat") return doubles(b.quat);
+    if (f == "quat") return quaternion(b.quat, row.values);
     if (f == "ipos") return doubles(b.inertial_pos);
-    if (f == "iquat") return doubles(b.inertial_quat);
+    if (f == "iquat") return quaternion(b.inertial_quat, row.values);
     if (f == "mass") return number(b.mass);
     if (f == "inertia") return doubles(b.inertia);
     if (f == "jntadr") return number(b.joints ? b.first_joint : -1.0);
@@ -128,7 +164,7 @@ auto find_value(const ArticulatedModel& m, const Row& row)
     if (f == "bodyid") return number(g.body);
     if (f == "size") return doubles(g.size);
     if (f == "pos") return doubles(g.pos);
-    if (f == "quat") return doubles(g.quat);
+    if (f == "quat") return quaternion(g.quat, row.values);
     if (f == "friction") return doubles(g.friction);
     if (f == "condim") return number(g.condim);
     if (f == "contype") return number(g.contype);
@@ -188,7 +224,15 @@ TEST_CASE("ModelAgainstMuJoCo") {
     double worst = 0.0;
     std::string where;
     std::size_t compared = 0;
-    for (const Row& row : load_rows()) {
+    std::vector<Row> rows = load_rows();
+    // MuJoCo's principal moments, by model and body.
+    std::map<std::pair<std::string, std::size_t>, std::vector<double>> inertias;
+    for (const Row& row : rows) {
+      if (row.element == "body" && row.field == "inertia") {
+        inertias[{row.model, row.index}] = row.values;
+      }
+    }
+    for (const Row& row : rows) {
       if (!models.contains(row.model)) {
         std::string path = row.model == "humanoid.xml" ? std::string{HUMANOID}
                            : row.model.find('/') != std::string::npos
@@ -201,11 +245,21 @@ TEST_CASE("ModelAgainstMuJoCo") {
         models.emplace(row.model, std::move(*loaded));
       }
       std::vector<double> ours = find_value(models.at(row.model), row);
+      std::vector<double> theirs = row.values;
       CAPTURE(row.model, row.element, row.index, row.field);
-      REQUIRE(ours.size() == row.values.size());
+      if (row.element == "body" && row.field == "iquat") {
+        // Principal axes are defined only up to their signs, and where
+        // moments are equal not at all: compare the inertia they give.
+        const model::ArticulatedBody& b =
+            models.at(row.model).bodies.at(row.index);
+        std::vector<double> moments{b.inertia[0], b.inertia[1], b.inertia[2]};
+        ours = find_tensor(moments, ours);
+        theirs = find_tensor(inertias.at({row.model, row.index}), theirs);
+      }
+      REQUIRE(ours.size() == theirs.size());
       for (std::size_t k = 0; k < ours.size(); ++k) {
-        double apart = std::abs(ours[k] - row.values[k]) /
-                       std::max(1.0, std::abs(row.values[k]));
+        double apart =
+            std::abs(ours[k] - theirs[k]) / std::max(1.0, std::abs(theirs[k]));
         if (apart > worst) {
           worst = apart;
           where = row.model + " " + row.element + " " +

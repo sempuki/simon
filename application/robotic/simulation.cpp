@@ -62,7 +62,7 @@ auto weigh(const model::ArticulatedModel& m, const model::Tree& tree,
   };
   std::vector<double> translation(3 * std::size_t{n});
   std::vector<double> rotation(3 * std::size_t{n});
-  std::span<const model::Spatial> cdof{dynamics->cdof.data(), n};
+  std::span<const Vector6> cdof{dynamics->cdof.data(), n};
   for (std::uint32_t b = 0; b < tree.bodies; ++b) {
     std::uint32_t body = tree.first_body + b;
     model::compute_point_jacobian(m, tree, cdof, dynamics->com, body,

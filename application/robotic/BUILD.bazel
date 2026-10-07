@@ -41,6 +41,7 @@ cc_library(
         "//engine:lifecycle",
         "//format:mjcf",
         "//framework",
+        "//core:lie",
         "//core:vocabulary",
         "//model/articulated:articulated",
         "//model/articulated:collision",
@@ -109,6 +110,7 @@ cc_test(
     srcs = ["collision_test.cpp"],
     copts = COPTS,
     data = glob(["models/*.xml"]) + [
+        "reference/mujoco_contact_spread.csv",
         "reference/mujoco_contacts.csv",
         "reference/mujoco_convex.csv",
     ],
@@ -151,7 +153,6 @@ VIEWER_DEPS = [
     "//application:viewing",
     "//engine:driver",
     "//core:vocabulary",
-    "//model/articulated:arithmetic",
     "//3rd_party:imgui",
     "//3rd_party:implot",
     "@lib//base:core",

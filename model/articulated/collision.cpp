@@ -4,29 +4,17 @@
 
 #include "model/articulated/collision.hpp"
 
-#include "model/articulated/arithmetic.hpp"
-#include "model/articulated/convex.hpp"
-
 #include <algorithm>
 #include <cmath>
+
+#include "model/articulated/convex.hpp"
 
 namespace simon::model {
 
 namespace {
 
-using articulated::add;
-using articulated::add_scaled;
-using articulated::add_to_scaled;
-using articulated::column;
-using articulated::convert_to_matrix;
-using articulated::cross;
-using articulated::dot;
 using articulated::MINVAL;
-using articulated::multiply;
-using articulated::multiply_transposed;
-using articulated::normalize3;
-using articulated::scale;
-using articulated::subtract;
+using articulated::normalize;
 
 constexpr double MAXVAL = 1e10;  // mjMAXVAL.
 
@@ -43,15 +31,15 @@ using Out1 = std::span<PreContact>;
 auto collide_plane_sphere(Out1 con, double margin, const Vector3& pos1,
                           const Matrix3& mat1, const Vector3& pos2,
                           double radius) -> std::uint32_t {
-  con[0].normal = column(mat1, 2);
-  Vector3 tmp = subtract(pos2, pos1);
-  double cdist = dot(tmp, con[0].normal);
+  con[0].normal = mat1.col(2);
+  Vector3 tmp = pos2 - pos1;
+  double cdist = tmp.dot(con[0].normal);
   if (cdist > margin + radius) {
     return 0;
   }
   con[0].dist = cdist - radius;
-  tmp = scale(con[0].normal, -con[0].dist / 2 - radius);
-  con[0].pos = add(pos2, tmp);
+  tmp = con[0].normal * (-con[0].dist / 2 - radius);
+  con[0].pos = pos2 + tmp;
   con[0].tangent = Vector3::Zero();
   return 1;
 }
@@ -60,21 +48,21 @@ auto collide_plane_sphere(Out1 con, double margin, const Vector3& pos1,
 auto collide_spheres(Out1 con, double margin, const Vector3& pos1,
                      const Matrix3& mat1, double radius1, const Vector3& pos2,
                      const Matrix3& mat2, double radius2) -> std::uint32_t {
-  Vector3 dif = subtract(pos1, pos2);
-  double cdist_sqr = dot(dif, dif);
+  Vector3 dif = pos1 - pos2;
+  double cdist_sqr = dif.dot(dif);
   double min_dist = margin + radius1 + radius2;
   if (cdist_sqr > min_dist * min_dist) {
     return 0;
   }
   con[0].dist = std::sqrt(cdist_sqr) - radius1 - radius2;
-  con[0].normal = subtract(pos2, pos1);
-  double len = normalize3(InOut(con[0].normal));
+  con[0].normal = pos2 - pos1;
+  double len = normalize(InOut(con[0].normal));
   if (len < MINVAL) {
-    con[0].normal = cross(column(mat1, 2), column(mat2, 2));
-    normalize3(InOut(con[0].normal));
+    con[0].normal = mat1.col(2).cross(mat2.col(2));
+    normalize(InOut(con[0].normal));
   }
-  con[0].pos = scale(con[0].normal, radius1 + con[0].dist / 2);
-  con[0].pos = add(con[0].pos, pos1);
+  con[0].pos = con[0].normal * (radius1 + con[0].dist / 2);
+  con[0].pos += pos1;
   con[0].tangent = Vector3::Zero();
   return 1;
 }
@@ -82,12 +70,12 @@ auto collide_spheres(Out1 con, double margin, const Vector3& pos1,
 auto collide_plane_capsule(Out1 con, double margin, const GeomFrame& f1,
                            const GeomFrame& f2, const Vector3& size2)
     -> std::uint32_t {
-  Vector3 axis = column(f2.mat, 2);
-  Vector3 segment{size2[1] * axis[0], size2[1] * axis[1], size2[1] * axis[2]};
-  Vector3 endpoint = add(f2.pos, segment);
+  Vector3 axis = f2.mat.col(2);
+  Vector3 segment = size2[1] * axis;
+  Vector3 endpoint = f2.pos + segment;
   std::uint32_t n1 =
       collide_plane_sphere(con, margin, f1.pos, f1.mat, endpoint, size2[0]);
-  endpoint = subtract(f2.pos, segment);
+  endpoint = f2.pos - segment;
   std::uint32_t n2 = collide_plane_sphere(con.subspan(n1), margin, f1.pos,
                                           f1.mat, endpoint, size2[0]);
   if (n1 != 0) {
@@ -102,55 +90,54 @@ auto collide_plane_capsule(Out1 con, double margin, const GeomFrame& f1,
 auto collide_plane_cylinder(Out1 con, double margin, const GeomFrame& f1,
                             const GeomFrame& f2, const Vector3& size2)
     -> std::uint32_t {
-  Vector3 normal = column(f1.mat, 2);
-  Vector3 axis = column(f2.mat, 2);
-  double prjaxis = dot(normal, axis);
+  Vector3 normal = f1.mat.col(2);
+  Vector3 axis = f2.mat.col(2);
+  double prjaxis = normal.dot(axis);
   if (prjaxis > 0) {
-    axis = scale(axis, -1);
+    axis = -axis;
     prjaxis = -prjaxis;
   }
-  Vector3 vec = subtract(f2.pos, f1.pos);
-  double dist0 = dot(vec, normal);
-  vec = scale(axis, prjaxis);
-  vec = subtract(vec, normal);
-  double len_sqr = dot(vec, vec);
+  Vector3 vec = f2.pos - f1.pos;
+  double dist0 = vec.dot(normal);
+  vec = axis * prjaxis;
+  vec -= normal;
+  double len_sqr = vec.dot(vec);
   if (len_sqr >= MINVAL * MINVAL) {
-    double scl = size2[0] / std::sqrt(len_sqr);
-    vec = {vec[0] * scl, vec[1] * scl, vec[2] * scl};
+    vec *= size2[0] / std::sqrt(len_sqr);
   } else {
-    vec = {f2.mat[0] * size2[0], f2.mat[3] * size2[0], f2.mat[6] * size2[0]};
+    vec = f2.mat.col(0) * size2[0];
   }
-  double prjvec = dot(vec, normal);
-  axis = scale(axis, size2[1]);
+  double prjvec = vec.dot(normal);
+  axis = axis * size2[1];
   prjaxis *= size2[1];
 
   std::uint32_t cnt = 0;
   auto emit = [&](double dist, const Vector3& pos) {
     con[cnt].dist = dist;
     con[cnt].pos = pos;
-    add_to_scaled(InOut(con[cnt].pos), normal, -dist * 0.5);
+    con[cnt].pos -= 0.5 * dist * normal;
     con[cnt].normal = normal;
     con[cnt].tangent = Vector3::Zero();
     ++cnt;
   };
   if (dist0 + prjaxis + prjvec <= margin) {
-    emit(dist0 + prjaxis + prjvec, add(add(f2.pos, vec), axis));
+    emit(dist0 + prjaxis + prjvec, f2.pos + vec + axis);
   } else {
     return 0;
   }
   if (dist0 - prjaxis + prjvec <= margin) {
-    emit(dist0 - prjaxis + prjvec, subtract(add(f2.pos, vec), axis));
+    emit(dist0 - prjaxis + prjvec, f2.pos + vec - axis);
   }
   double prjvec1 = -prjvec * 0.5;
   if (dist0 + prjaxis + prjvec1 <= margin) {
-    Vector3 vec1 = cross(vec, axis);
-    normalize3(InOut(vec1));
-    vec1 = scale(vec1, size2[0] * std::sqrt(3.0) / 2);
-    Vector3 a = add(add(f2.pos, vec1), axis);
-    add_to_scaled(InOut(a), vec, -0.5);
+    Vector3 vec1 = vec.cross(axis);
+    normalize(InOut(vec1));
+    vec1 = vec1 * (size2[0] * std::sqrt(3.0) / 2);
+    Vector3 a = f2.pos + vec1 + axis;
+    a -= 0.5 * vec;
     emit(dist0 + prjaxis + prjvec1, a);
-    Vector3 b = add(subtract(f2.pos, vec1), axis);
-    add_to_scaled(InOut(b), vec, -0.5);
+    Vector3 b = f2.pos - vec1 + axis;
+    b -= 0.5 * vec;
     emit(dist0 + prjaxis + prjvec1, b);
   }
   return cnt;
@@ -159,24 +146,24 @@ auto collide_plane_cylinder(Out1 con, double margin, const GeomFrame& f1,
 auto collide_plane_box(Out1 con, double margin, const GeomFrame& f1,
                        const GeomFrame& f2, const Vector3& size2)
     -> std::uint32_t {
-  Vector3 norm = column(f1.mat, 2);
-  Vector3 dif = subtract(f2.pos, f1.pos);
-  double dist = dot(dif, norm);
+  Vector3 norm = f1.mat.col(2);
+  Vector3 dif = f2.pos - f1.pos;
+  double dist = dif.dot(norm);
   std::uint32_t cnt = 0;
   for (int i = 0; i < 8; ++i) {
     Vector3 vec{(i & 1) != 0 ? size2[0] : -size2[0],
                 (i & 2) != 0 ? size2[1] : -size2[1],
                 (i & 4) != 0 ? size2[2] : -size2[2]};
-    Vector3 corner = multiply(f2.mat, vec);
-    double ldist = dot(norm, corner);
+    Vector3 corner = f2.mat * vec;
+    double ldist = norm.dot(corner);
     if (dist + ldist > margin || ldist > 0) {
       continue;
     }
     con[cnt].dist = dist + ldist;
     con[cnt].normal = norm;
-    corner = add(corner, f2.pos);
-    vec = scale(norm, -con[cnt].dist / 2);
-    con[cnt].pos = add(corner, vec);
+    corner += f2.pos;
+    vec = norm * (-con[cnt].dist / 2);
+    con[cnt].pos = corner + vec;
     con[cnt].tangent = Vector3::Zero();
     if (++cnt >= 4) {
       return 4;
@@ -191,10 +178,10 @@ auto collide_sphere_capsule(Out1 con, double margin, const Vector3& pos1,
                             const Vector3& pos2, const Matrix3& mat2,
                             const Vector3& size2) -> std::uint32_t {
   double len = size2[1];
-  Vector3 axis = column(mat2, 2);
-  Vector3 vec = subtract(pos1, pos2);
-  double x = clip(dot(axis, vec), -len, len);
-  vec = add(scale(axis, x), pos2);
+  Vector3 axis = mat2.col(2);
+  Vector3 vec = pos1 - pos2;
+  double x = clip(axis.dot(vec), -len, len);
+  vec = axis * x + pos2;
   return collide_spheres(con, margin, pos1, mat1, radius1, vec, mat2, size2[0]);
 }
 
@@ -203,12 +190,12 @@ auto collide_sphere_cylinder(Out1 con, double margin, const GeomFrame& f1,
                              const Vector3& size2) -> std::uint32_t {
   double radius = size2[0];
   double height = size2[1];
-  Vector3 axis = column(f2.mat, 2);
-  Vector3 vec = subtract(f1.pos, f2.pos);
-  double x = dot(axis, vec);
-  Vector3 a_proj = scale(axis, x);
-  Vector3 p_proj = subtract(vec, a_proj);
-  double p_proj_sqr = dot(p_proj, p_proj);
+  Vector3 axis = f2.mat.col(2);
+  Vector3 vec = f1.pos - f2.pos;
+  double x = axis.dot(vec);
+  Vector3 a_proj = axis * x;
+  Vector3 p_proj = vec - a_proj;
+  double p_proj_sqr = p_proj.dot(p_proj);
 
   bool collide_side = std::abs(x) < height;
   bool collide_cap = p_proj_sqr < radius * radius;
@@ -222,25 +209,28 @@ auto collide_sphere_cylinder(Out1 con, double margin, const GeomFrame& f1,
     }
   }
   if (collide_side) {
-    a_proj = add(a_proj, f2.pos);
+    a_proj += f2.pos;
     return collide_spheres(con, margin, f1.pos, f1.mat, size1[0], a_proj,
                            f2.mat, size2[0]);
   }
   if (collide_cap) {
     const Matrix3& m = f2.mat;
-    Matrix3 flip{-m[0], m[1], -m[2], -m[3], m[4], -m[5], -m[6], m[7], -m[8]};
-    Vector3 pos_cap = add_scaled(f2.pos, axis, x > 0 ? height : -height);
+    // The cap at the axis's far end faces the other way: x and z turned.
+    Matrix3 flip = m;
+    flip.col(0) = -m.col(0);
+    flip.col(2) = -m.col(2);
+    Vector3 pos_cap = f2.pos + (x > 0 ? height : -height) * axis;
     std::uint32_t n = collide_plane_sphere(con, margin, pos_cap,
                                            x > 0 ? m : flip, f1.pos, size1[0]);
     if (n != 0) {
-      con[0].normal = scale(con[0].normal, -1);
+      con[0].normal = -con[0].normal;
     }
     return n;
   }
-  p_proj = scale(p_proj, size2[0] / std::sqrt(p_proj_sqr));
-  vec = scale(axis, x > 0 ? height : -height);
-  vec = add(vec, p_proj);
-  vec = add(vec, f2.pos);
+  p_proj = p_proj * (size2[0] / std::sqrt(p_proj_sqr));
+  vec = axis * (x > 0 ? height : -height);
+  vec += p_proj;
+  vec += f2.pos;
   return collide_spheres(con, margin, f1.pos, f1.mat, size1[0], vec, f2.mat,
                          0.0);
 }
@@ -251,14 +241,14 @@ auto collide_capsules(Out1 con, double margin, const GeomFrame& f1,
                       const Vector3& size2) -> std::uint32_t {
   const Matrix3& mat1 = f1.mat;
   const Matrix3& mat2 = f2.mat;
-  Vector3 axis1{mat1[2] * size1[1], mat1[5] * size1[1], mat1[8] * size1[1]};
-  Vector3 axis2{mat2[2] * size2[1], mat2[5] * size2[1], mat2[8] * size2[1]};
-  Vector3 dif = subtract(f1.pos, f2.pos);
-  double ma = dot(axis1, axis1);
-  double mb = -dot(axis1, axis2);
-  double mc = dot(axis2, axis2);
-  double u = -dot(axis1, dif);
-  double v = dot(axis2, dif);
+  Vector3 axis1 = mat1.col(2) * size1[1];
+  Vector3 axis2 = mat2.col(2) * size2[1];
+  Vector3 dif = f1.pos - f2.pos;
+  double ma = axis1.dot(axis1);
+  double mb = -axis1.dot(axis2);
+  double mc = axis2.dot(axis2);
+  double u = -axis1.dot(dif);
+  double v = axis2.dot(dif);
   double det = ma * mc - mb * mb;
   auto spheres = [&](Out1 out, const Vector3& vec1, const Vector3& vec2) {
     return collide_spheres(out, margin, vec1, mat1, size1[0], vec2, mat2,
@@ -281,30 +271,27 @@ auto collide_capsules(Out1 con, double margin, const GeomFrame& f1,
       x2 = -1;
       x1 = clip((u + mb) / ma, -1, 1);
     }
-    return spheres(con, add(scale(axis1, x1), f1.pos),
-                   add(scale(axis2, x2), f2.pos));
+    return spheres(con, axis1 * x1 + f1.pos, axis2 * x2 + f2.pos);
   }
-  Vector3 vec1 = add(f1.pos, axis1);
+  Vector3 vec1 = f1.pos + axis1;
   double x2 = clip((v - mb) / mc, -1, 1);
-  std::uint32_t n1 = spheres(con, vec1, add(scale(axis2, x2), f2.pos));
-  vec1 = subtract(f1.pos, axis1);
+  std::uint32_t n1 = spheres(con, vec1, axis2 * x2 + f2.pos);
+  vec1 = f1.pos - axis1;
   x2 = clip((v + mb) / mc, -1, 1);
-  std::uint32_t n2 =
-      spheres(con.subspan(n1), vec1, add(scale(axis2, x2), f2.pos));
+  std::uint32_t n2 = spheres(con.subspan(n1), vec1, axis2 * x2 + f2.pos);
   if (n1 + n2 >= 2) {
     return n1 + n2;
   }
-  Vector3 vec2 = add(f2.pos, axis2);
+  Vector3 vec2 = f2.pos + axis2;
   double x1 = clip((u - mb) / ma, -1, 1);
-  std::uint32_t n3 =
-      spheres(con.subspan(n1 + n2), add(scale(axis1, x1), f1.pos), vec2);
+  std::uint32_t n3 = spheres(con.subspan(n1 + n2), axis1 * x1 + f1.pos, vec2);
   if (n1 + n2 + n3 >= 2) {
     return n1 + n2 + n3;
   }
-  vec2 = subtract(f2.pos, axis2);
+  vec2 = f2.pos - axis2;
   x1 = clip((u + mb) / ma, -1, 1);
   std::uint32_t n4 =
-      spheres(con.subspan(n1 + n2 + n3), add(scale(axis1, x1), f1.pos), vec2);
+      spheres(con.subspan(n1 + n2 + n3), axis1 * x1 + f1.pos, vec2);
   return n1 + n2 + n3 + n4;
 }
 
@@ -315,8 +302,8 @@ auto collide_sphere_box(Out1 con, double margin, const Vector3& pos1,
                         double radius1, const Vector3& pos2,
                         const Matrix3& mat2, const Vector3& size2)
     -> std::uint32_t {
-  Vector3 tmp = subtract(pos1, pos2);
-  Vector3 center = multiply_transposed(mat2, tmp);
+  Vector3 tmp = pos1 - pos2;
+  Vector3 center = mat2.transpose() * tmp;
   Vector3 clamped = center;
   for (int i = 0; i < 3; ++i) {
     if (size2[i] > 0) {
@@ -324,8 +311,8 @@ auto collide_sphere_box(Out1 con, double margin, const Vector3& pos1,
     }
   }
   Vector3 deepest = center;
-  tmp = subtract(clamped, center);
-  double dist = normalize3(InOut(tmp));
+  tmp = clamped - center;
+  double dist = normalize(InOut(tmp));
   if (dist - radius1 > margin) {
     return 0;
   }
@@ -344,17 +331,17 @@ auto collide_sphere_box(Out1 con, double margin, const Vector3& pos1,
     Vector3 nearest = Vector3::Zero();
     nearest[k / 2] = k % 2 != 0 ? -1 : 1;
     pos = center;
-    add_to_scaled(InOut(pos), nearest, (radius1 - closest) / 2);
-    con[0].normal = multiply(mat2, nearest);
+    pos += ((radius1 - closest) / 2) * nearest;
+    con[0].normal = mat2 * nearest;
     dist = -closest;
   } else {
-    add_to_scaled(InOut(deepest), tmp, radius1);
-    add_to_scaled(InOut(pos), clamped, 0.5);
-    add_to_scaled(InOut(pos), deepest, 0.5);
-    con[0].normal = multiply(mat2, tmp);
+    deepest += radius1 * tmp;
+    pos += 0.5 * clamped;
+    pos += 0.5 * deepest;
+    con[0].normal = mat2 * tmp;
   }
-  tmp = multiply(mat2, pos);
-  con[0].pos = add(tmp, pos2);
+  tmp = mat2 * pos;
+  con[0].pos = tmp + pos2;
   con[0].dist = dist - radius1;
   con[0].tangent = Vector3::Zero();
   return 1;
@@ -369,9 +356,9 @@ auto collide_capsule_box(Out1 con, double margin, const GeomFrame& f1,
                          const Vector3& size2) -> std::uint32_t {
   double halflength = size1[1];
   double secondpos = -4;
-  Vector3 pos = multiply_transposed(f2.mat, subtract(f1.pos, f2.pos));
-  Vector3 axis = multiply_transposed(f2.mat, column(f1.mat, 2));
-  Vector3 halfaxis = scale(axis, halflength);
+  Vector3 pos = f2.mat.transpose() * (f1.pos - f2.pos);
+  Vector3 axis = f2.mat.transpose() * f1.mat.col(2);
+  Vector3 halfaxis = axis * halflength;
 
   int axisdir = 0;
   if (halfaxis[0] > 0) {
@@ -397,7 +384,7 @@ auto collide_capsule_box(Out1 con, double margin, const GeomFrame& f1,
   // An end of the capsule nearest a face.
   for (int i = -1; i <= 1; i += 2) {
     Vector3 tmp1 = pos;
-    add_to_scaled(InOut(tmp1), halfaxis, i);
+    tmp1 += i * halfaxis;
     Vector3 tmp2 = tmp1;
     int c1 = 0;
     int c2 = -1;
@@ -415,8 +402,8 @@ auto collide_capsule_box(Out1 con, double margin, const GeomFrame& f1,
     if (c1 > 1) {
       continue;
     }
-    tmp1 = subtract(tmp1, tmp2);
-    double dist = dot(tmp1, tmp1);
+    tmp1 -= tmp2;
+    double dist = tmp1.dot(tmp1);
     if (dist < bestdist) {
       bestdist = dist;
       bestsegmentpos = i;
@@ -435,12 +422,12 @@ auto collide_capsule_box(Out1 con, double margin, const GeomFrame& f1,
                    ((i & 2) != 0 ? 1 : -1) * size2[1],
                    ((i & 4) != 0 ? 1 : -1) * size2[2]};
       tmp3[j] = 0;
-      Vector3 dif = subtract(tmp3, pos);
+      Vector3 dif = tmp3 - pos;
       double ma = size2[j] * size2[j];
       double mb = -size2[j] * halfaxis[j];
       double mc = size1[1] * size1[1];
       double u = -size2[j] * dif[j];
-      double v = dot(halfaxis, dif);
+      double v = halfaxis.dot(dif);
       double det = ma * mc - mb * mb;
       if (std::abs(det) < MINVAL) {
         continue;
@@ -482,10 +469,10 @@ auto collide_capsule_box(Out1 con, double margin, const GeomFrame& f1,
           s1 = 0;
         }
       }
-      dif = subtract(tmp3, pos);
-      add_to_scaled(InOut(dif), halfaxis, -x2);
+      dif = tmp3 - pos;
+      dif -= x2 * halfaxis;
       dif[j] += size2[j] * x1;
-      double d2 = dot(dif, dif);
+      double d2 = dif.dot(dif);
       int c1 = s1 * 3 + s2;
       if (d2 < bestdist - MINVAL) {
         bestdist = d2;
@@ -600,7 +587,7 @@ auto collide_capsule_box(Out1 con, double margin, const GeomFrame& f1,
       mul = cltype == -3 ? 1 : -1;
       secondpos = 2;
       Vector3 tmp1 = pos;
-      add_to_scaled(InOut(tmp1), halfaxis, -mul);
+      tmp1 -= mul * halfaxis;
       for (int i = 0; i < 3; ++i) {
         if (i != clface) {
           e1 = (size2[i] - tmp1[i]) / halfaxis[i] * mul;
@@ -618,14 +605,14 @@ auto collide_capsule_box(Out1 con, double margin, const GeomFrame& f1,
   }
 
   Vector3 tmp1 = pos;
-  add_to_scaled(InOut(tmp1), halfaxis, bestsegmentpos);
-  Vector3 tmp2 = add(multiply(f2.mat, tmp1), f2.pos);
+  tmp1 += bestsegmentpos * halfaxis;
+  Vector3 tmp2 = f2.mat * tmp1 + f2.pos;
   std::uint32_t n =
       collide_sphere_box(con, margin, tmp2, size1[0], f2.pos, f2.mat, size2);
   if (secondpos > -3) {
     tmp1 = pos;
-    add_to_scaled(InOut(tmp1), halfaxis, secondpos + bestsegmentpos);
-    tmp2 = add(multiply(f2.mat, tmp1), f2.pos);
+    tmp1 += (secondpos + bestsegmentpos) * halfaxis;
+    tmp2 = f2.mat * tmp1 + f2.pos;
     n += collide_sphere_box(con.subspan(n), margin, tmp2, size1[0], f2.pos,
                             f2.mat, size2);
   }
@@ -669,8 +656,7 @@ auto clip_half_plane(int nin, InOut<Polygon*> cur, InOut<Polygon*> spare,
     if (((dp < 0 && dq > 0) || (dp > 0 && dq < 0)) && nout < MAXVERT) {
       const Vector3& q = in[k1];
       double t = dp / (dp - dq);
-      out[nout] = {p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1]),
-                   p[2] + t * (q[2] - p[2])};
+      out[nout] = p + t * (q - p);
       ++nout;
     }
   }
@@ -690,30 +676,18 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
   const Vector3& pos2 = f2.pos;
   const Matrix3& mat1 = f1.mat;
   const Matrix3& mat2 = f2.mat;
-  Vector3 pos21 = multiply_transposed(mat1, subtract(pos2, pos1));
-  Vector3 pos12 = multiply_transposed(mat2, subtract(pos1, pos2));
-  Matrix3 rot{mat1[0] * mat2[0] + mat1[3] * mat2[3] + mat1[6] * mat2[6],
-              mat1[0] * mat2[1] + mat1[3] * mat2[4] + mat1[6] * mat2[7],
-              mat1[0] * mat2[2] + mat1[3] * mat2[5] + mat1[6] * mat2[8],
-              mat1[1] * mat2[0] + mat1[4] * mat2[3] + mat1[7] * mat2[6],
-              mat1[1] * mat2[1] + mat1[4] * mat2[4] + mat1[7] * mat2[7],
-              mat1[1] * mat2[2] + mat1[4] * mat2[5] + mat1[7] * mat2[8],
-              mat1[2] * mat2[0] + mat1[5] * mat2[3] + mat1[8] * mat2[6],
-              mat1[2] * mat2[1] + mat1[5] * mat2[4] + mat1[8] * mat2[7],
-              mat1[2] * mat2[2] + mat1[5] * mat2[5] + mat1[8] * mat2[8]};
-  Matrix3 rotabs{};
-  for (int i = 0; i < 9; ++i) {
-    rotabs[i] = std::abs(rot[i]);
-  }
+  Vector3 pos21 = mat1.transpose() * (pos2 - pos1);
+  Vector3 pos12 = mat2.transpose() * (pos1 - pos2);
+  // The second box's axes in the first's frame.
+  Matrix3 rot = mat1.transpose() * mat2;
+  Matrix3 rotabs = rot.cwiseAbs();
 
   double septol = margin + SEPEPS * (size1[0] + size1[1] + size1[2] + size2[0] +
                                      size2[1] + size2[2]);
   double sep_best = -MAXVAL;
   int code = -1;
   for (int i = 0; i < 3; ++i) {
-    double radius2 = rotabs[3 * i + 0] * size2[0] +
-                     rotabs[3 * i + 1] * size2[1] +
-                     rotabs[3 * i + 2] * size2[2];
+    double radius2 = rotabs.row(i).dot(size2);
     double sep = std::abs(pos21[i]) - size1[i] - radius2;
     if (sep > septol) {
       return 0;
@@ -724,8 +698,7 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
     }
   }
   for (int j = 0; j < 3; ++j) {
-    double radius1 = rotabs[0 + j] * size1[0] + rotabs[3 + j] * size1[1] +
-                     rotabs[6 + j] * size1[2];
+    double radius1 = rotabs.col(j).dot(size1);
     double sep = std::abs(pos12[j]) - size2[j] - radius1;
     if (sep > septol) {
       return 0;
@@ -742,8 +715,8 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
     for (int j = 0; j < 3; ++j) {
       int i1 = (i + 1) % 3;
       int i2 = (i + 2) % 3;
-      double ax1 = -rot[3 * i2 + j];
-      double ax2 = rot[3 * i1 + j];
+      double ax1 = -rot(i2, j);
+      double ax2 = rot(i1, j);
       double norm2 = ax1 * ax1 + ax2 * ax2;
       if (norm2 < PAREPS) {
         continue;
@@ -754,8 +727,8 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
       double radius1 = size1[i1] * std::abs(ax1) + size1[i2] * std::abs(ax2);
       int j1 = (j + 1) % 3;
       int j2 = (j + 2) % 3;
-      double a2_1 = ax1 * rot[3 * i1 + j1] + ax2 * rot[3 * i2 + j1];
-      double a2_2 = ax1 * rot[3 * i1 + j2] + ax2 * rot[3 * i2 + j2];
+      double a2_1 = ax1 * rot(i1, j1) + ax2 * rot(i2, j1);
+      double a2_2 = ax1 * rot(i1, j2) + ax2 * rot(i2, j2);
       double radius2 = size2[j1] * std::abs(a2_1) + size2[j2] * std::abs(a2_2);
       double sep =
           std::abs(ax1 * pos21[i1] + ax2 * pos21[i2]) - radius1 - radius2;
@@ -777,9 +750,9 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
     int i2 = (i + 2) % 3;
     Vector3 axis = Vector3::Zero();
     axis[i] = 0;
-    axis[i1] = -rot[3 * i2 + j];
-    axis[i2] = rot[3 * i1 + j];
-    normalize3(InOut(axis));
+    axis[i1] = -rot(i2, j);
+    axis[i2] = rot(i1, j);
+    normalize(InOut(axis));
     return axis;
   };
 
@@ -791,8 +764,7 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
       face_dot = std::abs(axis[code_face]);
     } else {
       int f = code_face - 3;
-      face_dot = std::abs(axis[0] * rot[0 + f] + axis[1] * rot[3 + f] +
-                          axis[2] * rot[6 + f]);
+      face_dot = std::abs(axis.dot(rot.col(f)));
     }
     if (face_dot > 0.99 &&
         sep_best < sep_face + 0.05 * std::abs(sep_face) + MINVAL) {
@@ -809,13 +781,10 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
     int j1 = (j + 1) % 3;
     int j2 = (j + 2) % 3;
     Vector3 axis = edge_axis(i, j);
-    if (dot(axis, pos21) < 0) {
-      axis = {-axis[0], -axis[1], -axis[2]};
+    if (axis.dot(pos21) < 0) {
+      axis = -axis;
     }
-    Vector3 a2{
-        axis[0] * rot[0 + 0] + axis[1] * rot[3 + 0] + axis[2] * rot[6 + 0],
-        axis[0] * rot[0 + 1] + axis[1] * rot[3 + 1] + axis[2] * rot[6 + 1],
-        axis[0] * rot[0 + 2] + axis[1] * rot[3 + 2] + axis[2] * rot[6 + 2]};
+    Vector3 a2 = rot.transpose() * axis;
     int amb1 = -1;
     int amb2 = -1;
     if (std::abs(axis[i1]) < SGNEPS) {
@@ -828,7 +797,7 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
     } else if (std::abs(a2[j2]) < SGNEPS) {
       amb2 = j2;
     }
-    Vector3 d2{rot[0 + j], rot[3 + j], rot[6 + j]};
+    Vector3 d2 = rot.col(j);
     double b = d2[i];
     double denom = 1 - b * b;
     Vector3 w1 = Vector3::Zero();
@@ -850,10 +819,10 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
         if (amb2 >= 0 && v2 != 0) {
           cc[amb2] = -cc[amb2];
         }
-        Vector3 c2 = add(multiply(rot, cc), pos21);
-        Vector3 e = subtract(c2, c1);
+        Vector3 c2 = rot * cc + pos21;
+        Vector3 e = c2 - c1;
         double d1e = e[i];
-        double d2e = dot(d2, e);
+        double d2e = d2.dot(e);
         double s = denom < MINVAL ? 0 : (d1e - b * d2e) / denom;
         s = clip(s, -size1[i], size1[i]);
         double t = clip(b * s - d2e, -size2[j], size2[j]);
@@ -861,9 +830,9 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
         Vector3 p1 = c1;
         p1[i] += s;
         Vector3 p2 = c2;
-        add_to_scaled(InOut(p2), d2, t);
-        Vector3 gap = subtract(p2, p1);
-        double gap2 = dot(gap, gap);
+        p2 += t * d2;
+        Vector3 gap = p2 - p1;
+        double gap2 = gap.dot(gap);
         if (gap2 < best_d2) {
           best_d2 = gap2;
           w1 = p1;
@@ -871,15 +840,14 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
         }
       }
     }
-    double dist = dot(subtract(w2, w1), axis);
+    double dist = (w2 - w1).dot(axis);
     if (dist > septol) {
       return 0;
     }
-    Vector3 mid{0.5 * (w1[0] + w2[0]), 0.5 * (w1[1] + w2[1]),
-                0.5 * (w1[2] + w2[2])};
+    Vector3 mid = 0.5 * (w1 + w2);
     con[0].dist = dist;
-    con[0].pos = add(multiply(mat1, mid), pos1);
-    con[0].normal = multiply(mat1, axis);
+    con[0].pos = mat1 * mid + pos1;
+    con[0].normal = mat1 * axis;
     con[0].tangent = Vector3::Zero();
     return 1;
   }
@@ -892,35 +860,28 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
   const Vector3& posref = ref1 ? pos1 : pos2;
   const Matrix3& matref = ref1 ? mat1 : mat2;
   const Vector3& posoi = ref1 ? pos21 : pos12;
-  Matrix3 rinc = rot;
-  if (!ref1) {
-    for (int r = 0; r < 3; ++r) {
-      for (int c = 0; c < 3; ++c) {
-        rinc[3 * r + c] = rot[3 * c + r];
-      }
-    }
-  }
+  Matrix3 rinc = ref1 ? rot : Matrix3{rot.transpose()};
   double sgn = posoi[a] >= 0 ? 1 : -1;
   int binc = 0;
   for (int k = 1; k < 3; ++k) {
-    if (std::abs(rinc[3 * a + k]) > std::abs(rinc[3 * a + binc])) {
+    if (std::abs(rinc(a, k)) > std::abs(rinc(a, binc))) {
       binc = k;
     }
   }
-  double tinc = sgn * rinc[3 * a + binc] > 0 ? -1 : 1;
+  double tinc = sgn * rinc(a, binc) > 0 ? -1 : 1;
   int ax = (a + 1) % 3;
   int ay = (a + 2) % 3;
   int bu = (binc + 1) % 3;
   int bv = (binc + 2) % 3;
-  std::array<Polygon, 2> poly{};
+  std::array<Polygon, 2> poly;
   Vector3 cx = Vector3::Zero();
   Vector3 du = Vector3::Zero();
   Vector3 dv = Vector3::Zero();
   for (int r = 0; r < 3; ++r) {
     int c = r == 0 ? ax : (r == 1 ? ay : a);
-    cx[r] = posoi[c] + tinc * sizeinc[binc] * rinc[3 * c + binc];
-    du[r] = sizeinc[bu] * rinc[3 * c + bu];
-    dv[r] = sizeinc[bv] * rinc[3 * c + bv];
+    cx[r] = posoi[c] + tinc * sizeinc[binc] * rinc(c, binc);
+    du[r] = sizeinc[bu] * rinc(c, bu);
+    dv[r] = sizeinc[bv] * rinc(c, bv);
   }
   cx[2] = sgn * cx[2] - sizeref[a];
   du[2] *= sgn;
@@ -942,7 +903,7 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
   nvert = clip_half_plane(nvert, InOut(cur), InOut(spare), 1, 1, sizeref[ay]);
   nvert = clip_half_plane(nvert, InOut(cur), InOut(spare), 1, -1, sizeref[ay]);
 
-  Polygon accepted{};
+  Polygon accepted;
   int naccept = 0;
   double dupe2 =
       DUPEPS * (sizeref[ax] * sizeref[ax] + sizeref[ay] * sizeref[ay]);
@@ -968,8 +929,7 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
     return 0;
   }
   double nsign = ref1 ? sgn : -sgn;
-  Vector3 normal{nsign * matref[3 * 0 + a], nsign * matref[3 * 1 + a],
-                 nsign * matref[3 * 2 + a]};
+  Vector3 normal = nsign * matref.col(a);
   for (int k = 0; k < naccept; ++k) {
     const Vector3& v = accepted[k];
     Vector3 posc = Vector3::Zero();
@@ -977,7 +937,7 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
     posc[ay] = v[1];
     posc[a] = sgn * (sizeref[a] + 0.5 * v[2]);
     con[k].dist = v[2];
-    con[k].pos = add(multiply(matref, posc), posref);
+    con[k].pos = matref * posc + posref;
     con[k].normal = normal;
     con[k].tangent = Vector3::Zero();
   }
@@ -987,9 +947,9 @@ auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
 // A contact's frame from its normal and tangent (mju_makeFrame).
 auto make_frame(const Vector3& normal, const Vector3& tangent) -> Matrix3 {
   Vector3 x = normal;
-  normalize3(InOut(x));
+  normalize(InOut(x));
   Vector3 y = tangent;
-  if (dot(y, y) < 0.25) {
+  if (y.dot(y) < 0.25) {
     y = Vector3::Zero();
     if (x[1] < 0.5 && x[1] > -0.5) {
       y[1] = 1;
@@ -997,11 +957,14 @@ auto make_frame(const Vector3& normal, const Vector3& tangent) -> Matrix3 {
       y[2] = 1;
     }
   }
-  Vector3 tmp = scale(x, dot(x, y));
-  y = subtract(y, tmp);
-  normalize3(InOut(y));
-  Vector3 z = cross(x, y);
-  return {x[0], x[1], x[2], y[0], y[1], y[2], z[0], z[1], z[2]};
+  Vector3 tmp = x * x.dot(y);
+  y -= tmp;
+  normalize(InOut(y));
+  Matrix3 frame;
+  frame.row(0) = x;
+  frame.row(1) = y;
+  frame.row(2) = x.cross(y);
+  return frame;
 }
 
 }  // namespace
@@ -1052,7 +1015,7 @@ auto compute_geom_frame(const Geom& geom, const BodyFrame& body) -> GeomFrame {
       frame.pos = body.xipos;
       break;
     default:
-      frame.pos = add(multiply(body.xmat, geom.pos), body.xpos);
+      frame.pos = body.xmat * geom.pos + body.xpos;
       break;
   }
   switch (geom.frame) {
@@ -1065,7 +1028,7 @@ auto compute_geom_frame(const Geom& geom, const BodyFrame& body) -> GeomFrame {
       frame.mat = body.ximat;
       break;
     default:
-      frame.mat = convert_to_matrix(multiply(body.xquat, geom.quat));
+      frame.mat = (body.xquat * geom.quat).toRotationMatrix();
       break;
   }
   return frame;
@@ -1175,14 +1138,14 @@ auto append_contacts(const ArticulatedModel& model, std::uint32_t first,
   double r1 = radii[first];
   double r2 = radii[second];
   if (r1 > 0 && r2 > 0) {
-    Vector3 dif = subtract(p1.pos, p2.pos);
+    Vector3 dif = p1.pos - p2.pos;
     double reach = r1 + r2 + bound;
-    if (dot(dif, dif) > reach * reach) {
+    if (dif.dot(dif) > reach * reach) {
       return;
     }
   } else {
     auto above = [&](const GeomFrame& plane, const GeomFrame& other) {
-      return dot(subtract(other.pos, plane.pos), column(plane.mat, 2));
+      return (other.pos - plane.pos).dot(plane.mat.col(2));
     };
     if (g1->type == GeomType::PLANE && r2 > 0 && above(p1, p2) > bound + r2) {
       return;

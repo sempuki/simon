@@ -7,6 +7,8 @@
 #include <cmath>
 #include <numbers>
 
+#include "core/lie.hpp"
+
 namespace simon::robotic {
 
 auto Collide::prepare(SystemWorld& world) -> bool {
@@ -148,16 +150,12 @@ namespace {
 
 constexpr std::array<double, 5> NO_FRICTION{};
 
-// MuJoCo's quaternion as a rotation vector (mju_quat2Vel, dt 1).
-auto convert_to_rotation(model::Quaternion4 quat) -> Vector3 {
-  model::articulated::normalize4(InOut(quat));
-  Vector3 axis{quat[1], quat[2], quat[3]};
-  double sin_half = model::articulated::normalize3(InOut(axis));
-  double angle = 2 * std::atan2(sin_half, quat[0]);
-  if (angle > std::numbers::pi) {
-    angle -= 2 * std::numbers::pi;
-  }
-  return {axis[0] * angle, axis[1] * angle, axis[2] * angle};
+// A ball joint's quaternion, w, x, y, z, as a rotation vector
+// (mju_quat2Vel, dt 1).
+auto convert_to_rotation(const double* quaternion) -> Vector3 {
+  return so3::log(
+      Quaternion{quaternion[0], quaternion[1], quaternion[2], quaternion[3]}
+          .normalized());
 }
 
 }  // namespace
@@ -281,9 +279,8 @@ auto Solve::prepare(SystemWorld& world) -> bool {
       const double* qpos = data_[t].qpos;
       std::uint32_t q = joint.qpos - tree.first_qpos;
       if (joint.type == model::JointType::BALL) {
-        Vector3 r = convert_to_rotation(
-            {qpos[q], qpos[q + 1], qpos[q + 2], qpos[q + 3]});
-        double angle = model::articulated::normalize3(InOut(r));
+        Vector3 r = convert_to_rotation(&qpos[q]);
+        double angle = model::articulated::normalize(InOut(r));
         marked[t] =
             std::max(joint.range[0], joint.range[1]) - angle < joint.margin;
       } else {
@@ -505,9 +502,8 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
       std::uint32_t q = joint.qpos - tree.first_qpos;
       std::uint32_t c = offset[t] + joint.dof - tree.first_dof;
       if (joint.type == model::JointType::BALL) {
-        Vector3 r = convert_to_rotation(
-            {qpos[q], qpos[q + 1], qpos[q + 2], qpos[q + 3]});
-        double angle = model::articulated::normalize3(InOut(r));
+        Vector3 r = convert_to_rotation(&qpos[q]);
+        double angle = model::articulated::normalize(InOut(r));
         double dist = std::max(joint.range[0], joint.range[1]) - angle;
         if (dist < joint.margin) {
           std::ranges::fill(row, 0.0);
@@ -594,9 +590,9 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
       const std::vector<double>& source = turning ? rotation : translation;
       std::uint32_t axis = turning ? r - 3 : r;
       for (std::uint32_t i = 0; i < n; ++i) {
-        framed[r * n + i] = contact.frame[3 * axis] * source[i] +
-                            contact.frame[3 * axis + 1] * source[n + i] +
-                            contact.frame[3 * axis + 2] * source[2 * n + i];
+        framed[r * n + i] = contact.frame(axis, 0) * source[i] +
+                            contact.frame(axis, 1) * source[n + i] +
+                            contact.frame(axis, 2) * source[2 * n + i];
       }
     }
     std::uint32_t group = p.rows();

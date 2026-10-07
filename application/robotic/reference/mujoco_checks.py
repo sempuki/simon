@@ -24,6 +24,15 @@ mujoco_menagerie.py, and this script writes:
                         simon's solver stops elsewhere than MuJoCo's, a test
                         holds it to being no farther from these than MuJoCo
                         is.
+  mujoco_contact_spread.csv
+                        For each pose of mujoco_contacts.csv and
+                        mujoco_convex.csv, how far rounding moves MuJoCo's
+                        contacts there: the largest difference in a distance,
+                        position or frame between its contacts and those of
+                        the pose nudged, or, for the convex collider, those
+                        found with its tolerance halved, since where EPA
+                        stops is rounding's to choose too; and whether
+                        either changes which contacts there are.
   mujoco_converged.csv  For each case without constraints, the converged
                         solution at each step: Runge-Kutta 4 at a fiftieth of
                         the timestep. A test holds simon's error from it to
@@ -218,8 +227,56 @@ def converged(case, model, coarse):
     return states
 
 
+def find_contacts(model, data, qpos):
+    """The contacts at `qpos`: geoms, and distance, position and frame,
+    sorted by geoms and then position, as collision_test sorts them."""
+    data.qpos[:] = qpos
+    mujoco.mj_forward(model, data)
+    found = [((int(c.geom[0]), int(c.geom[1])),
+              np.concatenate([[c.dist], c.pos, c.frame]))
+             for c in data.contact[:data.ncon]]
+    found.sort(key=lambda c: (c[0], tuple(c[1][1:4])))
+    return found
+
+
+def write_contact_spreads(out, table, model_file, generator):
+    model = mujoco.MjModel.from_xml_path(os.path.join(MODELS, model_file))
+    data = mujoco.MjData(model)
+    # The same model, its convex collider stopping at half the tolerance.
+    finer = mujoco.MjModel.from_xml_path(os.path.join(MODELS, model_file))
+    finer.opt.ccd_tolerance = model.opt.ccd_tolerance / 2
+    finer_data = mujoco.MjData(finer)
+    with open(os.path.join(HERE, table)) as f:
+        rows = [r for r in csv.reader(f)][1:]
+    for pose, kind, values in rows:
+        if kind != 'qpos':
+            continue
+        qpos = np.array([float(x) for x in values.split()])
+        base = find_contacts(model, data, qpos)
+        spread = 0.0
+        recount = False
+        others = [find_contacts(finer, finer_data, qpos)]
+        others += [find_contacts(model, data, nudge(qpos, generator))
+                   for _ in range(NUDGES)]
+        for moved in others:
+            if [c[0] for c in moved] != [c[0] for c in base]:
+                recount = True
+                continue
+            for (_, a), (_, b) in zip(base, moved):
+                spread = max(spread, float(np.max(np.abs(a - b))))
+        out.writerow([table, pose, repr(spread), int(recount)])
+
+
 def main():
     generator = np.random.default_rng(SEED)
+    with open(os.path.join(HERE, 'mujoco_contact_spread.csv'), 'w',
+              newline='') as f:
+        out = csv.writer(f, lineterminator='\n')
+        out.writerow(['table', 'pose', 'spread', 'recount'])
+        write_contact_spreads(out, 'mujoco_contacts.csv', 'collisions.xml',
+                              generator)
+        write_contact_spreads(out, 'mujoco_convex.csv', 'convex.xml',
+                              generator)
     local = open(os.path.join(HERE, 'mujoco_local.csv'), 'w', newline='')
     spread = open(os.path.join(HERE, 'mujoco_spread.csv'), 'w', newline='')
     smooth = open(os.path.join(HERE, 'mujoco_converged.csv'), 'w',

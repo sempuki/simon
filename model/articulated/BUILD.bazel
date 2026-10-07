@@ -17,15 +17,6 @@ cc_library(
 )
 
 
-cc_library(
-    name = "arithmetic",
-    hdrs = ["arithmetic.hpp"],
-    copts = COPTS,
-    deps = [
-        ":articulated",
-        "//core:vocabulary",
-    ],
-)
 
 
 cc_library(
@@ -34,7 +25,8 @@ cc_library(
     copts = COPTS,
     deps = [
         ":articulated",
-        ":arithmetic",
+        "//3rd_party:eigen",
+        "//core:lie",
         "//core:vocabulary",
     ],
 )
@@ -65,7 +57,6 @@ cc_library(
     copts = COPTS,
     deps = [
         ":articulated",
-        ":arithmetic",
         ":dynamics",
         "//core:vocabulary",
     ],

@@ -178,7 +178,7 @@ struct Solve final    //
   struct TreeData final {
     const double* mass = nullptr;  // Rows `stride` long, the lower triangle.
     std::size_t stride = 0;
-    const model::Spatial* cdof = nullptr;
+    const Vector6* cdof = nullptr;
     const Vector3* com = nullptr;
     const double* qacc_smooth = nullptr;
     const double* qfrc_smooth = nullptr;
@@ -354,10 +354,7 @@ auto Bound<Capacity>::operator()(SystemWorld&, Entity,                    //
     std::uint32_t b = geom.body - tree.first_body;
     Vector3 at = dynamics->xipos[b];
     if (geom.frame != model::SameFrame::INERTIA) {
-      at = model::articulated::multiply(dynamics->xmat[b], geom.pos);
-      for (int k = 0; k < 3; ++k) {
-        at[k] += dynamics->xpos[b][k];
-      }
+      at = dynamics->xmat[b] * geom.pos + dynamics->xpos[b];
     }
     double reach = mechanics_->radii()[g] + geom.margin + geom.gap;
     double apart = std::hypot(at[0] - bound.center[0], at[1] - bound.center[1],

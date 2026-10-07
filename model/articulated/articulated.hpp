@@ -16,11 +16,30 @@
 // model (see model/REFERENCES.md). Joints are generalized coordinates: a
 // hinge or slide adds one position and one degree of freedom, a ball four and
 // three, a free joint seven and six. Body 0 is the world. Every pose is
-// relative to the parent body's frame, quaternions w, x, y, z. Plain SI
-// numbers, as MuJoCo's are, read once and shared, never changed.
+// relative to the parent body's frame. A ball or free joint's quaternion lies
+// among the positions w, x, y, z. Plain SI numbers, as MuJoCo's are, read once
+// and shared, never changed.
 namespace simon::model {
 
-using Quaternion4 = std::array<double, 4>;  // w, x, y, z.
+namespace articulated {
+
+// Below this, MuJoCo takes a length, a pivot or a determinant as zero
+// (mjMINVAL).
+inline constexpr double MINVAL = 1e-15;
+
+// Makes `v` a unit vector and returns its length; one too short to have a
+// direction becomes the x axis, as MuJoCo's does (mju_normalize3).
+inline auto normalize(InOut<Vector3> v) -> double {
+  double length = v->norm();
+  if (length < MINVAL) {
+    *v = Vector3::UnitX();
+  } else {
+    *v /= length;
+  }
+  return length;
+}
+
+}  // namespace articulated
 
 // Joint and shape types, numbered as MuJoCo numbers them.
 enum class JointType : std::uint8_t { FREE, BALL, SLIDE, HINGE };
@@ -60,9 +79,9 @@ struct ArticulatedBody final {
   std::uint32_t parent = 0;
   std::uint32_t root = 0;  // The child of the world whose tree it is in.
   Vector3 pos = Vector3::Zero();
-  Quaternion4 quat{1.0, 0.0, 0.0, 0.0};
+  Quaternion quat = Quaternion::Identity();
   Vector3 inertial_pos = Vector3::Zero();
-  Quaternion4 inertial_quat{1.0, 0.0, 0.0, 0.0};
+  Quaternion inertial_quat = Quaternion::Identity();
   double mass = 0.0;                  // kg.
   Vector3 inertia = Vector3::Zero();  // kg m^2, about the principal axes.
   std::uint32_t first_joint = 0;
@@ -114,7 +133,7 @@ struct Geom final {
   std::uint32_t body = 0;
   Vector3 size = Vector3::Zero();
   Vector3 pos = Vector3::Zero();
-  Quaternion4 quat{1.0, 0.0, 0.0, 0.0};
+  Quaternion quat = Quaternion::Identity();
   Vector3 friction{1.0, 0.005, 0.0001};
   SoftConstraint contact;
   double margin = 0.0;

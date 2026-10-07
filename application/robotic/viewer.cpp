@@ -27,7 +27,6 @@
 #include "core/vocabulary.hpp"
 #include "engine/driver.hpp"
 #include "imgui/imgui.h"
-#include "model/articulated/arithmetic.hpp"
 
 namespace simon::robotic {
 namespace {
@@ -37,11 +36,6 @@ using Session = viewing::Session<Simulation, Scenario>;
 using framework::Entity;
 using model::GeomFrame;
 using model::GeomType;
-using model::articulated::add;
-using model::articulated::column;
-using model::articulated::dot;
-using model::articulated::scale;
-using model::articulated::subtract;
 
 constexpr std::string_view HUMANOID = "3rd_party/mujoco/humanoid.xml";
 
@@ -54,9 +48,7 @@ struct Camera final {
   double fov = 0.9;  // rad, vertical.
 
   // The camera's position and axes: right, up and forward.
-  auto eye() const -> Vector3 {
-    return add(target, scale(backward(), distance));
-  }
+  auto eye() const -> Vector3 { return target + backward() * distance; }
   auto backward() const -> Vector3 {
     return {std::cos(pitch) * std::cos(yaw), std::cos(pitch) * std::sin(yaw),
             std::sin(pitch)};
@@ -77,19 +69,19 @@ class Projection final {
       : eye_{camera.eye()},
         right_{camera.right()},
         up_{camera.up()},
-        forward_{scale(camera.backward(), -1.0)},
+        forward_{camera.backward() * (-1.0)},
         center_{origin.x + size.x / 2, origin.y + size.y / 2},
         focal_{size.y / 2 / std::tan(camera.fov / 2)} {}
 
   auto depth(const Vector3& p) const -> double {
-    return dot(subtract(p, eye_), forward_);
+    return (p - eye_).dot(forward_);
   }
   auto visible(const Vector3& p) const -> bool { return depth(p) > NEAR; }
   auto at(const Vector3& p) const -> ImVec2 {
-    Vector3 d = subtract(p, eye_);
-    double z = std::max(dot(d, forward_), NEAR);
-    return {static_cast<float>(center_.x + focal_ * dot(d, right_) / z),
-            static_cast<float>(center_.y - focal_ * dot(d, up_) / z)};
+    Vector3 d = p - eye_;
+    double z = std::max(d.dot(forward_), NEAR);
+    return {static_cast<float>(center_.x + focal_ * d.dot(right_) / z),
+            static_cast<float>(center_.y - focal_ * d.dot(up_) / z)};
   }
   auto size(double length, const Vector3& p) const -> float {
     return static_cast<float>(focal_ * length / std::max(depth(p), NEAR));
@@ -185,9 +177,9 @@ class Viewer final {
     }
     if (ImGui::IsMouseDragging(ImGuiMouseButton_Right)) {
       double pan = camera_.distance / size.y * 2 * std::tan(camera_.fov / 2);
-      camera_.target = add(camera_.target,
-                           add(scale(camera_.right(), -io.MouseDelta.x * pan),
-                               scale(camera_.up(), io.MouseDelta.y * pan)));
+      camera_.target = camera_.target +
+                       camera_.right() * (-io.MouseDelta.x * pan) +
+                       camera_.up() * (io.MouseDelta.y * pan);
     }
     if (io.MouseWheel != 0) {
       camera_.distance = std::clamp(
@@ -235,14 +227,13 @@ class Viewer final {
     simulation.world().store_of<TreeBound>().for_each(
         [&](Entity, const TreeBound& bound) {
           if (bound.radius > 0) {
-            sum = add(sum, bound.center);
+            sum += bound.center;
             ++count;
           }
         });
     if (count > 0) {
-      Vector3 mean = scale(sum, 1.0 / static_cast<double>(count));
-      camera_.target =
-          add(camera_.target, scale(subtract(mean, camera_.target), 0.05));
+      Vector3 mean = sum * (1.0 / static_cast<double>(count));
+      camera_.target += (mean - camera_.target) * 0.05;
     }
   }
 
@@ -279,12 +270,12 @@ class Viewer final {
                   ImDrawList* draw) const -> void {
     constexpr int LINES = 40;
     constexpr double SPACING = 0.5;  // m.
-    Vector3 x = column(frame.mat, 0);
-    Vector3 y = column(frame.mat, 1);
+    Vector3 x = frame.mat.col(0);
+    Vector3 y = frame.mat.col(1);
     // Centered under the camera's target, on the plane.
-    Vector3 offset = subtract(camera_.target, frame.pos);
-    double u0 = std::round(dot(offset, x) / SPACING) * SPACING;
-    double v0 = std::round(dot(offset, y) / SPACING) * SPACING;
+    Vector3 offset = camera_.target - frame.pos;
+    double u0 = std::round(offset.dot(x) / SPACING) * SPACING;
+    double v0 = std::round(offset.dot(y) / SPACING) * SPACING;
     double half = LINES / 2 * SPACING;
     for (int i = -LINES / 2; i <= LINES / 2; ++i) {
       for (int axis = 0; axis < 2; ++axis) {
@@ -292,9 +283,9 @@ class Viewer final {
         const Vector3& across = axis == 0 ? y : x;
         double c = (axis == 0 ? v0 : u0) + i * SPACING;
         double a = axis == 0 ? u0 : v0;
-        Vector3 base = add(frame.pos, add(scale(across, c), scale(along, a)));
-        draw_line(add(base, scale(along, -half)), add(base, scale(along, half)),
-                  projection, IM_COL32(70, 80, 95, 255), 1.0f, draw);
+        Vector3 base = frame.pos + across * c + along * a;
+        draw_line(base + along * (-half), base + along * half, projection,
+                  IM_COL32(70, 80, 95, 255), 1.0f, draw);
       }
     }
   }
@@ -309,9 +300,9 @@ class Viewer final {
       return;
     }
     if (da < NEAR) {
-      a = add(a, scale(subtract(b, a), (NEAR - da) / (db - da)));
+      a += (b - a) * ((NEAR - da) / (db - da));
     } else if (db < NEAR) {
-      b = add(b, scale(subtract(a, b), (NEAR - db) / (da - db)));
+      b += (a - b) * ((NEAR - db) / (da - db));
     }
     draw->AddLine(projection.at(a), projection.at(b), color,
                   thickness * scale_);
@@ -335,9 +326,9 @@ class Viewer final {
         break;
       }
       case GeomType::CAPSULE: {
-        Vector3 axis = scale(column(frame.mat, 2), s[1]);
-        Vector3 a = subtract(frame.pos, axis);
-        Vector3 b = add(frame.pos, axis);
+        Vector3 axis = frame.mat.col(2) * s[1];
+        Vector3 a = frame.pos - axis;
+        Vector3 b = frame.pos + axis;
         float ra = projection.size(s[0], a);
         float rb = projection.size(s[0], b);
         ImU32 fill = shade(color, 0.75);
@@ -374,10 +365,9 @@ class Viewer final {
         {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}};
     for (double z : {-1.0, 1.0}) {
       for (const auto& [u, v] : RING) {
-        corners.push_back(
-            add(frame.pos, add(scale(column(frame.mat, 0), u * s[0]),
-                               add(scale(column(frame.mat, 1), v * s[1]),
-                                   scale(column(frame.mat, 2), z * s[2])))));
+        corners.push_back(frame.pos + frame.mat.col(0) * (u * s[0]) +
+                          frame.mat.col(1) * (v * s[1]) +
+                          frame.mat.col(2) * (z * s[2]));
       }
     }
     return corners;
@@ -389,11 +379,10 @@ class Viewer final {
     for (double z : {-1.0, 1.0}) {
       for (int k = 0; k < CYLINDER_SIDES; ++k) {
         double angle = 2 * std::numbers::pi * k / CYLINDER_SIDES;
-        corners.push_back(
-            add(frame.pos,
-                add(scale(column(frame.mat, 0), s[0] * std::cos(angle)),
-                    add(scale(column(frame.mat, 1), s[0] * std::sin(angle)),
-                        scale(column(frame.mat, 2), z * s[1])))));
+        corners.push_back(frame.pos +
+                          frame.mat.col(0) * (s[0] * std::cos(angle)) +
+                          frame.mat.col(1) * (s[0] * std::sin(angle)) +
+                          frame.mat.col(2) * (z * s[1]));
       }
     }
     return corners;
@@ -406,17 +395,16 @@ class Viewer final {
       -> void {
     Vector3 center = Vector3::Zero();
     for (const Vector3& c : corners) {
-      center = add(center, scale(c, 1.0 / static_cast<double>(corners.size())));
+      center += c * (1.0 / static_cast<double>(corners.size()));
     }
     auto face = [&](const std::vector<Vector3>& points) {
       Vector3 middle = Vector3::Zero();
       for (const Vector3& p : points) {
-        middle =
-            add(middle, scale(p, 1.0 / static_cast<double>(points.size())));
+        middle += p * (1.0 / static_cast<double>(points.size()));
       }
-      Vector3 normal = subtract(middle, center);
-      double length = std::sqrt(dot(normal, normal));
-      if (length <= 0 || dot(normal, subtract(projection.eye(), middle)) <= 0) {
+      Vector3 normal = middle - center;
+      double length = std::sqrt(normal.dot(normal));
+      if (length <= 0 || normal.dot(projection.eye() - middle) <= 0) {
         return;
       }
       for (const Vector3& p : points) {
@@ -429,7 +417,7 @@ class Viewer final {
         pixels.push_back(projection.at(p));
       }
       draw->AddConvexPolyFilled(pixels.data(), static_cast<int>(pixels.size()),
-                                shade(color, dot(normal, light) / length));
+                                shade(color, normal.dot(light) / length));
     };
     for (int k = 0; k < sides; ++k) {
       int next = (k + 1) % sides;
