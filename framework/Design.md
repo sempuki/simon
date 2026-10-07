@@ -1580,8 +1580,8 @@ requirements, which include `now()`. GCC, Clang and MSVC do not enforce it. If
 that ever matters, `TimePoint` becomes a small type of our own wrapping
 `nanoseconds` since the start of the run, with the same arithmetic rules.
 
-These live in `2nd_party/lib/base/time.hpp` (included as `base/time.hpp`) as
-`lib::SimTime`, `lib::Duration` and `lib::TimePoint` (step 2 replaced the old `double`-second `SimClock`).
+These live in `core/time.hpp` as `SimTime`, `Duration` and `TimePoint`,
+beside `BasicStep` and `Step`.
 
 ### Units
 
