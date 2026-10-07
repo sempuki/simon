@@ -367,9 +367,9 @@ auto Bound<Capacity>::operator()(SystemWorld&, Entity,                    //
 template <typename Capacity>
 auto Solve::gather(SystemWorld& world) -> void {
   constexpr std::size_t V = Capacity::dofs;
-  const auto& mechanisms = world.template store_of<Mechanism>();
-  const auto& states = world.template store_of<TreeState<Capacity>>();
-  world.template store_of<TreeDynamics<Capacity>>().for_each(
+  const auto& mechanisms = world.store_of<Mechanism>();
+  const auto& states = world.store_of<TreeState<Capacity>>();
+  world.store_of<TreeDynamics<Capacity>>().for_each(
       [&](Entity owner, const TreeDynamics<Capacity>& dynamics) {
         std::uint32_t t = mechanisms.component_of(owner).tree;
         const TreeState<Capacity>& state = states.component_of(owner);
@@ -388,8 +388,8 @@ auto Solve::gather(SystemWorld& world) -> void {
 template <typename Capacity>
 auto Collide::place_geoms(SystemWorld& world) -> void {
   const model::ArticulatedModel& m = mechanics_->model();
-  const auto& mechanisms = world.template store_of<Mechanism>();
-  world.template store_of<TreeDynamics<Capacity>>().for_each(
+  const auto& mechanisms = world.store_of<Mechanism>();
+  world.store_of<TreeDynamics<Capacity>>().for_each(
       [&](Entity owner, const TreeDynamics<Capacity>& dynamics) {
         const model::Tree& tree =
             mechanics_->trees()[mechanisms.component_of(owner).tree];

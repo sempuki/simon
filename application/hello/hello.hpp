@@ -46,6 +46,9 @@ using World =
     framework::World<Kinematics, framework::TypeList<Control, Body, Contact>,
                      framework::TypeList<Ball>>;
 
+template <typename SystemType>
+using ProjectedWorld = framework::ProjectedWorld<SystemType, World>;
+
 //-- Systems ------------------------------------------------------------------
 
 // The box the balls bounce in, from the origin to `width` along x and to
@@ -80,7 +83,9 @@ auto append_wall_contacts(const Springiness& springiness, const Box& box,
 struct Integrate final               //
     : framework::System<Kinematics,  //
                         const Control> {
-  auto operator()(auto&, Entity,           //
+  using SystemWorld = ProjectedWorld<Integrate>;
+
+  auto operator()(SystemWorld&, Entity,    //
                   Kinematics& kinematics,  //
                   const Control* control,  //
                   Step step) const -> void {
@@ -98,26 +103,27 @@ struct DetectContacts final          //
     : framework::System<Contact,     //
                         const Body,  //
                         const Kinematics> {
+  using SystemWorld = ProjectedWorld<DetectContacts>;
   using AllowComponentList = framework::TypeList<Kinematics, Body>;
   using SequenceAfterSystemList = framework::SystemList<Integrate>;
 
-  auto prepare(auto& world) -> void {
+  auto prepare(SystemWorld& world) -> void {
     largest_radius = 0.0 * meter;
-    store_of<Body>(world).for_each([&](Entity, const Body& body) {
+    world.store_of<Body>().for_each([&](Entity, const Body& body) {
       largest_radius = max(largest_radius, body.radius);
     });
   }
 
-  auto operator()(auto& world, Entity self,  //
-                  Contact& contact,          //
-                  const Body* body,          //
+  auto operator()(SystemWorld& world, Entity self,  //
+                  Contact& contact,                 //
+                  const Body* body,                 //
                   const Kinematics* kinematics) const -> void {
     contact = Contact{};
     if (!body || !kinematics) return;
     world.within(
         *kinematics, body->radius + largest_radius,
         [&](Entity other, const Kinematics& other_kinematics) {
-          const Body* other_body = maybe_component_of<Body>(world, other);
+          const Body* other_body = world.maybe_component_of<Body>(other);
           if (other == self || !other_body) return;
           append_ball_contact(springiness, *body, *kinematics, *other_body,
                               other_kinematics, InOut(contact));
@@ -138,9 +144,10 @@ struct ApplyContacts final              //
     : framework::System<Kinematics,     //
                         const Contact,  //
                         const Body> {
+  using SystemWorld = ProjectedWorld<ApplyContacts>;
   using SequenceAfterSystemList = framework::SystemList<DetectContacts>;
 
-  auto operator()(auto&, Entity,           //
+  auto operator()(SystemWorld&, Entity,    //
                   Kinematics& kinematics,  //
                   const Contact* contact,  //
                   const Body* body,        //

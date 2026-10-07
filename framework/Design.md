@@ -755,9 +755,13 @@ component list. Logging, replaying or sending them to another process (the DIS
 and HLA direction) would build on them, and is not built.
 
 Systems use builders too, through their `ProjectedWorld`:
-`world.create<Interceptor>().under(self).with(...).build()`. Inside a system
-whose access parameter is `auto&`, the free-function form avoids the
-`template` keyword: `create<Interceptor>(lib::InOut(world))`.
+`world.create<Interceptor>().under(self).with(...).build()`. Each struct
+system names its projected world once, `using SystemWorld =
+ProjectedWorld<ThisSystem>;`, and its `prepare`, per-entity call and
+`resolve` take `SystemWorld&`. That alias is the one way a system reaches the
+world, and since its type is known, member templates need no `template`
+keyword. A helper several systems share takes the stores it reads
+(`const ComponentStore<Radar>&`) rather than a world.
 
 `ProjectedWorld` has the query forms as well, `world.destroy()` and
 `world.change()`, limited to what the system declares it reads. Selecting by a
@@ -919,6 +923,10 @@ auto guide = framework::system<const Interceptor, const Kinematics, Control>(
     framework::TypeList<Kinematics>{},  // AllowComponentList.
     [](auto& world, Entity, const Interceptor&, const Kinematics*, Control*) { ... });
 ```
+
+A lambda system has no type of its own to name, so its world is `auto&`, and
+a member template on it takes the keyword:
+`world.template maybe_component_of<Kinematics>(other)`.
 
 A struct system keeps its state in members, which the scheduler owns. Either
 way, each scheduled system is one object that lives as long as its scheduler.
@@ -1405,7 +1413,9 @@ returns false.
 
 ```cpp
 // Steps without a scan have nothing to detect.
-auto prepare(SystemWorld& world) -> bool { return radars_.collect(world); }
+auto prepare(SystemWorld& world) -> bool {
+  return radars_.collect(world.store_of<Radar>(), world.store_of<Kinematics>());
+}
 ```
 
 ### Keep the per-entity call small

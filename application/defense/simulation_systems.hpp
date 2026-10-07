@@ -13,11 +13,13 @@
 #include "application/defense/simulation_components.hpp"
 #include "base/core.hpp"
 #include "core/argument.hpp"
+#include "framework/component_store.hpp"
 #include "framework/system.hpp"
 #include "model/guidance.hpp"
 
 namespace simon::defense {
 
+using framework::ComponentStore;
 using framework::System;
 using framework::SystemList;
 using framework::TypeList;
@@ -51,15 +53,14 @@ struct ScanRadars final  //
 // near it. Systems build one in `prepare`.
 class ScanningRadars final {
  public:
-  // Collects and indexes the radars that scanned. Returns whether any did.
-  template <typename ProjectedWorldType>
-  auto collect(ProjectedWorldType& world) -> bool {
+  // Collects and indexes the radars in `radars` that scanned, at their
+  // Kinematics in `motions`. Returns whether any did.
+  auto collect(const ComponentStore<Radar>& radars,
+               const ComponentStore<Kinematics>& motions) -> bool {
     scanning_.clear();
     longest_ = 0.0 * meter;
-    const auto& radars = world.template store_of<Radar>();
     radars.for_each([&](Entity owner, const Radar& radar) {
-      const Kinematics* kinematics =
-          world.template maybe_component_of<Kinematics>(owner);
+      const Kinematics* kinematics = motions.maybe_component_of(owner);
       if (radar.scanned && kinematics) {
         scanning_.push_back(
             Scanning{.radar = kinematics, .range = radar.range});
@@ -117,7 +118,10 @@ struct DetectDrones final       //
   using AllowComponentList = TypeList<Kinematics, Radar>;
 
   // Steps without a scan have nothing to detect.
-  auto prepare(SystemWorld& world) -> bool { return radars_.collect(world); }
+  auto prepare(SystemWorld& world) -> bool {
+    return radars_.collect(world.store_of<Radar>(),
+                           world.store_of<Kinematics>());
+  }
 
   auto operator()(SystemWorld& world, Entity self,  //
                   const RedDrone&,                  //
@@ -155,7 +159,10 @@ struct UpdateTracks final  //
   using AllowComponentList = TypeList<Kinematics, Radar>;
 
   // Steps without a scan have nothing to update.
-  auto prepare(SystemWorld& world) -> bool { return radars_.collect(world); }
+  auto prepare(SystemWorld& world) -> bool {
+    return radars_.collect(world.store_of<Radar>(),
+                           world.store_of<Kinematics>());
+  }
 
   auto operator()(SystemWorld& world, Entity,  //
                   Track& track,                //
@@ -490,7 +497,9 @@ struct SteerRedDrones final     //
 struct Integrate final    //
     : System<Kinematics,  //
              const Control> {
-  auto operator()(auto&, Entity,           //
+  using SystemWorld = ProjectedWorld<Integrate>;
+
+  auto operator()(SystemWorld&, Entity,    //
                   Kinematics& kinematics,  //
                   const Control* control,  //
                   Step step) const -> void {

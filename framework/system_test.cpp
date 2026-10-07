@@ -28,8 +28,10 @@ const Step STEP{.time = TimePoint{}, .dt = std::chrono::milliseconds{500}};
 struct Record final           //
     : System<const Position,  //
              const Velocity> {
-  auto operator()(auto&, Entity entity,  //
-                  const Position&,       //
+  using SystemWorld = ProjectedWorld<Record, TestWorld>;
+
+  auto operator()(SystemWorld&, Entity entity,  //
+                  const Position&,              //
                   const Velocity* velocity) -> void {
     seen.push_back({entity, velocity != nullptr});
   }
@@ -39,7 +41,9 @@ struct Record final           //
 struct Integrate final  //
     : System<Position,  //
              const Velocity> {
-  auto operator()(auto&, Entity,             //
+  using SystemWorld = ProjectedWorld<Integrate, TestWorld>;
+
+  auto operator()(SystemWorld&, Entity,      //
                   Position& position,        //
                   const Velocity* velocity,  //
                   Step step) -> void {
@@ -51,12 +55,13 @@ struct Integrate final  //
 struct Chase final      //
     : System<Velocity,  //
              const Health> {
+  using SystemWorld = ProjectedWorld<Chase, TestWorld>;
   using AllowComponentList = TypeList<Position>;
-  auto operator()(auto& world, Entity self,  //
-                  Velocity& velocity,        //
+  auto operator()(SystemWorld& world, Entity self,  //
+                  Velocity& velocity,               //
                   const Health*) -> void {
-    const Position* mine = maybe_component_of<Position>(world, self);
-    const Position* other = maybe_component_of<Position>(world, target);
+    const Position* mine = world.maybe_component_of<Position>(self);
+    const Position* other = world.maybe_component_of<Position>(target);
     velocity.x = (mine && other) ? other->x - mine->x : 0.0;
   }
   Entity target;
@@ -66,8 +71,9 @@ struct Chase final      //
 // Velocity.
 struct RecordStill final  //
     : System<const Position> {
+  using SystemWorld = ProjectedWorld<RecordStill, TestWorld>;
   using ExcludeComponentList = TypeList<Velocity>;
-  auto operator()(auto&, Entity entity, const Position&) -> void {
+  auto operator()(SystemWorld&, Entity entity, const Position&) -> void {
     seen.push_back(entity);
   }
   std::vector<Entity> seen;
@@ -76,7 +82,10 @@ struct RecordStill final  //
 // Destroys every entity whose health is gone.
 struct Cull final  //
     : System<const Health> {
-  auto operator()(auto& world, Entity self, const Health& health) -> void {
+  using SystemWorld = ProjectedWorld<Cull, TestWorld>;
+
+  auto operator()(SystemWorld& world, Entity self, const Health& health)
+      -> void {
     if (health.points <= 0.0) {
       REQUIRE(world.destroy(self).build());
     }
@@ -86,8 +95,11 @@ struct Cull final  //
 // Spawns a child under every launcher, from inside a system.
 struct Spawn final  //
     : System<const Position> {
-  auto operator()(auto& world, Entity self, const Position& position) -> void {
-    REQUIRE(create<testing::Interceptor>(InOut(world))
+  using SystemWorld = ProjectedWorld<Spawn, TestWorld>;
+
+  auto operator()(SystemWorld& world, Entity self, const Position& position)
+      -> void {
+    REQUIRE(world.create<testing::Interceptor>()
                 .under(self)
                 .with(Position{position.x})
                 .with(Velocity{})
@@ -100,7 +112,9 @@ struct Spawn final  //
 struct CheckSiblings final    //
     : System<const Position,  //
              const Velocity> {
-  auto operator()(auto&, Entity,             //
+  using SystemWorld = ProjectedWorld<CheckSiblings, TestWorld>;
+
+  auto operator()(SystemWorld&, Entity,      //
                   const Position& position,  //
                   const Velocity* velocity) -> void {
     if (!velocity) {
@@ -118,9 +132,11 @@ struct CheckSiblings final    //
 // Skips its loop when told to, and counts what ran.
 struct Skippable final  //
     : System<const Health> {
-  auto prepare(auto&) -> bool { return run; }
-  auto operator()(auto&, Entity, const Health&) -> void { ++called; }
-  auto resolve(auto&) -> void { resolved = true; }
+  using SystemWorld = ProjectedWorld<Skippable, TestWorld>;
+
+  auto prepare(SystemWorld&) -> bool { return run; }
+  auto operator()(SystemWorld&, Entity, const Health&) -> void { ++called; }
+  auto resolve(SystemWorld&) -> void { resolved = true; }
   int called = 0;
   bool run = true;
   bool resolved = false;
@@ -129,10 +145,11 @@ struct Skippable final  //
 // Counts entities with health; runs after Cull, so it sees Cull's commands.
 struct Count final  //
     : System<const Health> {
+  using SystemWorld = ProjectedWorld<Count, TestWorld>;
   using SequenceAfterSystemList = SystemList<Cull>;
-  auto prepare(auto&) -> void { count = 0; }
-  auto operator()(auto&, Entity, const Health&) -> void { ++count; }
-  auto resolve(auto&) -> void { resolved = true; }
+  auto prepare(SystemWorld&) -> void { count = 0; }
+  auto operator()(SystemWorld&, Entity, const Health&) -> void { ++count; }
+  auto resolve(SystemWorld&) -> void { resolved = true; }
   int count = 0;
   bool resolved = false;
 };
@@ -141,15 +158,13 @@ struct Count final  //
 // and skips the per-entity loop.
 struct ClearOrigin final  //
     : System<const Health> {
+  using SystemWorld = ProjectedWorld<ClearOrigin, TestWorld>;
   using AllowComponentList = TypeList<Position>;
-  auto prepare(auto& world) -> bool {
-    destroyed = world.destroy()
-                    .template each<Body>()
-                    .within(Position{0.0}, 2.0)
-                    .build();
+  auto prepare(SystemWorld& world) -> bool {
+    destroyed = world.destroy().each<Body>().within(Position{0.0}, 2.0).build();
     return false;
   }
-  auto operator()(auto&, Entity, const Health&) -> void {}
+  auto operator()(SystemWorld&, Entity, const Health&) -> void {}
   std::expected<std::size_t, Status> destroyed;
 };
 
@@ -376,7 +391,8 @@ TEST_CASE("System") {
     auto chase = system<Velocity, const Position>(
         TypeList<Position>{}, [target](auto& world, Entity, Velocity& velocity,
                                        const Position* mine) {
-          const Position* other = maybe_component_of<Position>(world, target);
+          const Position* other =
+              world.template maybe_component_of<Position>(target);
           velocity.x = (mine && other) ? other->x - mine->x : 0.0;
         });
     Scheduler<TestWorld, SystemList<decltype(chase)>> scheduler{

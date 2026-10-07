@@ -93,8 +93,10 @@ auto build(Out<TestWorld> world) -> void {
 struct Spring final      //
     : System<PointRate,  //
              const Point> {
-  auto operator()(auto&, Entity,    //
-                  PointRate& rate,  //
+  using SystemWorld = ProjectedWorld<Spring, TestWorld>;
+
+  auto operator()(SystemWorld&, Entity,  //
+                  PointRate& rate,       //
                   const Point* point) const -> void {
     rate = {.dx = point->v, .dv = -point->x};
   }
@@ -106,16 +108,17 @@ struct Lead final          //
     : System<PointRate,    //
              const Point,  //
              const Follow> {
+  using SystemWorld = ProjectedWorld<Lead, TestWorld>;
   using AllowComponentList = TypeList<Point>;
-  auto operator()(auto& world, Entity,  //
-                  PointRate& rate,      //
-                  const Point*,         //
+  auto operator()(SystemWorld& world, Entity,  //
+                  PointRate& rate,             //
+                  const Point*,                //
                   const Follow* follow) const -> void {
     if (!follow) {
       rate = {.dx = 1.0};
       return;
     }
-    rate = {.dx = world.template component_of<Point>(follow->leader).x};
+    rate = {.dx = world.component_of<Point>(follow->leader).x};
   }
 };
 
@@ -123,9 +126,11 @@ struct Lead final          //
 struct Clock final       //
     : System<PointRate,  //
              const Point> {
-  auto operator()(auto&, Entity,    //
-                  PointRate& rate,  //
-                  const Point*,     //
+  using SystemWorld = ProjectedWorld<Clock, TestWorld>;
+
+  auto operator()(SystemWorld&, Entity,  //
+                  PointRate& rate,       //
+                  const Point*,          //
                   Step step) const -> void {
     rate = {.dx = std::chrono::duration<double>(step.time.time_since_epoch())
                       .count()};
@@ -136,8 +141,11 @@ struct Clock final       //
 struct Spawn final       //
     : System<PointRate,  //
              const Point> {
-  auto operator()(auto& world, Entity, PointRate&, const Point*) const -> void {
-    REQUIRE(world.template create<Loose>().build());
+  using SystemWorld = ProjectedWorld<Spawn, TestWorld>;
+
+  auto operator()(SystemWorld& world, Entity, PointRate&, const Point*) const
+      -> void {
+    REQUIRE(world.create<Loose>().build());
   }
 };
 
@@ -145,9 +153,10 @@ struct Spawn final       //
 struct Locate final      //
     : System<PointRate,  //
              const Point> {
+  using SystemWorld = ProjectedWorld<Locate, TestWorld>;
   using AllowComponentList = TypeList<Point>;
-  auto operator()(auto& world, Entity self,  //
-                  PointRate& rate,           //
+  auto operator()(SystemWorld& world, Entity self,  //
+                  PointRate& rate,                  //
                   const Point* point) -> void {
     bool found = false;
     world.within(*point, 1e-9, [&](Entity entity, const Point&) {

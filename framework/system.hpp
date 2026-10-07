@@ -337,38 +337,6 @@ class ProjectedWorld final {
   WorldType* world_ = nullptr;
 };
 
-// Free-function forms of the ProjectedWorld member templates, so a system whose
-// access parameter is `auto&` can write
-// `maybe_component_of<Collider>(access, other)` instead of
-// `access.template maybe_component_of<Collider>(other)`. Found by
-// argument-dependent lookup.
-template <typename ComponentType, typename SystemType, typename WorldType>
-auto maybe_component_of(const ProjectedWorld<SystemType, WorldType>& access,
-                        Entity entity) -> const ComponentType* {
-  return access.template maybe_component_of<ComponentType>(entity);
-}
-
-template <typename ComponentType, typename SystemType, typename WorldType>
-auto component_of(const ProjectedWorld<SystemType, WorldType>& access,
-                  Entity entity) -> const ComponentType& {
-  return access.template component_of<ComponentType>(entity);
-}
-
-template <typename ComponentType, typename SystemType, typename WorldType>
-auto store_of(const ProjectedWorld<SystemType, WorldType>& access)
-    -> const ComponentStore<ComponentType>& {
-  return access.template store_of<ComponentType>();
-}
-
-template <Archetypal ArchetypeType, typename SystemType, typename WorldType>
-auto create(Alias alias, InOut<ProjectedWorld<SystemType, WorldType>> access) {
-  return access->template create<ArchetypeType>(std::move(alias));
-}
-template <Archetypal ArchetypeType, typename SystemType, typename WorldType>
-auto create(InOut<ProjectedWorld<SystemType, WorldType>> access) {
-  return access->template create<ArchetypeType>();
-}
-
 //-- Running systems -----------------------------------------------------------
 
 struct SystemRunner final {

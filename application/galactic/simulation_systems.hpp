@@ -7,6 +7,7 @@
 #include "application/galactic/simulation_components.hpp"
 #include "core/argument.hpp"
 #include "core/units.hpp"
+#include "framework/component_store.hpp"
 #include "framework/entity.hpp"
 #include "framework/system.hpp"
 #include "model/gravity/gravity.hpp"
@@ -19,18 +20,19 @@ using model::GravitySource;
 using model::GravityTree;
 using model::Kinematics;
 
+template <typename SystemType>
+using ProjectedWorld = framework::ProjectedWorld<SystemType, World>;
+
 //-- Gravity -------------------------------------------------------------------
 
-// Gathers into `sources` every body of `world` with a PointMass and a
-// Kinematics, in the PointMass store's order.
-template <typename WorldType>
-auto gather_sources(const WorldType& world,
-                    InOut<std::vector<GravitySource>> sources) -> void {
+// Gathers into `sources` every body with a PointMass in `points` and a
+// Kinematics in `motions`, in the PointMass store's order.
+inline auto gather_sources(const framework::ComponentStore<PointMass>& points,
+                           const framework::ComponentStore<Kinematics>& motions,
+                           InOut<std::vector<GravitySource>> sources) -> void {
   sources->clear();
-  store_of<PointMass>(world).for_each([&](Entity entity,
-                                          const PointMass& point) {
-    const Kinematics* kinematics =
-        maybe_component_of<Kinematics>(world, entity);
+  points.for_each([&](Entity entity, const PointMass& point) {
+    const Kinematics* kinematics = motions.maybe_component_of(entity);
     if (!kinematics) return;
     sources->push_back(GravitySource{
         .position = kinematics->position.numerical_value_ref_in(meter).eigen(),
@@ -46,16 +48,18 @@ auto gather_sources(const WorldType& world,
 struct SumGravity final           //
     : framework::System<Gravity,  //
                         const Kinematics> {
+  using SystemWorld = ProjectedWorld<SumGravity>;
   using AllowComponentList = framework::TypeList<Kinematics, PointMass>;
 
-  auto prepare(auto& world) -> bool {
+  auto prepare(SystemWorld& world) -> bool {
     if (!enabled) return false;
-    gather_sources(world, InOut(sources));
+    gather_sources(world.store_of<PointMass>(), world.store_of<Kinematics>(),
+                   InOut(sources));
     return true;
   }
 
-  auto operator()(auto&, Entity self,  //
-                  Gravity& gravity,    //
+  auto operator()(SystemWorld&, Entity self,  //
+                  Gravity& gravity,           //
                   const Kinematics* kinematics) const -> void {
     if (!kinematics) return;
     gravity.acceleration =
@@ -78,17 +82,19 @@ struct SumGravity final           //
 struct TreeGravity final          //
     : framework::System<Gravity,  //
                         const Kinematics> {
+  using SystemWorld = ProjectedWorld<TreeGravity>;
   using AllowComponentList = framework::TypeList<Kinematics, PointMass>;
 
-  auto prepare(auto& world) -> bool {
+  auto prepare(SystemWorld& world) -> bool {
     if (!enabled) return false;
-    gather_sources(world, InOut(sources));
+    gather_sources(world.store_of<PointMass>(), world.store_of<Kinematics>(),
+                   InOut(sources));
     tree.build(sources);
     return true;
   }
 
-  auto operator()(auto&, Entity self,  //
-                  Gravity& gravity,    //
+  auto operator()(SystemWorld&, Entity self,  //
+                  Gravity& gravity,           //
                   const Kinematics* kinematics) const -> void {
     if (!kinematics) return;
     gravity.acceleration =
@@ -119,7 +125,9 @@ struct TreeGravity final          //
 struct OpenKick final                //
     : framework::System<Kinematics,  //
                         const Gravity> {
-  auto operator()(auto&, Entity,           //
+  using SystemWorld = ProjectedWorld<OpenKick>;
+
+  auto operator()(SystemWorld&, Entity,    //
                   Kinematics& kinematics,  //
                   const Gravity* gravity,  //
                   auto step) const -> void {
@@ -130,9 +138,10 @@ struct OpenKick final                //
 
 struct Drift final  //
     : framework::System<Kinematics> {
+  using SystemWorld = ProjectedWorld<Drift>;
   using SequenceAfterSystemList = framework::SystemList<OpenKick>;
 
-  auto operator()(auto&, Entity,           //
+  auto operator()(SystemWorld&, Entity,    //
                   Kinematics& kinematics,  //
                   auto step) const -> void {
     kinematics.position += kinematics.velocity * seconds(step.dt);
@@ -142,9 +151,10 @@ struct Drift final  //
 struct CloseKick final               //
     : framework::System<Kinematics,  //
                         const Gravity> {
+  using SystemWorld = ProjectedWorld<CloseKick>;
   using SequenceAfterSystemList = framework::SystemList<Drift>;
 
-  auto operator()(auto&, Entity,           //
+  auto operator()(SystemWorld&, Entity,    //
                   Kinematics& kinematics,  //
                   const Gravity* gravity,  //
                   auto step) const -> void {

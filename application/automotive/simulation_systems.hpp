@@ -17,6 +17,7 @@
 #include "application/automotive/simulation_components.hpp"
 #include "core/random.hpp"
 #include "engine/rate_gate.hpp"
+#include "framework/component_store.hpp"
 #include "framework/system.hpp"
 #include "model/road/lane_graph.hpp"
 #include "model/road/road.hpp"
@@ -26,6 +27,7 @@
 
 namespace simon::automotive {
 
+using framework::ComponentStore;
 using framework::System;
 using framework::SystemList;
 using framework::TypeList;
@@ -121,13 +123,13 @@ class LaneOccupancy final {
     bool committed = false;
   };
 
-  // Every vehicle, and its stop if `STOPPED`.
-  template <bool STOPPED = false, typename ProjectedWorldType>
-  auto collect(ProjectedWorldType& world, const Network& network) -> void {
+  // Every vehicle with a LaneState in `states` and a Driver in `drivers`,
+  // and its stop if `stopped` holds them.
+  auto collect(const ComponentStore<LaneState>& states,
+               const ComponentStore<Driver>& drivers, const Network& network,
+               const ComponentStore<Stopped>* stopped = nullptr) -> void {
     occupants_.clear();
-    const auto& drivers = world.template store_of<Driver>();
-    world.template store_of<LaneState>().for_each([&](Entity owner,
-                                                      const LaneState& state) {
+    states.for_each([&](Entity owner, const LaneState& state) {
       const Driver* driver = drivers.maybe_component_of(owner);
       if (!driver) {
         return;
@@ -140,15 +142,13 @@ class LaneOccupancy final {
                    .turns = state.turns,
                    .driver = driver,
                    .entity = owner});
-      if constexpr (STOPPED) {
-        if (const Stopped* since =
-                world.template store_of<Stopped>().maybe_component_of(owner)) {
-          if (owner.index >= stops_.size()) {
-            stops_.resize(owner.index + 1);
-          }
-          stops_[owner.index] =
-              Stop{.since = since->since, .committed = since->committed};
+      if (const Stopped* since =
+              stopped ? stopped->maybe_component_of(owner) : nullptr) {
+        if (owner.index >= stops_.size()) {
+          stops_.resize(owner.index + 1);
         }
+        stops_[owner.index] =
+            Stop{.since = since->since, .committed = since->committed};
       }
     });
     std::ranges::sort(occupants_, [](const Occupant& a, const Occupant& b) {
@@ -321,7 +321,7 @@ struct Decide final            //
       std::size_t crosswalks = network_->walking.crosswalks().size();
       on_.assign(crosswalks, 0.0);
       coming_.assign(crosswalks, 0.0);
-      world.template store_of<WalkCommand>().for_each(
+      world.store_of<WalkCommand>().for_each(
           [&](Entity, const WalkCommand& walking) {
             if (walking.crossing < crosswalks) {
               double& until = (walking.on ? on_ : coming_)[walking.crossing];
@@ -330,14 +330,12 @@ struct Decide final            //
           });
     }
     yields_ = !network_->rights.conflicts().empty();
-    if (yields_) {
-      occupancy_.collect<true>(world, *network_);
-    } else {
-      occupancy_.collect(world, *network_);
-    }
+    occupancy_.collect(world.store_of<LaneState>(), world.store_of<Driver>(),
+                       *network_,
+                       yields_ ? &world.store_of<Stopped>() : nullptr);
     changing_ = gate_.fire(step).has_value();
     aspects_.assign(network_->control.groups().size(), model::Aspect::GREEN);
-    world.template store_of<SignalState>().for_each(
+    world.store_of<SignalState>().for_each(
         [&](Entity, const SignalState& signal) {
           if (signal.group < aspects_.size()) {
             aspects_[signal.group] = signal.aspect;
@@ -1054,24 +1052,24 @@ class WalkOccupancy final {
     Entity entity;
   };
 
-  template <typename ProjectedWorldType>
-  auto collect(ProjectedWorldType& world) -> void {
+  // Every pedestrian with a WalkState in `states` on a WalkRoute in
+  // `routes`.
+  auto collect(const ComponentStore<WalkState>& states,
+               const ComponentStore<WalkRoute>& routes) -> void {
     walking_.clear();
-    const auto& routes = world.template store_of<WalkRoute>();
-    world.template store_of<WalkState>().for_each(
-        [&](Entity owner, const WalkState& state) {
-          const WalkRoute* route = routes.maybe_component_of(owner);
-          if (!route || state.leg >= route->legs.size()) {
-            return;
-          }
-          const model::Leg& leg = route->legs[state.leg];
-          walking_.push_back(
-              Walking{.edge = leg.edge,
-                      .forward = leg.forward,
-                      .along = state.along.numerical_value_in(meter),
-                      .speed = state.speed.numerical_value_in(meter_per_second),
-                      .entity = owner});
-        });
+    states.for_each([&](Entity owner, const WalkState& state) {
+      const WalkRoute* route = routes.maybe_component_of(owner);
+      if (!route || state.leg >= route->legs.size()) {
+        return;
+      }
+      const model::Leg& leg = route->legs[state.leg];
+      walking_.push_back(
+          Walking{.edge = leg.edge,
+                  .forward = leg.forward,
+                  .along = state.along.numerical_value_in(meter),
+                  .speed = state.speed.numerical_value_in(meter_per_second),
+                  .entity = owner});
+    });
     std::ranges::sort(walking_, [](const Walking& a, const Walking& b) {
       return std::tie(a.edge, a.forward, a.along, a.entity) <
              std::tie(b.edge, b.forward, b.along, b.entity);
@@ -1156,16 +1154,18 @@ struct Pace final              //
   }
 
   auto prepare(SystemWorld& world, Step step) -> bool {
-    occupancy_.collect(world);
+    occupancy_.collect(world.store_of<WalkState>(),
+                       world.store_of<WalkRoute>());
     crossings_ = !network_->walking.zones().empty();
     if (crossings_) {
-      vehicles_.collect(world, *network_);
+      vehicles_.collect(world.store_of<LaneState>(), world.store_of<Driver>(),
+                        *network_);
       now_ = step.time.time_since_epoch();
       std::size_t groups = network_->control.groups().size();
       aspects_.assign(groups, model::Aspect::GREEN);
       plans_.assign(groups, nullptr);
-      const auto& plans = world.template store_of<model::SignalPlan>();
-      world.template store_of<SignalState>().for_each(
+      const auto& plans = world.store_of<model::SignalPlan>();
+      world.store_of<SignalState>().for_each(
           [&](Entity owner, const SignalState& signal) {
             if (signal.group < groups) {
               aspects_[signal.group] = signal.aspect;
@@ -1416,9 +1416,9 @@ struct RunStoryboard final    //
     std::size_t count = context.scenario->entities.size();
     context.states.resize(count);
     std::vector<std::uint32_t> finished;
-    const auto& speeds = world.template store_of<ScenarioSpeed>();
-    const auto& motions = world.template store_of<ScenarioMotion>();
-    world.template store_of<ScenarioActor>().for_each(
+    const auto& speeds = world.store_of<ScenarioSpeed>();
+    const auto& motions = world.store_of<ScenarioMotion>();
+    world.store_of<ScenarioActor>().for_each(
         [&](Entity owner, const ScenarioActor& actor) {
           const ScenarioSpeed* speed = speeds.maybe_component_of(owner);
           const ScenarioMotion* motion = motions.maybe_component_of(owner);

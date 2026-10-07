@@ -72,8 +72,8 @@ auto Collide::prepare(SystemWorld& world) -> bool {
   }
 
   // Trees whose spheres overlap, each pair once.
-  const auto& mechanisms = world.template store_of<Mechanism>();
-  const auto& bounds = world.template store_of<TreeBound>();
+  const auto& mechanisms = world.store_of<Mechanism>();
+  const auto& bounds = world.store_of<TreeBound>();
   double largest = 0.0;
   bounds.for_each([&](Entity, const TreeBound& bound) {
     largest = std::max(largest, bound.radius);
