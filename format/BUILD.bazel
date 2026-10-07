@@ -81,7 +81,6 @@ cc_library(
         ":text",
         ":xml",
         "//model/articulated:articulated",
-        "//model/articulated:arithmetic",
         "@lib//base:core",
         "@lib//base:status",
         "//3rd_party:pugixml",
