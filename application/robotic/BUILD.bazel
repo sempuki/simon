@@ -145,6 +145,7 @@ cc_binary(
     copts = COPTS,
     deps = [
         ":robotic_library",
+        "//framework:benchmarking",
     ],
 )
 

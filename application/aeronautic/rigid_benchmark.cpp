@@ -5,13 +5,12 @@
 // in cruise, each flying on its own.
 //
 //   bazel run -c opt //application/aeronautic:rigid_benchmark [-- --steps N]
-//       [aircraft...]
+//       [--contend[=N]] [aircraft...]
 //
 // Each system runs in its own single-system scheduler, in schedule order,
 // against one world.
 
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -20,7 +19,6 @@
 #include <print>
 #include <string>
 #include <string_view>
-#include <tuple>
 #include <vector>
 
 #include "application/aeronautic/simulation.hpp"
@@ -35,7 +33,6 @@ namespace simon::aeronautic {
 namespace {
 
 using namespace std::chrono_literals;
-using WallClock = std::chrono::steady_clock;
 
 constexpr std::string_view BOEING_737 = "3rd_party/jsbsim/737.aircraft";
 constexpr Duration DT = 8ms;
@@ -71,73 +68,40 @@ auto measure(int aircraft, bool round, int steps,
   populate(aircraft, earth, data, InOut(world));
   world.sync();
 
-  std::tuple schedulers{
-      framework::Scheduler<World, SystemList<RunFlightControls>>{
-          SystemList{RunFlightControls{earth}}},
-      framework::Scheduler<World, SystemList<RunEngines>>{
-          SystemList{RunEngines{earth}}},
-      framework::Scheduler<World, SystemList<Rigid>>{
-          SystemList{Rigid{SystemList{RigidAircraftRates{earth}}}}},
-      framework::Scheduler<World, SystemList<BurnFuel>>{},
-      framework::Scheduler<World, SystemList<FollowRigidBody>>{
-          SystemList{FollowRigidBody{earth}}},
-  };
-  constexpr std::array<std::string_view, 5> NAMES{
-      "RunFlightControls", "RunEngines", "Rigid", "BurnFuel",
-      "FollowRigidBody"};
-  std::array<double, NAMES.size()> seconds{};
+  framework::benchmark::SystemTimer<World, RunFlightControls, RunEngines, Rigid,
+                                    BurnFuel, FollowRigidBody>
+      timer{RunFlightControls{earth}, RunEngines{earth},
+            Rigid{SystemList{RigidAircraftRates{earth}}}, BurnFuel{},
+            FollowRigidBody{earth}};
   for (int i = 0; i < steps; ++i) {
-    Step step{.time = TimePoint{} + i * DT, .dt = DT};
-    std::size_t index = 0;
-    std::apply(
-        [&](auto&... scheduler) {
-          (([&] {
-             auto start = WallClock::now();
-             scheduler.step(step, InOut(world));
-             seconds[index++] +=
-                 std::chrono::duration<double>(WallClock::now() - start)
-                     .count();
-           }()),
-           ...);
-        },
-        schedulers);
+    timer.step(Step{.time = TimePoint{} + i * DT, .dt = DT}, InOut(world));
   }
-
-  double total = 0.0;
-  for (double value : seconds) total += value;
-  double entity_steps = static_cast<double>(aircraft) * std::max(steps, 1);
   std::println("\n{} rigid aircraft, {} Earth: {} steps of 8 ms", aircraft,
                round ? "round" : "flat", steps);
-  std::println("  total {:10.3f} ms/step {:10.1f} ns/entity-step",
-               1e3 * total / std::max(steps, 1), 1e9 * total / entity_steps);
-  for (std::size_t i = 0; i < NAMES.size(); ++i) {
-    std::println("  {:<18} {:10.3f} ms/step {:6.1f}%", NAMES[i],
-                 1e3 * seconds[i] / std::max(steps, 1),
-                 total > 0.0 ? 100.0 * seconds[i] / total : 0.0);
-  }
+  timer.print(static_cast<double>(aircraft) * steps);
 }
 
 }  // namespace
 }  // namespace simon::aeronautic
 
-// rigid_benchmark [--steps N] [aircraft...]
+// rigid_benchmark [--steps N] [--contend[=N]] [aircraft...]
 auto main(int argc, char** argv) -> int {
+  using simon::framework::benchmark::Contention;
   using simon::framework::benchmark::parse_count;
-  int steps = simon::aeronautic::DEFAULT_STEPS;
+  auto arguments = simon::framework::benchmark::parse_arguments(argc, argv);
+  if (!arguments) {
+    std::println(stderr, "{}", arguments.error());
+    return 1;
+  }
+  int steps = arguments->steps.value_or(simon::aeronautic::DEFAULT_STEPS);
   std::vector<int> populations;
-  for (int i = 1; i < argc; ++i) {
-    std::string_view argument{argv[i]};
-    std::optional<int> count;
-    if (argument == "--steps" && i + 1 < argc &&
-        (count = parse_count(argv[i + 1]))) {
-      steps = *count;
-      ++i;
-    } else if ((count = parse_count(argument))) {
-      populations.push_back(*count);
-    } else {
+  for (std::string_view argument : arguments->rest) {
+    std::optional<int> count = parse_count(argument);
+    if (!count) {
       std::println(stderr, "unknown argument: {}", argument);
       return 1;
     }
+    populations.push_back(*count);
   }
   if (populations.empty()) {
     populations = {100, 1'000, 10'000};
@@ -148,6 +112,8 @@ auto main(int argc, char** argv) -> int {
     std::println(stderr, "{}", data.error().message());
     return 1;
   }
+  Contention contention{arguments->threads};
+  std::println("{}", Contention::describe(arguments->threads));
   for (int aircraft : populations) {
     simon::aeronautic::measure(aircraft, false, steps, *data);
     simon::aeronautic::measure(aircraft, true, steps, *data);

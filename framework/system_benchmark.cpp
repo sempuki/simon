@@ -211,18 +211,17 @@ auto measure(std::size_t count, bool shuffled, InOut<std::mt19937> random)
 
 auto main(int argc, char** argv) -> int {
   using namespace simon::framework;
-  unsigned threads = 0;
-  for (int i = 1; i < argc; ++i) {
-    std::string_view argument{argv[i]};
-    if (auto asked = benchmark::Contention::threads_from(argument)) {
-      threads = *asked;
-    } else {
-      std::println(stderr, "unknown argument: {}", argument);
-      return 1;
-    }
+  auto arguments = benchmark::parse_arguments(argc, argv);
+  if (!arguments) {
+    std::println(stderr, "{}", arguments.error());
+    return 1;
   }
-  benchmark::Contention contention{threads};
-  std::println("{}", benchmark::Contention::describe(threads));
+  if (!arguments->rest.empty() || arguments->steps) {
+    std::println(stderr, "takes only --contend[=N]");
+    return 1;
+  }
+  benchmark::Contention contention{arguments->threads};
+  std::println("{}", benchmark::Contention::describe(arguments->threads));
 
   std::mt19937 random{42};
   std::println("{:>8} {:>9} | {:>10} {:>10} {:>10} {:>10} {:>10}", "entities",

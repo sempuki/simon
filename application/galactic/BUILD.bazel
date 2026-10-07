@@ -195,6 +195,7 @@ cc_binary(
         ":galactic_library",
         "//engine:driver",
         "//core:argument",
+        "//framework:benchmarking",
         "//model/gravity:galaxy",
         "//model/gravity:gravity",
         "//core:random",

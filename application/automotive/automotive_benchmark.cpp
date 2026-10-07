@@ -15,15 +15,11 @@
 // has settled and drivers change lanes as they would. Each system runs in
 // its own single-system scheduler, in schedule order, against one world.
 
-#include <array>
-#include <charconv>
 #include <chrono>
 #include <cstddef>
 #include <optional>
 #include <print>
-#include <string>
 #include <string_view>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -36,7 +32,6 @@ namespace simon::automotive {
 namespace {
 
 using namespace std::chrono_literals;
-using WallClock = std::chrono::steady_clock;
 
 constexpr Duration DT = 100ms;
 constexpr int DEFAULT_STEPS = 300;  // 30 s simulated.
@@ -48,57 +43,20 @@ constexpr int SETTLING_STEPS = 600;
 // the measured time, per step and per entity-step of `entities`.
 template <typename... Systems>
 auto time_systems(const Network& network, InOut<World> world, int steps,
-                  double entities,
-                  std::array<std::string_view, sizeof...(Systems)> names,
-                  Systems... systems) -> void {
-  std::tuple<framework::Scheduler<World, SystemList<Systems>>...> schedulers{
-      SystemList<Systems>{std::move(systems)}...};
-  std::array<double, sizeof...(Systems)> seconds{};
-  double ordering = 0.0;
+                  double entities, Systems... systems) -> void {
+  framework::benchmark::SystemTimer<World, Systems...> timer{
+      std::move(systems)...};
   keep_road_order(network, world);
   for (int i = 0; i < SETTLING_STEPS + steps; ++i) {
-    Step step{.time = TimePoint{} + i * DT, .dt = DT};
-    std::size_t index = 0;
-    std::apply(
-        [&](auto&... scheduler) {
-          auto timed = [&](auto& one) {
-            auto start = WallClock::now();
-            one.step(step, world);
-            if (i >= SETTLING_STEPS) {
-              seconds[index] +=
-                  std::chrono::duration<double>(WallClock::now() - start)
-                      .count();
-            }
-            ++index;
-          };
-          (timed(scheduler), ...);
-        },
-        schedulers);
+    bool measured = i >= SETTLING_STEPS;
+    timer.step(Step{.time = TimePoint{} + i * DT, .dt = DT}, world, measured);
     if ((i + 1) % ROAD_ORDER_STEPS == 0) {
-      auto start = WallClock::now();
-      keep_road_order(network, world);
-      if (i >= SETTLING_STEPS) {
-        ordering +=
-            std::chrono::duration<double>(WallClock::now() - start).count();
-      }
+      timer.time(
+          "keep_road_order", [&] { keep_road_order(network, world); },
+          measured);
     }
   }
-
-  double total = ordering;
-  for (double s : seconds) {
-    total += s;
-  }
-  std::println("  total {:10.3f} ms/step {:10.1f} ns/entity-step",
-               1e3 * total / steps, 1e9 * total / (entities * steps));
-  std::array<std::size_t, sizeof...(Systems)> bytes{
-      framework::bytes_per_entity_v<Systems>...};
-  for (std::size_t i = 0; i < names.size(); ++i) {
-    std::println("  {:<22} {:10.3f} ms/step {:6.1f}% {:6} B/entity", names[i],
-                 1e3 * seconds[i] / steps, 100.0 * seconds[i] / total,
-                 bytes[i]);
-  }
-  std::println("  {:<22} {:10.3f} ms/step {:6.1f}%", "keep_road_order",
-               1e3 * ordering / steps, 100.0 * ordering / total);
+  timer.print(entities * steps);
 }
 
 auto measure_rings(const Network& network, int vehicles, int steps) -> void {
@@ -111,8 +69,7 @@ auto measure_rings(const Network& network, int vehicles, int steps) -> void {
       build_scenario(scenario, network, InOut(world)).has_value());
   world.sync();
   std::println("\n{} vehicles: {} steps of 0.1 s", vehicles, steps);
-  time_systems(network, InOut(world), steps, vehicles,
-               {"Decide", "Drive", "FollowLane"}, Decide{network},
+  time_systems(network, InOut(world), steps, vehicles, Decide{network},
                Drive{network}, FollowLane{network});
 
   double speeds = 0.0;
@@ -137,8 +94,6 @@ auto measure_grid(const Network& network, int vehicles, int pedestrians,
   std::println("\n{} vehicles and {} pedestrians: {} steps of 0.1 s", vehicles,
                pedestrians, steps);
   time_systems(network, InOut(world), steps, vehicles + pedestrians,
-               {"RunSignals", "Pace", "Decide", "Drive", "FollowLane", "Walk",
-                "PlaceWalker"},
                RunSignals{}, Pace{network}, Decide{network}, Drive{network},
                FollowLane{network}, Walk{network}, PlaceWalker{network});
 
@@ -160,28 +115,24 @@ auto measure_grid(const Network& network, int vehicles, int pedestrians,
 auto main(int argc, char** argv) -> int {
   using simon::framework::benchmark::Contention;
   using simon::framework::benchmark::parse_count;
-  int steps = simon::automotive::DEFAULT_STEPS;
-  unsigned threads = 0;
+  auto arguments = simon::framework::benchmark::parse_arguments(argc, argv);
+  if (!arguments) {
+    std::println(stderr, "{}", arguments.error());
+    return 1;
+  }
+  int steps = arguments->steps.value_or(simon::automotive::DEFAULT_STEPS);
   bool grid = false;
   std::vector<std::pair<int, int>> populations;
-  for (int i = 1; i < argc; ++i) {
-    std::string_view argument{argv[i]};
+  for (std::string_view argument : arguments->rest) {
     std::optional<int> count;
     std::size_t colon = argument.find(':');
-    if (argument == "--steps" && i + 1 < argc &&
-        (count = parse_count(argv[i + 1]))) {
-      steps = *count;
-      ++i;
-    } else if (argument == "--grid") {
+    if (argument == "--grid") {
       grid = true;
-    } else if (auto asked = Contention::threads_from(argument)) {
-      threads = *asked;
     } else if (colon != std::string_view::npos &&
-               parse_count(std::string{argument.substr(0, colon)}) &&
-               parse_count(std::string{argument.substr(colon + 1)})) {
-      populations.emplace_back(
-          *parse_count(std::string{argument.substr(0, colon)}),
-          *parse_count(std::string{argument.substr(colon + 1)}));
+               parse_count(argument.substr(0, colon)) &&
+               parse_count(argument.substr(colon + 1))) {
+      populations.emplace_back(*parse_count(argument.substr(0, colon)),
+                               *parse_count(argument.substr(colon + 1)));
     } else if ((count = parse_count(argument))) {
       populations.emplace_back(*count, 0);
     } else {
@@ -203,8 +154,8 @@ auto main(int argc, char** argv) -> int {
     std::println(stderr, "{}", network.error().message());
     return 1;
   }
-  Contention contention{threads};
-  std::println("{}", Contention::describe(threads));
+  Contention contention{arguments->threads};
+  std::println("{}", Contention::describe(arguments->threads));
   for (auto [vehicles, pedestrians] : populations) {
     if (grid) {
       simon::automotive::measure_grid(*network, vehicles, pedestrians, steps);

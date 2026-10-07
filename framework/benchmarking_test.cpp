@@ -2,7 +2,10 @@
 
 #include "framework/benchmarking.hpp"
 
+#include <array>
 #include <optional>
+#include <string_view>
+#include <vector>
 
 #include "base/testing.hpp"
 
@@ -45,6 +48,37 @@ TEST_CASE("parse_count") {
     CHECK(parse_count("") == std::nullopt);
     CHECK(parse_count("12x") == std::nullopt);
     CHECK(parse_count("--steps") == std::nullopt);
+  }
+}
+
+TEST_CASE("parse_arguments") {
+  SECTION("ShouldTakeStepsAndContentionAndKeepTheRestGivenMixedArguments") {
+    std::array<const char*, 6> argv{"benchmark", "1000",        "--steps",
+                                    "20",        "--contend=3", "--grid"};
+    auto arguments = parse_arguments(static_cast<int>(argv.size()),
+                                     const_cast<char**>(argv.data()));
+    REQUIRE(arguments.has_value());
+    CHECK(arguments->steps == 20);
+    CHECK(arguments->threads == 3u);
+    CHECK(arguments->rest == std::vector<std::string_view>{"1000", "--grid"});
+  }
+
+  SECTION("ShouldTakeNoStepsGivenNoStepsArgument") {
+    std::array<const char*, 2> argv{"benchmark", "1000"};
+    auto arguments = parse_arguments(static_cast<int>(argv.size()),
+                                     const_cast<char**>(argv.data()));
+    REQUIRE(arguments.has_value());
+    CHECK(arguments->steps == std::nullopt);
+    CHECK(arguments->threads == 0u);
+  }
+
+  SECTION("ShouldFailGivenStepsWithoutAWholePositiveNumber") {
+    std::array<const char*, 3> argv{"benchmark", "--steps", "0"};
+    CHECK_FALSE(parse_arguments(static_cast<int>(argv.size()),
+                                const_cast<char**>(argv.data())));
+    std::array<const char*, 2> last{"benchmark", "--steps"};
+    CHECK_FALSE(parse_arguments(static_cast<int>(last.size()),
+                                const_cast<char**>(last.data())));
   }
 }
 

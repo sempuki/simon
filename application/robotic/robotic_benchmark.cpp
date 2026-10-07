@@ -11,22 +11,30 @@
 // more, and prints the wall time per step and per tree.
 
 #include <chrono>
+#include <cmath>
+#include <cstdint>
 #include <cstdlib>
-#include <iostream>
-#include <string>
+#include <optional>
+#include <print>
 
 #include "application/robotic/simulation.hpp"
+#include "framework/benchmarking.hpp"
 
 auto main(int argc, char** argv) -> int {
   using namespace simon;
   if (argc < 2) {
-    std::cerr << "Usage: robotic_benchmark SCENE.xml [steps]\n";
+    std::println(stderr, "Usage: robotic_benchmark SCENE.xml [steps]");
     return EXIT_FAILURE;
   }
-  int steps = argc > 2 ? std::atoi(argv[2]) : 500;
+  std::optional<int> steps =
+      argc > 2 ? framework::benchmark::parse_count(argv[2]) : 500;
+  if (!steps) {
+    std::println(stderr, "steps is a whole positive number");
+    return EXIT_FAILURE;
+  }
   robotic::Simulation simulation{robotic::Scenario{.model = argv[1]}};
   if (auto configured = simulation.configure(); !configured) {
-    std::cerr << "Error: " << configured.error().message() << "\n";
+    std::println(stderr, "Error: {}", configured.error().message());
     return EXIT_FAILURE;
   }
   double h = simulation.mechanics().model().physics.timestep;
@@ -35,28 +43,26 @@ auto main(int argc, char** argv) -> int {
     if (auto stepped =
             simulation.step(Step{.time = TimePoint{} + k * dt, .dt = dt});
         !stepped) {
-      std::cerr << "Error: " << stepped.error().message() << "\n";
+      std::println(stderr, "Error: {}", stepped.error().message());
       std::exit(EXIT_FAILURE);
     }
   };
   step(0);
   std::uint64_t iterations = 0;
-  auto start = std::chrono::steady_clock::now();
-  for (int k = 1; k <= steps; ++k) {
+  framework::benchmark::Stopwatch stopwatch;
+  for (int k = 1; k <= *steps; ++k) {
     step(k);
     iterations += simulation.constraints().iterations;
   }
-  double seconds =
-      std::chrono::duration<double>(std::chrono::steady_clock::now() - start)
-          .count();
+  double seconds = stopwatch.seconds();
   std::size_t trees = simulation.mechanics().trees().size();
-  std::cout << argv[1] << ": " << trees << " trees, " << seconds / steps * 1e3
-            << " ms/step, "
-            << seconds / steps / static_cast<double>(trees) * 1e9
-            << " ns/tree-step, " << simulation.contacts().size()
-            << " contacts, " << simulation.constraints().rows << " rows and "
-            << simulation.constraints().islands << " islands at the end, "
-            << static_cast<double>(iterations) / steps
-            << " solver iterations a step\n";
+  std::println(
+      "{}: {} trees, {:.6g} ms/step, {:.6g} ns/tree-step, {} contacts, {} rows "
+      "and {} islands at the end, {:.6g} solver iterations a step",
+      argv[1], trees, seconds / *steps * 1e3,
+      seconds / *steps / static_cast<double>(trees) * 1e9,
+      simulation.contacts().size(), simulation.constraints().rows,
+      simulation.constraints().islands,
+      static_cast<double>(iterations) / *steps);
   return EXIT_SUCCESS;
 }

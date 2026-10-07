@@ -63,7 +63,6 @@ auto Contention::describe(unsigned threads) -> std::string {
                                     threads == 1 ? "" : "s");
 }
 
-// A whole positive number, or nothing.
 auto parse_count(std::string_view text) -> std::optional<int> {
   int count = 0;
   auto [end, error] =
@@ -72,6 +71,30 @@ auto parse_count(std::string_view text) -> std::optional<int> {
     return std::nullopt;
   }
   return count;
+}
+
+auto parse_arguments(int argc, char** argv)
+    -> std::expected<Arguments, std::string> {
+  Arguments arguments;
+  for (int i = 1; i < argc; ++i) {
+    std::string_view argument{argv[i]};
+    if (argument == "--steps") {
+      std::optional<int> count =
+          i + 1 < argc ? parse_count(argv[i + 1]) : std::nullopt;
+      if (!count) {
+        return std::unexpected(
+            std::string{"--steps needs a whole positive number"});
+      }
+      arguments.steps = *count;
+      ++i;
+    } else if (std::optional<unsigned> threads =
+                   Contention::threads_from(argument)) {
+      arguments.threads = *threads;
+    } else {
+      arguments.rest.push_back(argument);
+    }
+  }
+  return arguments;
 }
 
 }  // namespace simon::framework::benchmark

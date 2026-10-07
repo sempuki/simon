@@ -6,7 +6,6 @@
 //       [--contend[=N]] [--in-turn] [drones...]
 //
 // --in-turn has each site's radars scan in turn (Scenario::radars_in_turn).
-// The total line reports the slowest step as well as the average.
 //
 // Each scenario spawns its drones inside radar and launcher range, so
 // sensing, engagement, guidance and blasts all run from the first steps.
@@ -20,33 +19,28 @@
 // is the same as the full schedule, which also syncs after every system.
 
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdio>
 #include <expected>
 #include <optional>
 #include <print>
-#include <string>
 #include <string_view>
-#include <tuple>
 #include <vector>
 
 #include "application/defense/simulation.hpp"
 #include "base/core.hpp"
 #include "core/argument.hpp"
 #include "framework/benchmarking.hpp"
-#include "framework/type_list.hpp"
 
 namespace simon::defense {
 namespace {
 
 using namespace std::chrono_literals;
-using WallClock = std::chrono::steady_clock;
 
 constexpr Duration DT = 10ms;
-constexpr int DEFAULT_STEPS = 500;  // 5 s simulated.
-constexpr auto WALL_BUDGET = 30s;   // Per population, unless --steps is given.
+constexpr int DEFAULT_STEPS = 500;    // 5 s simulated.
+constexpr double WALL_BUDGET = 30.0;  // s per population, unless --steps.
 
 // One site per 1,000 drones, each with the density of the single-site
 // benchmark: 10 radars, 50 launchers and 1,000 drones spawning 3 to 4 km from
@@ -67,9 +61,6 @@ auto make_scenario(int drones) -> Scenario {
 
 auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
     -> void {
-  using List = Scheduler::FlattenedSystemList;
-  constexpr std::size_t SYSTEM_COUNT = List::size;
-
   Scenario scenario = make_scenario(drones);
   scenario.radars_in_turn = in_turn;
   World world;
@@ -80,40 +71,19 @@ auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
       build_scenario(scenario, InOut(world));
   CHECK_POSTCONDITION(built_asset.has_value());
   Entity asset = *built_asset;
-  auto schedulers = framework::benchmark::create_schedulers<World>(List{});
-  std::array<double, SYSTEM_COUNT> seconds{};
+  framework::benchmark::SystemTimerFor<World, Scheduler::FlattenedSystemList>
+      timer;
   std::size_t entity_steps = 0;
-  double slowest = 0.0;  // The slowest step, in seconds.
 
-  auto wall_start = WallClock::now();
+  framework::benchmark::Stopwatch wall;
   int steps = 0;
-  for (; steps < maximum_steps &&
-         (!budgeted || WallClock::now() - wall_start < WALL_BUDGET) &&
+  for (; steps < maximum_steps && (!budgeted || wall.seconds() < WALL_BUDGET) &&
          world.alive(asset) && world.store_of<RedDrone>().size() > 0;
        ++steps) {
-    Step step{.time = TimePoint{} + steps * DT, .dt = DT};
     entity_steps += world.size();
-    std::size_t index = 0;
-    double this_step = 0.0;
-    std::apply(
-        [&](auto&... scheduler) {
-          (([&] {
-             auto start = WallClock::now();
-             scheduler.step(step, InOut(world));
-             double elapsed =
-                 std::chrono::duration<double>(WallClock::now() - start)
-                     .count();
-             seconds[index++] += elapsed;
-             this_step += elapsed;
-           }()),
-           ...);
-        },
-        schedulers);
-    slowest = std::max(slowest, this_step);
+    timer.step(Step{.time = TimePoint{} + steps * DT, .dt = DT}, InOut(world));
   }
 
-  double total = 0.0;
-  for (double value : seconds) total += value;
   std::println(
       "\n{} drones, {} radars, {} launchers on {} site{}: {} steps, {:.0f} "
       "entities on average",
@@ -121,18 +91,7 @@ auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
       scenario.launchers * scenario.sites, scenario.sites,
       scenario.sites == 1 ? "" : "s", steps,
       static_cast<double>(entity_steps) / std::max(steps, 1));
-  std::println(
-      "  total {:10.3f} ms/step {:10.1f} ns/entity-step, slowest step {:.3f} "
-      "ms",
-      1e3 * total / std::max(steps, 1),
-      1e9 * total / std::max<double>(entity_steps, 1), 1e3 * slowest);
-  auto names = framework::benchmark::collect_system_names(List{});
-  auto bytes = framework::benchmark::collect_bytes_per_entity(List{});
-  for (std::size_t i = 0; i < SYSTEM_COUNT; ++i) {
-    std::println("  {:<20} {:10.3f} ms/step {:6.1f}% {:6} B/entity", names[i],
-                 1e3 * seconds[i] / std::max(steps, 1),
-                 total > 0.0 ? 100.0 * seconds[i] / total : 0.0, bytes[i]);
-  }
+  timer.print(static_cast<double>(entity_steps));
 }
 
 }  // namespace
@@ -146,23 +105,19 @@ auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
 auto main(int argc, char** argv) -> int {
   using simon::framework::benchmark::Contention;
   using simon::framework::benchmark::parse_count;
-  int steps = simon::defense::DEFAULT_STEPS;
-  bool budgeted = true;
+  auto arguments = simon::framework::benchmark::parse_arguments(argc, argv);
+  if (!arguments) {
+    std::println(stderr, "{}", arguments.error());
+    return 1;
+  }
+  int steps = arguments->steps.value_or(simon::defense::DEFAULT_STEPS);
+  bool budgeted = !arguments->steps;
   bool in_turn = false;
-  unsigned threads = 0;
   std::vector<int> populations;
-  for (int i = 1; i < argc; ++i) {
-    std::string_view argument{argv[i]};
+  for (std::string_view argument : arguments->rest) {
     std::optional<int> count;
     if (argument == "--in-turn") {
       in_turn = true;
-    } else if (argument == "--steps" && i + 1 < argc &&
-               (count = parse_count(argv[i + 1]))) {
-      steps = *count;
-      budgeted = false;
-      ++i;
-    } else if (auto asked = Contention::threads_from(argument)) {
-      threads = *asked;
     } else if ((count = parse_count(argument))) {
       populations.push_back(*count);
     } else {
@@ -173,8 +128,8 @@ auto main(int argc, char** argv) -> int {
   if (populations.empty()) {
     populations = {1'000, 10'000, 100'000};
   }
-  Contention contention{threads};
-  std::println("{}", Contention::describe(threads));
+  Contention contention{arguments->threads};
+  std::println("{}", Contention::describe(arguments->threads));
   for (int drones : populations) {
     simon::defense::measure(drones, steps, budgeted, in_turn);
   }

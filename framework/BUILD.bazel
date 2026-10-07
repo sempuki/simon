@@ -131,6 +131,8 @@ cc_library(
     ],
     deps = [
         ":framework",
+        "//core:argument",
+        "//core:time",
         "@lib//base:core",
     ],
 )

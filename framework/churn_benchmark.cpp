@@ -1269,21 +1269,22 @@ auto compare_competing(Workload workload) -> void {
 
 auto main(int argc, char** argv) -> int {
   using namespace simon::framework;
-  unsigned threads = 0;
+  auto arguments = benchmark::parse_arguments(argc, argv);
+  if (!arguments) {
+    std::println(stderr, "{}", arguments.error());
+    return 1;
+  }
   bool competing_only = false;
-  for (int i = 1; i < argc; ++i) {
-    std::string_view argument{argv[i]};
-    if (auto asked = benchmark::Contention::threads_from(argument)) {
-      threads = *asked;
-    } else if (argument == "--competing") {
+  for (std::string_view argument : arguments->rest) {
+    if (argument == "--competing") {
       competing_only = true;
     } else {
       std::println(stderr, "unknown argument: {}", argument);
       return 1;
     }
   }
-  benchmark::Contention contention{threads};
-  std::println("{}", benchmark::Contention::describe(threads));
+  benchmark::Contention contention{arguments->threads};
+  std::println("{}", benchmark::Contention::describe(arguments->threads));
 
   for (std::size_t population : {100'000uz, 1'000'000uz}) {
     Workload workload{.population = population};

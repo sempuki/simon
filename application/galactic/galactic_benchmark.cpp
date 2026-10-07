@@ -12,8 +12,8 @@
 // the first accelerations, then times `steps` more, and prints the wall time
 // per step and per body.
 
-#include <chrono>
 #include <cstdlib>
+#include <optional>
 #include <print>
 #include <string_view>
 
@@ -21,6 +21,7 @@
 #include "core/argument.hpp"
 #include "core/random.hpp"
 #include "engine/driver.hpp"
+#include "framework/benchmarking.hpp"
 #include "model/gravity/galaxy.hpp"
 #include "model/gravity/gravity.hpp"
 
@@ -73,16 +74,21 @@ auto main(int argc, char** argv) -> int {
     return EXIT_FAILURE;
   }
   std::string_view kind = argv[1];
-  auto count = static_cast<std::size_t>(std::strtoull(argv[2], nullptr, 10));
-  int steps = argc > 3 ? std::atoi(argv[3]) : 10;
+  std::optional<int> count = framework::benchmark::parse_count(argv[2]);
+  std::optional<int> steps =
+      argc > 3 ? framework::benchmark::parse_count(argv[3]) : 10;
+  if (!count || !steps) {
+    std::println(stderr, "N and steps are whole positive numbers");
+    return EXIT_FAILURE;
+  }
 
   Scenario scenario;
   if (kind == "direct") {
-    scenario = make_plummer_scenario(count, GravityMethod::DIRECT);
+    scenario = make_plummer_scenario(*count, GravityMethod::DIRECT);
   } else if (kind == "tree") {
-    scenario = make_plummer_scenario(count, GravityMethod::TREE);
+    scenario = make_plummer_scenario(*count, GravityMethod::TREE);
   } else if (kind == "restricted") {
-    scenario = make_restricted_scenario(count);
+    scenario = make_restricted_scenario(*count);
   } else {
     std::println(stderr, "Unknown kind {}", kind);
     return EXIT_FAILURE;
@@ -96,17 +102,15 @@ auto main(int argc, char** argv) -> int {
     std::println(stderr, "Error: {}", started.error().message());
     return EXIT_FAILURE;
   }
-  auto start = std::chrono::steady_clock::now();
-  if (auto reached = driver.advance_to(BasicTimePoint<Year>{} + steps * step);
+  framework::benchmark::Stopwatch stopwatch;
+  if (auto reached = driver.advance_to(BasicTimePoint<Year>{} + *steps * step);
       !reached) {
     std::println(stderr, "Error: {}", reached.error().message());
     return EXIT_FAILURE;
   }
-  double seconds =
-      std::chrono::duration<double>(std::chrono::steady_clock::now() - start)
-          .count();
+  double seconds = stopwatch.seconds();
   std::println("{} {}: {:.3f} ms/step, {:.0f} ns/body-step", kind, bodies,
-               seconds / steps * 1e3,
-               seconds / steps / static_cast<double>(bodies) * 1e9);
+               seconds / *steps * 1e3,
+               seconds / *steps / static_cast<double>(bodies) * 1e9);
   return EXIT_SUCCESS;
 }
