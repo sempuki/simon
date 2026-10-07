@@ -10,7 +10,7 @@
 
 namespace simon::aircraft {
 
-auto fill_fuel_tanks(const AircraftData& aircraft) -> FuelTanks {
+auto fill_fuel_tanks(const Definition& aircraft) -> FuelTanks {
   FuelTanks tanks;
   for (std::size_t i = 0; i < aircraft.tanks.size(); ++i) {
     tanks.contents[i] = aircraft.tanks[i].contents;
@@ -25,7 +25,7 @@ auto compute_body_offset(const Displacement& structural,
   return meters(-apart.x(), apart.y(), -apart.z());
 }
 
-auto compute_mass_balance(const AircraftData& aircraft,
+auto compute_mass_balance(const Definition& aircraft,
                           std::span<const Mass> contents) -> MassBalance {
   CHECK_PRECONDITION(contents.size() == aircraft.tanks.size());
   double empty = aircraft.empty_mass.numerical_value_in(kilogram);
@@ -77,11 +77,11 @@ auto compute_mass_balance(const AircraftData& aircraft,
   };
 }
 
-auto compute_mass_balance(const AircraftData& aircraft) -> MassBalance {
+auto compute_mass_balance(const Definition& aircraft) -> MassBalance {
   return compute_mass_balance(aircraft, fill_fuel_tanks(aircraft));
 }
 
-auto compute_mass_balance(const AircraftData& aircraft, const FuelTanks& tanks)
+auto compute_mass_balance(const Definition& aircraft, const FuelTanks& tanks)
     -> MassBalance {
   return compute_mass_balance(
       aircraft, std::span{tanks.contents.data(), aircraft.tanks.size()});

@@ -11,7 +11,7 @@ namespace simon::aircraft {
 
 auto compute_aero_inputs(const model::RigidBody& body,
                          const FlightSignals& signals,
-                         const AircraftData& aircraft,
+                         const Definition& aircraft,
                          const Displacement& reference, const Earth& earth,
                          const earth::StandardAirTable& air, Time time)
     -> AeroInputs {
@@ -22,7 +22,7 @@ auto compute_aero_inputs(const model::RigidBody& body,
 namespace {
 
 auto compute_aero_inputs(const BodyMotion& motion, const FlightSignals& signals,
-                         const AircraftData& aircraft,
+                         const Definition& aircraft,
                          const Displacement& reference, const Place& place,
                          const earth::StandardAirTable& air) -> AeroInputs {
   const Vector3& uvw = motion.air_velocity;
@@ -64,7 +64,7 @@ auto compute_aero_inputs(const BodyMotion& motion, const FlightSignals& signals,
 
 auto compute_aero_inputs(const model::RigidBody& body,
                          const FlightSignals& signals,
-                         const AircraftData& aircraft,
+                         const Definition& aircraft,
                          const Displacement& reference, const Earth& earth,
                          const Place& place, const earth::StandardAirTable& air)
     -> AeroInputs {
@@ -96,7 +96,7 @@ namespace {
 template <bool WINDY>
 auto compute_rate(const model::RigidBody& body, const FlightSignals& signals,
                   const Engines& engines, const MassBalance& mass,
-                  const AircraftData& aircraft, const Earth& earth,
+                  const Definition& aircraft, const Earth& earth,
                   const earth::StandardAirTable& air, const earth::Wind& wind,
                   Time time, Out<BodyAcceleration> felt)
     -> model::RigidBodyRate {
@@ -186,12 +186,12 @@ auto compute_rate(const model::RigidBody& body, const FlightSignals& signals,
 
 }  // namespace
 
-auto compute_rigid_aircraft_rate(
-    const model::RigidBody& body, const FlightSignals& signals,
-    const Engines& engines, const MassBalance& mass,
-    const AircraftData& aircraft, const Earth& earth,
-    const earth::StandardAirTable& air, const earth::Wind& wind, Time time,
-    Out<BodyAcceleration> felt) -> model::RigidBodyRate {
+auto compute_rigid_rate(const model::RigidBody& body,
+                        const FlightSignals& signals, const Engines& engines,
+                        const MassBalance& mass, const Definition& aircraft,
+                        const Earth& earth, const earth::StandardAirTable& air,
+                        const earth::Wind& wind, Time time,
+                        Out<BodyAcceleration> felt) -> model::RigidBodyRate {
   if (earth::is_still(wind)) {
     return compute_rate<false>(body, signals, engines, mass, aircraft, earth,
                                air, wind, time, felt);

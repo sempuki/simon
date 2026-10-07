@@ -25,10 +25,10 @@ namespace simon::format {
 
 // Reads the road network that `text` describes.
 auto parse_opendrive(std::string_view text)
-    -> std::expected<road::RoadNetwork, lib::Status>;
+    -> std::expected<road::Map, lib::Status>;
 
 // Reads the road network in the file at `path`.
 auto load_opendrive(const std::string& path)
-    -> std::expected<road::RoadNetwork, lib::Status>;
+    -> std::expected<road::Map, lib::Status>;
 
 }  // namespace simon::format

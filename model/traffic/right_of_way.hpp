@@ -82,9 +82,9 @@ class RightOfWay final {
   auto find_parting(const road::LaneKey& lane) const -> std::optional<double>;
 
  private:
-  friend auto build_right_of_way(const road::RoadNetwork& network,
+  friend auto build_right_of_way(const road::Map& network,
                                  const road::LaneGraph& graph,
-                                 const TrafficControl& control, double reach)
+                                 const Control& control, double reach)
       -> RightOfWay;
 
   std::vector<Conflict> conflicts_;
@@ -108,9 +108,8 @@ class RightOfWay final {
 // keep apart lanes whose lights are of different groups, by give-way and
 // stop signs, by a left turn giving way to oncoming traffic, and by giving
 // way to traffic from the right. Approaches reach back `reach` meters.
-auto build_right_of_way(const road::RoadNetwork& network,
-                        const road::LaneGraph& graph,
-                        const TrafficControl& control, double reach = 200.0)
+auto build_right_of_way(const road::Map& network, const road::LaneGraph& graph,
+                        const Control& control, double reach = 200.0)
     -> RightOfWay;
 
 // How long a vehicle at `speed`, able to accelerate at `acceleration` up to

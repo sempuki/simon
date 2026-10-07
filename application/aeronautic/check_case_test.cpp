@@ -186,9 +186,8 @@ struct Apart final {
 // The flight controls as the trim leaves them: as JSBSim recorded them in
 // `recorded`, if it did, with each PID's last input its input now; or else
 // settled from the trimmed commands.
-auto trimmed_flight_controls(const aircraft::AircraftData& data,
-                             const Row& trim, const Row* recorded)
-    -> FlightSignals {
+auto trimmed_flight_controls(const aircraft::Definition& data, const Row& trim,
+                             const Row* recorded) -> FlightSignals {
   const aircraft::FlightControlData& controls = data.flight_controls;
   FlightSignals signals;
   using enum aircraft::FlightSignal;
@@ -225,7 +224,7 @@ auto trimmed_flight_controls(const aircraft::AircraftData& data,
 }
 
 // The fuel the trim leaves in each tank.
-auto trimmed_tanks(const aircraft::AircraftData& data, const Row& trim)
+auto trimmed_tanks(const aircraft::Definition& data, const Row& trim)
     -> FuelTanks {
   FuelTanks tanks;
   for (std::size_t i = 0; i < data.tanks.size(); ++i) {
@@ -237,8 +236,8 @@ auto trimmed_tanks(const aircraft::AircraftData& data, const Row& trim)
 // Flies `flown` from the trim at steps of `dt`, and returns the body every
 // 0.2 s.
 auto fly(const Checked& checked, Case flown, Duration dt,
-         const aircraft::AircraftData& data, const Row& trim,
-         const Row* recorded) -> std::vector<RigidBody> {
+         const aircraft::Definition& data, const Row& trim, const Row* recorded)
+    -> std::vector<RigidBody> {
   World world;
   REQUIRE(World::set_up()
               .numbered(1)
@@ -255,9 +254,8 @@ auto fly(const Checked& checked, Case flown, Duration dt,
   FuelTanks tanks = trimmed_tanks(data, trim);
   MassBalance mass = aircraft::compute_mass_balance(data, tanks);
   BodyAcceleration felt;
-  aircraft::compute_rigid_aircraft_rate(body, signals, engines, mass, data,
-                                        earth, air, Wind{}, 0.0 * second,
-                                        Out(felt));
+  aircraft::compute_rigid_rate(body, signals, engines, mass, data, earth, air,
+                               Wind{}, 0.0 * second, Out(felt));
   auto aircraft = world.create<archetype::RigidAircraftInWind>()
                       .with(earth.air_state(body, 0.0 * second))
                       .with(body)

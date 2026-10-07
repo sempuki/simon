@@ -498,7 +498,7 @@ struct RigidAircraftRates final    //
         !felt) {
       return;
     }
-    rate = aircraft::compute_rigid_aircraft_rate(
+    rate = aircraft::compute_rigid_rate(
         *body, *signals, *engines, *mass, *type->data, earth_, air_,
         wind ? *wind : still_, seconds(step.time.time_since_epoch()),
         Out(*felt));

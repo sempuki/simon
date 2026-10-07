@@ -26,7 +26,6 @@ namespace {
 
 using namespace testing;
 using vehicle::DriftSingleTrack;
-using vehicle::VehicleParameters;
 
 constexpr double GRAVITY = 9.81;
 constexpr double SAMPLE = 0.01;  // s, Chrono's samples.
@@ -70,7 +69,7 @@ auto load_maneuvers() -> std::map<std::string, std::vector<Sample>> {
 // tire's and the axle's, front and rear averaged; its brakes, even front to
 // rear, and its front-wheel drive; and its Magic Formula tire. Its steering
 // and acceleration are left unbounded, as Chrono steers the wheels.
-auto load_sedan() -> VehicleParameters {
+auto load_sedan() -> vehicle::Parameters {
   std::map<std::string, double, std::less<>> value;
   for (const Row& row : load_rows("chrono_sedan.csv")) {
     value[row.find("name")->second] = number(row, "value");
@@ -94,7 +93,7 @@ auto load_sedan() -> VehicleParameters {
     (*tire).*camber = 0.0;
   }
   double com = value.at("com_x");
-  VehicleParameters sedan{
+  vehicle::Parameters sedan{
       .front = (value.at("front_left_x") - com) * meter,
       .rear = (com - value.at("rear_left_x")) * meter,
       .sprung_height = 0.411 * meter,
@@ -120,8 +119,8 @@ auto load_sedan() -> VehicleParameters {
 // axle's roll stiffness beyond its springs, less the tires' vertical
 // compliance; and each axle's roll center, from the load it transfers
 // beyond its roll stiffness's share.
-auto load_sedan_multibody() -> VehicleParameters {
-  VehicleParameters sedan = load_sedan();
+auto load_sedan_multibody() -> vehicle::Parameters {
+  vehicle::Parameters sedan = load_sedan();
   std::map<std::string, double, std::less<>> value;
   for (const Row& row : load_rows("chrono_sedan.csv")) {
     value[row.find("name")->second] = number(row, "value");
@@ -170,7 +169,7 @@ auto load_sedan_multibody() -> VehicleParameters {
 struct DriftModel final {
   using State = DriftSingleTrack;
 
-  static auto start(const Sample& at, const VehicleParameters& vehicle)
+  static auto start(const Sample& at, const vehicle::Parameters& vehicle)
       -> State {
     State state = vehicle::start_drift_single_track(
         std::hypot(at.speed, at.lateral) * meter_per_second, vehicle);
@@ -179,9 +178,8 @@ struct DriftModel final {
     state.slip_angle = std::atan2(at.lateral, at.speed) * radian;
     return state;
   }
-  static auto compute_rate(const State& state,
-                           const vehicle::VehicleInput& input,
-                           const VehicleParameters& vehicle, const Sample&) {
+  static auto compute_rate(const State& state, const vehicle::Input& input,
+                           const vehicle::Parameters& vehicle, const Sample&) {
     return vehicle::compute_drift_single_track_rate(state, input, vehicle);
   }
   static auto steering_of(const Sample& sample) -> double {
@@ -207,9 +205,9 @@ struct DriftModel final {
 // steers it, beyond the front wheels' mean.
 template <bool TOE>
 struct MultibodyModel final {
-  using State = vehicle::MultibodyVehicle;
+  using State = vehicle::Multibody;
 
-  static auto start(const Sample& at, const VehicleParameters& vehicle)
+  static auto start(const Sample& at, const vehicle::Parameters& vehicle)
       -> State {
     State state =
         vehicle::start_multibody(at.speed * meter_per_second, vehicle);
@@ -218,9 +216,8 @@ struct MultibodyModel final {
     state.body.lateral_speed = -at.lateral * meter_per_second;
     return state;
   }
-  static auto compute_rate(const State& state,
-                           const vehicle::VehicleInput& input,
-                           const VehicleParameters& vehicle,
+  static auto compute_rate(const State& state, const vehicle::Input& input,
+                           const vehicle::Parameters& vehicle,
                            const Sample& chrono) {
     vehicle::WheelSteer toe;
     if (TOE) {
@@ -252,8 +249,9 @@ struct MultibodyModel final {
 // Chrono's speed along x by its acceleration and a gain of 2 per second, by
 // classic Runge-Kutta 4 at 1 ms.
 template <typename Model>
-auto drive(const VehicleParameters& vehicle, const std::vector<Sample>& chrono,
-           double start) -> std::vector<Sample> {
+auto drive(const vehicle::Parameters& vehicle,
+           const std::vector<Sample>& chrono, double start)
+    -> std::vector<Sample> {
   constexpr int SUBSTEPS = 10;
   auto first = static_cast<std::size_t>(std::lround(start / SAMPLE));
   typename Model::State state = Model::start(chrono[first], vehicle);
@@ -268,10 +266,9 @@ auto drive(const VehicleParameters& vehicle, const std::vector<Sample>& chrono,
     for (int k = 0; k < SUBSTEPS; ++k) {
       double ours = Model::read(state, 0.0).speed;
       double target = now.speed + (next.speed - now.speed) * k / SUBSTEPS;
-      vehicle::VehicleInput input{
-          .steering_rate = steering_rate * radian_per_second,
-          .acceleration =
-              (wanted + 2.0 * (target - ours)) * meter_per_second_squared};
+      vehicle::Input input{.steering_rate = steering_rate * radian_per_second,
+                           .acceleration = (wanted + 2.0 * (target - ours)) *
+                                           meter_per_second_squared};
       auto rate = [&](const typename Model::State& at) {
         return Model::compute_rate(at, input, vehicle, now);
       };
@@ -405,7 +402,7 @@ auto measure(const std::map<std::string, std::vector<Sample>>& paths,
 }
 
 template <typename Model>
-auto drive_all(const VehicleParameters& vehicle,
+auto drive_all(const vehicle::Parameters& vehicle,
                const std::map<std::string, std::vector<Sample>>& chrono)
     -> std::map<std::string, std::vector<Sample>> {
   std::map<std::string, std::vector<Sample>> paths;
@@ -436,8 +433,8 @@ auto capture(const Comparison& theirs, const Comparison& ours) -> void {
 
 TEST_CASE("ManeuversAgainstChronoSedan") {
   std::map<std::string, std::vector<Sample>> chrono = load_maneuvers();
-  VehicleParameters sedan = load_sedan();
-  VehicleParameters multibody = load_sedan_multibody();
+  vehicle::Parameters sedan = load_sedan();
+  vehicle::Parameters multibody = load_sedan_multibody();
   Comparison theirs =
       measure(chrono, sedan.wheelbase().numerical_value_in(meter));
 

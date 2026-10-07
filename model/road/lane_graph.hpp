@@ -39,7 +39,7 @@ class LaneNumbering final {
   static constexpr std::uint32_t NONE = ~std::uint32_t{0};
 
   LaneNumbering() = default;
-  explicit LaneNumbering(const RoadNetwork& network);
+  explicit LaneNumbering(const Map& network);
 
   auto size() const -> std::uint32_t { return count_; }
 
@@ -147,29 +147,28 @@ class LaneGraph final {
 
 // Where `key`'s lane section ends in s: at the next section's start, or at
 // the road's end.
-auto find_section_end(const RoadNetwork& network, const LaneKey& key) -> double;
+auto find_section_end(const Map& network, const LaneKey& key) -> double;
 
 // The length of `key`'s lane, from its section's start to its end.
-auto find_lane_length(const RoadNetwork& network, const LaneKey& key) -> double;
+auto find_lane_length(const Map& network, const LaneKey& key) -> double;
 
 // The s of `along` meters along `key`'s lane, in the direction of travel.
-auto find_s_along(const RoadNetwork& network, const LaneKey& key, double along)
+auto find_s_along(const Map& network, const LaneKey& key, double along)
     -> double;
 
 // The lane `key` names.
-auto find_lane(const RoadNetwork& network, const LaneKey& key) -> const Lane&;
+auto find_lane(const Map& network, const LaneKey& key) -> const Lane&;
 
 // The t of the middle of `key`'s lane at `s`, between its borders.
-auto compute_lane_middle(const RoadNetwork& network, const LaneKey& key,
-                         Length s) -> Length;
+auto compute_lane_middle(const Map& network, const LaneKey& key, Length s)
+    -> Length;
 
 // The lane graph of every lane of `network`, of every type. A link to a lane
 // or road the network lacks adds no edge.
-auto build_lane_graph(const RoadNetwork& network) -> LaneGraph;
+auto build_lane_graph(const Map& network) -> LaneGraph;
 
 // The lane graph of `network`'s lanes of `type` alone, such as "driving",
 // each lane's successors in the same order as in the whole graph.
-auto build_lane_graph(const RoadNetwork& network, std::string_view type)
-    -> LaneGraph;
+auto build_lane_graph(const Map& network, std::string_view type) -> LaneGraph;
 
 }  // namespace simon::road

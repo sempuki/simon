@@ -62,7 +62,7 @@ Each choice says what it is, why, and where it comes from.
 ## Models
 
 `format/mjcf` reads MJCF and compiles it into `model/articulated/articulated`'s
-`ArticulatedModel` as MuJoCo 3.14.0's compiler does, in its order of
+`articulated::Scene` as MuJoCo 3.14.0's compiler does, in its order of
 operations: default classes, each from its parent, and `childclass`;
 attribute vectors given in part; angles in degrees unless the compiler says
 radians; orientations by quaternion, axis and angle, Euler angles on moving

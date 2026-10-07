@@ -39,10 +39,10 @@ using road::LaneKey;
 // and stop lines on them, read once and shared by the systems. It outlives
 // the world.
 struct Network final {
-  road::RoadNetwork roads;
+  road::Map map;
   road::LaneGraph graph;
   road::LaneGraph driving;  // The driving lanes' graph alone.
-  traffic::TrafficControl control;
+  traffic::Control control;
   traffic::RightOfWay rights;
   road::WalkingGraph walking;
   std::vector<std::uint32_t> walking_components;  // Each node's.
@@ -141,7 +141,7 @@ inline auto pose(const RoadPose& vehicle) -> model::Pose {
 // and orders as the storyboard saw and gave them this step. It outlives the
 // world.
 struct ScenarioContext final {
-  const road::RoadNetwork* roads = nullptr;
+  const road::Map* roads = nullptr;
   const road::LaneGraph* lanes = nullptr;
   const scenario::Scenario* scenario = nullptr;
   scenario::StoryboardPlayer* player = nullptr;
@@ -164,7 +164,7 @@ struct ScenarioOrders final {
   std::vector<scenario::ActionOrder> starts;
   // Where each teleport puts the vehicle, in the order given, each found
   // after the teleports before it, as a relative position needs.
-  std::vector<road::RoadPlacement> teleports;
+  std::vector<road::Placement> teleports;
   // Whether the storyboard teleported the vehicle this step, which then
   // stays where it was put; esmini's init teleports come before the first
   // step, and do not hold it.
@@ -223,7 +223,7 @@ struct TrajectoryRun final {
 // moving it, the roads its route runs through, how long it has been at the
 // end of its road, and the lateral actions it finished this step.
 struct ScenarioMotion final {
-  road::RoadPlacement placement;
+  road::Placement placement;
   std::optional<LateralChange> change;
   std::optional<TrajectoryRun> trajectory;
   // Where a trajectory put it this step, which its placement only nears.

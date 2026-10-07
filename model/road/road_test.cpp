@@ -132,8 +132,8 @@ TEST_CASE("Road") {
     road.elevation.pieces = {
         {.start = 0.0, .cubic = Cubic{.a = 2.0, .b = slope}}};
     road.superelevation.pieces = {{.start = 0.0, .cubic = Cubic{.a = roll}}};
-    Vector3 at = convert_to_meters(
-        compute_road_position(road, 30.0 * meter, 3.0 * meter));
+    Vector3 at =
+        convert_to_meters(compute_position(road, 30.0 * meter, 3.0 * meter));
     double norm = std::sqrt(1.0 + slope * slope);
     CHECK_THAT(at.x(),
                WithinAbs(30.0 - 3.0 * std::sin(roll) * slope / norm, 1e-12));
@@ -194,10 +194,10 @@ TEST_CASE("Road") {
     for (double s : {5.0, 39.0, 41.0, 63.0, 100.0, 141.0, 155.0}) {
       for (double t : {-4.0, -1.0, 0.0, 2.5, 6.0}) {
         CAPTURE(s, t);
-        Vector3 at = convert_to_meters(
-            compute_road_position(road, s * meter, t * meter));
-        RoadCoordinates found =
-            find_road_coordinates(road, at.x() * meter, at.y() * meter);
+        Vector3 at =
+            convert_to_meters(compute_position(road, s * meter, t * meter));
+        Coordinates found =
+            find_coordinates(road, at.x() * meter, at.y() * meter);
         CHECK_THAT(found.s.numerical_value_in(meter), WithinAbs(s, 1e-9));
         CHECK_THAT(found.t.numerical_value_in(meter), WithinAbs(t, 1e-9));
       }

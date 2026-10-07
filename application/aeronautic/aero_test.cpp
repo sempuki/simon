@@ -29,7 +29,7 @@ using namespace aeronautic::testing;
 
 // The inputs `row` records, by simon's names: the variables, and the
 // aircraft's flight control signals.
-auto read_inputs(const Row& row, const aircraft::AircraftData& aircraft)
+auto read_inputs(const Row& row, const aircraft::Definition& aircraft)
     -> aircraft::AeroInputs {
   aircraft::AeroInputs inputs;
   aircraft::FlightSignals signals;

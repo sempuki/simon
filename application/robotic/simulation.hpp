@@ -51,7 +51,7 @@ class Simulation final {
 
   // Every geom's pose in the world, by the model's geoms, from each tree's
   // last poses.
-  auto read_geom_frames() const -> std::vector<articulated::GeomFrame>;
+  auto read_geom_frames() const -> std::vector<articulated::GeometryFrame>;
 
   // The model's positions and velocities, gathered from every tree.
   auto read_qpos() const -> std::vector<double>;

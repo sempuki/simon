@@ -34,13 +34,13 @@ struct Room final {
 // none starts in a junction or beside one about to leave it.
 auto driving_lanes(const Network& network, double margin) -> std::vector<Room> {
   std::vector<Room> lanes;
-  for (std::uint32_t r = 0; r < network.roads.roads.size(); ++r) {
-    const road::Road& road = network.roads.roads[r];
+  for (std::uint32_t r = 0; r < network.map.roads.size(); ++r) {
+    const road::Road& road = network.map.roads[r];
     if (road.junction != "-1") {
       continue;
     }
-    bool before = road.predecessor.kind == road::RoadLink::Kind::JUNCTION;
-    bool after = road.successor.kind == road::RoadLink::Kind::JUNCTION;
+    bool before = road.predecessor.kind == road::Link::Kind::JUNCTION;
+    bool after = road.successor.kind == road::Link::Kind::JUNCTION;
     for (std::uint32_t k = 0; k < road.lane_sections.size(); ++k) {
       const road::LaneSection& section = road.lane_sections[k];
       // Whether this section's start, in s, is at the junction before the
@@ -72,10 +72,10 @@ auto driving_lanes(const Network& network, double margin) -> std::vector<Room> {
 
 auto load_network(const std::string& path)
     -> std::expected<Network, framework::Status> {
-  RETURN_OR_ASSIGN(road::RoadNetwork roads, format::load_opendrive(path));
+  RETURN_OR_ASSIGN(road::Map roads, format::load_opendrive(path));
   road::LaneGraph graph = road::build_lane_graph(roads);
   road::LaneGraph driving = road::build_lane_graph(roads, "driving");
-  traffic::TrafficControl control = traffic::build_traffic_control(roads);
+  traffic::Control control = traffic::build_control(roads);
   traffic::RightOfWay rights =
       traffic::build_right_of_way(roads, graph, control);
   road::WalkingGraph walking = road::build_walking_graph(roads);
@@ -89,7 +89,7 @@ auto load_network(const std::string& path)
       }
     }
   }
-  return Network{.roads = std::move(roads),
+  return Network{.map = std::move(roads),
                  .graph = std::move(graph),
                  .driving = std::move(driving),
                  .control = std::move(control),

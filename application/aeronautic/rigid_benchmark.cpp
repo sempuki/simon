@@ -40,7 +40,7 @@ constexpr int DEFAULT_STEPS = 250;  // 2 s simulated.
 
 // Creates `count` 737s in cruise, 2 km apart, each at 6 km and 200 m/s.
 auto populate(int count, const aircraft::Earth& earth,
-              const aircraft::AircraftData& data, InOut<World> world) -> void {
+              const aircraft::Definition& data, InOut<World> world) -> void {
   auto side = static_cast<int>(std::ceil(std::sqrt(count)));
   auto trim = trim_in_cruise(data, earth);
   CHECK_POSTCONDITION(trim.has_value());
@@ -55,7 +55,7 @@ auto populate(int count, const aircraft::Earth& earth,
 }
 
 auto measure(int aircraft, bool round, int steps,
-             const aircraft::AircraftData& data) -> void {
+             const aircraft::Definition& data) -> void {
   aircraft::Earth earth = round
                               ? aircraft::Earth::round(earth::wgs84::Geodetic{})
                               : aircraft::Earth::flat();

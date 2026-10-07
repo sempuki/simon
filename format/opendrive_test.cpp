@@ -115,15 +115,15 @@ TEST_CASE("OpenDrive") {
     CHECK(second.left.empty());
     CHECK(second.right[1].predecessor == -1);
     CHECK_FALSE(second.right[1].successor);
-    CHECK(road->predecessor.kind == RoadLink::Kind::ROAD);
-    CHECK(road->predecessor.contact == RoadLink::Contact::END);
-    CHECK(road->successor.kind == RoadLink::Kind::JUNCTION);
+    CHECK(road->predecessor.kind == road::Link::Kind::ROAD);
+    CHECK(road->predecessor.contact == road::Link::Contact::END);
+    CHECK(road->successor.kind == road::Link::Kind::JUNCTION);
     CHECK(road->successor.id == "9");
     REQUIRE(network->junctions.size() == 1);
     const JunctionConnection& connection =
         network->junctions[0].connections.at(0);
     CHECK(connection.connecting_road == "8");
-    CHECK(connection.contact == RoadLink::Contact::END);
+    CHECK(connection.contact == road::Link::Contact::END);
     CHECK(connection.lane_links.at(0).from == -1);
     CHECK(connection.lane_links.at(0).to == 1);
   }
@@ -140,7 +140,7 @@ TEST_CASE("OpenDrive") {
     CHECK(light.t == -5.0);
     CHECK(light.z_offset == 2.0);
     CHECK(light.dynamic);
-    CHECK(light.orientation == RoadDirection::POSITIVE);
+    CHECK(light.orientation == road::Direction::POSITIVE);
     CHECK(light.country == "DE");
     CHECK(light.type == "1000001");
     CHECK(light.subtype == "-1");
@@ -150,7 +150,7 @@ TEST_CASE("OpenDrive") {
     CHECK(light.validities[0].to == -1);
     const Signal& limit = road.signals[1];
     CHECK_FALSE(limit.dynamic);
-    CHECK(limit.orientation == RoadDirection::NEGATIVE);
+    CHECK(limit.orientation == road::Direction::NEGATIVE);
     CHECK(limit.value == 50.0);
     CHECK(limit.unit == "km/h");
     CHECK(limit.validities.empty());  // Every lane in its orientation.
@@ -161,15 +161,15 @@ TEST_CASE("OpenDrive") {
     REQUIRE(network);
     const Road& road = *network->find_road("7");
     REQUIRE(road.objects.size() == 1);
-    const RoadObject& walk = road.objects[0];
+    const road::Object& walk = road.objects[0];
     CHECK(walk.type == "crosswalk");
     CHECK(walk.s == 95.0);
     CHECK(walk.t == 0.5);
     CHECK(walk.heading == 0.1);
-    CHECK(walk.orientation == RoadDirection::BOTH);
+    CHECK(walk.orientation == road::Direction::BOTH);
     REQUIRE(walk.outlines.size() == 1);
-    const RoadObject::Outline& outline = walk.outlines[0];
-    CHECK(outline.frame == RoadObject::Outline::Frame::LOCAL);
+    const road::Object::Outline& outline = walk.outlines[0];
+    CHECK(outline.frame == road::Object::Outline::Frame::LOCAL);
     CHECK(outline.closed);
     REQUIRE(outline.corners.size() == 3);
     CHECK(outline.corners[1].first == 2.0);

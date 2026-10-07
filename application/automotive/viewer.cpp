@@ -100,7 +100,7 @@ class RoadMap final {
   auto ready() const -> bool { return ready_; }
 
   // Draws `network`'s roads from now on, the map fitted to them.
-  auto set_roads(const road::RoadNetwork& network) -> void {
+  auto set_roads(const road::Map& network) -> void {
     double length = 0.0;
     for (const road::Road& road : network.roads) {
       length += road.length;
@@ -393,7 +393,7 @@ class TrafficViewer final {
     session_->tick();
     bool running = check_running(*session_);
     if (running && !map_.ready()) {
-      map_.set_roads(session_->simulation().network().roads);
+      map_.set_roads(session_->simulation().network().map);
       set_furniture(session_->simulation().network());
     }
     if (running) {
@@ -454,12 +454,12 @@ class TrafficViewer final {
   auto set_furniture(const Network& network) -> void {
     stop_lines_.clear();
     for (const traffic::StopLine& line : network.control.stop_lines()) {
-      const road::Road& road = network.roads.roads[line.lane.road];
+      const road::Road& road = network.map.roads[line.lane.road];
       const road::LaneSection& section = road.lane_sections[line.lane.section];
       Length s = find_s_along(network, line.lane, line.along);
       int inner = line.lane.lane > 0 ? line.lane.lane - 1 : line.lane.lane + 1;
       auto at = [&](int id) {
-        Vector3 p = eigen(road::compute_road_position(
+        Vector3 p = eigen(road::compute_position(
             road, s, road::compute_lane_border(road, section, s, id)));
         return model::Point2{.x = p.x(), .y = p.y()};
       };
@@ -468,8 +468,8 @@ class TrafficViewer final {
     }
     crosswalks_.clear();
     for (const road::Crosswalk& crosswalk : network.walking.crosswalks()) {
-      const road::Road& road = network.roads.roads[crosswalk.road];
-      const road::RoadObject& object = road.objects[crosswalk.object];
+      const road::Road& road = network.map.roads[crosswalk.road];
+      const road::Object& object = road.objects[crosswalk.object];
       if (object.outlines.empty()) {
         continue;
       }
@@ -597,7 +597,7 @@ class TrafficViewer final {
     const Network& network = session_->simulation().network();
     ImGui::Checkbox("Keep in view", &keep_in_view_);
     ImGui::Text("Road          %7s",
-                network.roads.roads[state->lane.road].id.c_str());
+                network.map.roads[state->lane.road].id.c_str());
     ImGui::Text("Lane          %7d", state->lane.lane);
     ImGui::Text("s             %7.1f m", state->s.numerical_value_in(meter));
     ImGui::Text("Speed         %7.1f m/s",

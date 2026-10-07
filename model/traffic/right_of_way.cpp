@@ -38,9 +38,9 @@ struct Movement final {
   double heading_out = 0.0;
 };
 
-auto build_movement(const road::RoadNetwork& network,
-                    const road::LaneGraph& graph, const road::LaneKey& lane,
-                    const road::LaneKey& incoming) -> Movement {
+auto build_movement(const road::Map& network, const road::LaneGraph& graph,
+                    const road::LaneKey& lane, const road::LaneKey& incoming)
+    -> Movement {
   Movement movement{.lane = lane, .incoming = incoming};
   std::span<const road::LaneKey> next = graph.successors_of(lane);
   movement.exits.assign(next.begin(), next.end());
@@ -49,9 +49,8 @@ auto build_movement(const road::RoadNetwork& network,
   auto point_at = [&](double along) {
     Length s = road::find_s_along(network, lane, along) * meter;
     Length t = road::compute_lane_middle(network, lane, s);
-    Vector3 p = road::compute_road_position(road, s, t)
-                    .numerical_value_in(meter)
-                    .eigen();
+    Vector3 p =
+        road::compute_position(road, s, t).numerical_value_in(meter).eigen();
     return Point{.x = p.x(), .y = p.y()};
   };
   for (double along = 0.0; along < movement.length; along += SAMPLE) {
@@ -149,15 +148,15 @@ auto classify_turn(const Movement& movement) -> Turn {
 
 // Whether `road` has a give-way or stop sign for traffic in lane `lane`:
 // Germany's 205 or 206, the catalog OpenDRIVE's examples use.
-auto has_yield_sign(const road::RoadNetwork& network, const road::LaneKey& lane)
+auto has_yield_sign(const road::Map& network, const road::LaneKey& lane)
     -> bool {
   return std::ranges::any_of(
       network.roads[lane.road].signals, [&](const road::Signal& signal) {
         bool kind =
             !signal.dynamic && (signal.type == "205" || signal.type == "206");
-        bool direction = signal.orientation == road::RoadDirection::BOTH ||
-                         (signal.orientation ==
-                          road::RoadDirection::POSITIVE) == (lane.lane < 0);
+        bool direction = signal.orientation == road::Direction::BOTH ||
+                         (signal.orientation == road::Direction::POSITIVE) ==
+                             (lane.lane < 0);
         bool valid = signal.validities.empty() ||
                      std::ranges::any_of(
                          signal.validities, [&](const road::LaneValidity& v) {
@@ -168,7 +167,7 @@ auto has_yield_sign(const road::RoadNetwork& network, const road::LaneKey& lane)
 }
 
 // The signal group of the first stop line on `lane`, if it has one.
-auto find_group(const TrafficControl& control, const road::LaneKey& lane)
+auto find_group(const Control& control, const road::LaneKey& lane)
     -> std::optional<std::uint32_t> {
   std::span<const StopLine> lines = control.stop_lines_on(lane);
   if (lines.empty()) {
@@ -178,9 +177,9 @@ auto find_group(const TrafficControl& control, const road::LaneKey& lane)
 }
 
 // Whether `a` gives way to `b`, and why.
-auto who_yields(const road::RoadNetwork& network,
-                const road::Junction& junction, const Movement& a,
-                const Movement& b) -> std::pair<bool, Yielding> {
+auto who_yields(const road::Map& network, const road::Junction& junction,
+                const Movement& a, const Movement& b)
+    -> std::pair<bool, Yielding> {
   const std::string& road_a = network.roads[a.lane.road].id;
   const std::string& road_b = network.roads[b.lane.road].id;
   for (const road::JunctionPriority& priority : junction.priorities) {
@@ -255,10 +254,8 @@ auto RightOfWay::approaches_of(std::uint32_t index) const
                                         first_[index + 1] - first_[index]);
 }
 
-auto build_right_of_way(const road::RoadNetwork& network,
-                        const road::LaneGraph& graph,
-                        const TrafficControl& control, double reach)
-    -> RightOfWay {
+auto build_right_of_way(const road::Map& network, const road::LaneGraph& graph,
+                        const Control& control, double reach) -> RightOfWay {
   std::vector<road::LaneGraph::Edge> edges = graph.edges();
   std::map<road::LaneKey, std::vector<road::LaneKey>> predecessors;
   for (const road::LaneGraph::Edge& edge : edges) {

@@ -21,7 +21,7 @@ struct FuelTanks final {
 };
 
 // The tanks as the aircraft data fills them.
-auto fill_fuel_tanks(const AircraftData& aircraft) -> FuelTanks;
+auto fill_fuel_tanks(const Definition& aircraft) -> FuelTanks;
 
 // An aircraft's mass properties as loaded: its mass, its inertia about its
 // center of mass in body axes, and where that center is, in the structural
@@ -37,13 +37,13 @@ struct MassBalance final {
 // model/REFERENCES.md), as
 // JSBSim's FGMassBalance finds it: the empty aircraft, its point masses and
 // each tank's fuel, as a point mass, about the combined center of mass.
-auto compute_mass_balance(const AircraftData& aircraft,
+auto compute_mass_balance(const Definition& aircraft,
                           std::span<const Mass> contents) -> MassBalance;
 
 // The same, with each tank as the aircraft data fills it, or as `tanks`
 // holds.
-auto compute_mass_balance(const AircraftData& aircraft) -> MassBalance;
-auto compute_mass_balance(const AircraftData& aircraft, const FuelTanks& tanks)
+auto compute_mass_balance(const Definition& aircraft) -> MassBalance;
+auto compute_mass_balance(const Definition& aircraft, const FuelTanks& tanks)
     -> MassBalance;
 
 // A point in the structural frame, from the center of mass, in body axes.

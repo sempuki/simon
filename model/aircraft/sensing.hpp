@@ -33,7 +33,7 @@ struct BodyAcceleration final {
 // the flight controls are about to set. No wheel carries weight.
 auto sense_flight_state(const model::RigidBody& body,
                         const BodyAcceleration& felt, const MassBalance& mass,
-                        const AircraftData& aircraft, const Earth& earth,
+                        const Definition& aircraft, const Earth& earth,
                         const earth::StandardAirTable& air,
                         const earth::Wind& wind, Time time,
                         InOut<FlightSignals> signals) -> void;

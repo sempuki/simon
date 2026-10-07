@@ -26,7 +26,7 @@ struct Engines final {
 };
 
 // The engines settled at the throttles in `signals`, in `air`.
-auto compute_settled_engines(const AircraftData& aircraft,
+auto compute_settled_engines(const Definition& aircraft,
                              const FlightSignals& signals, const EngineAir& air)
     -> Engines;
 
@@ -38,13 +38,13 @@ auto compute_engine_air(const model::RigidBody& body, const Earth& earth,
 
 // Advances each engine by `dt` at its throttle in `signals`. An engine whose
 // tanks are empty makes no thrust and burns nothing.
-auto run_engines(const AircraftData& aircraft, InOut<Engines> engines,
+auto run_engines(const Definition& aircraft, InOut<Engines> engines,
                  const FlightSignals& signals, const FuelTanks& tanks,
                  const EngineAir& air, Time dt) -> void;
 
 // Burns each engine's fuel flow for `dt`, from its feed tanks that have fuel,
 // in equal shares, as JSBSim's FGPropulsion does.
-auto burn_fuel(const AircraftData& aircraft, const Engines& engines,
+auto burn_fuel(const Definition& aircraft, const Engines& engines,
                InOut<FuelTanks> tanks, Time dt) -> void;
 
 }  // namespace simon::aircraft

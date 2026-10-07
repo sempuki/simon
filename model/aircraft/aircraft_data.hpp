@@ -65,7 +65,7 @@ struct TurbineData final {
   std::optional<AeroTable> max_thrust_factor;  // Only with reheat.
 };
 
-struct AircraftData final {
+struct Definition final {
   std::string name;
   Area wing_area = 0.0 * square_meter;
   Length wing_span = 0.0 * meter;

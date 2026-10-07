@@ -62,7 +62,7 @@ auto solve_pitch(double alpha, double bank, double gamma) -> double {
 
 class Trimmer final {
  public:
-  Trimmer(const AircraftData& aircraft, const FlightCondition& condition,
+  Trimmer(const Definition& aircraft, const FlightCondition& condition,
           const Earth& earth, const earth::StandardAirTable& air)
       : aircraft_{aircraft},
         condition_{condition},
@@ -120,7 +120,7 @@ class Trimmer final {
       trim.engines =
           compute_settled_engines(aircraft_, trim.signals, engine_air);
       BodyAcceleration felt;
-      rate = aircraft::compute_rigid_aircraft_rate(
+      rate = aircraft::compute_rigid_rate(
           trim.body, trim.signals, trim.engines, trim.mass, aircraft_, earth_,
           air_, earth::Wind{}, 0.0 * second, Out(felt));
       double change =
@@ -213,7 +213,7 @@ class Trimmer final {
   }
 
  private:
-  const AircraftData& aircraft_;
+  const Definition& aircraft_;
   const FlightCondition& condition_;
   const Earth& earth_;
   const earth::StandardAirTable& air_;
@@ -223,7 +223,7 @@ class Trimmer final {
 
 }  // namespace
 
-auto trim(const AircraftData& aircraft, const FlightCondition& condition,
+auto trim(const Definition& aircraft, const FlightCondition& condition,
           const Earth& earth, const earth::StandardAirTable& air)
     -> std::expected<Trim, lib::Status> {
   return Trimmer{aircraft, condition, earth, air}.solve();

@@ -54,9 +54,9 @@ auto count_overlaps(const World& world) -> int {
 }
 
 auto road_index(const Network& network, std::string_view id) -> std::uint32_t {
-  const road::Road* road = network.roads.find_road(id);
+  const road::Road* road = network.map.find_road(id);
   REQUIRE(road);
-  return static_cast<std::uint32_t>(road - network.roads.roads.data());
+  return static_cast<std::uint32_t>(road - network.map.roads.data());
 }
 
 }  // namespace
@@ -67,8 +67,8 @@ TEST_CASE("RightOfWay") {
     REQUIRE(network);
     std::map<std::string, int> why;
     for (const traffic::Conflict& conflict : network->rights.conflicts()) {
-      std::string pair = network->roads.roads[conflict.lane.road].id + ">" +
-                         network->roads.roads[conflict.foe.road].id;
+      std::string pair = network->map.roads[conflict.lane.road].id + ">" +
+                         network->map.roads[conflict.foe.road].id;
       why[pair] = static_cast<int>(conflict.why);
     }
     using traffic::Yielding;
@@ -301,7 +301,7 @@ TEST_CASE("RightOfWay") {
         for (Entity vehicle : vehicles) {
           const LaneState& state =
               world.store_of<LaneState>().component_of(vehicle);
-          bool inside = network.roads.roads[state.lane.road].junction == "1";
+          bool inside = network.map.roads[state.lane.road].junction == "1";
           int& stage = through[vehicle];
           stage = stage == 0 && inside ? 1 : stage == 1 && !inside ? 2 : stage;
         }

@@ -10,17 +10,17 @@
 
 namespace simon::gravity {
 
-auto sum_gravity(std::span<const GravitySource> sources, std::uint32_t self,
-                 const Vector3& position, double softening) -> Vector3 {
+auto sum_acceleration(std::span<const Source> sources, std::uint32_t self,
+                      const Vector3& position, double softening) -> Vector3 {
   double softening2 = softening * softening;
   Vector3 acceleration = Vector3::Zero();
-  for (const GravitySource& source : sources) {
+  for (const Source& source : sources) {
     if (source.id == self) continue;
     double dx = position.x() - source.position.x();
     double dy = position.y() - source.position.y();
     double dz = position.z() - source.position.z();
     double r = std::sqrt(dx * dx + dy * dy + dz * dz + softening2);
-    double pull = -GRAVITATIONAL_CONSTANT / (r * r * r) * source.mass;
+    double pull = -CONSTANT / (r * r * r) * source.mass;
     acceleration.x() += pull * dx;
     acceleration.y() += pull * dy;
     acceleration.z() += pull * dz;
@@ -28,14 +28,14 @@ auto sum_gravity(std::span<const GravitySource> sources, std::uint32_t self,
   return acceleration;
 }
 
-auto compute_potential_energy(std::span<const GravitySource> sources,
-                              double softening) -> double {
+auto compute_potential_energy(std::span<const Source> sources, double softening)
+    -> double {
   double softening2 = softening * softening;
   double energy = 0.0;
   for (std::size_t i = 0; i < sources.size(); ++i) {
     for (std::size_t j = 0; j < i; ++j) {
       Vector3 d = sources[i].position - sources[j].position;
-      energy -= GRAVITATIONAL_CONSTANT * sources[i].mass * sources[j].mass /
+      energy -= CONSTANT * sources[i].mass * sources[j].mass /
                 std::sqrt(d.squaredNorm() + softening2);
     }
   }
@@ -57,7 +57,7 @@ auto find_octant(const Vector3& position, const Vector3& middle) -> int {
 
 }  // namespace
 
-auto GravityTree::build(std::span<const GravitySource> sources) -> void {
+auto Tree::build(std::span<const Source> sources) -> void {
   sources_.assign(sources.begin(), sources.end());
   scratch_.resize(sources_.size());
   cells_.clear();
@@ -65,7 +65,7 @@ auto GravityTree::build(std::span<const GravitySource> sources) -> void {
 
   Vector3 low = sources_.front().position;
   Vector3 high = low;
-  for (const GravitySource& source : sources_) {
+  for (const Source& source : sources_) {
     low = low.cwiseMin(source.position);
     high = high.cwiseMax(source.position);
   }
@@ -79,9 +79,9 @@ auto GravityTree::build(std::span<const GravitySource> sources) -> void {
 // Sorts the cell's sources by octant, stably, so the tree depends only on
 // the sources' order, and builds a child for each octant that has any. A
 // cell's mass and center of mass are its children's, or its sources'.
-auto GravityTree::build_cell(std::uint32_t cell, std::uint32_t begin,
-                             std::uint32_t end, const Vector3& corner,
-                             double width, int depth) -> void {
+auto Tree::build_cell(std::uint32_t cell, std::uint32_t begin,
+                      std::uint32_t end, const Vector3& corner, double width,
+                      int depth) -> void {
   cells_[cell].width = width;
   if (end - begin == 1 || depth == MOST_DEPTH) {
     double mass = 0.0;
@@ -147,10 +147,9 @@ auto GravityTree::build_cell(std::uint32_t cell, std::uint32_t begin,
   cells_[cell].center_of_mass = mass > 0.0 ? Vector3{moment / mass} : middle;
 }
 
-auto GravityTree::compute_acceleration(std::uint32_t self,
-                                       const Vector3& position,
-                                       double opening_angle,
-                                       double softening) const -> Vector3 {
+auto Tree::compute_acceleration(std::uint32_t self, const Vector3& position,
+                                double opening_angle, double softening) const
+    -> Vector3 {
   Vector3 acceleration = Vector3::Zero();
   if (cells_.empty()) return acceleration;
   double softening2 = softening * softening;
@@ -163,8 +162,8 @@ auto GravityTree::compute_acceleration(std::uint32_t self,
     const Cell& cell = cells_[stack[--size]];
     if (cell.leaf) {
       acceleration +=
-          sum_gravity(std::span{sources_}.subspan(cell.first, cell.count), self,
-                      position, softening);
+          sum_acceleration(std::span{sources_}.subspan(cell.first, cell.count),
+                           self, position, softening);
       continue;
     }
     double dx = position.x() - cell.center_of_mass.x();
@@ -179,7 +178,7 @@ auto GravityTree::compute_acceleration(std::uint32_t self,
       continue;
     }
     double r = std::sqrt(r2 + softening2);
-    double pull = -GRAVITATIONAL_CONSTANT / (r * r * r) * cell.mass;
+    double pull = -CONSTANT / (r * r * r) * cell.mass;
     acceleration.x() += pull * dx;
     acceleration.y() += pull * dy;
     acceleration.z() += pull * dz;

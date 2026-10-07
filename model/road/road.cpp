@@ -235,12 +235,12 @@ auto compute_plan_point(const PlanGeometry& geometry, double ds) -> PlanPoint {
       geometry.shape);
 }
 
-auto RoadNetwork::find_road(std::string_view id) const -> const Road* {
+auto Map::find_road(std::string_view id) const -> const Road* {
   auto found = std::ranges::find(roads, id, &Road::id);
   return found == roads.end() ? nullptr : &*found;
 }
 
-auto RoadNetwork::find_junction(std::string_view id) const -> const Junction* {
+auto Map::find_junction(std::string_view id) const -> const Junction* {
   auto found = std::ranges::find(junctions, id, &Junction::id);
   return found == junctions.end() ? nullptr : &*found;
 }
@@ -253,13 +253,13 @@ auto compute_plan_point(const Road& road, Length s) -> PlanPoint {
 
 // The point t across and h up from the reference line at s, along the
 // surface's axes there.
-auto compute_road_position(const Road& road, Length s, Length t, Length h)
+auto compute_position(const Road& road, Length s, Length t, Length h)
     -> Position {
-  return compute_road_position(road, compute_plan_point(road, s), s, t, h);
+  return compute_position(road, compute_plan_point(road, s), s, t, h);
 }
 
-auto compute_road_position(const Road& road, const PlanPoint& point, Length s,
-                           Length t, Length h) -> Position {
+auto compute_position(const Road& road, const PlanPoint& point, Length s,
+                      Length t, Length h) -> Position {
   double at = s.numerical_value_in(meter);
   RoadAxes axes = compute_road_axes(road, point, at);
   Vector3 position = Vector3{point.x, point.y, road.elevation.evaluate(at)} +
@@ -271,16 +271,15 @@ auto compute_road_position(const Road& road, const PlanPoint& point, Length s,
 // A local corner turns by the object's heading about e_h, then pitch, then
 // roll, z-y'-x'' as OpenDRIVE orders them, from the road's axes at the
 // object's origin.
-auto compute_outline(const Road& road, const RoadObject& object,
-                     const RoadObject::Outline& outline)
-    -> std::vector<Position> {
+auto compute_outline(const Road& road, const Object& object,
+                     const Object::Outline& outline) -> std::vector<Position> {
   std::vector<Position> corners;
   corners.reserve(outline.corners.size());
-  if (outline.frame == RoadObject::Outline::Frame::ROAD) {
-    for (const RoadObject::Corner& corner : outline.corners) {
-      corners.push_back(compute_road_position(road, corner.first * meter,
-                                              corner.second * meter,
-                                              corner.up * meter));
+  if (outline.frame == Object::Outline::Frame::ROAD) {
+    for (const Object::Corner& corner : outline.corners) {
+      corners.push_back(compute_position(road, corner.first * meter,
+                                         corner.second * meter,
+                                         corner.up * meter));
     }
     return corners;
   }
@@ -292,12 +291,11 @@ auto compute_outline(const Road& road, const RoadObject& object,
                           Eigen::AngleAxisd(object.pitch, Vector3::UnitY()) *
                           Eigen::AngleAxisd(object.roll, Vector3::UnitX()))
                              .toRotationMatrix();
-  Vector3 origin =
-      compute_road_position(road, point, object.s * meter, object.t * meter,
-                            object.z_offset * meter)
-          .numerical_value_in(meter)
-          .eigen();
-  for (const RoadObject::Corner& corner : outline.corners) {
+  Vector3 origin = compute_position(road, point, object.s * meter,
+                                    object.t * meter, object.z_offset * meter)
+                       .numerical_value_in(meter)
+                       .eigen();
+  for (const Object::Corner& corner : outline.corners) {
     Vector3 local{corner.first, corner.second, corner.up};
     corners.push_back(QuantityVector{origin + basis * (turn * local)} * meter);
   }
@@ -357,12 +355,11 @@ auto find_lane(const Road& road, Length s, Length t) -> std::optional<int> {
 // method on (P - r(s)) . T(s) = 0, whose derivative is
 // -1 + k(s) (P - r(s)) . N(s), with T the tangent, N the normal and k the
 // curvature.
-auto find_road_coordinates(const Road& road, Length x, Length y)
-    -> RoadCoordinates {
+auto find_coordinates(const Road& road, Length x, Length y) -> Coordinates {
   double px = x.numerical_value_in(meter);
   double py = y.numerical_value_in(meter);
   double best_distance = std::numeric_limits<double>::infinity();
-  RoadCoordinates best;
+  Coordinates best;
   for (const PlanGeometry& geometry : road.plan) {
     auto apart = [&](const PlanPoint& point) {
       return Planar{px - point.x, py - point.y};
@@ -405,7 +402,7 @@ auto find_road_coordinates(const Road& road, Length x, Length y)
     double distance = std::hypot(d.x, d.y);
     if (distance < best_distance) {
       best_distance = distance;
-      best = RoadCoordinates{
+      best = Coordinates{
           .s = (geometry.s0 + ds) * meter,
           .t =
               (-d.x * std::sin(point.heading) + d.y * std::cos(point.heading)) *

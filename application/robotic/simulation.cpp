@@ -19,7 +19,7 @@ namespace {
 
 // Whether MuJoCo takes dampers implicitly: if any dof is damped or
 // actuated, every dof's (mj_EulerSkip).
-auto is_implicit(const articulated::ArticulatedModel& m) -> bool {
+auto is_implicit(const articulated::Scene& m) -> bool {
   return !m.actuators.empty() ||
          std::ranges::any_of(
              m.dofs, [](const articulated::Dof& d) { return d.damping > 0; });
@@ -29,8 +29,7 @@ auto is_implicit(const articulated::ArticulatedModel& m) -> bool {
 // positions, averaged over translation and rotation, and the sum of its
 // mass matrix's diagonal (mj_setConst).
 template <typename Capacity>
-auto weigh(const articulated::ArticulatedModel& m,
-           const articulated::Tree& tree,
+auto weigh(const articulated::Scene& m, const articulated::Tree& tree,
            const articulated::TreeKernel<Capacity>& kernel,
            InOut<std::vector<double>> body_weight,
            InOut<std::vector<double>> dof_weight,
@@ -132,14 +131,14 @@ auto weigh(const articulated::ArticulatedModel& m,
 
 }  // namespace
 
-Mechanics::Mechanics(articulated::ArticulatedModel model)
+Mechanics::Mechanics(articulated::Scene model)
     : model_{std::move(model)},
       trees_{articulated::find_trees(model_)},
       filter_{model_} {
   for (std::uint32_t g = 0; g < model_.geoms.size(); ++g) {
-    const articulated::Geom& geom = model_.geoms[g];
+    const articulated::Geometry& geom = model_.geoms[g];
     radii_.push_back(articulated::compute_bounding_radius(geom));
-    if (geom.body == 0 || geom.type == articulated::GeomType::PLANE) {
+    if (geom.body == 0 || geom.type == articulated::GeometryType::PLANE) {
       unbounded_.push_back(g);
     }
   }
@@ -196,7 +195,7 @@ namespace {
 template <typename Capacity>
 auto start(const Mechanics& mechanics, std::uint32_t t,
            const Scenario& scenario) -> TreeState<Capacity> {
-  const articulated::ArticulatedModel& m = mechanics.model();
+  const articulated::Scene& m = mechanics.model();
   const articulated::Tree& tree = mechanics.trees()[t];
   TreeState<Capacity> state;
   for (std::uint32_t q = 0; q < tree.qpos; ++q) {
@@ -231,7 +230,7 @@ auto start_control(const Mechanics& mechanics, std::uint32_t t,
 }  // namespace
 
 auto Simulation::configure() -> engine::PhaseResult {
-  RETURN_OR_ASSIGN(articulated::ArticulatedModel model,
+  RETURN_OR_ASSIGN(articulated::Scene model,
                    format::load_mjcf(scenario_.model));
   if (scenario_.solver) {
     model.physics.solver = *scenario_.solver;
@@ -355,16 +354,15 @@ auto gather(const World& world, const Mechanics& mechanics, Field field,
 
 template <typename Capacity>
 auto place(const World& world, const Mechanics& mechanics,
-           InOut<std::vector<articulated::GeomFrame>> frames) -> void {
-  const articulated::ArticulatedModel& m = mechanics.model();
+           InOut<std::vector<articulated::GeometryFrame>> frames) -> void {
+  const articulated::Scene& m = mechanics.model();
   const auto& mechanisms = world.store_of<Mechanism>();
   world.store_of<TreeDynamics<Capacity>>().for_each(
       [&](Entity owner, const TreeDynamics<Capacity>& dynamics) {
         const articulated::Tree& tree =
             mechanics.trees()[mechanisms.component_of(owner).tree];
         for (std::uint32_t b = 0; b < tree.bodies; ++b) {
-          const articulated::ArticulatedBody& body =
-              m.bodies[tree.first_body + b];
+          const articulated::Body& body = m.bodies[tree.first_body + b];
           articulated::BodyFrame frame{.xpos = dynamics.xpos[b],
                                        .xquat = dynamics.xquat[b],
                                        .xmat = dynamics.xmat[b],
@@ -381,10 +379,10 @@ auto place(const World& world, const Mechanics& mechanics,
 }  // namespace
 
 auto Simulation::read_geom_frames() const
-    -> std::vector<articulated::GeomFrame> {
-  const articulated::ArticulatedModel& m = mechanics_->model();
-  std::vector<articulated::GeomFrame> frames(m.geoms.size());
-  const articulated::ArticulatedBody& ground = m.bodies[0];
+    -> std::vector<articulated::GeometryFrame> {
+  const articulated::Scene& m = mechanics_->model();
+  std::vector<articulated::GeometryFrame> frames(m.geoms.size());
+  const articulated::Body& ground = m.bodies[0];
   for (std::uint32_t g = ground.first_geom;
        g < ground.first_geom + ground.geoms; ++g) {
     frames[g] =

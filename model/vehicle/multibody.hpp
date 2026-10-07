@@ -47,15 +47,15 @@ struct UnsprungAxle final {
   Speed vertical_speed = 0.0 * meter_per_second;
 };
 
-struct MultibodyVehicleRate;
+struct MultibodyRate;
 
 // The multibody model's state, in CommonRoad's order: the center of
 // gravity's position in the plane, the steering angle, the speed along x,
 // the heading and yaw rate; the body; the front and rear axles; the left
 // front, right front, left rear and right rear wheels' speeds; and how far
 // the front and rear pins have slid sideways.
-struct MultibodyVehicle final {
-  using RateComponent = MultibodyVehicleRate;
+struct Multibody final {
+  using RateComponent = MultibodyRate;
   Length x = 0.0 * meter;
   Length y = 0.0 * meter;
   Angle steering = 0.0 * radian;
@@ -88,7 +88,7 @@ struct UnsprungAxleRate final {
   AccelerationMagnitude vertical_speed = 0.0 * meter_per_second_squared;
 };
 
-struct MultibodyVehicleRate final {
+struct MultibodyRate final {
   Speed x = 0.0 * meter_per_second;
   Speed y = 0.0 * meter_per_second;
   AngularRate steering = 0.0 * radian_per_second;
@@ -105,26 +105,21 @@ struct MultibodyVehicleRate final {
 
 // The state and its rate as CommonRoad's 29 numbers, in SI units, in order.
 using MultibodyNumbers = std::array<double, 29>;
-auto convert_multibody_to_numbers(const MultibodyVehicle& state)
-    -> MultibodyNumbers;
-auto convert_numbers_to_multibody(const MultibodyNumbers& numbers)
-    -> MultibodyVehicle;
-auto convert_multibody_rate_to_numbers(const MultibodyVehicleRate& rate)
+auto convert_multibody_to_numbers(const Multibody& state) -> MultibodyNumbers;
+auto convert_numbers_to_multibody(const MultibodyNumbers& numbers) -> Multibody;
+auto convert_multibody_rate_to_numbers(const MultibodyRate& rate)
     -> MultibodyNumbers;
 auto convert_numbers_to_multibody_rate(const MultibodyNumbers& numbers)
-    -> MultibodyVehicleRate;
+    -> MultibodyRate;
 
-auto operator+(const MultibodyVehicleRate& a, const MultibodyVehicleRate& b)
-    -> MultibodyVehicleRate;
-auto operator*(double weight, const MultibodyVehicleRate& rate)
-    -> MultibodyVehicleRate;
-auto advance(const MultibodyVehicle& state, const MultibodyVehicleRate& rate,
-             Duration dt) -> MultibodyVehicle;
+auto operator+(const MultibodyRate& a, const MultibodyRate& b) -> MultibodyRate;
+auto operator*(double weight, const MultibodyRate& rate) -> MultibodyRate;
+auto advance(const Multibody& state, const MultibodyRate& rate, Duration dt)
+    -> Multibody;
 
 // The multibody state straight ahead at `speed`, its wheels rolling and its
 // suspension at rest (CommonRoad's init_mb).
-auto start_multibody(Speed speed, const VehicleParameters& vehicle)
-    -> MultibodyVehicle;
+auto start_multibody(Speed speed, const Parameters& vehicle) -> Multibody;
 
 // Each wheel's steer beyond the steering, positive to the right as the
 // model's axes have it: its toe, and how a suspension's kinematics steer it
@@ -141,9 +136,8 @@ struct WheelSteer final {
 // acceleration asked becomes engine or brake torque, split between the axles
 // and their wheels, and a wheel spinning backward stops. A Magic Formula
 // tire is mirrored on the right (see model/tire.hpp).
-auto compute_multibody_rate(const MultibodyVehicle& state,
-                            const VehicleInput& input,
-                            const VehicleParameters& vehicle,
-                            const WheelSteer& toe = {}) -> MultibodyVehicleRate;
+auto compute_multibody_rate(const Multibody& state, const Input& input,
+                            const Parameters& vehicle,
+                            const WheelSteer& toe = {}) -> MultibodyRate;
 
 }  // namespace simon::vehicle

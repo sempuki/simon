@@ -106,7 +106,7 @@ struct SurfaceAutopilot final {
 // The data a rigid aircraft flies by, which every aircraft of its type
 // shares. It outlives the world.
 struct AircraftType final {
-  const aircraft::AircraftData* data = nullptr;
+  const aircraft::Definition* data = nullptr;
 };
 
 namespace archetype {

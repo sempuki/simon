@@ -161,10 +161,10 @@ TEST_CASE("TreeMomentum") {
   REQUIRE(driver.run(BasicTimePoint<Year>{} + 1280 * step));
 
   Mechanics after = measure_mechanics(simulation.world(), scenario.softening);
-  double scale_momentum = plummer.mass.numerical_value_in(kilogram) *
-                          std::sqrt(gravity::GRAVITATIONAL_CONSTANT *
-                                    plummer.mass.numerical_value_in(kilogram) /
-                                    plummer.scale.numerical_value_in(meter));
+  double scale_momentum =
+      plummer.mass.numerical_value_in(kilogram) *
+      std::sqrt(gravity::CONSTANT * plummer.mass.numerical_value_in(kilogram) /
+                plummer.scale.numerical_value_in(meter));
   // Measured: energy to 9.4e-4 and momentum to 9.3e-4, where direct
   // summation keeps them to 1.5e-4 and rounding.
   CHECK(std::abs(after.energy() / before.energy() - 1.0) < 2e-3);

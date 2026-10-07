@@ -103,8 +103,8 @@ TEST_CASE("DiskGalaxy") {
                   2.0 * v2(r) / (r * r));
     double sigma = GALAXY.disk_mass.numerical_value_in(kilogram) /
                    (2.0 * std::numbers::pi * h * h) * std::exp(-2.5);
-    double q = std::sqrt(radial2 / count) * kappa /
-               (3.36 * gravity::GRAVITATIONAL_CONSTANT * sigma);
+    double q =
+        std::sqrt(radial2 / count) * kappa / (3.36 * gravity::CONSTANT * sigma);
     // Measured: 1.661 h to the profile's 1.678 h, 0.557 kpc to a sech^2
     // layer's z_0 pi / 2 sqrt(3) = 0.544, rotation at 0.972 of circular
     // (asymmetric drift), Q 1.56 over 249 bodies, and a virial ratio of 0.953.

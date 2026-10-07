@@ -40,7 +40,7 @@ inline auto normalize(InOut<Vector3> v) -> double {
 
 // Joint and shape types, numbered as MuJoCo numbers them.
 enum class JointType : std::uint8_t { FREE, BALL, SLIDE, HINGE };
-enum class GeomType : std::uint8_t {
+enum class GeometryType : std::uint8_t {
   PLANE,
   HEIGHT_FIELD,
   SPHERE,
@@ -71,7 +71,7 @@ struct SoftConstraint final {
 // A rigid body: its frame on its parent's, its center of mass and principal
 // axes in its own frame, its mass and principal moments of inertia, and its
 // joints, degrees of freedom and geoms, as ranges.
-struct ArticulatedBody final {
+struct Body final {
   std::string name;
   std::uint32_t parent = 0;
   std::uint32_t root = 0;  // The child of the world whose tree it is in.
@@ -124,9 +124,9 @@ struct Dof final {
 // A shape a body collides with, in its body's frame, and how its contacts
 // behave: friction sliding, torsional and rolling, the dimensions of its
 // contact, which shapes it may touch, and how softly.
-struct Geom final {
+struct Geometry final {
   std::string name;
-  GeomType type = GeomType::SPHERE;
+  GeometryType type = GeometryType::SPHERE;
   std::uint32_t body = 0;
   Vector3 size = Vector3::Zero();
   Vector3 pos = Vector3::Zero();
@@ -212,13 +212,13 @@ struct Tree final {
   std::vector<std::uint32_t> actuators;  // On its joints.
 };
 
-struct ArticulatedModel final {
+struct Scene final {
   std::string name;
   Physics physics;
-  std::vector<ArticulatedBody> bodies;  // The world first.
+  std::vector<Body> bodies;  // The world first.
   std::vector<Joint> joints;
   std::vector<Dof> dofs;
-  std::vector<Geom> geoms;
+  std::vector<Geometry> geoms;
   std::vector<Actuator> actuators;
   std::vector<Tendon> tendons;
   // Pairs of bodies whose geoms never touch, the lower first, in order.
@@ -228,6 +228,6 @@ struct ArticulatedModel final {
 };
 
 // Each kinematic tree of `model`, in order.
-auto find_trees(const ArticulatedModel& model) -> std::vector<Tree>;
+auto find_trees(const Scene& model) -> std::vector<Tree>;
 
 }  // namespace simon::articulated

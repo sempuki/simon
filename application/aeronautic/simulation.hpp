@@ -69,7 +69,7 @@ struct Scenario final {
 // Trims a rigid aircraft of type `data` over `earth` for level flight at
 // `altitude` and `speed`, its tanks full, heading north from the world's
 // origin.
-auto trim_in_cruise(const aircraft::AircraftData& data,
+auto trim_in_cruise(const aircraft::Definition& data,
                     const aircraft::Earth& earth,
                     Length altitude = 6000.0 * meter,
                     Speed speed = 200.0 * meter_per_second)
@@ -82,7 +82,7 @@ auto trim_in_cruise(const aircraft::AircraftData& data,
 // steady wind, whose air it moves with. In a `wind` that is not still the
 // aircraft has a Wind, and in turbulence Gusts drawn from `seed`.
 auto create_rigid_aircraft(
-    const aircraft::AircraftData& data, const aircraft::Earth& earth,
+    const aircraft::Definition& data, const aircraft::Earth& earth,
     const aircraft::Trim& trim, const SurfaceGains& gains, Length x, Length y,
     Angle heading, const Route& route, InOut<World> world,
     const earth::WindField& wind = {}, std::uint64_t seed = 0)
@@ -91,8 +91,8 @@ auto create_rigid_aircraft(
 // The rigid aircraft types a scenario flies, read once: null where it flies
 // none of that type.
 struct RigidTypes final {
-  const aircraft::AircraftData* airliner = nullptr;
-  const aircraft::AircraftData* fighter = nullptr;
+  const aircraft::Definition* airliner = nullptr;
+  const aircraft::Definition* fighter = nullptr;
 };
 
 // Builds in `world` the world a scenario needs.
@@ -134,8 +134,8 @@ class Simulation final {
  private:
   Scenario scenario_;
   // Each rigid type, read if the scenario flies any.
-  std::unique_ptr<aircraft::AircraftData> airliner_;
-  std::unique_ptr<aircraft::AircraftData> fighter_;
+  std::unique_ptr<aircraft::Definition> airliner_;
+  std::unique_ptr<aircraft::Definition> fighter_;
   World world_;  // Empty until configure builds it.
   Scheduler scheduler_;
 };

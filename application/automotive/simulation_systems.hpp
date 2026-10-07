@@ -41,7 +41,7 @@ using ProjectedWorld = framework::ProjectedWorld<SystemType, World>;
 // The lane's length, from its section's start to its end.
 inline auto find_lane_length(const Network& network, const LaneKey& lane)
     -> double {
-  return road::find_lane_length(network.roads, lane);
+  return road::find_lane_length(network.map, lane);
 }
 
 // How far along its lane, in the direction of travel, `s` is.
@@ -49,15 +49,14 @@ inline auto along_lane(const Network& network, const LaneKey& lane, Length s)
     -> double {
   double at = s.numerical_value_in(meter);
   return road::runs_with_s(lane)
-             ? at -
-                   network.roads.roads[lane.road].lane_sections[lane.section].s0
-             : road::find_section_end(network.roads, lane) - at;
+             ? at - network.map.roads[lane.road].lane_sections[lane.section].s0
+             : road::find_section_end(network.map, lane) - at;
 }
 
 // The s of `along` meters along `lane`, in the direction of travel.
 inline auto find_s_along(const Network& network, const LaneKey& lane,
                          double along) -> Length {
-  return road::find_s_along(network.roads, lane, along) * meter;
+  return road::find_s_along(network.map, lane, along) * meter;
 }
 
 // The driving lane a vehicle enters from `lane`, its `turns`th: at a fork,
@@ -87,12 +86,12 @@ inline auto find_neighbor(const Network& network, const LaneKey& lane,
   LaneKey beside = lane;
   beside.lane += right ? outward : -outward;
   const road::LaneSection& section =
-      network.roads.roads[lane.road].lane_sections[lane.section];
+      network.map.roads[lane.road].lane_sections[lane.section];
   const std::vector<road::Lane>& side =
       beside.lane > 0 ? section.left : section.right;
   if (beside.lane == 0 ||
       static_cast<std::size_t>(std::abs(beside.lane)) > side.size() ||
-      road::find_lane(network.roads, beside).type != "driving") {
+      road::find_lane(network.map, beside).type != "driving") {
     return std::nullopt;
   }
   return beside;
@@ -413,7 +412,7 @@ struct Decide final            //
     double before = -along;  // From the vehicle to the lane's start.
     LaneKey key = state.lane;
     std::uint32_t turns = state.turns;
-    while (network_->roads.roads[key.road].junction == "-1") {
+    while (network_->map.roads[key.road].junction == "-1") {
       before += find_lane_length(*network_, key);
       std::optional<LaneKey> next =
           choose_next_lane(*network_, key, driver.seed, turns++);
@@ -995,16 +994,15 @@ struct FollowLane final  //
   // The pose of a vehicle in `state`.
   static auto locate_vehicle(const Network& network, const LaneState& state)
       -> RoadPose {
-    const road::Road& road = network.roads.roads[state.lane.road];
-    Length middle =
-        road::compute_lane_middle(network.roads, state.lane, state.s);
+    const road::Road& road = network.map.roads[state.lane.road];
+    Length middle = road::compute_lane_middle(network.map, state.lane, state.s);
     road::PlanPoint point = road::compute_plan_point(road, state.s);
     double heading = point.heading;
     if (!road::runs_with_s(state.lane)) {
       heading += std::numbers::pi;
     }
     return RoadPose{
-        .position = road::compute_road_position(road, point, state.s, middle),
+        .position = road::compute_position(road, point, state.s, middle),
         .heading = heading * radian};
   }
 
@@ -1142,7 +1140,7 @@ struct Pace final              //
           continue;
         }
         for (const LaneKey& before : network.graph.predecessors_of(lane)) {
-          if (road::find_lane(network.roads, before).type == "driving" &&
+          if (road::find_lane(network.map, before).type == "driving" &&
               std::none_of(upstream_.begin() + first_.back(), upstream_.end(),
                            [&](const auto& u) { return u.first == before; })) {
             upstream_.emplace_back(before,
@@ -1477,7 +1475,7 @@ struct RunStoryboard final    //
       orders_[order.entity].starts.push_back(order);
       if (const auto* teleport =
               std::get_if<scenario::TeleportAction>(order.action)) {
-        road::RoadPlacement placement =
+        road::Placement placement =
             context.player->locate(teleport->position, context.states);
         orders_[order.entity].teleports.push_back(placement);
         orders_[order.entity].held = orders_[order.entity].held || holding;

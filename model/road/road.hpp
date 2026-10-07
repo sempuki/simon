@@ -130,7 +130,7 @@ struct LaneSection final {
 
 // What a road's end joins: nothing, another road's start or end, or a
 // junction.
-struct RoadLink final {
+struct Link final {
   enum class Kind : std::uint8_t { NONE, ROAD, JUNCTION };
   enum class Contact : std::uint8_t { START, END };
 
@@ -142,7 +142,7 @@ struct RoadLink final {
 // The direction of travel along s that a signal or object holds for: "+",
 // "-" or "none" in OpenDRIVE, for traffic toward increasing s, decreasing s,
 // or both.
-enum class RoadDirection : std::uint8_t { POSITIVE, NEGATIVE, BOTH };
+enum class Direction : std::uint8_t { POSITIVE, NEGATIVE, BOTH };
 
 // The lanes a signal or object holds for, by id, from `from` to `to`.
 struct LaneValidity final {
@@ -167,7 +167,7 @@ struct Signal final {
   double s = 0.0;
   double t = 0.0;
   double z_offset = 0.0;
-  RoadDirection orientation = RoadDirection::BOTH;
+  Direction orientation = Direction::BOTH;
   bool dynamic = false;
 };
 
@@ -175,7 +175,7 @@ struct Signal final {
 // `z_offset` up, turned by `heading`, `pitch` and `roll` from the road's axes
 // there. Its outlines give its shape, each corner either in road coordinates
 // (s, t and dz up from the road) or in the object's own (u, v and z).
-struct RoadObject final {
+struct Object final {
   struct Corner final {
     double first = 0.0;   // s or u.
     double second = 0.0;  // t or v.
@@ -206,7 +206,7 @@ struct RoadObject final {
   double length = 0.0;
   double width = 0.0;
   double height = 0.0;
-  RoadDirection orientation = RoadDirection::BOTH;
+  Direction orientation = Direction::BOTH;
 };
 
 struct Road final {
@@ -219,9 +219,9 @@ struct Road final {
   CubicProfile lane_offset;                // The center lane's t.
   std::vector<LaneSection> lane_sections;  // In increasing s0.
   std::vector<Signal> signals;
-  std::vector<RoadObject> objects;
-  RoadLink predecessor;  // At s = 0.
-  RoadLink successor;    // At s = length.
+  std::vector<Object> objects;
+  Link predecessor;  // At s = 0.
+  Link successor;    // At s = length.
 };
 
 // Where traffic from an incoming road enters a junction: a connecting road,
@@ -235,7 +235,7 @@ struct JunctionConnection final {
 
   std::string incoming_road;
   std::string connecting_road;
-  RoadLink::Contact contact = RoadLink::Contact::START;
+  Link::Contact contact = Link::Contact::START;
   std::vector<LaneLink> lane_links;
 };
 
@@ -276,7 +276,7 @@ struct SignalController final {
   std::uint32_t sequence = 0;
 };
 
-struct RoadNetwork final {
+struct Map final {
   // The road with `id`, if there is one.
   auto find_road(std::string_view id) const -> const Road*;
 
@@ -294,20 +294,19 @@ auto compute_plan_point(const Road& road, Length s) -> PlanPoint;
 // The world position of (`s`, `t`, `h`) on `road`. t runs along the road's
 // surface across the reference line, tilted by the superelevation, and h
 // along the surface's normal.
-auto compute_road_position(const Road& road, Length s, Length t,
-                           Length h = 0.0 * meter) -> Position;
+auto compute_position(const Road& road, Length s, Length t,
+                      Length h = 0.0 * meter) -> Position;
 
 // The same, given the reference line's point at `s`.
-auto compute_road_position(const Road& road, const PlanPoint& point, Length s,
-                           Length t, Length h = 0.0 * meter) -> Position;
+auto compute_position(const Road& road, const PlanPoint& point, Length s,
+                      Length t, Length h = 0.0 * meter) -> Position;
 
 // The world positions of `outline`'s corners on `object` on `road`, on the
 // road's surface: road corners at (s, t, dz) on the road, and local ones
 // turned by the object's heading, pitch and roll from the road's axes at the
 // object's origin, and carried there.
-auto compute_outline(const Road& road, const RoadObject& object,
-                     const RoadObject::Outline& outline)
-    -> std::vector<Position>;
+auto compute_outline(const Road& road, const Object& object,
+                     const Object::Outline& outline) -> std::vector<Position>;
 
 // The lane section in force at `s`: the last that starts at or before it.
 auto find_lane_section(const Road& road, Length s) -> const LaneSection&;
@@ -324,14 +323,13 @@ auto find_lane(const Road& road, Length s, Length t) -> std::optional<int>;
 
 // Road coordinates in the plane: s along the reference line and t along its
 // normal.
-struct RoadCoordinates final {
+struct Coordinates final {
   Length s = 0.0 * meter;
   Length t = 0.0 * meter;
 };
 
 // The road coordinates of (`x`, `y`): the s on the reference line nearest it,
 // where the line's normal passes through it, and the t along that normal.
-auto find_road_coordinates(const Road& road, Length x, Length y)
-    -> RoadCoordinates;
+auto find_coordinates(const Road& road, Length x, Length y) -> Coordinates;
 
 }  // namespace simon::road

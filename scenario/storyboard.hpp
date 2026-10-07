@@ -34,7 +34,7 @@ namespace simon::scenario {
 
 // What the storyboard reads of each entity, as the last step left it.
 struct EntityState final {
-  road::RoadPlacement placement;
+  road::Placement placement;
   road::PlacementPose pose;
   double speed = 0.0;         // m/s, along the heading.
   double acceleration = 0.0;  // m/s^2.
@@ -68,7 +68,7 @@ class StoryboardPlayer final {
   };
 
   // The storyboard of `scenario` on `network`, both of which it keeps.
-  StoryboardPlayer(const Scenario& scenario, const road::RoadNetwork& network);
+  StoryboardPlayer(const Scenario& scenario, const road::Map& network);
 
   // The entity named `name`'s index, or the entity count if none is.
   auto find_entity(std::string_view name) const -> std::size_t;
@@ -100,8 +100,7 @@ class StoryboardPlayer final {
 
   // Where `position` is, entities' positions as `entities` has them.
   auto locate(const Position& position,
-              std::span<const EntityState> entities) const
-      -> road::RoadPlacement;
+              std::span<const EntityState> entities) const -> road::Placement;
 
  private:
   enum class State : std::uint8_t { INIT, STANDBY, RUNNING, COMPLETE };
@@ -177,7 +176,7 @@ class StoryboardPlayer final {
                            const DistanceCondition& condition) const -> double;
 
   const Scenario* scenario_ = nullptr;
-  const road::RoadNetwork* network_ = nullptr;
+  const road::Map* network_ = nullptr;
   std::vector<Element> elements_;  // The storyboard first.
   std::vector<std::pair<const Condition*, ConditionMemory>> memories_;
   std::vector<Parameter> parameters_;

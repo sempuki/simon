@@ -26,11 +26,7 @@ namespace simon::format {
 namespace {
 
 using articulated::Actuator;
-using articulated::ArticulatedBody;
-using articulated::ArticulatedModel;
 using articulated::Dof;
-using articulated::Geom;
-using articulated::GeomType;
 using articulated::Joint;
 using articulated::JointType;
 using articulated::Physics;
@@ -123,7 +119,7 @@ struct Orientation final {
 enum class Limited : std::uint8_t { AUTO, YES, NO };
 
 struct GeomSpec final {
-  Geom geom;
+  articulated::Geometry geom;
   Orientation orientation;
   std::optional<std::array<double, 6>> fromto;
   std::optional<double> mass;
@@ -202,10 +198,10 @@ struct CompilerSpec final {
 class Reader final {
  public:
   auto read(std::string_view text)
-      -> std::expected<ArticulatedModel, lib::Status> {
+      -> std::expected<articulated::Scene, lib::Status> {
     RETURN_IF_UNEXPECTED(document_.load(std::string{text}));
     RETURN_OR_ASSIGN(pugi::xml_node root, document_.find_root("mujoco"));
-    ArticulatedModel model{.name = root.attribute("model").as_string()};
+    articulated::Scene model{.name = root.attribute("model").as_string()};
     // The compiler's settings and the defaults come first, wherever they
     // stand.
     for (pugi::xml_node compiler : root.children("compiler")) {
@@ -619,7 +615,7 @@ class Reader final {
 
   auto apply_geom(pugi::xml_node node, InOut<GeomSpec> spec) const
       -> std::expected<void, lib::Status> {
-    Geom& geom = spec->geom;
+    articulated::Geometry& geom = spec->geom;
     for (pugi::xml_attribute attribute : node.attributes()) {
       std::string_view name = attribute.name();
       static constexpr std::array<std::string_view, 21> KNOWN{
@@ -643,14 +639,15 @@ class Reader final {
       geom.name = node.attribute("name").as_string();
     }
     if (pugi::xml_attribute type = node.attribute("type")) {
-      static constexpr std::array<std::pair<std::string_view, GeomType>, 7>
-          TYPES{{{"plane", GeomType::PLANE},
-                 {"sphere", GeomType::SPHERE},
-                 {"capsule", GeomType::CAPSULE},
-                 {"ellipsoid", GeomType::ELLIPSOID},
-                 {"cylinder", GeomType::CYLINDER},
-                 {"box", GeomType::BOX},
-                 {"mesh", GeomType::MESH}}};
+      static constexpr std::array<
+          std::pair<std::string_view, articulated::GeometryType>, 7>
+          TYPES{{{"plane", articulated::GeometryType::PLANE},
+                 {"sphere", articulated::GeometryType::SPHERE},
+                 {"capsule", articulated::GeometryType::CAPSULE},
+                 {"ellipsoid", articulated::GeometryType::ELLIPSOID},
+                 {"cylinder", articulated::GeometryType::CYLINDER},
+                 {"box", articulated::GeometryType::BOX},
+                 {"mesh", articulated::GeometryType::MESH}}};
       auto found = std::ranges::find(TYPES, std::string_view{type.as_string()},
                                      &decltype(TYPES)::value_type::first);
       if (found == TYPES.end()) {
@@ -1029,34 +1026,35 @@ class Reader final {
 
   // A geom's mass and principal moments from its shape and density
   // (mjCGeom::GetVolume and SetInertia, solid shapes).
-  static auto compute_volume(const Geom& geom) -> double {
+  static auto compute_volume(const articulated::Geometry& geom) -> double {
     const Vector3& s = geom.size;
     switch (geom.type) {
-      case GeomType::SPHERE:
+      case articulated::GeometryType::SPHERE:
         return 4 * PI * s[0] * s[0] * s[0] / 3;
-      case GeomType::CAPSULE: {
+      case articulated::GeometryType::CAPSULE: {
         double height = 2 * s[1];
         return PI * (s[0] * s[0] * height + 4 * s[0] * s[0] * s[0] / 3);
       }
-      case GeomType::CYLINDER:
+      case articulated::GeometryType::CYLINDER:
         return PI * s[0] * s[0] * 2 * s[1];
-      case GeomType::ELLIPSOID:
+      case articulated::GeometryType::ELLIPSOID:
         return 4 * PI * s[0] * s[1] * s[2] / 3;
-      case GeomType::BOX:
+      case articulated::GeometryType::BOX:
         return s[0] * s[1] * s[2] * 8;
       default:
         return 0.0;
     }
   }
 
-  static auto compute_inertia(const Geom& geom, double mass) -> Vector3 {
+  static auto compute_inertia(const articulated::Geometry& geom, double mass)
+      -> Vector3 {
     const Vector3& s = geom.size;
     switch (geom.type) {
-      case GeomType::SPHERE: {
+      case articulated::GeometryType::SPHERE: {
         double i = 2 * mass * s[0] * s[0] / 5;
         return {i, i, i};
       }
-      case GeomType::CAPSULE: {
+      case articulated::GeometryType::CAPSULE: {
         double height = 2 * s[1];
         double radius = s[0];
         double sphere_mass = mass * 4 * radius / (4 * radius + 3 * height);
@@ -1069,19 +1067,19 @@ class Reader final {
         axial += sphere;
         return {side, side, axial};
       }
-      case GeomType::CYLINDER: {
+      case articulated::GeometryType::CYLINDER: {
         double height = 2 * s[1];
         double side = mass * (3 * s[0] * s[0] + height * height) / 12;
         return {side, side, mass * s[0] * s[0] / 2};
       }
-      case GeomType::ELLIPSOID: {
+      case articulated::GeometryType::ELLIPSOID: {
         double s00 = s[0] * s[0];
         double s11 = s[1] * s[1];
         double s22 = s[2] * s[2];
         return {mass * (s11 + s22) / 5, mass * (s00 + s22) / 5,
                 mass * (s00 + s11) / 5};
       }
-      case GeomType::BOX:
+      case articulated::GeometryType::BOX:
         return {mass * (s[1] * s[1] + s[2] * s[2]) / 3,
                 mass * (s[0] * s[0] + s[2] * s[2]) / 3,
                 mass * (s[0] * s[0] + s[1] * s[1]) / 3};
@@ -1093,12 +1091,14 @@ class Reader final {
   // A geom's frame and size from fromto or its orientation, and its mass
   // and inertia if `infer` (mjCGeom::Compile).
   auto compile_geom(GeomSpec spec, bool infer)
-      -> std::expected<std::pair<Geom, double>, lib::Status> {
-    Geom geom = spec.geom;
+      -> std::expected<std::pair<articulated::Geometry, double>, lib::Status> {
+    articulated::Geometry geom = spec.geom;
     double mass = 0.0;
     if (spec.fromto) {
-      if (geom.type != GeomType::CAPSULE && geom.type != GeomType::CYLINDER &&
-          geom.type != GeomType::ELLIPSOID && geom.type != GeomType::BOX) {
+      if (geom.type != articulated::GeometryType::CAPSULE &&
+          geom.type != articulated::GeometryType::CYLINDER &&
+          geom.type != articulated::GeometryType::ELLIPSOID &&
+          geom.type != articulated::GeometryType::BOX) {
         return fail("fromto requires capsule, cylinder, box or ellipsoid");
       }
       if (geom.pos[0] != 0.0 || geom.pos[1] != 0.0 || geom.pos[2] != 0.0) {
@@ -1110,7 +1110,8 @@ class Reader final {
       if (geom.size[1] < EPS) {
         return fail("fromto points too close in geom");
       }
-      if (geom.type == GeomType::ELLIPSOID || geom.type == GeomType::BOX) {
+      if (geom.type == articulated::GeometryType::ELLIPSOID ||
+          geom.type == articulated::GeometryType::BOX) {
         geom.size[2] = geom.size[1];
         geom.size[1] = geom.size[0];
       }
@@ -1121,7 +1122,7 @@ class Reader final {
     }
     // A mesh only shows the model: it may neither collide nor weigh, as
     // its shape is not read.
-    if (geom.type == GeomType::MESH) {
+    if (geom.type == articulated::GeometryType::MESH) {
       if (geom.contype != 0 || geom.conaffinity != 0) {
         return refuse("a mesh geom that collides");
       }
@@ -1144,9 +1145,9 @@ class Reader final {
   }
 
   // Every body, depth first, the world first.
-  auto compile(const BodySpec& world, Out<ArticulatedModel> model)
+  auto compile(const BodySpec& world, Out<articulated::Scene> model)
       -> std::expected<void, lib::Status> {
-    model->bodies.push_back(ArticulatedBody{.name = "world"});
+    model->bodies.push_back(articulated::Body{.name = "world"});
     std::vector<std::uint32_t> last_dof{Dof::NONE};  // By body.
     RETURN_IF_UNEXPECTED(compile_world_geoms(world, 0, model));
     for (const BodySpec& child : world.children) {
@@ -1192,8 +1193,10 @@ class Reader final {
       model->tendons.push_back(std::move(tendon));
     }
     for (const auto& [first, second] : excludes_) {
-      auto a = std::ranges::find(model->bodies, first, &ArticulatedBody::name);
-      auto b = std::ranges::find(model->bodies, second, &ArticulatedBody::name);
+      auto a =
+          std::ranges::find(model->bodies, first, &articulated::Body::name);
+      auto b =
+          std::ranges::find(model->bodies, second, &articulated::Body::name);
       if (a == model->bodies.end() || b == model->bodies.end()) {
         return fail("no body " + (a == model->bodies.end() ? first : second) +
                     " for a contact exclusion");
@@ -1209,7 +1212,7 @@ class Reader final {
 
   // Which frames MuJoCo treats as one: within 1e-6 of each other, a
   // quaternion either sign (IsSamePose, IsNullPose).
-  static auto classify_frames(Out<ArticulatedModel> model) -> void {
+  static auto classify_frames(Out<articulated::Scene> model) -> void {
     constexpr double EPS = 1e-6;
     auto same_pos = [&](const Vector3& a, const Vector3& b) {
       return std::abs(a[0] - b[0]) < EPS && std::abs(a[1] - b[1]) < EPS &&
@@ -1222,7 +1225,7 @@ class Reader final {
     };
     const Vector3 zero = Vector3::Zero();
     const Quaternion unit = Quaternion::Identity();
-    for (ArticulatedBody& body : model->bodies) {
+    for (articulated::Body& body : model->bodies) {
       body.inertial_frame = same_pos(body.inertial_pos, zero) &&
                                     same_quat(body.inertial_quat, unit)
                                 ? SameFrame::BODY
@@ -1230,8 +1233,8 @@ class Reader final {
                                 ? SameFrame::BODY_ROTATION
                                 : SameFrame::NONE;
     }
-    for (Geom& geom : model->geoms) {
-      const ArticulatedBody& body = model->bodies[geom.body];
+    for (articulated::Geometry& geom : model->geoms) {
+      const articulated::Body& body = model->bodies[geom.body];
       bool rotation = same_quat(geom.quat, unit);
       bool inertial_rotation = same_quat(geom.quat, body.inertial_quat);
       geom.frame = same_pos(geom.pos, zero) && rotation ? SameFrame::BODY
@@ -1245,7 +1248,7 @@ class Reader final {
 
   // The world's geoms, which carry no mass.
   auto compile_world_geoms(const BodySpec& body, std::uint32_t index,
-                           Out<ArticulatedModel> model)
+                           Out<articulated::Scene> model)
       -> std::expected<void, lib::Status> {
     model->bodies[index].first_geom =
         static_cast<std::uint32_t>(model->geoms.size());
@@ -1262,10 +1265,11 @@ class Reader final {
   // (mjCBody::Compile, InertiaFromGeom and mjCModel's joint pass).
   auto compile_body(const BodySpec& spec, std::uint32_t parent,
                     Out<std::vector<std::uint32_t>> last_dof,
-                    Out<ArticulatedModel> model)
+                    Out<articulated::Scene> model)
       -> std::expected<void, lib::Status> {
     auto index = static_cast<std::uint32_t>(model->bodies.size());
-    ArticulatedBody body{.name = spec.name, .parent = parent, .pos = spec.pos};
+    articulated::Body body{
+        .name = spec.name, .parent = parent, .pos = spec.pos};
     body.root = parent == 0 ? index : model->bodies[parent].root;
     RETURN_OR_ASSIGN(body.quat, resolve(spec.orientation));
 
@@ -1306,7 +1310,7 @@ class Reader final {
     // Geoms, and their masses where the body's inertia comes from them.
     bool infer = !explicit_inertial ||
                  compiler_.from_geom == CompilerSpec::FromGeom::YES;
-    std::vector<std::pair<Geom, double>> geoms;
+    std::vector<std::pair<articulated::Geometry, double>> geoms;
     for (const GeomSpec& geom_spec : spec.geoms) {
       bool in_group = geom_spec.group >= compiler_.inertia_groups[0] &&
                       geom_spec.group <= compiler_.inertia_groups[1];
@@ -1496,7 +1500,7 @@ class Reader final {
       fixed = model->bodies[b].joints == 0;
     }
     for (auto& [geom, mass] : geoms) {
-      if (geom.type == GeomType::PLANE && !fixed) {
+      if (geom.type == articulated::GeometryType::PLANE && !fixed) {
         return fail("plane only allowed in static bodies");
       }
       geom.body = index;
@@ -1520,7 +1524,7 @@ class Reader final {
 }  // namespace
 
 auto parse_mjcf(std::string_view text)
-    -> std::expected<articulated::ArticulatedModel, lib::Status> {
+    -> std::expected<articulated::Scene, lib::Status> {
   return Reader{}.read(text);
 }
 
@@ -1565,7 +1569,7 @@ auto expand_includes(pugi::xml_node node, const std::filesystem::path& folder,
 }  // namespace
 
 auto load_mjcf(const std::string& path)
-    -> std::expected<articulated::ArticulatedModel, lib::Status> {
+    -> std::expected<articulated::Scene, lib::Status> {
   pugi::xml_document document;
   if (!document.load_file(path.c_str())) {
     return Failure{lib::raise(FormatError::UNREADABLE, "cannot open " + path)};

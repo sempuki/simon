@@ -34,8 +34,6 @@ namespace {
 
 using namespace std::chrono_literals;
 using Session = viewing::Session<Simulation, Scenario>;
-using articulated::GeomFrame;
-using articulated::GeomType;
 using framework::Entity;
 
 constexpr std::string_view HUMANOID = "3rd_party/mujoco/humanoid.xml";
@@ -242,11 +240,12 @@ class Viewer final {
   // nearest, its faces lit from above.
   auto draw_geoms(const Simulation& simulation, const Projection& projection,
                   ImDrawList* draw) const -> void {
-    const articulated::ArticulatedModel& m = simulation.mechanics().model();
-    std::vector<GeomFrame> frames = simulation.read_geom_frames();
+    const articulated::Scene& m = simulation.mechanics().model();
+    std::vector<articulated::GeometryFrame> frames =
+        simulation.read_geom_frames();
     std::vector<std::uint32_t> order;
     for (std::uint32_t g = 0; g < m.geoms.size(); ++g) {
-      if (m.geoms[g].type == GeomType::PLANE) {
+      if (m.geoms[g].type == articulated::GeometryType::PLANE) {
         draw_plane(frames[g], projection, draw);
       } else if (projection.visible(frames[g].pos)) {
         order.push_back(g);
@@ -258,7 +257,7 @@ class Viewer final {
     const std::vector<articulated::Tree>& trees =
         simulation.mechanics().trees();
     for (std::uint32_t g : order) {
-      const articulated::Geom& geom = m.geoms[g];
+      const articulated::Geometry& geom = m.geoms[g];
       auto tree = static_cast<std::uint32_t>(
           std::ranges::upper_bound(trees, geom.body, {},
                                    &articulated::Tree::first_body) -
@@ -268,8 +267,9 @@ class Viewer final {
     }
   }
 
-  auto draw_plane(const GeomFrame& frame, const Projection& projection,
-                  ImDrawList* draw) const -> void {
+  auto draw_plane(const articulated::GeometryFrame& frame,
+                  const Projection& projection, ImDrawList* draw) const
+      -> void {
     constexpr int LINES = 40;
     constexpr double SPACING = 0.5;  // m.
     Vector3 x = frame.mat.col(0);
@@ -310,16 +310,18 @@ class Viewer final {
                   thickness * scale_);
   }
 
-  auto draw_geom(const articulated::Geom& geom, const GeomFrame& frame,
+  auto draw_geom(const articulated::Geometry& geom,
+                 const articulated::GeometryFrame& frame,
                  const std::array<float, 3>& color,
                  const Projection& projection, ImDrawList* draw) const -> void {
     const Vector3& s = geom.size;
     Vector3 light{0.3, 0.2, 0.93};
     switch (geom.type) {
-      case GeomType::SPHERE:
-      case GeomType::ELLIPSOID: {
-        double radius =
-            geom.type == GeomType::SPHERE ? s[0] : (s[0] + s[1] + s[2]) / 3;
+      case articulated::GeometryType::SPHERE:
+      case articulated::GeometryType::ELLIPSOID: {
+        double radius = geom.type == articulated::GeometryType::SPHERE
+                            ? s[0]
+                            : (s[0] + s[1] + s[2]) / 3;
         float r = projection.size(radius, frame.pos);
         draw->AddCircleFilled(projection.at(frame.pos), r, shade(color, 0.8),
                               32);
@@ -327,7 +329,7 @@ class Viewer final {
                         scale_);
         break;
       }
-      case GeomType::CAPSULE: {
+      case articulated::GeometryType::CAPSULE: {
         Vector3 axis = frame.mat.col(2) * s[1];
         Vector3 a = frame.pos - axis;
         Vector3 b = frame.pos + axis;
@@ -345,10 +347,10 @@ class Viewer final {
         draw->AddCircleFilled(pb, rb, fill, 24);
         break;
       }
-      case GeomType::BOX:
+      case articulated::GeometryType::BOX:
         draw_prism(box_corners(frame, s), 4, color, light, projection, draw);
         break;
-      case GeomType::CYLINDER:
+      case articulated::GeometryType::CYLINDER:
         draw_prism(cylinder_corners(frame, s), CYLINDER_SIDES, color, light,
                    projection, draw);
         break;
@@ -360,8 +362,8 @@ class Viewer final {
   static constexpr int CYLINDER_SIDES = 16;
 
   // A prism's corners: the bottom ring, then the top ring.
-  static auto box_corners(const GeomFrame& frame, const Vector3& s)
-      -> std::vector<Vector3> {
+  static auto box_corners(const articulated::GeometryFrame& frame,
+                          const Vector3& s) -> std::vector<Vector3> {
     std::vector<Vector3> corners;
     constexpr std::array<std::array<double, 2>, 4> RING{
         {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}};
@@ -375,8 +377,8 @@ class Viewer final {
     return corners;
   }
 
-  static auto cylinder_corners(const GeomFrame& frame, const Vector3& s)
-      -> std::vector<Vector3> {
+  static auto cylinder_corners(const articulated::GeometryFrame& frame,
+                               const Vector3& s) -> std::vector<Vector3> {
     std::vector<Vector3> corners;
     for (double z : {-1.0, 1.0}) {
       for (int k = 0; k < CYLINDER_SIDES; ++k) {

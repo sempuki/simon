@@ -66,7 +66,7 @@ struct Suspension final {
 };
 
 // What the vehicle models read of a vehicle.
-struct VehicleParameters final {
+struct Parameters final {
   // The wheelbase.
   auto wheelbase() const -> Length { return front + rear; }
 
@@ -112,7 +112,7 @@ struct VehicleParameters final {
 
 // What drives a vehicle: the steering angle's rate, and the longitudinal
 // acceleration asked of the engine or brakes.
-struct VehicleInput final {
+struct Input final {
   AngularRate steering_rate = 0.0 * radian_per_second;
   AccelerationMagnitude acceleration = 0.0 * meter_per_second_squared;
 };
@@ -147,8 +147,8 @@ inline auto limit_acceleration(Speed speed, AccelerationMagnitude wanted,
 }
 
 // The input after the vehicle's limits, at `steering` and `speed`.
-inline auto limit_input(const VehicleInput& input, Angle steering, Speed speed,
-                        const VehicleParameters& vehicle) -> VehicleInput {
+inline auto limit_input(const Input& input, Angle steering, Speed speed,
+                        const Parameters& vehicle) -> Input {
   return {.steering_rate = limit_steering_rate(steering, input.steering_rate,
                                                vehicle.steering),
           .acceleration = limit_acceleration(speed, input.acceleration,

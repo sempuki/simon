@@ -79,7 +79,7 @@ auto is_instant(const PrivateAction& action) -> bool {
 }  // namespace
 
 StoryboardPlayer::StoryboardPlayer(const Scenario& scenario,
-                                   const RoadNetwork& network)
+                                   const road::Map& network)
     : scenario_{&scenario},
       network_{&network},
       parameters_{scenario.parameters} {
@@ -783,7 +783,7 @@ auto StoryboardPlayer::check(const EntityCondition& condition, double time)
                 compute_relative_distance(index, other, kind.distance));
             return compare(distance, kind.value, kind.rule);
           } else if constexpr (std::is_same_v<Kind, ReachPositionCondition>) {
-            RoadPlacement target = locate(kind.position, entities_);
+            road::Placement target = locate(kind.position, entities_);
             PlacementPose at = compute_placement_pose(*network_, target);
             return std::hypot(at.x - entity.pose.x, at.y - entity.pose.y) <
                    kind.tolerance;
@@ -809,7 +809,7 @@ auto StoryboardPlayer::check(const EntityCondition& condition, double time)
 auto StoryboardPlayer::compute_distance_to(
     std::size_t from, const DistanceCondition& condition) const -> double {
   const EntityState& a = entities_[from];
-  RoadPlacement target = locate(condition.position, entities_);
+  road::Placement target = locate(condition.position, entities_);
   PlacementPose b = compute_placement_pose(*network_, target);
   double dx = b.x - a.pose.x;
   double dy = b.y - a.pose.y;
@@ -905,7 +905,7 @@ auto StoryboardPlayer::compute_road_gap(std::size_t from, std::size_t to,
       double sn = std::sin(pose.heading);
       double x = pose.x + c * corners[i][0] - sn * corners[i][1];
       double y = pose.y + sn * corners[i][0] + c * corners[i][1];
-      s[i] = find_road_coordinates(road, x * meter, y * meter)
+      s[i] = road::find_coordinates(road, x * meter, y * meter)
                  .s.numerical_value_in(meter);
     }
     return s;
@@ -933,8 +933,8 @@ auto StoryboardPlayer::compute_road_gap(std::size_t from, std::size_t to,
 
 auto StoryboardPlayer::locate(const Position& position,
                               std::span<const EntityState> entities) const
-    -> RoadPlacement {
-  const RoadNetwork& network = *network_;
+    -> road::Placement {
+  const road::Map& network = *network_;
   auto road_index = [&](std::string_view id) {
     const Road* road = network.find_road(id);
     return road == nullptr
@@ -944,7 +944,7 @@ auto StoryboardPlayer::locate(const Position& position,
   // Along the lane's travel by default, else as the orientation says: a
   // relative heading turns from the lane's travel, as esmini has it in
   // right-hand traffic.
-  auto heading_of = [&](const RoadPlacement& placement,
+  auto heading_of = [&](const road::Placement& placement,
                         const std::optional<Orientation>& orientation) {
     double travel = placement.lane > 0 ? std::numbers::pi : 0.0;
     if (!orientation) {
@@ -962,39 +962,39 @@ auto StoryboardPlayer::locate(const Position& position,
   auto place_at = [&](std::size_t road, double s, double t) {
     const Road& r = network.roads[road];
     int lane = find_lane(r, s * meter, t * meter).value_or(-1);
-    return RoadPlacement{.road = road,
-                         .lane = lane,
-                         .s = s,
-                         .offset = t - compute_lane_center(r, s, lane)};
+    return road::Placement{.road = road,
+                           .lane = lane,
+                           .s = s,
+                           .offset = t - compute_lane_center(r, s, lane)};
   };
   return std::visit(
-      [&](const auto& p) -> RoadPlacement {
+      [&](const auto& p) -> road::Placement {
         using Kind = std::decay_t<decltype(p)>;
         if constexpr (std::is_same_v<Kind, WorldPosition>) {
           return find_placement(network, p.x, p.y, p.h)
-              .value_or(RoadPlacement{});
+              .value_or(road::Placement{});
         } else if constexpr (std::is_same_v<Kind, LanePosition>) {
-          RoadPlacement placement{.road = road_index(p.road),
-                                  .lane = p.lane,
-                                  .s = p.s,
-                                  .offset = p.offset};
+          road::Placement placement{.road = road_index(p.road),
+                                    .lane = p.lane,
+                                    .s = p.s,
+                                    .offset = p.offset};
           placement.heading = heading_of(placement, p.orientation);
           return placement;
         } else if constexpr (std::is_same_v<Kind, RoadPosition>) {
-          RoadPlacement placement = place_at(road_index(p.road), p.s, p.t);
+          road::Placement placement = place_at(road_index(p.road), p.s, p.t);
           placement.heading = heading_of(placement, p.orientation);
           return placement;
         } else if constexpr (std::is_same_v<Kind, RelativeRoadPosition>) {
-          const RoadPlacement& reference =
+          const road::Placement& reference =
               entities[find_entity(p.entity)].placement;
           const Road& road = network.roads[reference.road];
-          RoadPlacement placement =
+          road::Placement placement =
               place_at(reference.road, reference.s + p.ds,
                        compute_placement_t(road, reference) + p.dt);
           placement.heading = heading_of(placement, p.orientation);
           return placement;
         } else {
-          const RoadPlacement& reference =
+          const road::Placement& reference =
               entities[find_entity(p.entity)].placement;
           // dLane counts to the left of the reference's travel, skipping
           // lane 0.
@@ -1003,10 +1003,10 @@ auto StoryboardPlayer::locate(const Position& position,
           if (lane == 0 || (lane > 0) != (reference.lane > 0)) {
             lane += lanes > 0 ? 1 : -1;
           }
-          RoadPlacement placement{.road = reference.road,
-                                  .lane = lane,
-                                  .s = reference.s + p.ds,
-                                  .offset = p.offset};
+          road::Placement placement{.road = reference.road,
+                                    .lane = lane,
+                                    .s = reference.s + p.ds,
+                                    .offset = p.offset};
           placement.heading = heading_of(placement, p.orientation);
           return placement;
         }

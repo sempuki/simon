@@ -39,7 +39,7 @@ class ScenarioSimulation final {
   // The scenario, its roads and its storyboard's player: until configured,
   // none.
   auto scenario() const -> const scenario::Scenario& { return *scenario_; }
-  auto roads() const -> const road::RoadNetwork& { return *roads_; }
+  auto roads() const -> const road::Map& { return *roads_; }
   auto player() const -> const scenario::StoryboardPlayer& { return *player_; }
 
  private:
@@ -47,7 +47,7 @@ class ScenarioSimulation final {
   std::vector<scenario::ParameterAssignment> assignments_;
   // Shared by the systems; none moves once configured.
   std::unique_ptr<scenario::Scenario> scenario_;
-  std::unique_ptr<road::RoadNetwork> roads_;
+  std::unique_ptr<road::Map> roads_;
   std::unique_ptr<road::LaneGraph> lanes_;
   std::unique_ptr<scenario::StoryboardPlayer> player_;
   std::unique_ptr<ScenarioContext> context_;

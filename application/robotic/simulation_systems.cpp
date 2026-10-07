@@ -12,7 +12,7 @@
 namespace simon::robotic {
 
 auto Collide::prepare(SystemWorld& world) -> bool {
-  const articulated::ArticulatedModel& m = mechanics_->model();
+  const articulated::Scene& m = mechanics_->model();
   const std::vector<articulated::Tree>& trees = mechanics_->trees();
   std::vector<articulated::Contact>& contacts = contacts_->contacts;
   if (frames_.size() != m.geoms.size()) {
@@ -21,7 +21,7 @@ auto Collide::prepare(SystemWorld& world) -> bool {
     for (std::uint32_t g : mechanics_->unbounded()) {
       unbounded_[g] = 1;
     }
-    const articulated::ArticulatedBody& ground = m.bodies[0];
+    const articulated::Body& ground = m.bodies[0];
     for (std::uint32_t g = ground.first_geom;
          g < ground.first_geom + ground.geoms; ++g) {
       frames_[g] =
@@ -49,7 +49,7 @@ auto Collide::prepare(SystemWorld& world) -> bool {
           mechanics_->excludes(owner, b)) {
         continue;
       }
-      const articulated::ArticulatedBody& body = m.bodies[b];
+      const articulated::Body& body = m.bodies[b];
       for (std::uint32_t other = body.first_geom;
            other < body.first_geom + body.geoms; ++other) {
         if (unbounded_[other] == 0) {
@@ -114,13 +114,13 @@ auto Collide::prepare(SystemWorld& world) -> bool {
 
 auto Collide::collide_bodies(std::uint32_t first, std::uint32_t second)
     -> void {
-  const articulated::ArticulatedModel& m = mechanics_->model();
+  const articulated::Scene& m = mechanics_->model();
   if (mechanics_->filter().discards(first, second) ||
       mechanics_->excludes(first, second)) {
     return;
   }
-  const articulated::ArticulatedBody& a = m.bodies[first];
-  const articulated::ArticulatedBody& b = m.bodies[second];
+  const articulated::Body& a = m.bodies[first];
+  const articulated::Body& b = m.bodies[second];
   for (std::uint32_t g1 = a.first_geom; g1 < a.first_geom + a.geoms; ++g1) {
     if (unbounded_[g1] != 0) {
       continue;
@@ -171,7 +171,7 @@ auto Solve::find_root(std::uint32_t tree) -> std::uint32_t {
 }
 
 auto Solve::tree_of_geom(std::uint32_t geom) const -> std::uint32_t {
-  const articulated::ArticulatedModel& m = mechanics_->model();
+  const articulated::Scene& m = mechanics_->model();
   std::uint32_t body = m.geoms[geom].body;
   if (body == 0) {
     return NO_TREE;
@@ -188,7 +188,7 @@ auto Solve::tree_of_joint(std::uint32_t joint) const -> std::uint32_t {
 }
 
 auto Solve::tendon_length(std::uint32_t k) const -> double {
-  const articulated::ArticulatedModel& m = mechanics_->model();
+  const articulated::Scene& m = mechanics_->model();
   const articulated::Tendon& tendon = m.tendons[k];
   double length = 0.0;
   for (std::size_t i = 0; i < tendon.joints.size(); ++i) {
@@ -212,7 +212,7 @@ auto Solve::tendon_reached(std::uint32_t k) const -> bool {
 }
 
 auto Solve::prepare(SystemWorld& world) -> bool {
-  const articulated::ArticulatedModel& m = mechanics_->model();
+  const articulated::Scene& m = mechanics_->model();
   const std::vector<articulated::Tree>& trees = mechanics_->trees();
   std::size_t count = trees.size();
   if (data_.size() != count) {
@@ -373,7 +373,7 @@ auto Solve::prepare(SystemWorld& world) -> bool {
 auto Solve::solve_island(std::span<const std::uint32_t> members,
                          std::span<const std::uint32_t> joined)
     -> std::uint32_t {
-  const articulated::ArticulatedModel& m = mechanics_->model();
+  const articulated::Scene& m = mechanics_->model();
   const std::vector<articulated::Tree>& trees = mechanics_->trees();
   const std::vector<double>& body_weight = mechanics_->body_weight();
   const std::vector<double>& dof_weight = mechanics_->dof_weight();

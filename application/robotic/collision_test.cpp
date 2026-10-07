@@ -222,7 +222,7 @@ TEST_CASE("CollisionAgainstMuJoCo") {
     Simulation simulation{scenario};
     REQUIRE(simulation.configure());
     step_once(InOut(simulation), 0);
-    const articulated::ArticulatedModel& m = simulation.mechanics().model();
+    const articulated::Scene& m = simulation.mechanics().model();
     std::uint32_t arm =
         static_cast<std::uint32_t>(simulation.mechanics().trees().size() - 1);
     std::uint32_t first = simulation.mechanics().trees()[arm].first_geom;

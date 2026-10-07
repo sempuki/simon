@@ -12,7 +12,7 @@ namespace {
 
 auto convert_to_point(const road::Road& road, const road::PlanPoint& plan,
                       double s, double t) -> model::Point2 {
-  Vector3 at = road::compute_road_position(road, plan, s * meter, t * meter)
+  Vector3 at = road::compute_position(road, plan, s * meter, t * meter)
                    .numerical_value_in(meter)
                    .eigen();
   return {.x = at.x(), .y = at.y()};
@@ -20,8 +20,7 @@ auto convert_to_point(const road::Road& road, const road::PlanPoint& plan,
 
 }  // namespace
 
-auto draw_roads(const road::RoadNetwork& network, double spacing)
-    -> RoadDrawing {
+auto draw_roads(const road::Map& network, double spacing) -> RoadDrawing {
   RoadDrawing drawing;
   for (const road::Road& road : network.roads) {
     for (std::size_t k = 0; k < road.lane_sections.size(); ++k) {

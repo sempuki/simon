@@ -34,8 +34,8 @@ using namespace testing;
 constexpr std::size_t EDGES = 387;
 
 // Each file's road network, read once.
-auto find_network(std::string_view file) -> const road::RoadNetwork& {
-  static std::map<std::string, road::RoadNetwork, std::less<>> networks;
+auto find_network(std::string_view file) -> const road::Map& {
+  static std::map<std::string, road::Map, std::less<>> networks;
   auto found = networks.find(file);
   if (found == networks.end()) {
     auto network = format::load_opendrive(find_road_path(file));
@@ -59,21 +59,20 @@ auto find_signal(const Row& row) -> const road::Signal& {
   return *found;
 }
 
-auto find_object(const Row& row) -> const road::RoadObject& {
+auto find_object(const Row& row) -> const road::Object& {
   const road::Road& road = find_road(row);
-  auto found =
-      std::ranges::find(road.objects, row.at("id"), &road::RoadObject::id);
+  auto found = std::ranges::find(road.objects, row.at("id"), &road::Object::id);
   REQUIRE(found != road.objects.end());
   return *found;
 }
 
-auto orientation_word(road::RoadDirection orientation) -> std::string {
+auto orientation_word(road::Direction orientation) -> std::string {
   switch (orientation) {
-    case road::RoadDirection::POSITIVE:
+    case road::Direction::POSITIVE:
       return "+";
-    case road::RoadDirection::NEGATIVE:
+    case road::Direction::NEGATIVE:
       return "-";
-    case road::RoadDirection::BOTH:
+    case road::Direction::BOTH:
       return "none";
   }
   return "";
@@ -86,7 +85,7 @@ using Largest = std::map<std::string, double, std::less<>>;
 auto position_errors(std::string_view table) -> Largest {
   Largest largest;
   for (const Row& row : load_rows(table)) {
-    Position position = road::compute_road_position(
+    Position position = road::compute_position(
         find_road(row), number(row, "s") * meter, number(row, "t") * meter,
         number(row, "h") * meter);
     Vector3 apart =
@@ -170,7 +169,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
     }
     std::set<Edge> ours;
     for (const std::string& file : files) {
-      const road::RoadNetwork& network = find_network(file);
+      const road::Map& network = find_network(file);
       for (const road::LaneGraph::Edge& edge :
            road::build_lane_graph(network).edges()) {
         const road::Road& from = network.roads[edge.from.road];
@@ -210,9 +209,9 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
         validities.emplace(static_cast<int>(number(row, "from_lane")),
                            static_cast<int>(number(row, "to_lane")));
       }
-      Position position = road::compute_road_position(
-          find_road(row), signal.s * meter, signal.t * meter,
-          signal.z_offset * meter);
+      Position position =
+          road::compute_position(find_road(row), signal.s * meter,
+                                 signal.t * meter, signal.z_offset * meter);
       Vector3 apart =
           position.numerical_value_in(meter).eigen() -
           Vector3{number(row, "x"), number(row, "y"), number(row, "z")};
@@ -240,7 +239,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
     std::set<std::string> objects;
     double farthest = 0.0;
     for (const Row& row : load_rows("libopendrive_objects.csv")) {
-      const road::RoadObject& object = find_object(row);
+      const road::Object& object = find_object(row);
       CAPTURE(row.at("file"), row.at("road"), row.at("id"));
       objects.insert(row.at("file") + "," + row.at("id"));
       CHECK(object.type == row.at("type"));
@@ -257,7 +256,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
                       std::to_string(validity.to);
       }
       CHECK(validities == row.at("validities"));
-      const road::RoadObject::Outline& outline =
+      const road::Object::Outline& outline =
           object.outlines.at(static_cast<std::size_t>(number(row, "outline")));
       std::vector<Position> corners =
           road::compute_outline(find_road(row), object, outline);

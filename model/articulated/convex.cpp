@@ -71,7 +71,7 @@ struct Object final {
   Matrix3 mat = Matrix3::Identity();
   double margin = 0.0;
   Support support = nullptr;
-  GeomType type = GeomType::SPHERE;
+  GeometryType type = GeometryType::SPHERE;
   int vertex_index = -1;
 };
 
@@ -143,27 +143,27 @@ auto support_box(InOut<Object> object, const Vector3& dir) -> Vector3 {
 }
 
 // mjc_initCCDObj, for primitives.
-auto make_object(const Geom& geom, const GeomFrame& frame, double margin)
-    -> Object {
+auto make_object(const Geometry& geom, const GeometryFrame& frame,
+                 double margin) -> Object {
   Object object{.size = geom.size,
                 .pos = frame.pos,
                 .mat = frame.mat,
                 .margin = margin,
                 .type = geom.type};
   switch (geom.type) {
-    case GeomType::ELLIPSOID:
+    case GeometryType::ELLIPSOID:
       object.support = support_ellipsoid;
       break;
-    case GeomType::SPHERE:
+    case GeometryType::SPHERE:
       object.support = support_sphere;
       break;
-    case GeomType::CAPSULE:
+    case GeometryType::CAPSULE:
       object.support = support_capsule;
       break;
-    case GeomType::CYLINDER:
+    case GeometryType::CYLINDER:
       object.support = support_cylinder;
       break;
-    case GeomType::BOX:
+    case GeometryType::BOX:
       object.support = support_box;
       break;
     default:
@@ -258,7 +258,7 @@ auto are_discrete(const Object& first, const Object& second) -> bool {
   if (first.margin != 0 || second.margin != 0) {
     return false;
   }
-  return first.type == GeomType::BOX && second.type == GeomType::BOX;
+  return first.type == GeometryType::BOX && second.type == GeometryType::BOX;
 }
 
 // The sum of the first `n` points weighted by `coef` (lincomb).
@@ -1742,10 +1742,10 @@ inline auto reduce_simplex(InOut<Indices> vi, InOut<Triple> v) -> int {
 auto find_normals(const Object& object, Out<Triple> normals,
                   Out<Indices> indices, int dim, const Indices& vi,
                   const Vector3& dir) -> int {
-  if (object.type == GeomType::BOX) {
+  if (object.type == GeometryType::BOX) {
     return find_box_normals(normals, indices, dim, object, vi, dir);
   }
-  if (object.type == GeomType::CYLINDER) {
+  if (object.type == GeometryType::CYLINDER) {
     return find_cylinder_normals(normals, indices, dim, object, vi);
   }
   return 0;
@@ -1754,20 +1754,20 @@ auto find_normals(const Object& object, Out<Triple> normals,
 auto find_edge_normals(const Object& object, Out<Triple> normals,
                        Out<Triple> ends, int dim, const Triple& v, int v1i)
     -> int {
-  if (object.type == GeomType::BOX) {
+  if (object.type == GeometryType::BOX) {
     return find_box_edge_normals(normals, ends, dim, object, v, v1i);
   }
-  if (object.type == GeomType::CYLINDER) {
+  if (object.type == GeometryType::CYLINDER) {
     return find_cylinder_edge_normals(normals, ends, dim, object, v, v1i);
   }
   return 0;
 }
 
 auto compute_face(const Object& object, Out<Polygon> face, int index) -> int {
-  if (object.type == GeomType::BOX) {
+  if (object.type == GeometryType::BOX) {
     return compute_box_face(face, object, index);
   }
-  if (object.type == GeomType::CYLINDER) {
+  if (object.type == GeometryType::CYLINDER) {
     return compute_cylinder_face(face, object, index);
   }
   return 0;
@@ -1902,28 +1902,30 @@ auto compute_ccd(int max_contacts, InOut<CcdStatus> status, InOut<Object> first,
 
   // A sphere or capsule shrunk to its point or segment, its radius added
   // back after.
-  if (first->type == GeomType::SPHERE || second->type == GeomType::SPHERE ||
-      first->type == GeomType::CAPSULE || second->type == GeomType::CAPSULE) {
+  if (first->type == GeometryType::SPHERE ||
+      second->type == GeometryType::SPHERE ||
+      first->type == GeometryType::CAPSULE ||
+      second->type == GeometryType::CAPSULE) {
     Support support1 = first->support;
     Support support2 = second->support;
     double full_margin1 = 0;
     double full_margin2 = 0;
     double margin1 = first->margin;
     double margin2 = second->margin;
-    if (first->type == GeomType::SPHERE) {
+    if (first->type == GeometryType::SPHERE) {
       full_margin1 = first->size[0] + 0.5 * margin1;
       first->support = support_point;
       first->margin = 0;
-    } else if (first->type == GeomType::CAPSULE) {
+    } else if (first->type == GeometryType::CAPSULE) {
       full_margin1 = first->size[0] + 0.5 * margin1;
       first->support = support_line;
       first->margin = 0;
     }
-    if (second->type == GeomType::SPHERE) {
+    if (second->type == GeometryType::SPHERE) {
       full_margin2 = second->size[0] + 0.5 * margin2;
       second->support = support_point;
       second->margin = 0;
-    } else if (second->type == GeomType::CAPSULE) {
+    } else if (second->type == GeometryType::CAPSULE) {
       full_margin2 = second->size[0] + 0.5 * margin2;
       second->support = support_line;
       second->margin = 0;
@@ -2006,10 +2008,10 @@ auto count_max_contacts(const Object& first, const Object& second) -> int {
     return 1;
   }
   bool polygonal1 =
-      first.type == GeomType::BOX || first.type == GeomType::CYLINDER;
+      first.type == GeometryType::BOX || first.type == GeometryType::CYLINDER;
   bool polygonal2 =
-      second.type == GeomType::BOX || second.type == GeomType::CYLINDER;
-  if (first.type == GeomType::BOX && second.type == GeomType::BOX) {
+      second.type == GeometryType::BOX || second.type == GeometryType::CYLINDER;
+  if (first.type == GeometryType::BOX && second.type == GeometryType::BOX) {
     return 8;
   }
   return polygonal1 && polygonal2 ? 4 : 1;
@@ -2026,14 +2028,14 @@ auto rotate_frame(const Vector3& origin, const Matrix3& rot, InOut<Matrix3> mat,
 
 }  // namespace
 
-auto collide_convex(const Geom& first, const GeomFrame& first_frame,
-                    double first_radius, const Geom& second,
-                    const GeomFrame& second_frame, double second_radius,
+auto collide_convex(const Geometry& first, const GeometryFrame& first_frame,
+                    double first_radius, const Geometry& second,
+                    const GeometryFrame& second_frame, double second_radius,
                     double margin, std::span<PreContact, MAX_PAIR_CONTACTS> out)
     -> std::uint32_t {
   // A plane against a convex geom: its support point opposite the plane's
   // normal (mjc_PlaneConvex).
-  if (first.type == GeomType::PLANE) {
+  if (first.type == GeometryType::PLANE) {
     Object object = make_object(second, second_frame, 0);
     const Matrix3& mat = first_frame.mat;
     Vector3 normal = mat.col(2);
@@ -2060,9 +2062,10 @@ auto collide_convex(const Geom& first, const GeomFrame& first_frame,
 
   // One contact found: turn the geoms a little each way about it, and keep
   // each new contact far enough from the others (mjc_Convex's multiCCD).
-  if (ncon == 1 && first.type != GeomType::ELLIPSOID &&
-      first.type != GeomType::SPHERE && second.type != GeomType::ELLIPSOID &&
-      second.type != GeomType::SPHERE) {
+  if (ncon == 1 && first.type != GeometryType::ELLIPSOID &&
+      first.type != GeometryType::SPHERE &&
+      second.type != GeometryType::ELLIPSOID &&
+      second.type != GeometryType::SPHERE) {
     constexpr double RELATIVE_TOLERANCE = 1e-3;
     constexpr double PERTURBATION = 1e-3;
 

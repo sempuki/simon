@@ -28,11 +28,11 @@ namespace simon::format {
 
 // Reads and compiles the model that `text` describes.
 auto parse_mjcf(std::string_view text)
-    -> std::expected<articulated::ArticulatedModel, lib::Status>;
+    -> std::expected<articulated::Scene, lib::Status>;
 
 // Reads and compiles the model in the file at `path`, its includes expanded
 // in place, so that a failure's line counts in the expanded text.
 auto load_mjcf(const std::string& path)
-    -> std::expected<articulated::ArticulatedModel, lib::Status>;
+    -> std::expected<articulated::Scene, lib::Status>;
 
 }  // namespace simon::format

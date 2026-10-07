@@ -17,8 +17,8 @@ namespace simon::traffic {
 namespace {
 
 // How far into `lane`, in its direction of travel, `s` is.
-auto along_lane(const road::RoadNetwork& network, const road::LaneKey& lane,
-                double s) -> double {
+auto along_lane(const road::Map& network, const road::LaneKey& lane, double s)
+    -> double {
   return road::runs_with_s(lane)
              ? s - network.roads[lane.road].lane_sections[lane.section].s0
              : road::find_section_end(network, lane) - s;
@@ -27,8 +27,8 @@ auto along_lane(const road::RoadNetwork& network, const road::LaneKey& lane,
 // Whether `signal` holds for traffic in lane `id`.
 auto holds_for(const road::Signal& signal, int id) -> bool {
   bool direction =
-      signal.orientation == road::RoadDirection::BOTH ||
-      (signal.orientation == road::RoadDirection::POSITIVE) == (id < 0);
+      signal.orientation == road::Direction::BOTH ||
+      (signal.orientation == road::Direction::POSITIVE) == (id < 0);
   if (!direction) {
     return false;
   }
@@ -108,14 +108,14 @@ auto plan_in_turn(std::size_t groups, std::chrono::nanoseconds green,
   return plans;
 }
 
-auto TrafficControl::stop_lines_on(const road::LaneKey& lane) const
+auto Control::stop_lines_on(const road::LaneKey& lane) const
     -> std::span<const StopLine> {
   auto [first, last] = lines_.range_of(numbering_.number_of(lane));
   return std::span{stop_lines_}.subspan(first, last - first);
 }
 
-auto build_traffic_control(const road::RoadNetwork& network) -> TrafficControl {
-  TrafficControl control;
+auto build_control(const road::Map& network) -> Control {
+  Control control;
   std::map<std::string, std::uint32_t, std::less<>> group_of_signal;
   for (const road::SignalController& controller : network.controllers) {
     SignalGroup group{.controller = controller.id,

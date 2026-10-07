@@ -16,8 +16,6 @@
 namespace simon::galactic {
 
 using framework::Entity;
-using gravity::GravitySource;
-using gravity::GravityTree;
 using model::Kinematics;
 
 template <typename SystemType>
@@ -29,12 +27,13 @@ using ProjectedWorld = framework::ProjectedWorld<SystemType, World>;
 // Kinematics in `motions`, in the PointMass store's order.
 inline auto gather_sources(const framework::ComponentStore<PointMass>& points,
                            const framework::ComponentStore<Kinematics>& motions,
-                           InOut<std::vector<GravitySource>> sources) -> void {
+                           InOut<std::vector<gravity::Source>> sources)
+    -> void {
   sources->clear();
   points.for_each([&](Entity entity, const PointMass& point) {
     const Kinematics* kinematics = motions.maybe_component_of(entity);
     if (!kinematics) return;
-    sources->push_back(GravitySource{
+    sources->push_back(gravity::Source{
         .position = kinematics->position.numerical_value_ref_in(meter).eigen(),
         .mass = point.mass.numerical_value_in(kilogram),
         .id = entity.index});
@@ -63,7 +62,7 @@ struct SumGravity final           //
                   const Kinematics* kinematics) const -> void {
     if (!kinematics) return;
     gravity.acceleration =
-        QuantityVector{sum_gravity(
+        QuantityVector{gravity::sum_acceleration(
             sources, self.index,
             kinematics->position.numerical_value_ref_in(meter).eigen(),
             softening.numerical_value_in(meter))} *
@@ -71,7 +70,7 @@ struct SumGravity final           //
   }
 
   Length softening = 0.0 * meter;
-  std::vector<GravitySource> sources;
+  std::vector<gravity::Source> sources;
   bool enabled = true;
 };
 
@@ -107,8 +106,8 @@ struct TreeGravity final          //
 
   double opening_angle = 0.5;
   Length softening = 0.0 * meter;
-  std::vector<GravitySource> sources;
-  GravityTree tree;
+  std::vector<gravity::Source> sources;
+  gravity::Tree tree;
   bool enabled = false;
 };
 

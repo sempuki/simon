@@ -64,8 +64,8 @@ auto collide_spheres(Out1 con, double margin, const Vector3& pos1,
   return 1;
 }
 
-auto collide_plane_capsule(Out1 con, double margin, const GeomFrame& f1,
-                           const GeomFrame& f2, const Vector3& size2)
+auto collide_plane_capsule(Out1 con, double margin, const GeometryFrame& f1,
+                           const GeometryFrame& f2, const Vector3& size2)
     -> std::uint32_t {
   Vector3 axis = f2.mat.col(2);
   Vector3 segment = size2[1] * axis;
@@ -84,8 +84,8 @@ auto collide_plane_capsule(Out1 con, double margin, const GeomFrame& f1,
   return n1 + n2;
 }
 
-auto collide_plane_cylinder(Out1 con, double margin, const GeomFrame& f1,
-                            const GeomFrame& f2, const Vector3& size2)
+auto collide_plane_cylinder(Out1 con, double margin, const GeometryFrame& f1,
+                            const GeometryFrame& f2, const Vector3& size2)
     -> std::uint32_t {
   Vector3 normal = f1.mat.col(2);
   Vector3 axis = f2.mat.col(2);
@@ -140,8 +140,8 @@ auto collide_plane_cylinder(Out1 con, double margin, const GeomFrame& f1,
   return cnt;
 }
 
-auto collide_plane_box(Out1 con, double margin, const GeomFrame& f1,
-                       const GeomFrame& f2, const Vector3& size2)
+auto collide_plane_box(Out1 con, double margin, const GeometryFrame& f1,
+                       const GeometryFrame& f2, const Vector3& size2)
     -> std::uint32_t {
   Vector3 norm = f1.mat.col(2);
   Vector3 dif = f2.pos - f1.pos;
@@ -182,8 +182,8 @@ auto collide_sphere_capsule(Out1 con, double margin, const Vector3& pos1,
   return collide_spheres(con, margin, pos1, mat1, radius1, vec, mat2, size2[0]);
 }
 
-auto collide_sphere_cylinder(Out1 con, double margin, const GeomFrame& f1,
-                             const Vector3& size1, const GeomFrame& f2,
+auto collide_sphere_cylinder(Out1 con, double margin, const GeometryFrame& f1,
+                             const Vector3& size1, const GeometryFrame& f2,
                              const Vector3& size2) -> std::uint32_t {
   double radius = size2[0];
   double height = size2[1];
@@ -233,8 +233,8 @@ auto collide_sphere_cylinder(Out1 con, double margin, const GeomFrame& f1,
 }
 
 // mjraw_CapsuleCapsule.
-auto collide_capsules(Out1 con, double margin, const GeomFrame& f1,
-                      const Vector3& size1, const GeomFrame& f2,
+auto collide_capsules(Out1 con, double margin, const GeometryFrame& f1,
+                      const Vector3& size1, const GeometryFrame& f2,
                       const Vector3& size2) -> std::uint32_t {
   const Matrix3& mat1 = f1.mat;
   const Matrix3& mat2 = f2.mat;
@@ -348,8 +348,8 @@ auto collide_sphere_box(Out1 con, double margin, const Vector3& pos1,
 // its ends against the faces and the segment against the edges, then a
 // second point along the segment when it lies within 45 degrees of a face
 // or an edge, each a sphere against the box.
-auto collide_capsule_box(Out1 con, double margin, const GeomFrame& f1,
-                         const Vector3& size1, const GeomFrame& f2,
+auto collide_capsule_box(Out1 con, double margin, const GeometryFrame& f1,
+                         const Vector3& size1, const GeometryFrame& f2,
                          const Vector3& size2) -> std::uint32_t {
   double halflength = size1[1];
   double secondpos = -4;
@@ -666,8 +666,8 @@ auto clip_half_plane(int nin, InOut<Polygon*> cur, InOut<Polygon*> spare,
 // contact between the nearest points of the two edges, and for a face axis
 // the other box's face clipped to it (Sutherland–Hodgman), a contact at
 // each vertex within the margin.
-auto collide_boxes(Out1 con, double margin, const GeomFrame& f1,
-                   const Vector3& size1, const GeomFrame& f2,
+auto collide_boxes(Out1 con, double margin, const GeometryFrame& f1,
+                   const Vector3& size1, const GeometryFrame& f2,
                    const Vector3& size2) -> std::uint32_t {
   const Vector3& pos1 = f1.pos;
   const Vector3& pos2 = f2.pos;
@@ -966,8 +966,8 @@ auto make_frame(const Vector3& normal, const Vector3& tangent) -> Matrix3 {
 
 }  // namespace
 
-auto has_collider(GeomType first, GeomType second) -> bool {
-  using enum GeomType;
+auto has_collider(GeometryType first, GeometryType second) -> bool {
+  using enum GeometryType;
   switch (first) {
     case PLANE:
       return second == SPHERE || second == CAPSULE || second == CYLINDER ||
@@ -984,26 +984,27 @@ auto has_collider(GeomType first, GeomType second) -> bool {
   }
 }
 
-auto compute_bounding_radius(const Geom& geom) -> double {
+auto compute_bounding_radius(const Geometry& geom) -> double {
   const Vector3& s = geom.size;
   switch (geom.type) {
-    case GeomType::SPHERE:
+    case GeometryType::SPHERE:
       return s[0];
-    case GeomType::CAPSULE:
+    case GeometryType::CAPSULE:
       return s[0] + s[1];
-    case GeomType::CYLINDER:
+    case GeometryType::CYLINDER:
       return std::sqrt(s[0] * s[0] + s[1] * s[1]);
-    case GeomType::ELLIPSOID:
+    case GeometryType::ELLIPSOID:
       return std::max(std::max(s[0], s[1]), s[2]);
-    case GeomType::BOX:
+    case GeometryType::BOX:
       return std::sqrt(s[0] * s[0] + s[1] * s[1] + s[2] * s[2]);
     default:
       return 0.0;
   }
 }
 
-auto compute_geom_frame(const Geom& geom, const BodyFrame& body) -> GeomFrame {
-  GeomFrame frame;
+auto compute_geom_frame(const Geometry& geom, const BodyFrame& body)
+    -> GeometryFrame {
+  GeometryFrame frame;
   switch (geom.frame) {
     case SameFrame::BODY:
       frame.pos = body.xpos;
@@ -1031,10 +1032,10 @@ auto compute_geom_frame(const Geom& geom, const BodyFrame& body) -> GeomFrame {
   return frame;
 }
 
-auto collide(const Geom& first, const GeomFrame& f1, const Geom& second,
-             const GeomFrame& f2, double margin,
+auto collide(const Geometry& first, const GeometryFrame& f1,
+             const Geometry& second, const GeometryFrame& f2, double margin,
              std::span<PreContact, MAX_PAIR_CONTACTS> out) -> std::uint32_t {
-  using enum GeomType;
+  using enum GeometryType;
   Out1 con{out};
   const Vector3& size1 = first.size;
   const Vector3& size2 = second.size;
@@ -1087,13 +1088,13 @@ auto collide(const Geom& first, const GeomFrame& f1, const Geom& second,
   }
 }
 
-BodyFilter::BodyFilter(const ArticulatedModel& model) {
+BodyFilter::BodyFilter(const Scene& model) {
   std::size_t n = model.bodies.size();
   weld_.resize(n);
   weld_parent_.resize(n);
   weld_dofs_.resize(n);
   for (std::uint32_t b = 0; b < n; ++b) {
-    const ArticulatedBody& body = model.bodies[b];
+    const Body& body = model.bodies[b];
     weld_[b] = b == 0 || body.joints > 0 ? b : weld_[body.parent];
   }
   for (std::uint32_t b = 0; b < n; ++b) {
@@ -1116,12 +1117,13 @@ auto BodyFilter::discards(std::uint32_t first, std::uint32_t second) const
          (weld1 == weld_parent_[second] || weld2 == weld_parent_[first]);
 }
 
-auto append_contacts(const ArticulatedModel& model, std::uint32_t first,
-                     std::uint32_t second, std::span<const GeomFrame> frames,
+auto append_contacts(const Scene& model, std::uint32_t first,
+                     std::uint32_t second,
+                     std::span<const GeometryFrame> frames,
                      std::span<const double> radii,
                      InOut<std::vector<Contact>> out) -> void {
-  const Geom* g1 = &model.geoms[first];
-  const Geom* g2 = &model.geoms[second];
+  const Geometry* g1 = &model.geoms[first];
+  const Geometry* g2 = &model.geoms[second];
   if ((g1->contype & g2->conaffinity) == 0 &&
       (g2->contype & g1->conaffinity) == 0) {
     return;
@@ -1130,8 +1132,8 @@ auto append_contacts(const ArticulatedModel& model, std::uint32_t first,
   double gap = g1->gap + g2->gap;
   double bound = margin + gap;
   // Bounding spheres, or a sphere against a plane (mj_filterSphere).
-  const GeomFrame& p1 = frames[first];
-  const GeomFrame& p2 = frames[second];
+  const GeometryFrame& p1 = frames[first];
+  const GeometryFrame& p2 = frames[second];
   double r1 = radii[first];
   double r2 = radii[second];
   if (r1 > 0 && r2 > 0) {
@@ -1141,13 +1143,15 @@ auto append_contacts(const ArticulatedModel& model, std::uint32_t first,
       return;
     }
   } else {
-    auto above = [&](const GeomFrame& plane, const GeomFrame& other) {
+    auto above = [&](const GeometryFrame& plane, const GeometryFrame& other) {
       return (other.pos - plane.pos).dot(plane.mat.col(2));
     };
-    if (g1->type == GeomType::PLANE && r2 > 0 && above(p1, p2) > bound + r2) {
+    if (g1->type == GeometryType::PLANE && r2 > 0 &&
+        above(p1, p2) > bound + r2) {
       return;
     }
-    if (g2->type == GeomType::PLANE && r1 > 0 && above(p2, p1) > bound + r1) {
+    if (g2->type == GeometryType::PLANE && r1 > 0 &&
+        above(p2, p1) > bound + r1) {
       return;
     }
   }
@@ -1172,7 +1176,7 @@ auto append_contacts(const ArticulatedModel& model, std::uint32_t first,
   contact.include_margin = margin;
   Vector3 friction = Vector3::Zero();
   if (g1->priority != g2->priority) {
-    const Geom& high = g1->priority > g2->priority ? *g1 : *g2;
+    const Geometry& high = g1->priority > g2->priority ? *g1 : *g2;
     contact.dim = high.condim;
     contact.soft = high.contact;
     friction = high.friction;

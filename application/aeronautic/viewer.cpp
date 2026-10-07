@@ -244,7 +244,7 @@ class Viewer final {
         !felt) {
       return;
     }
-    const aircraft::AircraftData& data = *type->data;
+    const aircraft::Definition& data = *type->data;
     aircraft::Earth earth = aircraft::Earth::flat();
     Matrix3 attitude =
         earth.convert_body_to_north_east_down(*body, seconds(0.0s));

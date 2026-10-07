@@ -30,8 +30,7 @@ struct RoadDrawing final {
 
 // Samples every lane section of every road at most `spacing` meters apart
 // along its reference line, and at its start and end.
-auto draw_roads(const road::RoadNetwork& network, double spacing)
-    -> RoadDrawing;
+auto draw_roads(const road::Map& network, double spacing) -> RoadDrawing;
 
 // The area of a strip: the quadrilaterals between consecutive samples, by
 // the shoelace formula.

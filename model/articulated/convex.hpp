@@ -22,9 +22,9 @@ namespace simon::articulated {
 // collider, the first's type no later than the second's, their bounding
 // radii given (mjc_Convex, mjc_PlaneConvex); writes at most
 // MAX_PAIR_CONTACTS and returns how many.
-auto collide_convex(const Geom& first, const GeomFrame& first_frame,
-                    double first_radius, const Geom& second,
-                    const GeomFrame& second_frame, double second_radius,
+auto collide_convex(const Geometry& first, const GeometryFrame& first_frame,
+                    double first_radius, const Geometry& second,
+                    const GeometryFrame& second_frame, double second_radius,
                     double margin, std::span<PreContact, MAX_PAIR_CONTACTS> out)
     -> std::uint32_t;
 

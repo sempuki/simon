@@ -94,11 +94,10 @@ auto advance(const DynamicSingleTrack& state,
 // shifted by the acceleration through the center of gravity's height, and the
 // cornering stiffness C_S and friction mu the tire's, -p_ky1 / p_dy1 and p_dy1.
 auto compute_dynamic_single_track_rate(const DynamicSingleTrack& state,
-                                       const VehicleInput& input,
-                                       const VehicleParameters& vehicle)
+                                       const Input& input,
+                                       const Parameters& vehicle)
     -> DynamicSingleTrackRate {
-  VehicleInput limited =
-      limit_input(input, state.steering, state.speed, vehicle);
+  Input limited = limit_input(input, state.steering, state.speed, vehicle);
   double u0 = limited.steering_rate.numerical_value_in(radian_per_second);
   double u1 = limited.acceleration.numerical_value_in(meter_per_second_squared);
   double steering = radians(state.steering);
@@ -199,7 +198,7 @@ auto advance(const DriftSingleTrack& state, const DriftSingleTrackRate& rate,
           .rear_wheel = state.rear_wheel + rate.rear_wheel * seconds};
 }
 
-auto start_drift_single_track(Speed speed, const VehicleParameters& vehicle)
+auto start_drift_single_track(Speed speed, const Parameters& vehicle)
     -> DriftSingleTrack {
   AngularRate rolling = speed / vehicle.wheel_radius * radian;
   return {.speed = speed, .front_wheel = rolling, .rear_wheel = rolling};
@@ -213,16 +212,15 @@ auto start_drift_single_track(Speed speed, const VehicleParameters& vehicle)
 // tanh((v - 0.2) / 0.05), its wheels then rolling to the ground's speed with a
 // time constant of 0.02 s.
 auto compute_drift_single_track_rate(const DriftSingleTrack& state,
-                                     const VehicleInput& input,
-                                     const VehicleParameters& vehicle)
+                                     const Input& input,
+                                     const Parameters& vehicle)
     -> DriftSingleTrackRate {
   constexpr double BLEND_SPEED = 0.2;               // v_s, m/s.
   constexpr double BLEND_WIDTH = 0.05;              // v_b, m/s.
   constexpr double SLIP_SPEED = BLEND_SPEED / 2.0;  // v_min, m/s.
   constexpr double WHEEL_TIME = 0.02;               // s.
 
-  VehicleInput limited =
-      limit_input(input, state.steering, state.speed, vehicle);
+  Input limited = limit_input(input, state.steering, state.speed, vehicle);
   double u0 = limited.steering_rate.numerical_value_in(radian_per_second);
   double u1 = limited.acceleration.numerical_value_in(meter_per_second_squared);
   double steering = radians(state.steering);

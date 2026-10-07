@@ -80,7 +80,7 @@ inline constexpr std::size_t TRIM_ERROR_COUNT =
     static_cast<std::size_t>(TrimError::COUNT);
 
 // Trims `aircraft` for `condition` over `earth`, at time zero.
-auto trim(const AircraftData& aircraft, const FlightCondition& condition,
+auto trim(const Definition& aircraft, const FlightCondition& condition,
           const Earth& earth, const earth::StandardAirTable& air)
     -> std::expected<Trim, lib::Status>;
 

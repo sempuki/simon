@@ -10,7 +10,7 @@
 
 namespace simon::aircraft {
 
-auto compute_settled_engines(const AircraftData& aircraft,
+auto compute_settled_engines(const Definition& aircraft,
                              const FlightSignals& signals, const EngineAir& air)
     -> Engines {
   Engines engines;
@@ -61,7 +61,7 @@ auto has_fuel(const TurbineData& turbine, const FuelTanks& tanks) -> bool {
 
 }  // namespace
 
-auto run_engines(const AircraftData& aircraft, InOut<Engines> engines,
+auto run_engines(const Definition& aircraft, InOut<Engines> engines,
                  const FlightSignals& signals, const FuelTanks& tanks,
                  const EngineAir& air, Time dt) -> void {
   for (std::size_t i = 0; i < aircraft.engines.size(); ++i) {
@@ -78,7 +78,7 @@ auto run_engines(const AircraftData& aircraft, InOut<Engines> engines,
   }
 }
 
-auto burn_fuel(const AircraftData& aircraft, const Engines& engines,
+auto burn_fuel(const Definition& aircraft, const Engines& engines,
                InOut<FuelTanks> tanks, Time dt) -> void {
   for (std::size_t i = 0; i < aircraft.engines.size(); ++i) {
     const TurbineData& turbine = aircraft.engines[i];

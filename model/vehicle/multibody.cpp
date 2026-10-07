@@ -21,13 +21,12 @@ constexpr double GRAVITY = 9.81;  // m/s^2, as CommonRoad has it.
 constexpr double CRAWL = 0.1;  // m/s.
 
 auto compute_rate_numbers(const MultibodyNumbers& x, double u0, double u1,
-                          const WheelSteer& toe,
-                          const VehicleParameters& vehicle) -> MultibodyNumbers;
+                          const WheelSteer& toe, const Parameters& vehicle)
+    -> MultibodyNumbers;
 
 }  // namespace
 
-auto convert_multibody_to_numbers(const MultibodyVehicle& state)
-    -> MultibodyNumbers {
+auto convert_multibody_to_numbers(const Multibody& state) -> MultibodyNumbers {
   auto axle = [](const UnsprungAxle& axle) {
     return std::array{radians(axle.roll),
                       axle.roll_rate.numerical_value_in(radian_per_second),
@@ -71,8 +70,7 @@ auto convert_multibody_to_numbers(const MultibodyVehicle& state)
   };
 }
 
-auto convert_numbers_to_multibody(const MultibodyNumbers& x)
-    -> MultibodyVehicle {
+auto convert_numbers_to_multibody(const MultibodyNumbers& x) -> Multibody {
   auto axle = [&](std::size_t at) {
     return UnsprungAxle{.roll = x[at] * radian,
                         .roll_rate = x[at + 1] * radian_per_second,
@@ -80,7 +78,7 @@ auto convert_numbers_to_multibody(const MultibodyNumbers& x)
                         .height = x[at + 3] * meter,
                         .vertical_speed = x[at + 4] * meter_per_second};
   };
-  return MultibodyVehicle{
+  return Multibody{
       .x = x[0] * meter,
       .y = x[1] * meter,
       .steering = x[2] * radian,
@@ -103,7 +101,7 @@ auto convert_numbers_to_multibody(const MultibodyNumbers& x)
   };
 }
 
-auto convert_multibody_rate_to_numbers(const MultibodyVehicleRate& rate)
+auto convert_multibody_rate_to_numbers(const MultibodyRate& rate)
     -> MultibodyNumbers {
   auto axle = [](const UnsprungAxleRate& axle) {
     return std::array{
@@ -150,7 +148,7 @@ auto convert_multibody_rate_to_numbers(const MultibodyVehicleRate& rate)
 }
 
 auto convert_numbers_to_multibody_rate(const MultibodyNumbers& f)
-    -> MultibodyVehicleRate {
+    -> MultibodyRate {
   auto axle = [&](std::size_t at) {
     return UnsprungAxleRate{
         .roll = f[at] * radian_per_second,
@@ -159,7 +157,7 @@ auto convert_numbers_to_multibody_rate(const MultibodyNumbers& f)
         .height = f[at + 3] * meter_per_second,
         .vertical_speed = f[at + 4] * meter_per_second_squared};
   };
-  return MultibodyVehicleRate{
+  return MultibodyRate{
       .x = f[0] * meter_per_second,
       .y = f[1] * meter_per_second,
       .steering = f[2] * radian_per_second,
@@ -184,8 +182,8 @@ auto convert_numbers_to_multibody_rate(const MultibodyNumbers& f)
   };
 }
 
-auto operator+(const MultibodyVehicleRate& a, const MultibodyVehicleRate& b)
-    -> MultibodyVehicleRate {
+auto operator+(const MultibodyRate& a, const MultibodyRate& b)
+    -> MultibodyRate {
   MultibodyNumbers sum = convert_multibody_rate_to_numbers(a);
   MultibodyNumbers other = convert_multibody_rate_to_numbers(b);
   for (std::size_t i = 0; i < sum.size(); ++i) {
@@ -194,8 +192,7 @@ auto operator+(const MultibodyVehicleRate& a, const MultibodyVehicleRate& b)
   return convert_numbers_to_multibody_rate(sum);
 }
 
-auto operator*(double weight, const MultibodyVehicleRate& rate)
-    -> MultibodyVehicleRate {
+auto operator*(double weight, const MultibodyRate& rate) -> MultibodyRate {
   MultibodyNumbers scaled = convert_multibody_rate_to_numbers(rate);
   for (double& value : scaled) {
     value *= weight;
@@ -203,8 +200,8 @@ auto operator*(double weight, const MultibodyVehicleRate& rate)
   return convert_numbers_to_multibody_rate(scaled);
 }
 
-auto advance(const MultibodyVehicle& state, const MultibodyVehicleRate& rate,
-             Duration dt) -> MultibodyVehicle {
+auto advance(const Multibody& state, const MultibodyRate& rate, Duration dt)
+    -> Multibody {
   double seconds = simon::seconds(dt).numerical_value_in(second);
   MultibodyNumbers x = convert_multibody_to_numbers(state);
   MultibodyNumbers f = convert_multibody_rate_to_numbers(rate);
@@ -214,8 +211,7 @@ auto advance(const MultibodyVehicle& state, const MultibodyVehicleRate& rate,
   return convert_numbers_to_multibody(x);
 }
 
-auto start_multibody(Speed speed, const VehicleParameters& vehicle)
-    -> MultibodyVehicle {
+auto start_multibody(Speed speed, const Parameters& vehicle) -> Multibody {
   double l = vehicle.wheelbase().numerical_value_in(meter);
   double k_zt =
       vehicle.suspension.tire_spring.numerical_value_in(newton_per_meter);
@@ -228,7 +224,7 @@ auto start_multibody(Speed speed, const VehicleParameters& vehicle)
       m_s * GRAVITY * vehicle.front.numerical_value_in(meter) / l +
       vehicle.rear_unsprung_mass.numerical_value_in(kilogram) * GRAVITY;
   AngularRate rolling = speed / vehicle.wheel_radius * radian;
-  return MultibodyVehicle{
+  return Multibody{
       .speed = speed,
       .front = {.height = front_load / (2.0 * k_zt) * meter},
       .rear = {.height = rear_load / (2.0 * k_zt) * meter},
@@ -236,12 +232,10 @@ auto start_multibody(Speed speed, const VehicleParameters& vehicle)
   };
 }
 
-auto compute_multibody_rate(const MultibodyVehicle& state,
-                            const VehicleInput& input,
-                            const VehicleParameters& vehicle,
-                            const WheelSteer& toe) -> MultibodyVehicleRate {
-  VehicleInput limited =
-      limit_input(input, state.steering, state.speed, vehicle);
+auto compute_multibody_rate(const Multibody& state, const Input& input,
+                            const Parameters& vehicle, const WheelSteer& toe)
+    -> MultibodyRate {
+  Input limited = limit_input(input, state.steering, state.speed, vehicle);
   return convert_numbers_to_multibody_rate(compute_rate_numbers(
       convert_multibody_to_numbers(state),
       limited.steering_rate.numerical_value_in(radian_per_second),
@@ -258,8 +252,7 @@ namespace {
 // it, where CommonRoad divides by a speed that may be zero; and a tire off
 // the ground pushes nothing (see model/tire.hpp).
 auto compute_rate_numbers(const MultibodyNumbers& x, double u0, double u1,
-                          const WheelSteer& toe,
-                          const VehicleParameters& vehicle)
+                          const WheelSteer& toe, const Parameters& vehicle)
     -> MultibodyNumbers {
   const double g = GRAVITY;
   const Suspension& s = vehicle.suspension;

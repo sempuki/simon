@@ -16,7 +16,7 @@ using namespace std::chrono_literals;
 // A straight road, 100 m, two lanes each way, with a traffic light at
 // s = 90 for the right lanes, lane -1 only, and a static sign; a controller
 // groups the light, and a junction lists the controller.
-auto network_with_light() -> road::RoadNetwork {
+auto network_with_light() -> road::Map {
   auto lane = [](int id) {
     return road::Lane{
         .id = id, .type = "driving", .widths = {{.cubic = {.a = 3.5}}}};
@@ -29,24 +29,22 @@ auto network_with_light() -> road::RoadNetwork {
                                   .shape = road::LineGeometry{}}},
       .lane_sections = {road::LaneSection{.left = {lane(1), lane(2)},
                                           .right = {lane(-1), lane(-2)}}}};
-  road.signals.push_back(
-      road::Signal{.id = "light",
-                   .validities = {{.from = -1, .to = -1}},
-                   .s = 90.0,
-                   .orientation = road::RoadDirection::POSITIVE,
-                   .dynamic = true});
+  road.signals.push_back(road::Signal{.id = "light",
+                                      .validities = {{.from = -1, .to = -1}},
+                                      .s = 90.0,
+                                      .orientation = road::Direction::POSITIVE,
+                                      .dynamic = true});
   road.signals.push_back(road::Signal{.id = "sign", .s = 50.0});
-  return road::RoadNetwork{
-      .roads = {road},
-      .junctions = {road::Junction{
-          .id = "9", .controllers = {{.id = "c", .sequence = 3}}}},
-      .controllers = {road::SignalController{
-          .id = "c", .controls = {{.signal = "light"}}}}};
+  return road::Map{.roads = {road},
+                   .junctions = {road::Junction{
+                       .id = "9", .controllers = {{.id = "c", .sequence = 3}}}},
+                   .controllers = {road::SignalController{
+                       .id = "c", .controls = {{.signal = "light"}}}}};
 }
 
 }  // namespace
 
-TEST_CASE("TrafficControl") {
+TEST_CASE("traffic::Control") {
   SECTION("ShouldCycleThroughPhasesGivenPlan") {
     SignalPlan plan{.phases = {{.duration = 20s, .aspect = Aspect::GREEN},
                                {.duration = 3s, .aspect = Aspect::YELLOW},
@@ -85,8 +83,8 @@ TEST_CASE("TrafficControl") {
   }
 
   SECTION("ShouldPutStopLinesOnLanesTheLightHoldsFor") {
-    road::RoadNetwork network = network_with_light();
-    TrafficControl control = build_traffic_control(network);
+    road::Map network = network_with_light();
+    Control control = build_control(network);
     REQUIRE(control.groups().size() == 1);
     CHECK(control.groups()[0].junction == "9");
     CHECK(control.groups()[0].sequence == 3);
@@ -99,11 +97,11 @@ TEST_CASE("TrafficControl") {
   }
 
   SECTION("ShouldPutStopLinesAgainstSGivenNegativeOrientation") {
-    road::RoadNetwork network = network_with_light();
+    road::Map network = network_with_light();
     road::Signal& light = network.roads[0].signals[0];
-    light.orientation = road::RoadDirection::NEGATIVE;
+    light.orientation = road::Direction::NEGATIVE;
     light.validities.clear();
-    TrafficControl control = build_traffic_control(network);
+    Control control = build_control(network);
     REQUIRE(control.stop_lines().size() == 2);
     CHECK(control.stop_lines()[0].lane.lane == 1);
     CHECK(control.stop_lines()[0].along == 10.0);  // Measured against s.

@@ -358,7 +358,7 @@ constexpr std::string_view BOEING_737 = "3rd_party/jsbsim/737.aircraft";
 
 // A 737 trimmed in cruise at 6 km and 200 m/s, heading north from the
 // world's origin toward a waypoint 500 km ahead.
-auto rigid_737(const aircraft::Earth& earth, const aircraft::AircraftData& data,
+auto rigid_737(const aircraft::Earth& earth, const aircraft::Definition& data,
                InOut<World> world) -> Entity {
   Route route{.speed = 200.0 * meter_per_second};
   route.waypoints.fill(meters(0.0, 500000.0, 6000.0));

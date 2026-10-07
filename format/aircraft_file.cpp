@@ -61,14 +61,14 @@ class Parser final {
  public:
   explicit Parser(std::vector<Line> lines) : lines_{std::move(lines)} {}
 
-  auto parse() -> std::expected<AircraftData, lib::Status> {
+  auto parse() -> std::expected<aircraft::Definition, lib::Status> {
     if (done() || line().words.size() != 2 ||
         line().words[0] != "simon-aircraft" || line().words[1] != "1") {
       return fail("expected the header `simon-aircraft 1`");
     }
     ++at_;
 
-    AircraftData data;
+    aircraft::Definition data;
     while (!done()) {
       std::string_view key = line().words[0];
       if (key == "name") {
@@ -207,7 +207,7 @@ class Parser final {
     return {};
   }
 
-  auto read_metrics(InOut<AircraftData> data)
+  auto read_metrics(InOut<aircraft::Definition> data)
       -> std::expected<void, lib::Status> {
     std::array<double, 3> value{};
     RETURN_IF_UNEXPECTED(read_numbers(Out(value)));
@@ -217,7 +217,7 @@ class Parser final {
     return {};
   }
 
-  auto append_point_mass(InOut<AircraftData> data)
+  auto append_point_mass(InOut<aircraft::Definition> data)
       -> std::expected<void, lib::Status> {
     std::array<double, 4> value{};
     RETURN_IF_UNEXPECTED(read_numbers(Out(value)));
@@ -228,7 +228,7 @@ class Parser final {
     return {};
   }
 
-  auto append_tank(InOut<AircraftData> data)
+  auto append_tank(InOut<aircraft::Definition> data)
       -> std::expected<void, lib::Status> {
     std::array<double, 5> value{};
     RETURN_IF_UNEXPECTED(read_numbers(Out(value)));
@@ -243,7 +243,7 @@ class Parser final {
   // An input by name: a variable, else a flight control signal, which the
   // flight controls must already have named, or `|signal|` for its magnitude.
   // The aerodynamics read each signal from their own slot.
-  auto input(std::string_view name, InOut<AircraftData> data) const
+  auto input(std::string_view name, InOut<aircraft::Definition> data) const
       -> std::expected<AeroInput, lib::Status> {
     if (std::optional<AeroVariable> found = find_aero_variable(name)) {
       return aero_input(*found);
@@ -282,7 +282,7 @@ class Parser final {
   // A table block: `table <row> [<column>]`, then for one variable a
   // breakpoint and value per line, or for two a `columns` line and then a
   // row breakpoint and its values per line, then `end`.
-  auto table(InOut<AircraftData> data)
+  auto table(InOut<aircraft::Definition> data)
       -> std::expected<AeroTable, lib::Status> {
     const Line& header = line();
     if (header.words.size() < 2 || header.words.size() > 3) {
@@ -338,7 +338,7 @@ class Parser final {
                      .table = Table1<>{std::move(rows), std::move(values)}};
   }
 
-  auto append_term(InOut<AircraftData> data)
+  auto append_term(InOut<aircraft::Definition> data)
       -> std::expected<void, lib::Status> {
     const Line& header = line();
     if (header.words.size() != 3) {
@@ -378,7 +378,7 @@ class Parser final {
     return {};
   }
 
-  auto append_engine(InOut<AircraftData> data)
+  auto append_engine(InOut<aircraft::Definition> data)
       -> std::expected<void, lib::Status> {
     const Line& header = line();
     if (header.words.size() != 3 || header.words[1] != "turbine") {
@@ -506,7 +506,7 @@ class Parser final {
   // `flight_controls`, then signals and blocks, then `end`. A signal is
   // `signal <name>`: one nothing writes, which holds zero. A block is
   // `block <kind> <name>`, its entries, then `end`.
-  auto read_flight_controls(InOut<AircraftData> data)
+  auto read_flight_controls(InOut<aircraft::Definition> data)
       -> std::expected<void, lib::Status> {
     ++at_;
     std::vector<std::string> declared;
@@ -973,12 +973,12 @@ class Parser final {
 }  // namespace
 
 auto parse_aircraft(std::string_view text)
-    -> std::expected<AircraftData, lib::Status> {
+    -> std::expected<aircraft::Definition, lib::Status> {
   return Parser{split_lines(text)}.parse();
 }
 
 auto load_aircraft(const std::string& path)
-    -> std::expected<AircraftData, lib::Status> {
+    -> std::expected<aircraft::Definition, lib::Status> {
   RETURN_OR_ASSIGN(std::string text, read_text_file(path));
   return parse_aircraft(text);
 }

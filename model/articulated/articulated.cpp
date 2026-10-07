@@ -6,10 +6,10 @@
 
 namespace simon::articulated {
 
-auto find_trees(const ArticulatedModel& model) -> std::vector<Tree> {
+auto find_trees(const Scene& model) -> std::vector<Tree> {
   std::vector<Tree> trees;
   for (std::uint32_t b = 1; b < model.bodies.size(); ++b) {
-    const ArticulatedBody& body = model.bodies[b];
+    const Body& body = model.bodies[b];
     if (body.parent == 0) {
       trees.push_back(Tree{.first_body = b,
                            .first_joint = body.first_joint,

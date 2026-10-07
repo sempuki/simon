@@ -19,8 +19,6 @@ namespace simon::robotic {
 
 namespace {
 
-using articulated::ArticulatedModel;
-
 using namespace testing;
 
 struct Row final {
@@ -89,7 +87,7 @@ auto find_tensor(const std::vector<double>& moments,
 }
 
 // simon's value for one row of the table, by MuJoCo's names.
-auto find_value(const ArticulatedModel& m, const Row& row)
+auto find_value(const articulated::Scene& m, const Row& row)
     -> std::vector<double> {
   const std::string& f = row.field;
   std::size_t i = row.index;
@@ -108,7 +106,7 @@ auto find_value(const ArticulatedModel& m, const Row& row)
   } else if (row.element == "qpos_spring") {
     return m.qpos_spring;
   } else if (row.element == "body") {
-    const articulated::ArticulatedBody& b = m.bodies.at(i);
+    const articulated::Body& b = m.bodies.at(i);
     if (f == "parentid") return number(b.parent);
     if (f == "rootid") return number(b.root);
     if (f == "pos") return doubles(b.pos);
@@ -153,10 +151,10 @@ auto find_value(const ArticulatedModel& m, const Row& row)
     if (f == "solref") return doubles(m.joints.at(d.joint).friction.reference);
     if (f == "solimp") return doubles(m.joints.at(d.joint).friction.impedance);
   } else if (row.element == "geom") {
-    const articulated::Geom& g = m.geoms.at(i);
+    const articulated::Geometry& g = m.geoms.at(i);
     // A mesh's frame and size come from its shape, which is not read; it
     // only shows the model.
-    if (g.type == articulated::GeomType::MESH &&
+    if (g.type == articulated::GeometryType::MESH &&
         (f == "size" || f == "pos" || f == "quat" || f == "sameframe")) {
       return row.values;
     }
@@ -220,7 +218,7 @@ TEST_CASE("ModelAgainstMuJoCo") {
   SECTION("ShouldCompileAsMuJoCoDoesGivenEveryTestModel") {
     // Every field of every model to rounding, relative to the field's size
     // where it is more than 1; counts and kinds exactly.
-    std::map<std::string, ArticulatedModel> models;
+    std::map<std::string, articulated::Scene> models;
     double worst = 0.0;
     std::string where;
     std::size_t compared = 0;
@@ -250,8 +248,7 @@ TEST_CASE("ModelAgainstMuJoCo") {
       if (row.element == "body" && row.field == "iquat") {
         // Principal axes are defined only up to their signs, and where
         // moments are equal not at all: compare the inertia they give.
-        const articulated::ArticulatedBody& b =
-            models.at(row.model).bodies.at(row.index);
+        const articulated::Body& b = models.at(row.model).bodies.at(row.index);
         std::vector<double> moments{b.inertia[0], b.inertia[1], b.inertia[2]};
         ours = find_tensor(moments, ours);
         theirs = find_tensor(inertias.at({row.model, row.index}), theirs);

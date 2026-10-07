@@ -24,7 +24,7 @@ constexpr double SAMPLE = 1.0;  // m between a path's points, at most.
 constexpr double SAME = 0.5;    // m: ends nearer are one node.
 
 auto point_at(const Road& road, double s, double t) -> WalkPoint {
-  Vector3 p = compute_road_position(road, s * meter, t * meter)
+  Vector3 p = compute_position(road, s * meter, t * meter)
                   .numerical_value_in(meter)
                   .eigen();
   return WalkPoint{.x = p.x(), .y = p.y(), .z = p.z()};
@@ -262,7 +262,7 @@ auto WalkingGraph::find_components() const -> std::vector<std::uint32_t> {
   return component;
 }
 
-auto build_walking_graph(const RoadNetwork& network, double corner_reach)
+auto build_walking_graph(const Map& network, double corner_reach)
     -> WalkingGraph {
   WalkingGraph graph;
   Builder builder;
@@ -272,7 +272,7 @@ auto build_walking_graph(const RoadNetwork& network, double corner_reach)
   for (std::uint32_t r = 0; r < network.roads.size(); ++r) {
     const Road& road = network.roads[r];
     for (std::uint32_t o = 0; o < road.objects.size(); ++o) {
-      const RoadObject& object = road.objects[o];
+      const Object& object = road.objects[o];
       if (object.type != "crosswalk") {
         continue;
       }

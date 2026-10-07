@@ -17,7 +17,7 @@ namespace {
 // Finds roads by id, once.
 class RoadIndex final {
  public:
-  explicit RoadIndex(const RoadNetwork& network) : network_{&network} {
+  explicit RoadIndex(const Map& network) : network_{&network} {
     for (std::size_t i = 0; i < network.roads.size(); ++i) {
       by_id_.emplace(network.roads[i].id, static_cast<std::uint32_t>(i));
     }
@@ -36,7 +36,7 @@ class RoadIndex final {
   }
 
  private:
-  const RoadNetwork* network_ = nullptr;
+  const Map* network_ = nullptr;
   std::map<std::string, std::uint32_t, std::less<>> by_id_;
 };
 
@@ -61,8 +61,8 @@ auto adjacent_section(const RoadIndex& roads, std::uint32_t road,
   if (!before && section + 1 < here.lane_sections.size()) {
     return std::pair{road, section + 1};
   }
-  const RoadLink& link = before ? here.predecessor : here.successor;
-  if (link.kind != RoadLink::Kind::ROAD) {
+  const Link& link = before ? here.predecessor : here.successor;
+  if (link.kind != Link::Kind::ROAD) {
     return std::nullopt;
   }
   std::optional<std::uint32_t> next = roads.find(link.id);
@@ -71,35 +71,32 @@ auto adjacent_section(const RoadIndex& roads, std::uint32_t road,
   }
   auto last =
       static_cast<std::uint32_t>(roads.road(*next).lane_sections.size() - 1);
-  return std::pair{*next, link.contact == RoadLink::Contact::START
-                              ? std::uint32_t{0}
-                              : last};
+  return std::pair{
+      *next, link.contact == Link::Contact::START ? std::uint32_t{0} : last};
 }
 
 }  // namespace
 
-auto find_section_end(const RoadNetwork& network, const LaneKey& key)
-    -> double {
+auto find_section_end(const Map& network, const LaneKey& key) -> double {
   const Road& road = network.roads[key.road];
   return key.section + 1 < road.lane_sections.size()
              ? road.lane_sections[key.section + 1].s0
              : road.length;
 }
 
-auto find_lane_length(const RoadNetwork& network, const LaneKey& key)
-    -> double {
+auto find_lane_length(const Map& network, const LaneKey& key) -> double {
   return find_section_end(network, key) -
          network.roads[key.road].lane_sections[key.section].s0;
 }
 
-auto find_s_along(const RoadNetwork& network, const LaneKey& key, double along)
+auto find_s_along(const Map& network, const LaneKey& key, double along)
     -> double {
   return runs_with_s(key)
              ? network.roads[key.road].lane_sections[key.section].s0 + along
              : find_section_end(network, key) - along;
 }
 
-auto find_lane(const RoadNetwork& network, const LaneKey& key) -> const Lane& {
+auto find_lane(const Map& network, const LaneKey& key) -> const Lane& {
   const LaneSection& section =
       network.roads[key.road].lane_sections[key.section];
   CHECK_PRECONDITION(has_lane(section, key.lane));
@@ -107,8 +104,8 @@ auto find_lane(const RoadNetwork& network, const LaneKey& key) -> const Lane& {
   return side[static_cast<std::size_t>(std::abs(key.lane)) - 1];
 }
 
-auto compute_lane_middle(const RoadNetwork& network, const LaneKey& key,
-                         Length s) -> Length {
+auto compute_lane_middle(const Map& network, const LaneKey& key, Length s)
+    -> Length {
   const Road& road = network.roads[key.road];
   const LaneSection& section = road.lane_sections[key.section];
   int inner = key.lane > 0 ? key.lane - 1 : key.lane + 1;
@@ -116,7 +113,7 @@ auto compute_lane_middle(const RoadNetwork& network, const LaneKey& key,
                 compute_lane_border(road, section, s, inner));
 }
 
-LaneNumbering::LaneNumbering(const RoadNetwork& network) {
+LaneNumbering::LaneNumbering(const Map& network) {
   for (const Road& road : network.roads) {
     first_section_.push_back(static_cast<std::uint32_t>(sections_.size()));
     for (const LaneSection& section : road.lane_sections) {
@@ -161,7 +158,7 @@ auto LaneGraph::edges() const -> std::vector<Edge> {
 auto build_graph(const LaneNumbering& numbering,
                  std::vector<std::pair<LaneKey, LaneKey>> edges) -> LaneGraph;
 
-auto build_lane_graph(const RoadNetwork& network) -> LaneGraph {
+auto build_lane_graph(const Map& network) -> LaneGraph {
   RoadIndex roads{network};
   std::vector<std::pair<LaneKey, LaneKey>> edges;
 
@@ -212,14 +209,14 @@ auto build_lane_graph(const RoadNetwork& network) -> LaneGraph {
       if (in.lane_sections.empty() || through.lane_sections.empty()) {
         continue;
       }
-      bool ends_here = in.successor.kind == RoadLink::Kind::JUNCTION &&
+      bool ends_here = in.successor.kind == Link::Kind::JUNCTION &&
                        in.successor.id == junction.id;
       auto in_section = static_cast<std::uint32_t>(
           ends_here ? in.lane_sections.size() - 1 : 0);
-      auto through_section = static_cast<std::uint32_t>(
-          connection.contact == RoadLink::Contact::START
-              ? 0
-              : through.lane_sections.size() - 1);
+      auto through_section =
+          static_cast<std::uint32_t>(connection.contact == Link::Contact::START
+                                         ? 0
+                                         : through.lane_sections.size() - 1);
       for (const JunctionConnection::LaneLink& link : connection.lane_links) {
         if (!has_lane(in.lane_sections[in_section], link.from) ||
             !has_lane(through.lane_sections[through_section], link.to)) {
@@ -238,8 +235,7 @@ auto build_lane_graph(const RoadNetwork& network) -> LaneGraph {
   return build_graph(LaneNumbering{network}, std::move(edges));
 }
 
-auto build_lane_graph(const RoadNetwork& network, std::string_view type)
-    -> LaneGraph {
+auto build_lane_graph(const Map& network, std::string_view type) -> LaneGraph {
   std::vector<std::pair<LaneKey, LaneKey>> edges;
   for (const LaneGraph::Edge& edge : build_lane_graph(network).edges()) {
     if (find_lane(network, edge.from).type == type &&

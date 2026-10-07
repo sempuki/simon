@@ -87,8 +87,8 @@ inline auto advance(const KinematicSingleTrack& state,
 
 // The kinematic model's rate under `input` (CommonRoad's vehicle_dynamics_ks).
 inline auto compute_kinematic_single_track_rate(
-    const KinematicSingleTrack& state, const VehicleInput& input,
-    const VehicleParameters& vehicle) -> KinematicSingleTrackRate {
+    const KinematicSingleTrack& state, const Input& input,
+    const Parameters& vehicle) -> KinematicSingleTrackRate {
   double steering = radians(state.steering);
   return KinematicSingleTrackRate{
       .x = state.speed * cos(state.heading),
@@ -142,8 +142,8 @@ auto advance(const DynamicSingleTrack& state,
 // its tires' cornering stiffness and friction those of the Magic Formula
 // tire at small slip.
 auto compute_dynamic_single_track_rate(const DynamicSingleTrack& state,
-                                       const VehicleInput& input,
-                                       const VehicleParameters& vehicle)
+                                       const Input& input,
+                                       const Parameters& vehicle)
     -> DynamicSingleTrackRate;
 
 //-- Drift single-track model --------------------------------------------------
@@ -184,15 +184,15 @@ auto advance(const DriftSingleTrack& state, const DriftSingleTrackRate& rate,
              Duration dt) -> DriftSingleTrack;
 
 // The drift model's state straight ahead at `speed`, its wheels rolling.
-auto start_drift_single_track(Speed speed, const VehicleParameters& vehicle)
+auto start_drift_single_track(Speed speed, const Parameters& vehicle)
     -> DriftSingleTrack;
 
 // The drift model's rate under `input` (CommonRoad's vehicle_dynamics_std).
 // The acceleration asked becomes engine or brake torque, split between the
 // axles, and a wheel spinning backward stops.
 auto compute_drift_single_track_rate(const DriftSingleTrack& state,
-                                     const VehicleInput& input,
-                                     const VehicleParameters& vehicle)
+                                     const Input& input,
+                                     const Parameters& vehicle)
     -> DriftSingleTrackRate;
 
 }  // namespace simon::vehicle

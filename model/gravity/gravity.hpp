@@ -18,7 +18,7 @@ namespace simon::gravity {
 //-- Constants -----------------------------------------------------------------
 
 // G, CODATA 2018.
-inline constexpr double GRAVITATIONAL_CONSTANT = 6.67430e-11;  // m^3/(kg s^2).
+inline constexpr double CONSTANT = 6.67430e-11;  // m^3/(kg s^2).
 
 // The astronomical unit, exact by IAU 2012 Resolution B2, and the parsec,
 // exactly 648000 / pi of them by IAU 2015 Resolution B2.
@@ -30,8 +30,7 @@ inline constexpr Length KILOPARSEC = 1000.0 * PARSEC;
 // The nominal solar mass parameter GM, exact by IAU 2015 Resolution B3, over
 // G: the Sun's mass as far as G is known.
 inline constexpr double SOLAR_MASS_PARAMETER = 1.3271244e20;  // m^3/s^2.
-inline constexpr Mass SOLAR_MASS =
-    SOLAR_MASS_PARAMETER / GRAVITATIONAL_CONSTANT * kilogram;
+inline constexpr Mass SOLAR_MASS = SOLAR_MASS_PARAMETER / CONSTANT * kilogram;
 
 // The Julian year, 365.25 days of 86,400 s.
 inline constexpr Time JULIAN_YEAR = 365.25 * 86400.0 * second;
@@ -41,7 +40,7 @@ inline constexpr Time MEGAYEAR = 1e6 * JULIAN_YEAR;
 
 // A body that pulls on others. `id` is the caller's name for the body, which
 // leaves it out of its own pull.
-struct GravitySource final {
+struct Source final {
   Vector3 position = Vector3::Zero();  // Meters.
   double mass = 0.0;                   // Kilograms.
   std::uint32_t id = 0;
@@ -51,13 +50,14 @@ struct GravitySource final {
 // whose id is `self`, each
 // softened by Plummer's kernel: G m d / (|d|^2 + softening^2)^(3/2) (Dehnen),
 // in REBOUND's order of operations. Meters, kilograms and seconds.
-auto sum_gravity(std::span<const GravitySource> sources, std::uint32_t self,
-                 const Vector3& position, double softening) -> Vector3;
+auto sum_acceleration(std::span<const Source> sources, std::uint32_t self,
+                      const Vector3& position, double softening) -> Vector3;
 
 // Computes the potential energy of `sources`, each pair once, softened as
-// sum_gravity softens them: -G m_i m_j / (|d|^2 + softening^2)^(1/2). Joules.
-auto compute_potential_energy(std::span<const GravitySource> sources,
-                              double softening) -> double;
+// sum_acceleration softens them: -G m_i m_j / (|d|^2 + softening^2)^(1/2).
+// Joules.
+auto compute_potential_energy(std::span<const Source> sources, double softening)
+    -> double;
 
 //-- Barnes and Hut's tree -----------------------------------------------------
 
@@ -65,17 +65,17 @@ auto compute_potential_energy(std::span<const GravitySource> sources,
 // mass, after Barnes and Hut. A body far from a cell takes the cell's pull as
 // that of one point of its mass at its center of mass, so a body's
 // acceleration costs about log N cells instead of N sources.
-class GravityTree final {
+class Tree final {
  public:
   // Rebuilds the tree over `sources`: a cube around them, split into octants
   // until each cell holds one source, or several that cannot be told apart.
-  auto build(std::span<const GravitySource> sources) -> void;
+  auto build(std::span<const Source> sources) -> void;
 
   // Computes the acceleration at `position` on `self`, opening each cell
   // whose width is more than `opening_angle` times its distance from
   // `position` to its center of mass, as REBOUND's tree does. An unopened cell
-  // pulls as a point; a source pulls as sum_gravity has it. Meters, kilograms
-  // and seconds.
+  // pulls as a point; a source pulls as sum_acceleration has it. Meters,
+  // kilograms and seconds.
   auto compute_acceleration(std::uint32_t self, const Vector3& position,
                             double opening_angle, double softening) const
       -> Vector3;
@@ -95,8 +95,8 @@ class GravityTree final {
   auto build_cell(std::uint32_t cell, std::uint32_t begin, std::uint32_t end,
                   const Vector3& corner, double width, int depth) -> void;
 
-  std::vector<GravitySource> sources_;  // In tree order.
-  std::vector<GravitySource> scratch_;
+  std::vector<Source> sources_;  // In tree order.
+  std::vector<Source> scratch_;
   std::vector<Cell> cells_;
 };
 

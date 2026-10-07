@@ -23,8 +23,6 @@ using namespace std::chrono_literals;
 using namespace testing;
 using vehicle::KinematicSingleTrack;
 using vehicle::KinematicSingleTrackRate;
-using vehicle::VehicleInput;
-using vehicle::VehicleParameters;
 
 auto read_state(const Row& row) -> KinematicSingleTrack {
   return {.x = number(row, "x") * meter,
@@ -36,7 +34,7 @@ auto read_state(const Row& row) -> KinematicSingleTrack {
 
 // The inputs the reference script drives by, at `t` seconds, each held over
 // 0.05 s.
-auto inputs(double t) -> VehicleInput {
+auto inputs(double t) -> vehicle::Input {
   t = std::floor(t / 0.05 + 1e-9) * 0.05;
   double acceleration = t < 5.0    ? 3.0
                         : t < 9.0  ? -1.5
@@ -73,7 +71,7 @@ struct Apart final {
 // Drives `vehicle` from the script's start for 20 s at steps of `dt` seconds
 // by classic Runge-Kutta 4, the inputs held over each step, and returns the
 // state every 0.1 s.
-auto drive(const VehicleParameters& vehicle, std::chrono::microseconds dt)
+auto drive(const vehicle::Parameters& vehicle, std::chrono::microseconds dt)
     -> std::vector<KinematicSingleTrack> {
   KinematicSingleTrack state{.speed = 10.0 * meter_per_second,
                              .heading = 0.3 * radian};
@@ -81,7 +79,8 @@ auto drive(const VehicleParameters& vehicle, std::chrono::microseconds dt)
   auto steps = 20s / dt;
   auto every = std::chrono::microseconds{100'000} / dt;
   for (std::int64_t k = 0; k < steps; ++k) {
-    VehicleInput input = inputs(std::chrono::duration<double>(k * dt).count());
+    vehicle::Input input =
+        inputs(std::chrono::duration<double>(k * dt).count());
     auto rate = [&](const KinematicSingleTrack& at) {
       return vehicle::compute_kinematic_single_track_rate(at, input, vehicle);
     };
@@ -101,14 +100,14 @@ auto drive(const VehicleParameters& vehicle, std::chrono::microseconds dt)
 }  // namespace
 
 TEST_CASE("KinematicSingleTrackAgainstCommonRoad") {
-  std::map<int, VehicleParameters> by_id = load_commonroad_vehicles();
+  std::map<int, vehicle::Parameters> by_id = load_commonroad_vehicles();
   REQUIRE(by_id.size() == 3);
 
   SECTION("ShouldMatchRatesGivenStatesOnAndPastLimits") {
     double largest = 0.0;
     int rows = 0;
     for (const Row& row : load_rows("commonroad_rates.csv")) {
-      const VehicleParameters& vehicle =
+      const vehicle::Parameters& vehicle =
           by_id.at(static_cast<int>(number(row, "vehicle")));
       KinematicSingleTrackRate rate =
           vehicle::compute_kinematic_single_track_rate(

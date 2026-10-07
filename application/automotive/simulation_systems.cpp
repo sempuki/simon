@@ -185,9 +185,9 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
     return;
   }
   const ScenarioContext& context = *context_;
-  const road::RoadNetwork& roads = *context.roads;
+  const road::Map& roads = *context.roads;
   double dt = convert_to_seconds(step);
-  road::RoadPlacement& placement = motion.placement;
+  road::Placement& placement = motion.placement;
 
   if (motion.change && stopped(orders, motion.change->handle)) {
     motion.change.reset();
@@ -222,7 +222,7 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
         } else {
           const auto& relative =
               std::get<osc::RelativeTargetLane>(change->target);
-          const road::RoadPlacement& reference =
+          const road::Placement& reference =
               context.states[context.player->find_entity(relative.entity)]
                   .placement;
           lane = reference.lane +
@@ -258,7 +258,7 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
         lateral.transition.start = agnostic_offset(placement.lane);
         double target = offset->value;
         if (offset->relative_to) {
-          const road::RoadPlacement& reference =
+          const road::Placement& reference =
               context.states[context.player->find_entity(*offset->relative_to)]
                   .placement;
           const road::Road& road = roads.roads[placement.road];
@@ -282,7 +282,7 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
         motion.change = lateral;
       } else if (const auto* assign =
                      std::get_if<osc::AssignRouteAction>(order.action)) {
-        std::vector<road::RoadPlacement> waypoints;
+        std::vector<road::Placement> waypoints;
         for (const osc::Waypoint& waypoint : assign->route.waypoints) {
           waypoints.push_back(
               context.player->locate(waypoint.position, context.states));
@@ -318,7 +318,7 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
       *speed->stepped_by > *lateral_handle) {
     v = speed->unstepped;
   }
-  road::RoadMove moved = road::RoadMove::ALONG;
+  road::Move moved = road::Move::ALONG;
   if (motion.trajectory) {
     // esmini's FollowTrajectoryAction::Step without timing: along the
     // polyline at the speed, the way it faced as it started.
@@ -390,14 +390,14 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
     placement.lane = change.lane;
     placement.offset = offset * sign(change.lane);
     double ds = road::convert_distance_to_ds(roads, placement, sign(v) * along);
-    moved = road::move_along_road(roads, InOut(placement), ds, motion.route);
+    moved = road::move_along(roads, InOut(placement), ds, motion.route);
     forward = road::runs_forward(placement);
     bool ended = change.transition.done() ||
                  std::abs(offset - change.transition.target) < SMALL ||
                  (change.transition.parameter > 0.0 &&
                   sign(offset - change.transition.target) !=
                       sign(change.transition.start - change.transition.target));
-    if (ended || moved == road::RoadMove::END_OF_ROAD) {
+    if (ended || moved == road::Move::END_OF_ROAD) {
       placement.heading = forward ? 0.0 : std::numbers::pi;
       motion.finished.push_back(change.handle);
       motion.change.reset();
@@ -407,10 +407,10 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
     }
   } else if (std::abs(v) > SMALL && !(orders != nullptr && orders->held)) {
     double ds = road::convert_distance_to_ds(roads, placement, v * dt);
-    moved = road::move_along_road(roads, InOut(placement), ds, motion.route);
+    moved = road::move_along(roads, InOut(placement), ds, motion.route);
   }
 
-  if (moved == road::RoadMove::END_OF_ROAD) {
+  if (moved == road::Move::END_OF_ROAD) {
     motion.end_of_road =
         motion.end_of_road < 0.0 ? 0.0 : motion.end_of_road + dt;
   } else if (std::abs(v) > SMALL) {

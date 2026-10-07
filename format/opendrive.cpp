@@ -25,10 +25,10 @@ using lib::Out;
 // Reads one document, saying on which line anything is wrong.
 class Parser final {
  public:
-  auto parse(std::string_view text) -> std::expected<RoadNetwork, lib::Status> {
+  auto parse(std::string_view text) -> std::expected<road::Map, lib::Status> {
     RETURN_IF_UNEXPECTED(document_.load(std::string{text}));
     RETURN_OR_ASSIGN(pugi::xml_node root, document_.find_root("OpenDRIVE"));
-    RoadNetwork network;
+    road::Map network;
     for (pugi::xml_node node : root.children("road")) {
       RETURN_OR_ASSIGN(Road road, read_road(node));
       network.roads.push_back(std::move(road));
@@ -60,12 +60,12 @@ class Parser final {
   }
 
   auto read_contact(pugi::xml_node node, std::string_view value) const
-      -> std::expected<RoadLink::Contact, lib::Status> {
+      -> std::expected<road::Link::Contact, lib::Status> {
     if (value == "start") {
-      return RoadLink::Contact::START;
+      return road::Link::Contact::START;
     }
     if (value == "end") {
-      return RoadLink::Contact::END;
+      return road::Link::Contact::END;
     }
     return fail(node, "contactPoint `" + std::string{value} +
                           "` is neither start nor end");
@@ -73,8 +73,8 @@ class Parser final {
 
   // The road link `node` describes, or none if there is no node.
   auto read_road_link(pugi::xml_node node) const
-      -> std::expected<RoadLink, lib::Status> {
-    RoadLink link;
+      -> std::expected<road::Link, lib::Status> {
+    road::Link link;
     if (!node) {
       return link;
     }
@@ -84,12 +84,12 @@ class Parser final {
       return fail(node, "needs elementId");
     }
     if (kind == "road") {
-      link.kind = RoadLink::Kind::ROAD;
+      link.kind = road::Link::Kind::ROAD;
       RETURN_OR_ASSIGN(
           link.contact,
           read_contact(node, node.attribute("contactPoint").as_string()));
     } else if (kind == "junction") {
-      link.kind = RoadLink::Kind::JUNCTION;
+      link.kind = road::Link::Kind::JUNCTION;
     } else {
       return fail(node, "elementType `" + std::string{kind} +
                             "` is neither road nor junction");
@@ -198,16 +198,16 @@ class Parser final {
   }
 
   auto read_orientation(pugi::xml_node node) const
-      -> std::expected<RoadDirection, lib::Status> {
+      -> std::expected<road::Direction, lib::Status> {
     std::string_view word = node.attribute("orientation").as_string("none");
     if (word == "+") {
-      return RoadDirection::POSITIVE;
+      return road::Direction::POSITIVE;
     }
     if (word == "-") {
-      return RoadDirection::NEGATIVE;
+      return road::Direction::NEGATIVE;
     }
     if (word == "none") {
-      return RoadDirection::BOTH;
+      return road::Direction::BOTH;
     }
     return fail(node,
                 "orientation `" + std::string{word} + "` is not +, - or none");
@@ -264,15 +264,15 @@ class Parser final {
   }
 
   auto read_outline(pugi::xml_node node) const
-      -> std::expected<RoadObject::Outline, lib::Status> {
-    RoadObject::Outline outline;
+      -> std::expected<road::Object::Outline, lib::Status> {
+    road::Object::Outline outline;
     outline.closed =
         node.attribute("closed").as_string("true") != std::string_view{"false"};
     bool road = false;
     bool local = false;
     for (pugi::xml_node corner_node : node.children()) {
       std::string_view kind = corner_node.name();
-      RoadObject::Corner corner;
+      road::Object::Corner corner;
       if (kind == "cornerRoad") {
         road = true;
         RETURN_OR_ASSIGN(corner.first, read_number(corner_node, "s"));
@@ -292,14 +292,14 @@ class Parser final {
     if (road && local) {
       return fail(node, "mixes cornerRoad and cornerLocal");
     }
-    outline.frame = local ? RoadObject::Outline::Frame::LOCAL
-                          : RoadObject::Outline::Frame::ROAD;
+    outline.frame = local ? road::Object::Outline::Frame::LOCAL
+                          : road::Object::Outline::Frame::ROAD;
     return outline;
   }
 
   auto read_object(pugi::xml_node node) const
-      -> std::expected<RoadObject, lib::Status> {
-    RoadObject object;
+      -> std::expected<road::Object, lib::Status> {
+    road::Object object;
     object.id = node.attribute("id").as_string();
     if (object.id.empty()) {
       return fail(node, "needs id");
@@ -322,7 +322,8 @@ class Parser final {
     pugi::xml_node outlines =
         node.child("outlines") ? node.child("outlines") : node;
     for (pugi::xml_node outline_node : outlines.children("outline")) {
-      RETURN_OR_ASSIGN(RoadObject::Outline outline, read_outline(outline_node));
+      RETURN_OR_ASSIGN(road::Object::Outline outline,
+                       read_outline(outline_node));
       object.outlines.push_back(std::move(outline));
     }
     RETURN_IF_UNEXPECTED(read_validities(node, InOut(object.validities)));
@@ -519,7 +520,7 @@ class Parser final {
     }
     for (pugi::xml_node object_node :
          node.child("objects").children("object")) {
-      RETURN_OR_ASSIGN(RoadObject object, read_object(object_node));
+      RETURN_OR_ASSIGN(road::Object object, read_object(object_node));
       road.objects.push_back(std::move(object));
     }
     return road;
@@ -531,12 +532,12 @@ class Parser final {
 }  // namespace
 
 auto parse_opendrive(std::string_view text)
-    -> std::expected<RoadNetwork, lib::Status> {
+    -> std::expected<road::Map, lib::Status> {
   return Parser{}.parse(text);
 }
 
 auto load_opendrive(const std::string& path)
-    -> std::expected<RoadNetwork, lib::Status> {
+    -> std::expected<road::Map, lib::Status> {
   RETURN_OR_ASSIGN(std::string text, read_text_file(path));
   return parse_opendrive(text);
 }

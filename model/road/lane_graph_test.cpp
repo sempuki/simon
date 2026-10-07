@@ -11,7 +11,7 @@ namespace simon::road {
 namespace {
 
 // A road with one lane each way, linked to its neighbors as given.
-auto road(std::string id, RoadLink predecessor, RoadLink successor) -> Road {
+auto road(std::string id, Link predecessor, Link successor) -> Road {
   return Road{
       .id = std::move(id),
       .length = 100.0,
@@ -23,9 +23,9 @@ auto road(std::string id, RoadLink predecessor, RoadLink successor) -> Road {
   };
 }
 
-auto to_road(std::string id, RoadLink::Contact contact) -> RoadLink {
-  return RoadLink{
-      .kind = RoadLink::Kind::ROAD, .id = std::move(id), .contact = contact};
+auto to_road(std::string id, Link::Contact contact) -> Link {
+  return Link{
+      .kind = Link::Kind::ROAD, .id = std::move(id), .contact = contact};
 }
 
 auto lanes(std::span<const LaneKey> keys) -> std::vector<LaneKey> {
@@ -37,11 +37,10 @@ auto lanes(std::span<const LaneKey> keys) -> std::vector<LaneKey> {
 TEST_CASE("LaneGraph") {
   SECTION("ShouldFollowTravelGivenRingOfTwoRoads") {
     // a's end meets b's start and b's end meets a's start.
-    RoadNetwork network{
-        .roads = {road("a", to_road("b", RoadLink::Contact::END),
-                       to_road("b", RoadLink::Contact::START)),
-                  road("b", to_road("a", RoadLink::Contact::END),
-                       to_road("a", RoadLink::Contact::START))}};
+    Map network{.roads = {road("a", to_road("b", Link::Contact::END),
+                               to_road("b", Link::Contact::START)),
+                          road("b", to_road("a", Link::Contact::END),
+                               to_road("a", Link::Contact::START))}};
     LaneGraph graph = build_lane_graph(network);
     // Right lanes run with s, from a into b; left lanes against it, into the
     // road before.
@@ -58,14 +57,14 @@ TEST_CASE("LaneGraph") {
   }
 
   SECTION("ShouldEnterConnectingRoadGivenJunction") {
-    RoadNetwork network{
-        .roads = {road("in", {}, {.kind = RoadLink::Kind::JUNCTION, .id = "j"}),
+    Map network{
+        .roads = {road("in", {}, {.kind = Link::Kind::JUNCTION, .id = "j"}),
                   road("through", {}, {})},
         .junctions = {Junction{.id = "j",
                                .connections = {JunctionConnection{
                                    .incoming_road = "in",
                                    .connecting_road = "through",
-                                   .contact = RoadLink::Contact::START,
+                                   .contact = Link::Contact::START,
                                    .lane_links = {{.from = -1, .to = -1},
                                                   {.from = -9, .to = -1}}}}}}};
     LaneGraph graph = build_lane_graph(network);

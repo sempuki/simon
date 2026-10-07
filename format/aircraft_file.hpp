@@ -16,10 +16,10 @@ namespace simon::format {
 
 // Reads the aircraft that `text` describes.
 auto parse_aircraft(std::string_view text)
-    -> std::expected<aircraft::AircraftData, lib::Status>;
+    -> std::expected<aircraft::Definition, lib::Status>;
 
 // Reads the aircraft in the file at `path`.
 auto load_aircraft(const std::string& path)
-    -> std::expected<aircraft::AircraftData, lib::Status>;
+    -> std::expected<aircraft::Definition, lib::Status>;
 
 }  // namespace simon::format

@@ -99,7 +99,7 @@ auto solve_kepler_orbit(double a, double e, double mu, double time)
 
 // Two bodies on a Kepler orbit about their center of mass, at pericenter.
 auto make_binary(double a, double e, double m1, double m2) -> Scenario {
-  double mu = gravity::GRAVITATIONAL_CONSTANT * (m1 + m2);
+  double mu = gravity::CONSTANT * (m1 + m2);
   OrbitState relative = solve_kepler_orbit(a, e, mu, 0.0);
   double share1 = -m2 / (m1 + m2);
   double share2 = m1 / (m1 + m2);
@@ -199,7 +199,7 @@ TEST_CASE("Leapfrog") {
   const double e = 0.5;
   const double m1 = 1e11 * SOLAR_MASS.numerical_value_in(kilogram);
   const double m2 = 1e9 * SOLAR_MASS.numerical_value_in(kilogram);
-  const double mu = gravity::GRAVITATIONAL_CONSTANT * (m1 + m2);
+  const double mu = gravity::CONSTANT * (m1 + m2);
   const double period = 2.0 * std::numbers::pi * std::sqrt(a * a * a / mu);
   const Scenario binary = make_binary(a, e, m1, m2);
 

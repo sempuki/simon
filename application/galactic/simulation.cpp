@@ -186,7 +186,7 @@ namespace {
 
 // Every body's position, velocity and mass, in store order. SI.
 struct Sample final {
-  std::vector<gravity::GravitySource> sources;
+  std::vector<gravity::Source> sources;
   std::vector<Vector3> velocities;
 };
 
@@ -196,7 +196,7 @@ auto collect_sample(const World& world) -> Sample {
       [&](Entity entity, const PointMass& point) {
         const Kinematics& kinematics =
             world.store_of<Kinematics>().component_of(entity);
-        sample.sources.push_back(gravity::GravitySource{
+        sample.sources.push_back(gravity::Source{
             .position = kinematics.position.numerical_value_in(meter).eigen(),
             .mass = point.mass.numerical_value_in(kilogram),
             .id = entity.index});
@@ -213,7 +213,7 @@ auto measure_mechanics(const World& world, Length softening) -> Mechanics {
   Mechanics mechanics;
   double mass = 0.0;
   for (std::size_t i = 0; i < sample.sources.size(); ++i) {
-    const gravity::GravitySource& body = sample.sources[i];
+    const gravity::Source& body = sample.sources[i];
     const Vector3& velocity = sample.velocities[i];
     mechanics.kinetic += 0.5 * body.mass * velocity.squaredNorm();
     mechanics.momentum += body.mass * velocity;
@@ -232,14 +232,14 @@ auto compute_mass_radii(const World& world, std::span<const double> fractions)
   Sample sample = collect_sample(world);
   Vector3 center = Vector3::Zero();
   double mass = 0.0;
-  for (const gravity::GravitySource& body : sample.sources) {
+  for (const gravity::Source& body : sample.sources) {
     center += body.mass * body.position;
     mass += body.mass;
   }
   center /= mass;
 
   std::vector<std::pair<double, double>> radii;  // Radius, mass.
-  for (const gravity::GravitySource& body : sample.sources) {
+  for (const gravity::Source& body : sample.sources) {
     radii.emplace_back((body.position - center).norm(), body.mass);
   }
   std::ranges::sort(radii);

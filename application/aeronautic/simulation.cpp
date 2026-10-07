@@ -93,7 +93,7 @@ Simulation::Simulation(Scenario scenario)
           Fly{}, Precise{}, DriftWithWind{}, FlySurfaces{}, RunFlightControls{},
           RunEngines{}, Rigid{}, BurnFuel{}, FollowRigidBody{}}} {}
 
-auto trim_in_cruise(const aircraft::AircraftData& data,
+auto trim_in_cruise(const aircraft::Definition& data,
                     const aircraft::Earth& earth, Length altitude, Speed speed)
     -> std::expected<aircraft::Trim, framework::Status> {
   aircraft::FlightCondition condition{
@@ -104,7 +104,7 @@ auto trim_in_cruise(const aircraft::AircraftData& data,
   return aircraft::trim(data, condition, earth, earth::StandardAirTable{});
 }
 
-auto create_rigid_aircraft(const aircraft::AircraftData& data,
+auto create_rigid_aircraft(const aircraft::Definition& data,
                            const aircraft::Earth& earth,
                            const aircraft::Trim& trim,
                            const SurfaceGains& gains, Length x, Length y,
@@ -246,14 +246,14 @@ auto build_scenario(const Scenario& scenario, const RigidTypes& types,
 
 auto Simulation::configure() -> engine::PhaseResult {
   if (scenario_.rigid > 0) {
-    RETURN_OR_ASSIGN(aircraft::AircraftData loaded,
+    RETURN_OR_ASSIGN(aircraft::Definition loaded,
                      format::load_aircraft(scenario_.rigid_aircraft));
-    airliner_ = std::make_unique<aircraft::AircraftData>(std::move(loaded));
+    airliner_ = std::make_unique<aircraft::Definition>(std::move(loaded));
   }
   if (scenario_.fighters > 0) {
-    RETURN_OR_ASSIGN(aircraft::AircraftData loaded,
+    RETURN_OR_ASSIGN(aircraft::Definition loaded,
                      format::load_aircraft(scenario_.fighter_aircraft));
-    fighter_ = std::make_unique<aircraft::AircraftData>(std::move(loaded));
+    fighter_ = std::make_unique<aircraft::Definition>(std::move(loaded));
   }
   RETURN_IF_UNEXPECTED(build_world(scenario_, Out(world_)));
   RETURN_IF_UNEXPECTED(build_scenario(

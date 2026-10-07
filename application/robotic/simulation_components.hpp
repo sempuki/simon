@@ -38,9 +38,9 @@ using TreeDynamics = articulated::TreeDynamics<Capacity>;
 // the systems. It outlives the world and never moves.
 class Mechanics final {
  public:
-  explicit Mechanics(articulated::ArticulatedModel model);
+  explicit Mechanics(articulated::Scene model);
 
-  auto model() const -> const articulated::ArticulatedModel& { return model_; }
+  auto model() const -> const articulated::Scene& { return model_; }
   auto trees() const -> const std::vector<articulated::Tree>& { return trees_; }
 
   // Whether tree `tree` fits a capacity.
@@ -93,7 +93,7 @@ class Mechanics final {
   }
 
  private:
-  articulated::ArticulatedModel model_;
+  articulated::Scene model_;
   std::vector<articulated::Tree> trees_;
   articulated::BodyFilter filter_;
   std::vector<double> radii_;

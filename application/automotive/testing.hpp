@@ -98,15 +98,14 @@ inline auto number(const Row& row, std::string_view column) -> double {
 
 // CommonRoad's vehicles 1, 2 and 3 by number, every parameter from
 // commonroad_vehicles.csv.
-inline auto load_commonroad_vehicles()
-    -> std::map<int, vehicle::VehicleParameters> {
+inline auto load_commonroad_vehicles() -> std::map<int, vehicle::Parameters> {
   using namespace vehicle;
   std::map<int, std::map<std::string, double, std::less<>>> values;
   for (const Row& row : load_rows("commonroad_vehicles.csv")) {
     values[static_cast<int>(number(row, "vehicle"))][row.find("name")->second] =
         number(row, "value");
   }
-  std::map<int, VehicleParameters> vehicles;
+  std::map<int, vehicle::Parameters> vehicles;
   for (const auto& [id, named] : values) {
     auto at = [&](std::string_view name) {
       auto found = named.find(name);
@@ -145,7 +144,7 @@ inline auto load_commonroad_vehicles()
                         .r_vy4 = at("tire_r_vy4"),
                         .r_vy5 = at("tire_r_vy5"),
                         .r_vy6 = at("tire_r_vy6")};
-    vehicles[id] = VehicleParameters{
+    vehicles[id] = vehicle::Parameters{
         .length = at("l") * meter,
         .width = at("w") * meter,
         .front = at("a") * meter,

@@ -24,7 +24,7 @@
 namespace simon::articulated {
 
 // A geom's pose in the world.
-struct GeomFrame final {
+struct GeometryFrame final {
   Vector3 pos = Vector3::Zero();
   Matrix3 mat = Matrix3::Identity();
 };
@@ -58,11 +58,11 @@ struct Contact final {
 inline constexpr std::size_t MAX_PAIR_CONTACTS = 12;
 
 // Whether a primitive collider handles geoms of these types, the first no
-// later than the second in GeomType.
-auto has_collider(GeomType first, GeomType second) -> bool;
+// later than the second in GeometryType.
+auto has_collider(GeometryType first, GeometryType second) -> bool;
 
 // A geom's bounding sphere's radius, zero for a plane (mjCGeom::GetRBound).
-auto compute_bounding_radius(const Geom& geom) -> double;
+auto compute_bounding_radius(const Geometry& geom) -> double;
 
 // A body's frame and inertial frame in the world.
 struct BodyFrame final {
@@ -75,20 +75,22 @@ struct BodyFrame final {
 
 // A geom's pose from its body's, or the frame it is snapped to
 // (mj_local2Global).
-auto compute_geom_frame(const Geom& geom, const BodyFrame& body) -> GeomFrame;
+auto compute_geom_frame(const Geometry& geom, const BodyFrame& body)
+    -> GeometryFrame;
 
 // The contacts of two geoms within `margin`, the first's type no later than
 // the second's; writes at most MAX_PAIR_CONTACTS and returns how many.
-auto collide(const Geom& first, const GeomFrame& first_frame,
-             const Geom& second, const GeomFrame& second_frame, double margin,
-             std::span<PreContact, MAX_PAIR_CONTACTS> out) -> std::uint32_t;
+auto collide(const Geometry& first, const GeometryFrame& first_frame,
+             const Geometry& second, const GeometryFrame& second_frame,
+             double margin, std::span<PreContact, MAX_PAIR_CONTACTS> out)
+    -> std::uint32_t;
 
 // Which pairs of bodies MuJoCo lets touch: never two on one rigid assembly
 // (a body without joints is welded to its parent), never two that cannot
 // move, never an assembly and its parent's (mj_broadphase, filterBodyPair).
 class BodyFilter final {
  public:
-  explicit BodyFilter(const ArticulatedModel& model);
+  explicit BodyFilter(const Scene& model);
 
   auto discards(std::uint32_t first, std::uint32_t second) const -> bool;
 
@@ -103,8 +105,9 @@ class BodyFilter final {
 // filterCollisionPair, mj_narrowphase, mj_contactParam and mj_setContact):
 // their types and affinities must match and their bounding spheres overlap
 // within the margin and gap, then the collider runs with the lower type first.
-auto append_contacts(const ArticulatedModel& model, std::uint32_t first,
-                     std::uint32_t second, std::span<const GeomFrame> frames,
+auto append_contacts(const Scene& model, std::uint32_t first,
+                     std::uint32_t second,
+                     std::span<const GeometryFrame> frames,
                      std::span<const double> radii,
                      InOut<std::vector<Contact>> out) -> void;
 

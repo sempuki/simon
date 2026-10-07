@@ -95,8 +95,8 @@ class WalkingGraph final {
   auto find_components() const -> std::vector<std::uint32_t>;
 
  private:
-  friend auto build_walking_graph(const RoadNetwork& network,
-                                  double corner_reach) -> WalkingGraph;
+  friend auto build_walking_graph(const Map& network, double corner_reach)
+      -> WalkingGraph;
 
   std::vector<WalkPoint> nodes_;
   std::vector<WalkEdge> edges_;
@@ -115,7 +115,7 @@ class WalkingGraph final {
 // line crosses no driving lane. Ends within 0.5 m are one node. Each
 // crosswalk's zone is on every driving lane between its sidewalks, its depth
 // its object's length, 3 m if it has none.
-auto build_walking_graph(const RoadNetwork& network, double corner_reach = 25.0)
+auto build_walking_graph(const Map& network, double corner_reach = 25.0)
     -> WalkingGraph;
 
 }  // namespace simon::road
