@@ -14,7 +14,6 @@
 #include "base/core.hpp"
 #include "framework/system.hpp"
 #include "model/guidance.hpp"
-#include "model/motion.hpp"
 
 namespace simon::defense {
 
@@ -483,6 +482,23 @@ struct SteerRedDrones final     //
   }
 };
 
+//-- Motion -------------------------------------------------------------------
+
+// Moves each entity under its Control by the midpoint rule. Entities
+// without a Control coast.
+struct Integrate final    //
+    : System<Kinematics,  //
+             const Control> {
+  auto operator()(auto&, Entity,           //
+                  Kinematics& kinematics,  //
+                  const Control* control,  //
+                  Step step) const -> void {
+    model::integrate_midpoint(
+        control ? control->acceleration : meters_per_second_squared(0, 0, 0),
+        seconds(step.dt), InOut(kinematics));
+  }
+};
+
 //-- Blasts -------------------------------------------------------------------
 
 // A warhead within its fuse distance of its target detonates: it creates a
@@ -496,7 +512,7 @@ struct TriggerWarheads final    //
              const Kinematics,  //
              const Target> {
   using SystemWorld = ProjectedWorld<TriggerWarheads>;
-  using SequenceAfterSystemList = SystemList<model::Integrate>;
+  using SequenceAfterSystemList = SystemList<Integrate>;
   using AllowComponentList = TypeList<Kinematics>;
 
   auto operator()(SystemWorld& world, Entity self,  //
@@ -592,7 +608,7 @@ using Blasts = SystemList<TriggerWarheads, ApplyBlasts, ExpireBlasts>;
 //-- Schedule -----------------------------------------------------------------
 
 using Schedule = SystemList<Sensing, Engaging, GuideInterceptors,
-                            SteerRedDrones, model::Motion, Blasts>;
+                            SteerRedDrones, Integrate, Blasts>;
 using Scheduler = framework::Scheduler<World, Schedule>;
 
 }  // namespace simon::defense

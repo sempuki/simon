@@ -1064,22 +1064,15 @@ lambdas with captures cannot be default-constructed. Schedules of
 default-constructible systems need no value:
 
 ```cpp
-framework::Scheduler<World, SystemList<ApplyForces, model::Motion>> scheduler;   // Structs only.
+framework::Scheduler<World, SystemList<ApplyForces, Integrate>> scheduler;   // Structs only.
 
-auto schedule = SystemList{count, SystemList<ApplyForces, model::Motion>{}, guide};
+auto schedule = SystemList{count, SystemList<ApplyForces, Integrate>{}, guide};
 framework::Scheduler<World, decltype(schedule)> scheduler{schedule};         // With lambdas.
 ```
 
 Schedules compose:
 
 ```cpp
-// model/motion.hpp
-using Motion = framework::SystemList<Integrate>;
-
-// application/hello
-using Schedule =
-    framework::SystemList<model::Motion, DetectContacts, ApplyContacts>;
-
 // application/defense
 using Sensing =
     SystemList<ScanRadars, DetectDrones, UpdateTracks, DropStaleTracks>;
@@ -1087,7 +1080,7 @@ using Engaging =
     SystemList<ProposeEngagements, ResolveEngagements, LaunchInterceptors>;
 using Blasts = SystemList<TriggerWarheads, ApplyBlasts, ExpireBlasts>;
 using Schedule = SystemList<Sensing, Engaging, GuideInterceptors,
-                            SteerRedDrones, model::Motion, Blasts>;
+                            SteerRedDrones, Integrate, Blasts>;
 ```
 
 - **Nested schedules flatten** at compile time into one list.
@@ -2171,8 +2164,7 @@ needs a parser, errors and a policy for what it refuses, and the scenario
 player keeps a storyboard's states from step to step. `core/` depends on
 nothing in simon, `framework/` and `model/` on `core/`, `scenario/` on
 `model/`, `format/` on both, and the applications on all of them. Systems
-belong to the applications; the one model file that is still a system
-(motion, shared by hello and defense) depends on `framework/` as well.
+belong to the applications, so nothing in `model/` depends on `framework/`.
 
 ## Applications
 

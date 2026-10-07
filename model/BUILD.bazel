@@ -20,16 +20,6 @@ cc_library(
 )
 
 
-cc_library(
-    name = "motion",
-    hdrs = ["motion.hpp"],
-    copts = COPTS,
-    deps = [
-        "//core:vocabulary",
-        ":kinematics",
-        "//framework",
-    ],
-)
 
 
 cc_test(

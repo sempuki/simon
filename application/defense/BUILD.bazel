@@ -24,7 +24,6 @@ cc_library(
         "//framework",
         "//model:guidance",
         "//model:kinematics",
-        "//model:motion",
         "//core:random",
         "//core:units",
         "@lib//base:core",

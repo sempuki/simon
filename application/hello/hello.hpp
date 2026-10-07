@@ -14,7 +14,6 @@
 #include "framework/system.hpp"
 #include "framework/world.hpp"
 #include "model/kinematics.hpp"
-#include "model/motion.hpp"
 
 // Balls bouncing off each other and the walls of a box, under gravity: the
 // smallest complete use of the architecture.
@@ -76,6 +75,21 @@ auto append_wall_contacts(const Springiness& springiness, const Box& box,
                           const Body& body, const Kinematics& kinematics,
                           InOut<Contact> contact) -> void;
 
+// Moves each entity under its Control by the midpoint rule. Entities
+// without a Control coast.
+struct Integrate final               //
+    : framework::System<Kinematics,  //
+                        const Control> {
+  auto operator()(auto&, Entity,           //
+                  Kinematics& kinematics,  //
+                  const Control* control,  //
+                  Step step) const -> void {
+    model::integrate_midpoint(
+        control ? control->acceleration : meters_per_second_squared(0, 0, 0),
+        seconds(step.dt), InOut(kinematics));
+  }
+};
+
 // Each ball finds the balls it touches through a spatial query, and sums
 // their forces and the walls' on it into its own Contact. It writes nothing
 // else, and every ball reads the same positions and velocities, so each pair's
@@ -85,7 +99,7 @@ struct DetectContacts final          //
                         const Body,  //
                         const Kinematics> {
   using AllowComponentList = framework::TypeList<Kinematics, Body>;
-  using SequenceAfterSystemList = framework::SystemList<model::Integrate>;
+  using SequenceAfterSystemList = framework::SystemList<Integrate>;
 
   auto prepare(auto& world) -> void {
     largest_radius = 0.0 * meter;
@@ -137,7 +151,7 @@ struct ApplyContacts final              //
 };
 
 using Schedule =
-    framework::SystemList<model::Motion, DetectContacts, ApplyContacts>;
+    framework::SystemList<Integrate, DetectContacts, ApplyContacts>;
 using Scheduler = framework::Scheduler<World, Schedule>;
 
 //-- Scenario ------------------------------------------------------------------

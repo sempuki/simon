@@ -4,7 +4,7 @@ Balls bouncing off each other and the walls of a box, under gravity. It is
 the smallest complete use of the architecture: four components, an archetype,
 a schedule of three systems, a scenario, a headless runner and a viewer.
 
-Each step, `model::Integrate` moves every ball under gravity.
+Each step, `Integrate` moves every ball under gravity.
 `DetectContacts` then has each ball find the balls it touches through the
 world's spatial query and sum their forces, and the walls', into its own
 `Contact`. `ApplyContacts` then has each ball take that force. A system
