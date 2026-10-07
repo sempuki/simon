@@ -323,13 +323,14 @@ auto find_lane(const Road& road, Length s, Length t) -> std::optional<int>;
 
 // Road coordinates in the plane: s along the reference line and t along its
 // normal.
-struct Coordinates final {
+struct RoadCoordinates final {
   Length s = 0.0 * meter;
   Length t = 0.0 * meter;
 };
 
 // The road coordinates of (`x`, `y`): the s on the reference line nearest it,
 // where the line's normal passes through it, and the t along that normal.
-auto find_coordinates(const Road& road, Length x, Length y) -> Coordinates;
+auto find_road_coordinates(const Road& road, Length x, Length y)
+    -> RoadCoordinates;
 
 }  // namespace simon::road

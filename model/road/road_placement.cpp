@@ -207,7 +207,7 @@ auto find_placement(const Map& network, double x, double y, double heading,
   // Road `i`'s lane holding (x, y), if one does.
   auto place_on = [&](std::size_t i) -> std::optional<Placement> {
     const Road& road = network.roads[i];
-    Coordinates at = find_coordinates(road, x * meter, y * meter);
+    RoadCoordinates at = find_road_coordinates(road, x * meter, y * meter);
     double s = at.s.numerical_value_in(meter);
     double t = at.t.numerical_value_in(meter);
     if (s < 0.0 || s > road.length) {

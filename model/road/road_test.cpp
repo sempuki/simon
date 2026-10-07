@@ -196,8 +196,8 @@ TEST_CASE("Road") {
         CAPTURE(s, t);
         Vector3 at =
             convert_to_meters(compute_position(road, s * meter, t * meter));
-        Coordinates found =
-            find_coordinates(road, at.x() * meter, at.y() * meter);
+        RoadCoordinates found =
+            find_road_coordinates(road, at.x() * meter, at.y() * meter);
         CHECK_THAT(found.s.numerical_value_in(meter), WithinAbs(s, 1e-9));
         CHECK_THAT(found.t.numerical_value_in(meter), WithinAbs(t, 1e-9));
       }

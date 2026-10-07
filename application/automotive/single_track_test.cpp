@@ -71,8 +71,8 @@ struct Apart final {
 // Drives `vehicle` from the script's start for 20 s at steps of `dt` seconds
 // by classic Runge-Kutta 4, the inputs held over each step, and returns the
 // state every 0.1 s.
-auto drive(const vehicle::Parameters& vehicle, std::chrono::microseconds dt)
-    -> std::vector<KinematicSingleTrack> {
+auto drive(const vehicle::VehicleParameters& vehicle,
+           std::chrono::microseconds dt) -> std::vector<KinematicSingleTrack> {
   KinematicSingleTrack state{.speed = 10.0 * meter_per_second,
                              .heading = 0.3 * radian};
   std::vector<KinematicSingleTrack> path{state};
@@ -100,14 +100,14 @@ auto drive(const vehicle::Parameters& vehicle, std::chrono::microseconds dt)
 }  // namespace
 
 TEST_CASE("KinematicSingleTrackAgainstCommonRoad") {
-  std::map<int, vehicle::Parameters> by_id = load_commonroad_vehicles();
+  std::map<int, vehicle::VehicleParameters> by_id = load_commonroad_vehicles();
   REQUIRE(by_id.size() == 3);
 
   SECTION("ShouldMatchRatesGivenStatesOnAndPastLimits") {
     double largest = 0.0;
     int rows = 0;
     for (const Row& row : load_rows("commonroad_rates.csv")) {
-      const vehicle::Parameters& vehicle =
+      const vehicle::VehicleParameters& vehicle =
           by_id.at(static_cast<int>(number(row, "vehicle")));
       KinematicSingleTrackRate rate =
           vehicle::compute_kinematic_single_track_rate(

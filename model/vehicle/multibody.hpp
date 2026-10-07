@@ -119,7 +119,8 @@ auto advance(const Multibody& state, const MultibodyRate& rate, Duration dt)
 
 // The multibody state straight ahead at `speed`, its wheels rolling and its
 // suspension at rest (CommonRoad's init_mb).
-auto start_multibody(Speed speed, const Parameters& vehicle) -> Multibody;
+auto start_multibody(Speed speed, const VehicleParameters& vehicle)
+    -> Multibody;
 
 // Each wheel's steer beyond the steering, positive to the right as the
 // model's axes have it: its toe, and how a suspension's kinematics steer it
@@ -137,7 +138,7 @@ struct WheelSteer final {
 // and their wheels, and a wheel spinning backward stops. A Magic Formula
 // tire is mirrored on the right (see model/tire.hpp).
 auto compute_multibody_rate(const Multibody& state, const Input& input,
-                            const Parameters& vehicle,
+                            const VehicleParameters& vehicle,
                             const WheelSteer& toe = {}) -> MultibodyRate;
 
 }  // namespace simon::vehicle

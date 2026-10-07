@@ -905,7 +905,7 @@ auto StoryboardPlayer::compute_road_gap(std::size_t from, std::size_t to,
       double sn = std::sin(pose.heading);
       double x = pose.x + c * corners[i][0] - sn * corners[i][1];
       double y = pose.y + sn * corners[i][0] + c * corners[i][1];
-      s[i] = road::find_coordinates(road, x * meter, y * meter)
+      s[i] = road::find_road_coordinates(road, x * meter, y * meter)
                  .s.numerical_value_in(meter);
     }
     return s;

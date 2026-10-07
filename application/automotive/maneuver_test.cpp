@@ -69,7 +69,7 @@ auto load_maneuvers() -> std::map<std::string, std::vector<Sample>> {
 // tire's and the axle's, front and rear averaged; its brakes, even front to
 // rear, and its front-wheel drive; and its Magic Formula tire. Its steering
 // and acceleration are left unbounded, as Chrono steers the wheels.
-auto load_sedan() -> vehicle::Parameters {
+auto load_sedan() -> vehicle::VehicleParameters {
   std::map<std::string, double, std::less<>> value;
   for (const Row& row : load_rows("chrono_sedan.csv")) {
     value[row.find("name")->second] = number(row, "value");
@@ -93,7 +93,7 @@ auto load_sedan() -> vehicle::Parameters {
     (*tire).*camber = 0.0;
   }
   double com = value.at("com_x");
-  vehicle::Parameters sedan{
+  vehicle::VehicleParameters sedan{
       .front = (value.at("front_left_x") - com) * meter,
       .rear = (com - value.at("rear_left_x")) * meter,
       .sprung_height = 0.411 * meter,
@@ -119,8 +119,8 @@ auto load_sedan() -> vehicle::Parameters {
 // axle's roll stiffness beyond its springs, less the tires' vertical
 // compliance; and each axle's roll center, from the load it transfers
 // beyond its roll stiffness's share.
-auto load_sedan_multibody() -> vehicle::Parameters {
-  vehicle::Parameters sedan = load_sedan();
+auto load_sedan_multibody() -> vehicle::VehicleParameters {
+  vehicle::VehicleParameters sedan = load_sedan();
   std::map<std::string, double, std::less<>> value;
   for (const Row& row : load_rows("chrono_sedan.csv")) {
     value[row.find("name")->second] = number(row, "value");
@@ -169,7 +169,7 @@ auto load_sedan_multibody() -> vehicle::Parameters {
 struct DriftModel final {
   using State = DriftSingleTrack;
 
-  static auto start(const Sample& at, const vehicle::Parameters& vehicle)
+  static auto start(const Sample& at, const vehicle::VehicleParameters& vehicle)
       -> State {
     State state = vehicle::start_drift_single_track(
         std::hypot(at.speed, at.lateral) * meter_per_second, vehicle);
@@ -179,7 +179,8 @@ struct DriftModel final {
     return state;
   }
   static auto compute_rate(const State& state, const vehicle::Input& input,
-                           const vehicle::Parameters& vehicle, const Sample&) {
+                           const vehicle::VehicleParameters& vehicle,
+                           const Sample&) {
     return vehicle::compute_drift_single_track_rate(state, input, vehicle);
   }
   static auto steering_of(const Sample& sample) -> double {
@@ -207,7 +208,7 @@ template <bool TOE>
 struct MultibodyModel final {
   using State = vehicle::Multibody;
 
-  static auto start(const Sample& at, const vehicle::Parameters& vehicle)
+  static auto start(const Sample& at, const vehicle::VehicleParameters& vehicle)
       -> State {
     State state =
         vehicle::start_multibody(at.speed * meter_per_second, vehicle);
@@ -217,7 +218,7 @@ struct MultibodyModel final {
     return state;
   }
   static auto compute_rate(const State& state, const vehicle::Input& input,
-                           const vehicle::Parameters& vehicle,
+                           const vehicle::VehicleParameters& vehicle,
                            const Sample& chrono) {
     vehicle::WheelSteer toe;
     if (TOE) {
@@ -249,7 +250,7 @@ struct MultibodyModel final {
 // Chrono's speed along x by its acceleration and a gain of 2 per second, by
 // classic Runge-Kutta 4 at 1 ms.
 template <typename Model>
-auto drive(const vehicle::Parameters& vehicle,
+auto drive(const vehicle::VehicleParameters& vehicle,
            const std::vector<Sample>& chrono, double start)
     -> std::vector<Sample> {
   constexpr int SUBSTEPS = 10;
@@ -402,7 +403,7 @@ auto measure(const std::map<std::string, std::vector<Sample>>& paths,
 }
 
 template <typename Model>
-auto drive_all(const vehicle::Parameters& vehicle,
+auto drive_all(const vehicle::VehicleParameters& vehicle,
                const std::map<std::string, std::vector<Sample>>& chrono)
     -> std::map<std::string, std::vector<Sample>> {
   std::map<std::string, std::vector<Sample>> paths;
@@ -433,8 +434,8 @@ auto capture(const Comparison& theirs, const Comparison& ours) -> void {
 
 TEST_CASE("ManeuversAgainstChronoSedan") {
   std::map<std::string, std::vector<Sample>> chrono = load_maneuvers();
-  vehicle::Parameters sedan = load_sedan();
-  vehicle::Parameters multibody = load_sedan_multibody();
+  vehicle::VehicleParameters sedan = load_sedan();
+  vehicle::VehicleParameters multibody = load_sedan_multibody();
   Comparison theirs =
       measure(chrono, sedan.wheelbase().numerical_value_in(meter));
 

@@ -254,8 +254,9 @@ auto fly(const Checked& checked, Case flown, Duration dt,
   FuelTanks tanks = trimmed_tanks(data, trim);
   MassBalance mass = aircraft::compute_mass_balance(data, tanks);
   BodyAcceleration felt;
-  aircraft::compute_rigid_rate(body, signals, engines, mass, data, earth, air,
-                               Wind{}, 0.0 * second, Out(felt));
+  aircraft::compute_rigid_aircraft_rate(body, signals, engines, mass, data,
+                                        earth, air, Wind{}, 0.0 * second,
+                                        Out(felt));
   auto aircraft = world.create<archetype::RigidAircraftInWind>()
                       .with(earth.air_state(body, 0.0 * second))
                       .with(body)

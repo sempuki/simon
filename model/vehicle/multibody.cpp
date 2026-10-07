@@ -21,8 +21,8 @@ constexpr double GRAVITY = 9.81;  // m/s^2, as CommonRoad has it.
 constexpr double CRAWL = 0.1;  // m/s.
 
 auto compute_rate_numbers(const MultibodyNumbers& x, double u0, double u1,
-                          const WheelSteer& toe, const Parameters& vehicle)
-    -> MultibodyNumbers;
+                          const WheelSteer& toe,
+                          const VehicleParameters& vehicle) -> MultibodyNumbers;
 
 }  // namespace
 
@@ -211,7 +211,8 @@ auto advance(const Multibody& state, const MultibodyRate& rate, Duration dt)
   return convert_numbers_to_multibody(x);
 }
 
-auto start_multibody(Speed speed, const Parameters& vehicle) -> Multibody {
+auto start_multibody(Speed speed, const VehicleParameters& vehicle)
+    -> Multibody {
   double l = vehicle.wheelbase().numerical_value_in(meter);
   double k_zt =
       vehicle.suspension.tire_spring.numerical_value_in(newton_per_meter);
@@ -233,8 +234,8 @@ auto start_multibody(Speed speed, const Parameters& vehicle) -> Multibody {
 }
 
 auto compute_multibody_rate(const Multibody& state, const Input& input,
-                            const Parameters& vehicle, const WheelSteer& toe)
-    -> MultibodyRate {
+                            const VehicleParameters& vehicle,
+                            const WheelSteer& toe) -> MultibodyRate {
   Input limited = limit_input(input, state.steering, state.speed, vehicle);
   return convert_numbers_to_multibody_rate(compute_rate_numbers(
       convert_multibody_to_numbers(state),
@@ -252,7 +253,8 @@ namespace {
 // it, where CommonRoad divides by a speed that may be zero; and a tire off
 // the ground pushes nothing (see model/tire.hpp).
 auto compute_rate_numbers(const MultibodyNumbers& x, double u0, double u1,
-                          const WheelSteer& toe, const Parameters& vehicle)
+                          const WheelSteer& toe,
+                          const VehicleParameters& vehicle)
     -> MultibodyNumbers {
   const double g = GRAVITY;
   const Suspension& s = vehicle.suspension;

@@ -120,7 +120,7 @@ class Trimmer final {
       trim.engines =
           compute_settled_engines(aircraft_, trim.signals, engine_air);
       BodyAcceleration felt;
-      rate = aircraft::compute_rigid_rate(
+      rate = aircraft::compute_rigid_aircraft_rate(
           trim.body, trim.signals, trim.engines, trim.mass, aircraft_, earth_,
           air_, earth::Wind{}, 0.0 * second, Out(felt));
       double change =

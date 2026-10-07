@@ -355,11 +355,12 @@ auto find_lane(const Road& road, Length s, Length t) -> std::optional<int> {
 // method on (P - r(s)) . T(s) = 0, whose derivative is
 // -1 + k(s) (P - r(s)) . N(s), with T the tangent, N the normal and k the
 // curvature.
-auto find_coordinates(const Road& road, Length x, Length y) -> Coordinates {
+auto find_road_coordinates(const Road& road, Length x, Length y)
+    -> RoadCoordinates {
   double px = x.numerical_value_in(meter);
   double py = y.numerical_value_in(meter);
   double best_distance = std::numeric_limits<double>::infinity();
-  Coordinates best;
+  RoadCoordinates best;
   for (const PlanGeometry& geometry : road.plan) {
     auto apart = [&](const PlanPoint& point) {
       return Planar{px - point.x, py - point.y};
@@ -402,7 +403,7 @@ auto find_coordinates(const Road& road, Length x, Length y) -> Coordinates {
     double distance = std::hypot(d.x, d.y);
     if (distance < best_distance) {
       best_distance = distance;
-      best = Coordinates{
+      best = RoadCoordinates{
           .s = (geometry.s0 + ds) * meter,
           .t =
               (-d.x * std::sin(point.heading) + d.y * std::cos(point.heading)) *

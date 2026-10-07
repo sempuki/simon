@@ -56,7 +56,8 @@ struct DynamicModel final {
             .slip_angle = x[6] * radian};
   }
   static auto rate_numbers(const Numbers& x, const vehicle::Input& input,
-                           const vehicle::Parameters& vehicle) -> Numbers {
+                           const vehicle::VehicleParameters& vehicle)
+      -> Numbers {
     vehicle::DynamicSingleTrackRate f =
         vehicle::compute_dynamic_single_track_rate(state_of(x), input, vehicle);
     return {f.x.numerical_value_in(meter_per_second),
@@ -67,7 +68,7 @@ struct DynamicModel final {
             f.yaw_rate.numerical_value_in(radian_per_second_squared),
             f.slip_angle.numerical_value_in(radian_per_second)};
   }
-  static auto start(const vehicle::Parameters&) -> Numbers {
+  static auto start(const vehicle::VehicleParameters&) -> Numbers {
     return numbers_of(DynamicSingleTrack{.speed = 20.0 * meter_per_second});
   }
 };
@@ -96,7 +97,8 @@ struct DriftModel final {
             .rear_wheel = x[8] * radian_per_second};
   }
   static auto rate_numbers(const Numbers& x, const vehicle::Input& input,
-                           const vehicle::Parameters& vehicle) -> Numbers {
+                           const vehicle::VehicleParameters& vehicle)
+      -> Numbers {
     vehicle::DriftSingleTrackRate f =
         vehicle::compute_drift_single_track_rate(state_of(x), input, vehicle);
     return {f.x.numerical_value_in(meter_per_second),
@@ -109,7 +111,7 @@ struct DriftModel final {
             f.front_wheel.numerical_value_in(radian_per_second_squared),
             f.rear_wheel.numerical_value_in(radian_per_second_squared)};
   }
-  static auto start(const vehicle::Parameters& vehicle) -> Numbers {
+  static auto start(const vehicle::VehicleParameters& vehicle) -> Numbers {
     return numbers_of(
         vehicle::start_drift_single_track(20.0 * meter_per_second, vehicle));
   }
@@ -122,12 +124,13 @@ struct MultibodyModel final {
     return vehicle::convert_numbers_to_multibody(numbers);
   }
   static auto rate_numbers(const Numbers& x, const vehicle::Input& input,
-                           const vehicle::Parameters& vehicle) -> Numbers {
+                           const vehicle::VehicleParameters& vehicle)
+      -> Numbers {
     vehicle::MultibodyNumbers f = vehicle::convert_multibody_rate_to_numbers(
         vehicle::compute_multibody_rate(state_of(x), input, vehicle));
     return {f.begin(), f.end()};
   }
-  static auto start(const vehicle::Parameters& vehicle) -> Numbers {
+  static auto start(const vehicle::VehicleParameters& vehicle) -> Numbers {
     vehicle::MultibodyNumbers x = vehicle::convert_multibody_to_numbers(
         vehicle::start_multibody(20.0 * meter_per_second, vehicle));
     return {x.begin(), x.end()};
@@ -150,8 +153,8 @@ auto inputs(double t) -> vehicle::Input {
 // Runge-Kutta 4 on its numbers, the inputs held over each step, and returns
 // the state every 0.1 s.
 template <typename Model>
-auto drive(const vehicle::Parameters& vehicle, std::chrono::microseconds dt)
-    -> std::vector<Numbers> {
+auto drive(const vehicle::VehicleParameters& vehicle,
+           std::chrono::microseconds dt) -> std::vector<Numbers> {
   double h = std::chrono::duration<double>(dt).count();
   Numbers x = Model::start(vehicle);
   std::vector<Numbers> path{x};
@@ -188,7 +191,7 @@ auto drive(const vehicle::Parameters& vehicle, std::chrono::microseconds dt)
 // and CommonRoad's rate, over its rows of the rates table.
 template <typename Model>
 auto compare_rates(std::string_view name,
-                   const std::map<int, vehicle::Parameters>& vehicles,
+                   const std::map<int, vehicle::VehicleParameters>& vehicles,
                    const std::vector<std::vector<std::string>>& lines)
     -> std::pair<double, int> {
   double largest = 0.0;
@@ -197,7 +200,7 @@ auto compare_rates(std::string_view name,
     if (cells[0] != name) {
       continue;
     }
-    const vehicle::Parameters& vehicle =
+    const vehicle::VehicleParameters& vehicle =
         vehicles.at(static_cast<int>(parse_number(cells[1])));
     vehicle::Input input{
         .steering_rate = parse_number(cells[2]) * radian_per_second,
@@ -229,7 +232,7 @@ struct PathAgreement final {
 
 template <typename Model>
 auto compare_paths(std::string_view name, int id,
-                   const vehicle::Parameters& vehicle,
+                   const vehicle::VehicleParameters& vehicle,
                    const std::vector<std::vector<std::string>>& lines)
     -> PathAgreement {
   std::vector<Numbers> theirs;
@@ -312,7 +315,8 @@ TEST_CASE("TireAgainstCommonRoad") {
 }
 
 TEST_CASE("VehicleDynamicsAgainstCommonRoad") {
-  std::map<int, vehicle::Parameters> vehicles = load_commonroad_vehicles();
+  std::map<int, vehicle::VehicleParameters> vehicles =
+      load_commonroad_vehicles();
   REQUIRE(vehicles.size() == 3);
 
   SECTION("ShouldMatchRatesGivenStatesFromCrawlToFast") {
