@@ -62,14 +62,14 @@ struct TreeDynamics final {
   static constexpr std::size_t B = Capacity::bodies;
   static constexpr std::size_t V = Capacity::dofs;
 
-  std::array<Array3, B> xpos{};
+  std::array<Vector3, B> xpos{};
   std::array<Quaternion4, B> xquat{};
   std::array<Matrix3, B> xmat{};
-  std::array<Array3, B> xipos{};
+  std::array<Vector3, B> xipos{};
   std::array<Matrix3, B> ximat{};
-  std::array<Array3, V> xanchor{};  // By joint.
-  std::array<Array3, V> xaxis{};
-  Array3 com{};  // The tree's center of mass.
+  std::array<Vector3, V> xanchor{};  // By joint.
+  std::array<Vector3, V> xaxis{};
+  Vector3 com = Vector3::Zero();  // The tree's center of mass.
   std::array<Inertia10, B> cinert{};
   std::array<Spatial, V> cdof{};
   std::array<Spatial, V> cdof_dot{};
@@ -117,8 +117,8 @@ inline auto cross_force(const Spatial& vel, const Spatial& f) -> Spatial {
 
 // A body's inertia about a point `dif` from its center of mass, its axes
 // turned by `mat` (mju_inertCom).
-inline auto shift_inertia(const Array3& inert, const Matrix3& mat,
-                          const Array3& dif, double mass) -> Inertia10 {
+inline auto shift_inertia(const Vector3& inert, const Matrix3& mat,
+                          const Vector3& dif, double mass) -> Inertia10 {
   std::array<double, 9> t{
       mat[0] * inert[0], mat[3] * inert[0], mat[6] * inert[0],
       mat[1] * inert[1], mat[4] * inert[1], mat[7] * inert[1],
@@ -152,12 +152,12 @@ inline auto multiply(const Inertia10& i, const Spatial& v) -> Spatial {
 }
 
 // A rotation's motion about the center of mass, and a translation's.
-inline auto turn_about(const Array3& axis, const Array3& offset) -> Spatial {
-  Array3 c = cross(axis, offset);
+inline auto turn_about(const Vector3& axis, const Vector3& offset) -> Spatial {
+  Vector3 c = cross(axis, offset);
   return {axis[0], axis[1], axis[2], c[0], c[1], c[2]};
 }
 
-inline auto slide_along(const Array3& axis) -> Spatial {
+inline auto slide_along(const Vector3& axis) -> Spatial {
   return {0.0, 0.0, 0.0, axis[0], axis[1], axis[2]};
 }
 
@@ -183,9 +183,9 @@ inline auto combine(std::span<const Spatial> dofs, std::span<const double> w)
 
 // The quaternion turned by angular velocity `vel` for `scale`
 // (mju_quatIntegrate).
-inline auto integrate_quaternion(Quaternion4 q, const Array3& vel, double scale)
-    -> Quaternion4 {
-  Array3 axis = vel;
+inline auto integrate_quaternion(Quaternion4 q, const Vector3& vel,
+                                 double scale) -> Quaternion4 {
+  Vector3 axis = vel;
   double angle = scale * normalize3(InOut(axis));
   Quaternion4 turn = convert_axis_angle(axis, angle);
   normalize4(InOut(q));
@@ -200,8 +200,8 @@ inline auto integrate_quaternion(Quaternion4 q, const Array3& vel, double scale)
 inline auto compute_point_jacobian(const ArticulatedModel& model,
                                    const Tree& tree,
                                    std::span<const Spatial> cdof,
-                                   const Array3& com, std::uint32_t body,
-                                   const Array3& point,
+                                   const Vector3& com, std::uint32_t body,
+                                   const Vector3& point,
                                    std::span<double> translation,
                                    std::span<double> rotation) -> void {
   std::uint32_t n = tree.dofs;
@@ -214,12 +214,12 @@ inline auto compute_point_jacobian(const ArticulatedModel& model,
     return;
   }
   const ArticulatedBody& b = model.bodies[body];
-  Array3 offset{point[0] - com[0], point[1] - com[1], point[2] - com[2]};
+  Vector3 offset{point[0] - com[0], point[1] - com[1], point[2] - com[2]};
   for (std::uint32_t d = b.first_dof + b.dofs - 1; d != Dof::NONE;
        d = model.dofs[d].parent) {
     std::uint32_t c = d - tree.first_dof;
     const Spatial& s = cdof[c];
-    Array3 turn = articulated::cross({s[0], s[1], s[2]}, offset);
+    Vector3 turn = articulated::cross({s[0], s[1], s[2]}, offset);
     for (std::uint32_t k = 0; k < 3; ++k) {
       translation[k * n + c] = s[3 + k] + turn[k];
       rotation[k * n + c] = s[k];
@@ -423,12 +423,12 @@ class TreeKernel final {
     std::array<double, 9> iw{crb[0], crb[3], crb[4], crb[3], crb[1],
                              crb[5], crb[4], crb[5], crb[2]};
     const Matrix3& r = dynamics.xmat[0];
-    Array3 s{dynamics.com[0] - dynamics.xpos[0][0],
-             dynamics.com[1] - dynamics.xpos[0][1],
-             dynamics.com[2] - dynamics.xpos[0][2]};
-    Array3 w = multiply(r, Array3{qvel[3], qvel[4], qvel[5]});
-    Array3 ws = cross(w, s);
-    Array3 iww = multiply(iw, w);
+    Vector3 s{dynamics.com[0] - dynamics.xpos[0][0],
+              dynamics.com[1] - dynamics.xpos[0][1],
+              dynamics.com[2] - dynamics.xpos[0][2]};
+    Vector3 w = multiply(r, Vector3{qvel[3], qvel[4], qvel[5]});
+    Vector3 ws = cross(w, s);
+    Vector3 iww = multiply(iw, w);
     double w_dot_s = w[0] * s[0] + w[1] * s[1] + w[2] * s[2];
     std::array<double, 9> k{
         s[0] * w[0] - w_dot_s, s[0] * w[1] - ws[2],   s[0] * w[2] + ws[1],
@@ -597,7 +597,7 @@ class TreeKernel final {
     const ArticulatedModel& m = *model_;
     for (std::uint32_t b = 0; b < tree_->bodies; ++b) {
       const ArticulatedBody& body = m.bodies[tree_->first_body + b];
-      Array3 xpos{};
+      Vector3 xpos = Vector3::Zero();
       Quaternion4 xquat{};
       if (body.joints == 1 &&
           m.joints[body.first_joint].type == JointType::FREE) {
@@ -626,8 +626,8 @@ class TreeKernel final {
           const Joint& joint = m.joints[body.first_joint + jj];
           std::uint32_t j = body.first_joint + jj - tree_->first_joint;
           std::uint32_t q = joint.qpos - tree_->first_qpos;
-          Array3 xaxis = rotate(joint.axis, xquat);
-          Array3 xanchor = rotate(joint.pos, xquat);
+          Vector3 xaxis = rotate(joint.axis, xquat);
+          Vector3 xanchor = rotate(joint.pos, xquat);
           for (int k = 0; k < 3; ++k) {
             xanchor[k] += xpos[k];
           }
@@ -647,7 +647,7 @@ class TreeKernel final {
                                          state.qpos[q] - m.qpos0[joint.qpos]);
             }
             xquat = multiply(xquat, local);
-            Array3 v = rotate(joint.pos, xquat);
+            Vector3 v = rotate(joint.pos, xquat);
             for (int k = 0; k < 3; ++k) {
               xpos[k] = xanchor[k] - v[k];
             }
@@ -663,7 +663,7 @@ class TreeKernel final {
       if (body.inertial_frame == SameFrame::BODY) {
         out->xipos[b] = xpos;
       } else {
-        Array3 xipos = multiply(out->xmat[b], body.inertial_pos);
+        Vector3 xipos = multiply(out->xmat[b], body.inertial_pos);
         for (int k = 0; k < 3; ++k) {
           xipos[k] += xpos[k];
         }
@@ -680,7 +680,8 @@ class TreeKernel final {
   auto compute_com(Out<Dynamics> out) const -> void {
     using namespace articulated;
     const ArticulatedModel& m = *model_;
-    std::array<Array3, Capacity::bodies> subtree{};
+    std::array<Vector3, Capacity::bodies> subtree;
+    subtree.fill(Vector3::Zero());
     for (std::uint32_t b = 0; b < tree_->bodies; ++b) {
       double mass = m.bodies[tree_->first_body + b].mass;
       for (int k = 0; k < 3; ++k) {
@@ -704,9 +705,9 @@ class TreeKernel final {
     }
     for (std::uint32_t b = 0; b < tree_->bodies; ++b) {
       const ArticulatedBody& body = m.bodies[tree_->first_body + b];
-      Array3 offset{out->xipos[b][0] - out->com[0],
-                    out->xipos[b][1] - out->com[1],
-                    out->xipos[b][2] - out->com[2]};
+      Vector3 offset{out->xipos[b][0] - out->com[0],
+                     out->xipos[b][1] - out->com[1],
+                     out->xipos[b][2] - out->com[2]};
       out->cinert[b] =
           shift_inertia(body.inertia, out->ximat[b], offset, body.mass);
     }
@@ -716,9 +717,9 @@ class TreeKernel final {
         const Joint& joint = m.joints[body.first_joint + jj];
         std::uint32_t j = body.first_joint + jj - tree_->first_joint;
         std::uint32_t da = joint.dof - tree_->first_dof;
-        Array3 offset{out->com[0] - out->xanchor[j][0],
-                      out->com[1] - out->xanchor[j][1],
-                      out->com[2] - out->xanchor[j][2]};
+        Vector3 offset{out->com[0] - out->xanchor[j][0],
+                       out->com[1] - out->xanchor[j][1],
+                       out->com[2] - out->xanchor[j][2]};
         std::uint32_t skip = 0;
         switch (joint.type) {
           case JointType::FREE:
@@ -897,9 +898,9 @@ class TreeKernel final {
         case JointType::BALL: {
           std::uint32_t skip = joint.type == JointType::FREE ? 3 : 0;
           if (skip > 0) {
-            Array3 dif{state.qpos[q] - m.qpos_spring[qs],
-                       state.qpos[q + 1] - m.qpos_spring[qs + 1],
-                       state.qpos[q + 2] - m.qpos_spring[qs + 2]};
+            Vector3 dif{state.qpos[q] - m.qpos_spring[qs],
+                        state.qpos[q + 1] - m.qpos_spring[qs + 1],
+                        state.qpos[q + 2] - m.qpos_spring[qs + 2]};
             for (int k = 0; k < 3; ++k) {
               out->passive[v + k] += dif[k] * -joint.stiffness;
             }
@@ -911,7 +912,7 @@ class TreeKernel final {
               m.qpos_spring[qs + skip], -m.qpos_spring[qs + skip + 1],
               -m.qpos_spring[qs + skip + 2], -m.qpos_spring[qs + skip + 3]};
           Quaternion4 dq = multiply(spring, quat);
-          Array3 axis{dq[1], dq[2], dq[3]};
+          Vector3 axis{dq[1], dq[2], dq[3]};
           double sin_half = normalize3(InOut(axis));
           double speed = 2 * std::atan2(sin_half, dq[0]);
           if (speed > std::numbers::pi) {

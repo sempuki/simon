@@ -11,6 +11,9 @@ cc_library(
     srcs = ["articulated.cpp"],
     hdrs = ["articulated.hpp"],
     copts = COPTS,
+    deps = [
+        "//core:vocabulary",
+    ],
 )
 
 

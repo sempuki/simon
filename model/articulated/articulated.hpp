@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include "core/vocabulary.hpp"
+
 // Articulated rigid bodies: kinematic trees of bodies on joints, the shapes
 // they collide with and the actuators that drive them, as MuJoCo compiles a
 // model (see model/REFERENCES.md). Joints are generalized coordinates: a
@@ -18,7 +20,6 @@
 // numbers, as MuJoCo's are, read once and shared, never changed.
 namespace simon::model {
 
-using Array3 = std::array<double, 3>;
 using Quaternion4 = std::array<double, 4>;  // w, x, y, z.
 
 // Joint and shape types, numbered as MuJoCo numbers them.
@@ -58,12 +59,12 @@ struct ArticulatedBody final {
   std::string name;
   std::uint32_t parent = 0;
   std::uint32_t root = 0;  // The child of the world whose tree it is in.
-  Array3 pos{};
+  Vector3 pos = Vector3::Zero();
   Quaternion4 quat{1.0, 0.0, 0.0, 0.0};
-  Array3 inertial_pos{};
+  Vector3 inertial_pos = Vector3::Zero();
   Quaternion4 inertial_quat{1.0, 0.0, 0.0, 0.0};
-  double mass = 0.0;  // kg.
-  Array3 inertia{};   // kg m^2, about the principal axes.
+  double mass = 0.0;                  // kg.
+  Vector3 inertia = Vector3::Zero();  // kg m^2, about the principal axes.
   std::uint32_t first_joint = 0;
   std::uint32_t joints = 0;
   std::uint32_t first_dof = 0;
@@ -79,8 +80,8 @@ struct Joint final {
   std::string name;
   JointType type = JointType::HINGE;
   std::uint32_t body = 0;
-  Array3 pos{};
-  Array3 axis{0.0, 0.0, 1.0};
+  Vector3 pos = Vector3::Zero();
+  Vector3 axis{0.0, 0.0, 1.0};
   std::array<double, 2> range{};  // rad or m.
   double stiffness = 0.0;
   double margin = 0.0;
@@ -111,10 +112,10 @@ struct Geom final {
   std::string name;
   GeomType type = GeomType::SPHERE;
   std::uint32_t body = 0;
-  Array3 size{};
-  Array3 pos{};
+  Vector3 size = Vector3::Zero();
+  Vector3 pos = Vector3::Zero();
   Quaternion4 quat{1.0, 0.0, 0.0, 0.0};
-  Array3 friction{1.0, 0.005, 0.0001};
+  Vector3 friction{1.0, 0.005, 0.0001};
   SoftConstraint contact;
   double margin = 0.0;
   double gap = 0.0;
@@ -169,7 +170,7 @@ struct Physics final {
   enum class Solver : std::uint8_t { PGS, CG, NEWTON };
 
   double timestep = 0.002;  // s.
-  Array3 gravity{0.0, 0.0, -9.81};
+  Vector3 gravity{0.0, 0.0, -9.81};
   Integrator integrator = Integrator::EULER;
   Cone cone = Cone::PYRAMIDAL;
   Solver solver = Solver::NEWTON;

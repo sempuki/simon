@@ -24,7 +24,7 @@ namespace simon::model {
 
 // A geom's pose in the world.
 struct GeomFrame final {
-  Array3 pos{};
+  Vector3 pos = Vector3::Zero();
   Matrix3 mat{1, 0, 0, 0, 1, 0, 0, 0, 1};
 };
 
@@ -33,16 +33,16 @@ struct GeomFrame final {
 // second, and a tangent to align the frame with, or zero.
 struct PreContact final {
   double dist = 0.0;
-  Array3 pos{};
-  Array3 normal{};
-  Array3 tangent{};
+  Vector3 pos = Vector3::Zero();
+  Vector3 normal = Vector3::Zero();
+  Vector3 tangent = Vector3::Zero();
 };
 
 // A contact, as MuJoCo's mjContact holds it: the frame's rows are the normal
 // and two tangents; friction is sliding twice, torsional, rolling twice.
 struct Contact final {
   double dist = 0.0;
-  Array3 pos{};
+  Vector3 pos = Vector3::Zero();
   Matrix3 frame{};
   std::array<std::uint32_t, 2> geom{};
   std::uint32_t dim = 3;
@@ -65,10 +65,10 @@ auto compute_bounding_radius(const Geom& geom) -> double;
 
 // A body's frame and inertial frame in the world.
 struct BodyFrame final {
-  Array3 xpos{};
+  Vector3 xpos = Vector3::Zero();
   Quaternion4 xquat{1.0, 0.0, 0.0, 0.0};
   Matrix3 xmat{1, 0, 0, 0, 1, 0, 0, 0, 1};
-  Array3 xipos{};
+  Vector3 xipos = Vector3::Zero();
   Matrix3 ximat{1, 0, 0, 0, 1, 0, 0, 0, 1};
 };
 

@@ -179,7 +179,7 @@ struct Solve final    //
     const double* mass = nullptr;  // Rows `stride` long, the lower triangle.
     std::size_t stride = 0;
     const model::Spatial* cdof = nullptr;
-    const model::Array3* com = nullptr;
+    const Vector3* com = nullptr;
     const double* qacc_smooth = nullptr;
     const double* qfrc_smooth = nullptr;
     const double* qpos = nullptr;
@@ -352,7 +352,7 @@ auto Bound<Capacity>::operator()(SystemWorld&, Entity,                    //
       continue;
     }
     std::uint32_t b = geom.body - tree.first_body;
-    model::Array3 at = dynamics->xipos[b];
+    Vector3 at = dynamics->xipos[b];
     if (geom.frame != model::SameFrame::INERTIA) {
       at = model::articulated::multiply(dynamics->xmat[b], geom.pos);
       for (int k = 0; k < 3; ++k) {

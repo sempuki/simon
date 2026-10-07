@@ -53,36 +53,36 @@ constexpr double CCD_TOLERANCE = 1e-6;       // mjOption's ccd_tolerance.
 constexpr int MAXCONPAIR = 50;               // mjMAXCONPAIR.
 constexpr int MAX_POLYGON = 16;              // A cylinder's face, the most.
 
-using Triple = std::array<Array3, 3>;
+using Triple = std::array<Vector3, 3>;
 using Indices = std::array<int, 3>;
-using Polygon = std::array<Array3, MAX_POLYGON>;
+using Polygon = std::array<Vector3, MAX_POLYGON>;
 
 //-- Vectors -------------------------------------------------------------------
 
 // The determinant of the matrix with rows `a`, `b` and `c` (det3).
-inline auto compute_determinant(const Array3& a, const Array3& b,
-                                const Array3& c) -> double {
+inline auto compute_determinant(const Vector3& a, const Vector3& b,
+                                const Vector3& c) -> double {
   return a[0] * (b[1] * c[2] - b[2] * c[1]) +
          a[1] * (b[2] * c[0] - b[0] * c[2]) +
          a[2] * (b[0] * c[1] - b[1] * c[0]);
 }
 
 // `local` turned by `mat` and moved to `pos` (localToGlobal, globalcoord).
-inline auto transform(const Matrix3& mat, const Array3& pos,
-                      const Array3& local) -> Array3 {
+inline auto transform(const Matrix3& mat, const Vector3& pos,
+                      const Vector3& local) -> Vector3 {
   return add(multiply(mat, local), pos);
 }
 
 //-- Objects and their support functions (engine_collision_convex.c) ----------
 
 struct Object;
-using Support = auto (*)(InOut<Object> object, const Array3& dir) -> Array3;
+using Support = auto (*)(InOut<Object> object, const Vector3& dir) -> Vector3;
 
 // A geom as the convex collider sees it: a support function sets the index
 // of the vertex it found, for a box or cylinder (mjCCDObj).
 struct Object final {
-  Array3 size{};
-  Array3 pos{};
+  Vector3 size = Vector3::Zero();
+  Vector3 pos = Vector3::Zero();
   Matrix3 mat{};
   double margin = 0.0;
   Support support = nullptr;
@@ -91,19 +91,19 @@ struct Object final {
 };
 
 // The point itself (mjc_pointSupport).
-auto support_point(InOut<Object> object, const Array3& /*dir*/) -> Array3 {
+auto support_point(InOut<Object> object, const Vector3& /*dir*/) -> Vector3 {
   return object->pos;
 }
 
 // mjc_sphereSupport.
-auto support_sphere(InOut<Object> object, const Array3& dir) -> Array3 {
+auto support_sphere(InOut<Object> object, const Vector3& dir) -> Vector3 {
   double radius = object->size[0];
   return {radius * dir[0] + object->pos[0], radius * dir[1] + object->pos[1],
           radius * dir[2] + object->pos[2]};
 }
 
 // A capsule's segment (mjc_lineSupport).
-auto support_line(InOut<Object> object, const Array3& dir) -> Array3 {
+auto support_line(InOut<Object> object, const Vector3& dir) -> Vector3 {
   const Matrix3& mat = object->mat;
   double length = object->size[1];
   double along = mat[2] * dir[0] + mat[5] * dir[1] + mat[8] * dir[2];
@@ -113,23 +113,23 @@ auto support_line(InOut<Object> object, const Array3& dir) -> Array3 {
 }
 
 // mjc_capsuleSupport.
-auto support_capsule(InOut<Object> object, const Array3& dir) -> Array3 {
+auto support_capsule(InOut<Object> object, const Vector3& dir) -> Vector3 {
   double radius = object->size[0];
   double length = object->size[1];
-  Array3 local_dir = multiply_transposed(object->mat, dir);
-  Array3 local_supp{local_dir[0] * radius, local_dir[1] * radius,
-                    local_dir[2] * radius};
+  Vector3 local_dir = multiply_transposed(object->mat, dir);
+  Vector3 local_supp{local_dir[0] * radius, local_dir[1] * radius,
+                     local_dir[2] * radius};
   local_supp[2] += (local_dir[2] >= 0 ? length : -length);
   return transform(object->mat, object->pos, local_supp);
 }
 
 // mjc_ellipsoidSupport.
-auto support_ellipsoid(InOut<Object> object, const Array3& dir) -> Array3 {
+auto support_ellipsoid(InOut<Object> object, const Vector3& dir) -> Vector3 {
   const Matrix3& mat = object->mat;
-  const Array3& size = object->size;
-  Array3 local_dir = multiply_transposed(mat, dir);
-  Array3 local_supp{local_dir[0] * size[0], local_dir[1] * size[1],
-                    local_dir[2] * size[2]};
+  const Vector3& size = object->size;
+  Vector3 local_dir = multiply_transposed(mat, dir);
+  Vector3 local_supp{local_dir[0] * size[0], local_dir[1] * size[1],
+                     local_dir[2] * size[2]};
   double norm2 = local_supp[0] * local_supp[0] + local_supp[1] * local_supp[1] +
                  local_supp[2] * local_supp[2];
   if (norm2 < MINVAL2) {
@@ -145,24 +145,24 @@ auto support_ellipsoid(InOut<Object> object, const Array3& dir) -> Array3 {
 }
 
 // mjc_cylinderSupport.
-auto support_cylinder(InOut<Object> object, const Array3& dir) -> Array3 {
-  const Array3& size = object->size;
-  Array3 local_dir = multiply_transposed(object->mat, dir);
+auto support_cylinder(InOut<Object> object, const Vector3& dir) -> Vector3 {
+  const Vector3& size = object->size;
+  Vector3 local_dir = multiply_transposed(object->mat, dir);
   double n2 = local_dir[0] * local_dir[0] + local_dir[1] * local_dir[1];
   double scl = n2 >= MINVAL2 ? size[0] / std::sqrt(n2) : 0;
-  Array3 local_supp{scl * local_dir[0], scl * local_dir[1],
-                    local_dir[2] >= 0 ? size[1] : -size[1]};
+  Vector3 local_supp{scl * local_dir[0], scl * local_dir[1],
+                     local_dir[2] >= 0 ? size[1] : -size[1]};
   object->vertex_index = local_dir[2] >= 0 ? 0 : 1;
   return transform(object->mat, object->pos, local_supp);
 }
 
 // mjc_boxSupport.
-auto support_box(InOut<Object> object, const Array3& dir) -> Array3 {
-  const Array3& size = object->size;
-  Array3 local_dir = multiply_transposed(object->mat, dir);
-  Array3 local_supp{local_dir[0] >= 0 ? size[0] : -size[0],
-                    local_dir[1] >= 0 ? size[1] : -size[1],
-                    local_dir[2] >= 0 ? size[2] : -size[2]};
+auto support_box(InOut<Object> object, const Vector3& dir) -> Vector3 {
+  const Vector3& size = object->size;
+  Vector3 local_dir = multiply_transposed(object->mat, dir);
+  Vector3 local_supp{local_dir[0] >= 0 ? size[0] : -size[0],
+                     local_dir[1] >= 0 ? size[1] : -size[1],
+                     local_dir[2] >= 0 ? size[2] : -size[2]};
   object->vertex_index = (local_supp[0] > 0) ? 1 : 0;
   object->vertex_index |= (local_supp[1] > 0) ? 2 : 0;
   object->vertex_index |= (local_supp[2] > 0) ? 4 : 0;
@@ -205,9 +205,9 @@ auto make_object(const Geom& geom, const GeomFrame& frame, double margin)
 // A vertex of the Minkowski difference, the points on each geom it is the
 // difference of, and those points' vertex indices (mjtVertex).
 struct Vertex final {
-  Array3 point{};
-  Array3 first{};
-  Array3 second{};
+  Vector3 point = Vector3::Zero();
+  Vector3 first = Vector3::Zero();
+  Vector3 second = Vector3::Zero();
   int first_index = 0;
   int second_index = 0;
 };
@@ -230,8 +230,8 @@ enum EpaStatus : int {
 // progress (mjCCDStatus).
 struct CcdStatus final {
   std::array<double, MAXCONPAIR> dist{};
-  std::array<Array3, MAXCONPAIR> x1{};
-  std::array<Array3, MAXCONPAIR> x2{};
+  std::array<Vector3, MAXCONPAIR> x1{};
+  std::array<Vector3, MAXCONPAIR> x2{};
   std::array<Vertex, 4> simplex{};
   double tolerance = 0.0;
   double dist_cutoff = 0.0;
@@ -250,7 +250,7 @@ struct CcdStatus final {
 // vertices packed ten bits each, and its place in the map, -1 outside it and
 // -2 deleted (mjtFace).
 struct Face final {
-  Array3 closest{};
+  Vector3 closest = Vector3::Zero();
   double dist2 = 0.0;
   std::array<int, 3> adj{};
   int verts = 0;
@@ -268,8 +268,8 @@ struct Polytope final {
   std::vector<Vertex> vertices;
   std::vector<Face> faces;
   std::vector<Face*> map;
-  Array3 center{};
-  Array3 horizon_point{};
+  Vector3 center = Vector3::Zero();
+  Vector3 horizon_point = Vector3::Zero();
   std::array<int, 24> horizon_indices{};
   std::array<int, 24> horizon_edges{};
   int vertex_count = 0;
@@ -290,9 +290,9 @@ auto are_discrete(const Object& first, const Object& second) -> bool {
 
 // The sum of the first `n` points weighted by `coef` (lincomb).
 inline auto combine_points(std::span<const double> coef, int n,
-                           const Array3& v1, const Array3& v2,
-                           const Array3& v3 = {}, const Array3& v4 = {})
-    -> Array3 {
+                           const Vector3& v1, const Vector3& v2,
+                           const Vector3& v3 = {}, const Vector3& v4 = {})
+    -> Vector3 {
   switch (n) {
     case 1:
       return {coef[0] * v1[0], coef[0] * v1[1], coef[0] * v1[2]};
@@ -317,12 +317,12 @@ inline auto combine_points(std::span<const double> coef, int n,
 
 // The origin projected onto the plane through three points, or nothing if
 // they lie on a line (projectOriginPlane).
-auto project_origin_plane(const Array3& v1, const Array3& v2, const Array3& v3)
-    -> std::optional<Array3> {
-  Array3 diff21 = subtract(v2, v1);
-  Array3 diff31 = subtract(v3, v1);
-  Array3 diff32 = subtract(v3, v2);
-  Array3 n = cross(diff32, diff21);
+auto project_origin_plane(const Vector3& v1, const Vector3& v2,
+                          const Vector3& v3) -> std::optional<Vector3> {
+  Vector3 diff21 = subtract(v2, v1);
+  Vector3 diff31 = subtract(v3, v1);
+  Vector3 diff32 = subtract(v3, v2);
+  Vector3 n = cross(diff32, diff21);
   double nv = dot(n, v2);
   double nn = dot(n, n);
   if (nn == 0) {
@@ -347,8 +347,9 @@ auto project_origin_plane(const Array3& v1, const Array3& v2, const Array3& v3)
 }
 
 // The origin projected onto the line through two points (projectOriginLine).
-inline auto project_origin_line(const Array3& v1, const Array3& v2) -> Array3 {
-  Array3 diff = subtract(v2, v1);
+inline auto project_origin_line(const Vector3& v1, const Vector3& v2)
+    -> Vector3 {
+  Vector3 diff = subtract(v2, v1);
   double scl = -(dot(v2, diff) / dot(diff, diff));
   return add_scaled(v2, diff, scl);
 }
@@ -366,9 +367,9 @@ inline auto compare_signs(double a, double b) -> int {
 
 // The weights of a segment's ends at its point nearest the origin, by signed
 // volumes (S1D).
-auto weigh_segment(const Array3& s1, const Array3& s2)
+auto weigh_segment(const Vector3& s1, const Vector3& s2)
     -> std::array<double, 2> {
-  Array3 p_o = project_origin_line(s1, s2);
+  Vector3 p_o = project_origin_line(s1, s2);
   double mu = s1[0] - s2[0];
   double mu_max = mu;
   int index = 0;
@@ -389,14 +390,14 @@ auto weigh_segment(const Array3& s1, const Array3& s2)
 }
 
 // The weights of a triangle's corners at its point nearest the origin (S2D).
-auto weigh_triangle(const Array3& s1, const Array3& s2, const Array3& s3)
+auto weigh_triangle(const Vector3& s1, const Vector3& s2, const Vector3& s3)
     -> std::array<double, 3> {
-  std::optional<Array3> projected = project_origin_plane(s1, s2, s3);
+  std::optional<Vector3> projected = project_origin_plane(s1, s2, s3);
   if (!projected) {
     std::array<double, 2> l = weigh_segment(s1, s2);
     return {l[0], l[1], 0};
   }
-  const Array3& p_o = *projected;
+  const Vector3& p_o = *projected;
   double m14 = s2[1] * s3[2] - s2[2] * s3[1] - s1[1] * s3[2] + s1[2] * s3[1] +
                s1[1] * s2[2] - s1[2] * s2[1];
   double m24 = s2[0] * s3[2] - s2[2] * s3[0] - s1[0] * s3[2] + s1[2] * s3[0] +
@@ -444,14 +445,14 @@ auto weigh_triangle(const Array3& s1, const Array3& s2, const Array3& s3)
   double dmin = MAX_LIMIT;
   if (!comp1) {
     std::array<double, 2> l = weigh_segment(s2, s3);
-    Array3 v = combine_points(l, 2, s2, s3);
+    Vector3 v = combine_points(l, 2, s2, s3);
     double d = dot(v, v);
     lambda = {0, l[0], l[1]};
     dmin = d;
   }
   if (!comp2) {
     std::array<double, 2> l = weigh_segment(s1, s3);
-    Array3 v = combine_points(l, 2, s1, s3);
+    Vector3 v = combine_points(l, 2, s1, s3);
     double d = dot(v, v);
     if (d < dmin) {
       lambda = {l[0], 0, l[1]};
@@ -460,7 +461,7 @@ auto weigh_triangle(const Array3& s1, const Array3& s2, const Array3& s3)
   }
   if (!comp3) {
     std::array<double, 2> l = weigh_segment(s1, s2);
-    Array3 v = combine_points(l, 2, s1, s2);
+    Vector3 v = combine_points(l, 2, s1, s2);
     double d = dot(v, v);
     if (d < dmin) {
       lambda = {l[0], l[1], 0};
@@ -471,8 +472,8 @@ auto weigh_triangle(const Array3& s1, const Array3& s2, const Array3& s3)
 
 // The weights of a tetrahedron's corners at its point nearest the origin
 // (S3D).
-auto weigh_tetrahedron(const Array3& s1, const Array3& s2, const Array3& s3,
-                       const Array3& s4) -> std::array<double, 4> {
+auto weigh_tetrahedron(const Vector3& s1, const Vector3& s2, const Vector3& s3,
+                       const Vector3& s4) -> std::array<double, 4> {
   double c41 = -compute_determinant(s2, s3, s4);
   double c42 = compute_determinant(s1, s3, s4);
   double c43 = -compute_determinant(s1, s2, s4);
@@ -491,14 +492,14 @@ auto weigh_tetrahedron(const Array3& s1, const Array3& s2, const Array3& s3,
   double dmin = MAX_LIMIT;
   if (!comp1) {
     std::array<double, 3> l = weigh_triangle(s2, s3, s4);
-    Array3 x = combine_points(l, 3, s2, s3, s4);
+    Vector3 x = combine_points(l, 3, s2, s3, s4);
     double d = dot(x, x);
     lambda = {0, l[0], l[1], l[2]};
     dmin = d;
   }
   if (!comp2) {
     std::array<double, 3> l = weigh_triangle(s1, s3, s4);
-    Array3 x = combine_points(l, 3, s1, s3, s4);
+    Vector3 x = combine_points(l, 3, s1, s3, s4);
     double d = dot(x, x);
     if (d < dmin) {
       lambda = {l[0], 0, l[1], l[2]};
@@ -507,7 +508,7 @@ auto weigh_tetrahedron(const Array3& s1, const Array3& s2, const Array3& s3,
   }
   if (!comp3) {
     std::array<double, 3> l = weigh_triangle(s1, s2, s4);
-    Array3 x = combine_points(l, 3, s1, s2, s4);
+    Vector3 x = combine_points(l, 3, s1, s2, s4);
     double d = dot(x, x);
     if (d < dmin) {
       lambda = {l[0], l[1], 0, l[2]};
@@ -516,7 +517,7 @@ auto weigh_tetrahedron(const Array3& s1, const Array3& s2, const Array3& s3,
   }
   if (!comp4) {
     std::array<double, 3> l = weigh_triangle(s1, s2, s3);
-    Array3 x = combine_points(l, 3, s1, s2, s3);
+    Vector3 x = combine_points(l, 3, s1, s2, s3);
     double d = dot(x, x);
     if (d < dmin) {
       lambda = {l[0], l[1], l[2], 0};
@@ -551,7 +552,7 @@ inline auto weigh_simplex(int n, const std::array<Vertex, 4>& simplex)
 // S_{A-B}(dir), each geom's support grown by half its margin (gjk_support's
 // mjc_support pair).
 inline auto find_support(InOut<Object> first, InOut<Object> second,
-                         const Array3& dir, const Array3& dir_neg) -> Vertex {
+                         const Vector3& dir, const Vector3& dir_neg) -> Vertex {
   Vertex v;
   v.first = first->support(first, dir);
   if (first->margin > 0) {
@@ -569,19 +570,19 @@ inline auto find_support(InOut<Object> first, InOut<Object> second,
 
 // The support toward the origin from `x_k` (gjkSupport).
 inline auto find_gjk_support(InOut<Object> first, InOut<Object> second,
-                             const Array3& x_k, double x_norm) -> Vertex {
-  Array3 dir_neg = scale(x_k, 1 / x_norm);
-  Array3 dir = scale(dir_neg, -1);
+                             const Vector3& x_k, double x_norm) -> Vertex {
+  Vector3 dir_neg = scale(x_k, 1 / x_norm);
+  Vector3 dir = scale(dir_neg, -1);
   return find_support(first, second, dir, dir_neg);
 }
 
 // Appends the support along `d` to the polytope and returns its index
 // (epaSupport).
 auto append_epa_support(InOut<Polytope> polytope, InOut<Object> first,
-                        InOut<Object> second, const Array3& d, double dnorm)
+                        InOut<Object> second, const Vector3& d, double dnorm)
     -> int {
-  Array3 dir{1, 0, 0};
-  Array3 dir_neg{-1, 0, 0};
+  Vector3 dir{1, 0, 0};
+  Vector3 dir_neg{-1, 0, 0};
   if (dnorm > MINVAL) {
     dir = {d[0] / dnorm, d[1] / dnorm, d[2] / dnorm};
     dir_neg = scale(dir, -1);
@@ -593,11 +594,11 @@ auto append_epa_support(InOut<Polytope> polytope, InOut<Object> first,
 
 // The origin's signed distance from the plane of three vertices, and the
 // plane's normal, or MAX_LIMIT if they lie on a line (signedDistance).
-inline auto compute_signed_distance(Out<Array3> normal, const Vertex& v1,
+inline auto compute_signed_distance(Out<Vector3> normal, const Vertex& v1,
                                     const Vertex& v2, const Vertex& v3)
     -> double {
-  Array3 diff1 = subtract(v3.point, v1.point);
-  Array3 diff2 = subtract(v2.point, v1.point);
+  Vector3 diff1 = subtract(v3.point, v1.point);
+  Vector3 diff2 = subtract(v2.point, v1.point);
   *normal = cross(diff1, diff2);
   double norm2 = dot(*normal, *normal);
   if (norm2 > MINVAL2 && norm2 < MAXVAL2) {
@@ -617,7 +618,7 @@ auto intersect_gjk(InOut<CcdStatus> status, InOut<Object> first,
   int kmax = status->max_iterations;
   for (; k < kmax; k++) {
     std::array<double, 4> dist{};
-    std::array<Array3, 4> normals{};
+    std::array<Vector3, 4> normals{};
     dist[0] = compute_signed_distance(Out(normals[0]), simplex[s[2]],
                                       simplex[s[1]], simplex[s[3]]);
     dist[1] = compute_signed_distance(Out(normals[1]), simplex[s[0]],
@@ -641,7 +642,7 @@ auto intersect_gjk(InOut<CcdStatus> status, InOut<Object> first,
       status->gjk_iterations = k;
       return 1;
     }
-    const Array3& dir = normals[index];
+    const Vector3& dir = normals[index];
     simplex[s[index]] =
         find_support(first, second, dir, {-dir[0], -dir[1], -dir[2]});
     if (dot(dir, simplex[s[index]].point) < 0) {
@@ -667,15 +668,15 @@ auto run_gjk(InOut<CcdStatus> status, InOut<Object> first, InOut<Object> second)
   int n = 0;
   int k = 0;
   int kmax = status->max_iterations;
-  Array3& x1_k = status->x1[0];
-  Array3& x2_k = status->x2[0];
+  Vector3& x1_k = status->x1[0];
+  Vector3& x2_k = status->x2[0];
   std::array<double, 4> lambda{};
   double tol2 = status->tolerance * status->tolerance;
   status->separated = false;
   bool discrete = are_discrete(*first, *second);
   double epsilon = discrete ? 0 : 0.5 * tol2;
   double min_norm = discrete ? MINVAL : status->tolerance;
-  Array3 x_k = subtract(x1_k, x2_k);
+  Vector3 x_k = subtract(x1_k, x2_k);
   double x_norm = norm(x_k);
   double x_norm_prev = 0;
 
@@ -684,7 +685,7 @@ auto run_gjk(InOut<CcdStatus> status, InOut<Object> first, InOut<Object> second)
       break;
     }
     simplex[n] = find_gjk_support(first, second, x_k, x_norm);
-    const Array3& s_k = simplex[n].point;
+    const Vector3& s_k = simplex[n].point;
     if (dot(x_k, subtract(x_k, s_k)) < epsilon) {
       break;
     }
@@ -775,27 +776,27 @@ inline auto replace_simplex(InOut<Polytope> polytope, InOut<CcdStatus> status,
 
 // Whether `p3` and the origin lie on the same side of the plane through the
 // other three (sameSide).
-auto lie_on_same_side(const Array3& p0, const Array3& p1, const Array3& p2,
-                      const Array3& p3) -> bool {
-  Array3 diff1 = subtract(p1, p0);
-  Array3 diff2 = subtract(p2, p0);
-  Array3 n = cross(diff1, diff2);
-  Array3 diff3 = subtract(p3, p0);
+auto lie_on_same_side(const Vector3& p0, const Vector3& p1, const Vector3& p2,
+                      const Vector3& p3) -> bool {
+  Vector3 diff1 = subtract(p1, p0);
+  Vector3 diff2 = subtract(p2, p0);
+  Vector3 n = cross(diff1, diff2);
+  Vector3 diff3 = subtract(p3, p0);
   double dot1 = dot(n, diff3);
-  Array3 diff4 = scale(p0, -1);
+  Vector3 diff4 = scale(p0, -1);
   double dot2 = dot(n, diff4);
   return (dot1 > 0 && dot2 > 0) || (dot1 < 0 && dot2 < 0);
 }
 
 // Whether a tetrahedron holds the origin (testTetra).
-auto contains_origin(const Array3& p0, const Array3& p1, const Array3& p2,
-                     const Array3& p3) -> bool {
+auto contains_origin(const Vector3& p0, const Vector3& p1, const Vector3& p2,
+                     const Vector3& p3) -> bool {
   return lie_on_same_side(p0, p1, p2, p3) && lie_on_same_side(p1, p2, p3, p0) &&
          lie_on_same_side(p2, p3, p0, p1) && lie_on_same_side(p3, p0, p1, p2);
 }
 
 // A turn by a third of a circle about `axis` (rotmat).
-auto compute_third_turn(const Array3& axis) -> Matrix3 {
+auto compute_third_turn(const Vector3& axis) -> Matrix3 {
   double n = norm(axis);
   double u1 = axis[0] / n;
   double u2 = axis[1] / n;
@@ -811,12 +812,13 @@ auto compute_third_turn(const Array3& axis) -> Matrix3 {
 
 // Which way the segment from `v1` to `v2` passes the triangle of the other
 // three: 1 or -1 through it, 0 beside it (rayTriangle).
-inline auto cross_triangle(const Array3& v1, const Array3& v2, const Array3& v3,
-                           const Array3& v4, const Array3& v5) -> int {
-  Array3 diff12 = subtract(v2, v1);
-  Array3 diff13 = subtract(v3, v1);
-  Array3 diff14 = subtract(v4, v1);
-  Array3 diff15 = subtract(v5, v1);
+inline auto cross_triangle(const Vector3& v1, const Vector3& v2,
+                           const Vector3& v3, const Vector3& v4,
+                           const Vector3& v5) -> int {
+  Vector3 diff12 = subtract(v2, v1);
+  Vector3 diff13 = subtract(v3, v1);
+  Vector3 diff14 = subtract(v4, v1);
+  Vector3 diff15 = subtract(v5, v1);
   double vol1 = compute_determinant(diff13, diff14, diff12);
   double vol2 = compute_determinant(diff14, diff15, diff12);
   double vol3 = compute_determinant(diff15, diff13, diff12);
@@ -857,14 +859,14 @@ inline auto attach_face(InOut<Polytope> polytope, int v1, int v2, int v3,
   Face& face = polytope->faces[polytope->face_count++];
   face.verts = v1 + (v2 << 10) + (v3 << 20);
   face.adj = {adj1, adj2, adj3};
-  std::optional<Array3> projected = project_origin_plane(
+  std::optional<Vector3> projected = project_origin_plane(
       polytope->vertices[v3].point, polytope->vertices[v2].point,
       polytope->vertices[v1].point);
   if (!projected) {
     return 0;
   }
   face.closest = *projected;
-  Array3 outward = subtract(polytope->vertices[v1].point, polytope->center);
+  Vector3 outward = subtract(polytope->vertices[v1].point, polytope->center);
   if (dot(face.closest, outward) < 0) {
     face.closest = scale(face.closest, -1);
   }
@@ -874,8 +876,9 @@ inline auto attach_face(InOut<Polytope> polytope, int v1, int v2, int v3,
 }
 
 // The affine coordinates of `p` in a triangle (triAffineCoord).
-auto compute_affine_coordinates(const Array3& v1, const Array3& v2,
-                                const Array3& v3, const Array3& p) -> Array3 {
+auto compute_affine_coordinates(const Vector3& v1, const Vector3& v2,
+                                const Vector3& v3, const Vector3& p)
+    -> Vector3 {
   double m14 = v2[1] * v3[2] - v2[2] * v3[1] - v1[1] * v3[2] + v1[2] * v3[1] +
                v1[1] * v2[2] - v1[2] * v2[1];
   double m24 = v2[0] * v3[2] - v2[2] * v3[0] - v1[0] * v3[2] + v1[2] * v3[0] +
@@ -911,49 +914,49 @@ auto compute_affine_coordinates(const Array3& v1, const Array3& v2,
 }
 
 // Whether `p` lies in a triangle (triPointIntersect).
-auto lies_in_triangle(const Array3& v1, const Array3& v2, const Array3& v3,
-                      const Array3& p) -> bool {
-  Array3 lambda = compute_affine_coordinates(v1, v2, v3, p);
+auto lies_in_triangle(const Vector3& v1, const Vector3& v2, const Vector3& v3,
+                      const Vector3& p) -> bool {
+  Vector3 lambda = compute_affine_coordinates(v1, v2, v3, p);
   if (lambda[0] < 0 || lambda[1] < 0 || lambda[2] < 0) {
     return false;
   }
-  Array3 pr{v1[0] * lambda[0] + v2[0] * lambda[1] + v3[0] * lambda[2],
-            v1[1] * lambda[0] + v2[1] * lambda[1] + v3[1] * lambda[2],
-            v1[2] * lambda[0] + v2[2] * lambda[1] + v3[2] * lambda[2]};
+  Vector3 pr{v1[0] * lambda[0] + v2[0] * lambda[1] + v3[0] * lambda[2],
+             v1[1] * lambda[0] + v2[1] * lambda[1] + v3[1] * lambda[2],
+             v1[2] * lambda[0] + v2[2] * lambda[1] + v3[2] * lambda[2]};
   return norm(subtract(pr, p)) < MINVAL;
 }
 
 // The first polytope from GJK's triangle: a bipyramid on it (polytope3).
 auto build_triangle_polytope(InOut<Polytope> polytope, InOut<CcdStatus> status,
                              InOut<Object> first, InOut<Object> second) -> int {
-  Array3 n{};
+  Vector3 n = Vector3::Zero();
   double n_norm = 0.0;
   {
-    const Array3& s1 = status->simplex[0].point;
-    const Array3& s2 = status->simplex[1].point;
-    const Array3& s3 = status->simplex[2].point;
+    const Vector3& s1 = status->simplex[0].point;
+    const Vector3& s2 = status->simplex[1].point;
+    const Vector3& s3 = status->simplex[2].point;
     polytope->center = add(s1, s2);
     polytope->center = add(polytope->center, s3);
     polytope->center = scale(polytope->center, 1.0 / 3.0);
-    Array3 diff1 = subtract(s2, s1);
-    Array3 diff2 = subtract(s3, s1);
+    Vector3 diff1 = subtract(s2, s1);
+    Vector3 diff2 = subtract(s3, s1);
     n = cross(diff1, diff2);
     n_norm = norm(n);
   }
   if (n_norm < MINVAL) {
     return EPA_P3_BAD_NORMAL;
   }
-  Array3 n_neg = scale(n, -1);
+  Vector3 n_neg = scale(n, -1);
   int v1i = append_vertex(polytope, status->simplex[0]);
   int v2i = append_vertex(polytope, status->simplex[1]);
   int v3i = append_vertex(polytope, status->simplex[2]);
   int v5i = append_epa_support(polytope, first, second, n_neg, n_norm);
   int v4i = append_epa_support(polytope, first, second, n, n_norm);
-  const Array3& v1 = polytope->vertices[v1i].point;
-  const Array3& v2 = polytope->vertices[v2i].point;
-  const Array3& v3 = polytope->vertices[v3i].point;
-  const Array3& v4 = polytope->vertices[v4i].point;
-  const Array3& v5 = polytope->vertices[v5i].point;
+  const Vector3& v1 = polytope->vertices[v1i].point;
+  const Vector3& v2 = polytope->vertices[v2i].point;
+  const Vector3& v3 = polytope->vertices[v3i].point;
+  const Vector3& v4 = polytope->vertices[v4i].point;
+  const Vector3& v5 = polytope->vertices[v5i].point;
   if (lies_in_triangle(v1, v2, v3, v4)) {
     return EPA_P3_INVALID_V4;
   }
@@ -994,10 +997,10 @@ auto build_triangle_polytope(InOut<Polytope> polytope, InOut<CcdStatus> status,
 // around it (polytope2).
 auto build_segment_polytope(InOut<Polytope> polytope, InOut<CcdStatus> status,
                             InOut<Object> first, InOut<Object> second) -> int {
-  Array3 diff{};
+  Vector3 diff = Vector3::Zero();
   {
-    const Array3& s1 = status->simplex[0].point;
-    const Array3& s2 = status->simplex[1].point;
+    const Vector3& s1 = status->simplex[0].point;
+    const Vector3& s2 = status->simplex[1].point;
     polytope->center = add(s1, s2);
     polytope->center = scale(polytope->center, 0.5);
     diff = subtract(s2, s1);
@@ -1010,12 +1013,12 @@ auto build_segment_polytope(InOut<Polytope> polytope, InOut<CcdStatus> status,
       index = i;
     }
   }
-  Array3 e{0, 0, 0};
+  Vector3 e{0, 0, 0};
   e[index] = 1;
-  Array3 d1 = cross(e, diff);
+  Vector3 d1 = cross(e, diff);
   Matrix3 r = compute_third_turn(diff);
-  Array3 d2 = multiply(r, d1);
-  Array3 d3 = multiply(r, d2);
+  Vector3 d2 = multiply(r, d1);
+  Vector3 d3 = multiply(r, d2);
   int v1i = append_vertex(polytope, status->simplex[0]);
   int v2i = append_vertex(polytope, status->simplex[1]);
   int v3i = append_epa_support(polytope, first, second, d1, norm(d1));
@@ -1165,12 +1168,12 @@ auto find_horizon(InOut<Polytope> polytope, InOut<Face> face) -> void {
 // The witness points on each geom of `face`'s nearest point, and the
 // penetration, negative (epaWitness).
 auto compute_epa_witness(const Polytope& polytope, const Face& face,
-                         Out<Array3> x1, Out<Array3> x2) -> double {
+                         Out<Vector3> x1, Out<Vector3> x2) -> double {
   Indices verts = unpack_vertices(face.verts);
   const Vertex& v1 = polytope.vertices[verts[0]];
   const Vertex& v2 = polytope.vertices[verts[1]];
   const Vertex& v3 = polytope.vertices[verts[2]];
-  Array3 lambda =
+  Vector3 lambda =
       compute_affine_coordinates(v1.point, v2.point, v3.point, face.closest);
   *x1 = combine_points(lambda, 3, v1.first, v2.first, v3.first);
   *x2 = combine_points(lambda, 3, v1.second, v2.second, v3.second);
@@ -1303,15 +1306,15 @@ auto run_epa(InOut<CcdStatus> status, InOut<Polytope> polytope,
 //-- Multiple contacts ---------------------------------------------------------
 
 // The area of the quadrilateral on four of `hull`'s points (area4).
-inline auto compute_quad_area(std::span<const Array3> hull, int a, int b, int c,
-                              int d) -> double {
-  Array3 ca = subtract(hull[a], hull[c]);
-  Array3 db = subtract(hull[b], hull[d]);
+inline auto compute_quad_area(std::span<const Vector3> hull, int a, int b,
+                              int c, int d) -> double {
+  Vector3 ca = subtract(hull[a], hull[c]);
+  Vector3 db = subtract(hull[b], hull[d]);
   return 0.5 * norm(cross(ca, db));
 }
 
 // The four points of a convex polygon spanning the largest area (hull4).
-inline auto find_largest_quad(std::span<const Array3> hull)
+inline auto find_largest_quad(std::span<const Vector3> hull)
     -> std::array<int, 4> {
   int nhull = static_cast<int>(hull.size());
   int a = 0;
@@ -1364,27 +1367,27 @@ inline auto find_largest_quad(std::span<const Array3> hull)
 
 // The plane through the edge from `v1` to `v2` along `n`: its unit normal,
 // and its offset (planeNormal).
-auto compute_side_plane(Out<Array3> normal, const Array3& v1, const Array3& v2,
-                        const Array3& n) -> double {
-  Array3 v3 = add(v1, n);
-  Array3 diff1 = subtract(v2, v1);
-  Array3 diff2 = subtract(v3, v1);
-  Array3 res = cross(diff1, diff2);
+auto compute_side_plane(Out<Vector3> normal, const Vector3& v1,
+                        const Vector3& v2, const Vector3& n) -> double {
+  Vector3 v3 = add(v1, n);
+  Vector3 diff1 = subtract(v2, v1);
+  Vector3 diff2 = subtract(v3, v1);
+  Vector3 res = cross(diff1, diff2);
   normalize3(InOut(res));
   *normal = res;
   return dot(res, v1);
 }
 
 // Whether `p` lies inside the plane through `a` with normal `n` (halfspace).
-auto lies_inside(const Array3& a, const Array3& n, const Array3& p) -> bool {
+auto lies_inside(const Vector3& a, const Vector3& n, const Vector3& p) -> bool {
   return dot(subtract(p, a), n) > -MINVAL;
 }
 
 // The witness points of `v` on a face through `p` with normal `n`, moved
 // back along `dir` by its distance, and that distance (witnessOnFace).
-inline auto place_witness(Out<Array3> w1, Out<Array3> w2, const Array3& v,
-                          const Array3& p, const Array3& n, const Array3& dir)
-    -> double {
+inline auto place_witness(Out<Vector3> w1, Out<Vector3> w2, const Vector3& v,
+                          const Vector3& p, const Vector3& n,
+                          const Vector3& dir) -> double {
   double dist = dot(subtract(v, p), n);
   *w1 = add_scaled(v, dir, -std::abs(dist));
   *w2 = v;
@@ -1393,9 +1396,9 @@ inline auto place_witness(Out<Array3> w1, Out<Array3> w2, const Array3& v,
 
 // The contacts of `face2` clipped to `face1`'s sides, below `face1`, with
 // normal `n`, their witnesses moved along `dir` (polygonClip).
-auto clip_polygon(InOut<CcdStatus> status, std::span<const Array3> face1,
-                  std::span<const Array3> face2, const Array3& n,
-                  const Array3& dir) -> void {
+auto clip_polygon(InOut<CcdStatus> status, std::span<const Vector3> face1,
+                  std::span<const Vector3> face2, const Vector3& n,
+                  const Vector3& dir) -> void {
   int nface1 = static_cast<int>(face1.size());
   int nface2 = static_cast<int>(face2.size());
   if (nface1 < 3) {
@@ -1404,7 +1407,7 @@ auto clip_polygon(InOut<CcdStatus> status, std::span<const Array3> face1,
 
   // Each side's plane. Here and below, only what is written is read, so the
   // scratch arrays are left uninitialized.
-  std::array<Array3, MAX_POLYGON> pn;
+  std::array<Vector3, MAX_POLYGON> pn;
   std::array<double, MAX_POLYGON> pd;
   for (int i = 0; i < nface1 - 1; i++) {
     pd[i] = compute_side_plane(Out(pn[i]), face1[i], face1[i + 1], n);
@@ -1413,18 +1416,18 @@ auto clip_polygon(InOut<CcdStatus> status, std::span<const Array3> face1,
       compute_side_plane(Out(pn[nface1 - 1]), face1[nface1 - 1], face1[0], n);
 
   // Sutherland–Hodgman: each clip adds at most one point.
-  std::array<std::array<Array3, 2 * MAX_POLYGON>, 2> polygons;
+  std::array<std::array<Vector3, 2 * MAX_POLYGON>, 2> polygons;
   int current = 0;
   int npolygon = nface2;
   int nclipped = 0;
   std::ranges::copy(face2, polygons[current].begin());
   for (int e = 0; e < nface1; e++) {
-    const std::array<Array3, 2 * MAX_POLYGON>& polygon = polygons[current];
-    std::array<Array3, 2 * MAX_POLYGON>& clipped = polygons[1 - current];
+    const std::array<Vector3, 2 * MAX_POLYGON>& polygon = polygons[current];
+    std::array<Vector3, 2 * MAX_POLYGON>& clipped = polygons[1 - current];
     for (int i = 0; i < npolygon; i++) {
-      const Array3& p = polygon[i];
-      const Array3& q = (i < npolygon - 1) ? polygon[i + 1] : polygon[0];
-      Array3 pq = subtract(q, p);
+      const Vector3& p = polygon[i];
+      const Vector3& q = (i < npolygon - 1) ? polygon[i + 1] : polygon[0];
+      Vector3 pq = subtract(q, p);
       bool inside1 = lies_inside(face1[e], pn[e], p);
       bool inside2 = lies_inside(face1[e], pn[e], q);
       if (!inside1 && !inside2) {
@@ -1451,7 +1454,7 @@ auto clip_polygon(InOut<CcdStatus> status, std::span<const Array3> face1,
   }
 
   // The points below `face1`.
-  std::array<Array3, 2 * MAX_POLYGON>& polygon = polygons[current];
+  std::array<Vector3, 2 * MAX_POLYGON>& polygon = polygons[current];
   int m = npolygon;
   npolygon = 0;
   for (int i = 0; i < m; i++) {
@@ -1469,7 +1472,7 @@ auto clip_polygon(InOut<CcdStatus> status, std::span<const Array3> face1,
   if (status->max_contacts < 5 && npolygon > 4) {
     status->witness_count = 4;
     std::array<int, 4> idx = find_largest_quad(
-        std::span<const Array3>{polygon.data(), std::size_t(npolygon)});
+        std::span<const Vector3>{polygon.data(), std::size_t(npolygon)});
     for (int i = 0; i < 4; i++) {
       status->dist[i] = place_witness(Out(status->x1[i]), Out(status->x2[i]),
                                       polygon[idx[i]], face1[0], n, dir);
@@ -1482,7 +1485,7 @@ auto clip_polygon(InOut<CcdStatus> status, std::span<const Array3> face1,
     double d = 0;
     for (int i = 0; i < npolygon; i++) {
       for (int j = i + 1; j < npolygon; j++) {
-        Array3 diff = subtract(polygon[j], polygon[i]);
+        Vector3 diff = subtract(polygon[j], polygon[i]);
         double d2 = dot(diff, diff);
         if (d2 > d) {
           d = d2;
@@ -1511,7 +1514,7 @@ auto clip_polygon(InOut<CcdStatus> status, std::span<const Array3> face1,
 auto find_cylinder_normals(Out<Triple> normals, Out<Indices> indices, int dim,
                            const Object& object, const Indices& vi) -> int {
   if (dim == 1) {
-    (*normals)[0] = multiply(object.mat, Array3{0, 0, vi[0] ? -1.0 : 1.0});
+    (*normals)[0] = multiply(object.mat, Vector3{0, 0, vi[0] ? -1.0 : 1.0});
     (*indices)[0] = vi[0];
     return 1;
   }
@@ -1520,10 +1523,10 @@ auto find_cylinder_normals(Out<Triple> normals, Out<Indices> indices, int dim,
 
 // The box face whose normal lies within FACE_TOL of `n` (boxNormals2).
 auto find_box_face_normal(Out<Triple> normals, Out<Indices> indices,
-                          const Matrix3& mat, const Array3& n) -> int {
-  static constexpr std::array<Array3, 6> FACES{
+                          const Matrix3& mat, const Vector3& n) -> int {
+  static const std::array<Vector3, 6> FACES{
       {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}};
-  Array3 local_n = multiply_transposed(mat, n);
+  Vector3 local_n = multiply_transposed(mat, n);
   local_n = scale(local_n, 1 / std::sqrt(dot(local_n, local_n)));
   for (int i = 0; i < 6; i++) {
     if (dot(local_n, FACES[i]) > FACE_TOL) {
@@ -1539,7 +1542,7 @@ auto find_box_face_normal(Out<Triple> normals, Out<Indices> indices,
 // (boxNormals).
 auto find_box_normals(Out<Triple> normals, Out<Indices> indices, int dim,
                       const Object& object, const Indices& vi,
-                      const Array3& dir) -> int {
+                      const Vector3& dir) -> int {
   int v1 = vi[0];
   int v2 = vi[1];
   int v3 = vi[2];
@@ -1552,7 +1555,7 @@ auto find_box_normals(Out<Triple> normals, Out<Indices> indices, int dim,
             (!(v1 & 2) && !(v2 & 2) && !(v3 & 2));
     int z = ((v1 & 4) && (v2 & 4) && (v3 & 4)) -
             (!(v1 & 4) && !(v2 & 4) && !(v3 & 4));
-    (*normals)[0] = multiply(mat, Array3{double(x), double(y), double(z)});
+    (*normals)[0] = multiply(mat, Vector3{double(x), double(y), double(z)});
     int sgn = x + y + z;
     if (x) {
       (*indices)[c++] = 0;
@@ -1574,16 +1577,16 @@ auto find_box_normals(Out<Triple> normals, Out<Indices> indices, int dim,
     int y = ((v1 & 2) && (v2 & 2)) - (!(v1 & 2) && !(v2 & 2));
     int z = ((v1 & 4) && (v2 & 4)) - (!(v1 & 4) && !(v2 & 4));
     if (x) {
-      (*normals)[0] = multiply(mat, Array3{double(x), 0, 0});
+      (*normals)[0] = multiply(mat, Vector3{double(x), 0, 0});
       (*indices)[c++] = (x > 0) ? 0 : 1;
     }
     if (y) {
-      (*normals)[c] = multiply(mat, Array3{0, double(y), 0});
+      (*normals)[c] = multiply(mat, Vector3{0, double(y), 0});
       (*indices)[c++] = (y > 0) ? 2 : 3;
     }
     if (z) {
       // MuJoCo writes the z normal second, wherever it falls.
-      (*normals)[1] = multiply(mat, Array3{0, 0, double(z)});
+      (*normals)[1] = multiply(mat, Vector3{0, 0, double(z)});
       (*indices)[c++] = (z > 0) ? 4 : 5;
     }
     return c == 2 ? 2 : find_box_face_normal(normals, indices, mat, dir);
@@ -1592,9 +1595,9 @@ auto find_box_normals(Out<Triple> normals, Out<Indices> indices, int dim,
     double x = (v1 & 1) ? 1 : -1;
     double y = (v1 & 2) ? 1 : -1;
     double z = (v1 & 4) ? 1 : -1;
-    (*normals)[0] = multiply(mat, Array3{x, 0, 0});
-    (*normals)[1] = multiply(mat, Array3{0, y, 0});
-    (*normals)[2] = multiply(mat, Array3{0, 0, z});
+    (*normals)[0] = multiply(mat, Vector3{x, 0, 0});
+    (*normals)[1] = multiply(mat, Vector3{0, y, 0});
+    (*normals)[2] = multiply(mat, Vector3{0, 0, z});
     (*indices)[0] = (x > 0) ? 0 : 1;
     (*indices)[1] = (y > 0) ? 2 : 3;
     (*indices)[2] = (z > 0) ? 4 : 5;
@@ -1608,11 +1611,11 @@ auto find_box_normals(Out<Triple> normals, Out<Indices> indices, int dim,
 auto find_box_edge_normals(Out<Triple> normals, Out<Triple> ends, int dim,
                            const Object& object, const Triple& v, int v1i)
     -> int {
-  const Array3& v1 = v[0];
-  const Array3& v2 = v[1];
+  const Vector3& v1 = v[0];
+  const Vector3& v2 = v[1];
   const Matrix3& mat = object.mat;
-  const Array3& pos = object.pos;
-  const Array3& size = object.size;
+  const Vector3& pos = object.pos;
+  const Vector3& size = object.size;
   if (dim == 2) {
     (*ends)[0] = v2;
     (*normals)[0] = subtract(v2, v1);
@@ -1682,8 +1685,8 @@ auto compute_cylinder_face(Out<Polygon> face, const Object& object, int idx)
 // A box's face `idx` as its four corners (boxFace).
 auto compute_box_face(Out<Polygon> face, const Object& object, int idx) -> int {
   const Matrix3& mat = object.mat;
-  const Array3& pos = object.pos;
-  const Array3& s = object.size;
+  const Vector3& pos = object.pos;
+  const Vector3& s = object.size;
   Polygon& f = *face;
   switch (idx) {
     case 0:
@@ -1728,8 +1731,8 @@ auto compute_box_face(Out<Polygon> face, const Object& object, int idx) -> int {
 }
 
 // The first face of `v` facing a face of `w` (alignedFaces).
-inline auto find_aligned_faces(std::span<const Array3> v,
-                               std::span<const Array3> w)
+inline auto find_aligned_faces(std::span<const Vector3> v,
+                               std::span<const Vector3> w)
     -> std::optional<std::array<int, 2>> {
   for (int i = 0; i < static_cast<int>(v.size()); i++) {
     for (int j = 0; j < static_cast<int>(w.size()); j++) {
@@ -1742,9 +1745,9 @@ inline auto find_aligned_faces(std::span<const Array3> v,
 }
 
 // The first edge lying in a face that faces along `dir` (alignedFaceEdge).
-inline auto find_aligned_face_edge(std::span<const Array3> edge,
-                                   std::span<const Array3> face,
-                                   const Array3& dir)
+inline auto find_aligned_face_edge(std::span<const Vector3> edge,
+                                   std::span<const Vector3> face,
+                                   const Vector3& dir)
     -> std::optional<std::array<int, 2>> {
   for (int i = 0; i < static_cast<int>(face.size()); i++) {
     if (dot(face[i], dir) <= MINVAL) {
@@ -1775,7 +1778,7 @@ inline auto reduce_simplex(InOut<Indices> vi, InOut<Triple> v) -> int {
 
 auto find_normals(const Object& object, Out<Triple> normals,
                   Out<Indices> indices, int dim, const Indices& vi,
-                  const Array3& dir) -> int {
+                  const Vector3& dir) -> int {
   if (object.type == GeomType::BOX) {
     return find_box_normals(normals, indices, dim, object, vi, dir);
   }
@@ -1834,12 +1837,12 @@ auto find_multicontact(const Polytope& polytope, const Face& face,
   Polygon face2{};
   int nface1 = reduce_simplex(InOut(v1i), InOut(v1));
   int nface2 = reduce_simplex(InOut(v2i), InOut(v2));
-  Array3 dir = subtract(status->x2[0], status->x1[0]);
-  Array3 dir_neg = subtract(status->x1[0], status->x2[0]);
+  Vector3 dir = subtract(status->x2[0], status->x1[0]);
+  Vector3 dir_neg = subtract(status->x1[0], status->x2[0]);
   int nnorms1 = find_normals(first, Out(n1), Out(idx1), nface1, v1i, dir_neg);
   int nnorms2 = find_normals(second, Out(n2), Out(idx2), nface2, v2i, dir);
   auto first_of = [](const Triple& normals, int count) {
-    return std::span<const Array3>{normals.data(), std::size_t(count)};
+    return std::span<const Vector3>{normals.data(), std::size_t(count)};
   };
 
   std::optional<std::array<int, 2>> res =
@@ -1885,8 +1888,8 @@ auto find_multicontact(const Polytope& polytope, const Face& face,
   } else {
     nface2 = compute_face(second, Out(face2), idx2[j]);
   }
-  std::span<const Array3> polygon1{face1.data(), std::size_t(nface1)};
-  std::span<const Array3> polygon2{face2.data(), std::size_t(nface2)};
+  std::span<const Vector3> polygon1{face1.data(), std::size_t(nface1)};
+  std::span<const Vector3> polygon2{face2.data(), std::size_t(nface2)};
 
   if (edgecon1) {
     clip_polygon(status, polygon2, polygon1, n2[j], scale(n2[j], -1.0));
@@ -1906,7 +1909,7 @@ auto find_multicontact(const Polytope& polytope, const Face& face,
 // (inflate).
 inline auto inflate(InOut<CcdStatus> status, double margin1, double margin2)
     -> void {
-  Array3 n = subtract(status->x2[0], status->x1[0]);
+  Vector3 n = subtract(status->x2[0], status->x1[0]);
   normalize3(InOut(n));
   if (margin1 != 0) {
     status->x1[0][0] += margin1 * n[0];
@@ -2050,8 +2053,8 @@ auto count_max_contacts(const Object& first, const Object& second) -> int {
 }
 
 // Turns a frame by `rot` about `origin` (mju_rotateFrame).
-auto rotate_frame(const Array3& origin, const Matrix3& rot, InOut<Matrix3> mat,
-                  InOut<Array3> pos) -> void {
+auto rotate_frame(const Vector3& origin, const Matrix3& rot, InOut<Matrix3> mat,
+                  InOut<Vector3> pos) -> void {
   Matrix3 turned{};
   for (int i = 0; i < 3; ++i) {
     for (int j = 0; j < 3; ++j) {
@@ -2061,8 +2064,8 @@ auto rotate_frame(const Array3& origin, const Matrix3& rot, InOut<Matrix3> mat,
     }
   }
   *mat = turned;
-  Array3 rel = subtract(origin, *pos);
-  Array3 vec = subtract(multiply(rot, rel), rel);
+  Vector3 rel = subtract(origin, *pos);
+  Vector3 vec = subtract(multiply(rot, rel), rel);
   *pos = subtract(*pos, vec);
 }
 
@@ -2078,8 +2081,8 @@ auto collide_convex(const Geom& first, const GeomFrame& first_frame,
   if (first.type == GeomType::PLANE) {
     Object object = make_object(second, second_frame, 0);
     const Matrix3& mat = first_frame.mat;
-    Array3 normal{mat[2], mat[5], mat[8]};
-    Array3 v = object.support(InOut(object), {-mat[2], -mat[5], -mat[8]});
+    Vector3 normal{mat[2], mat[5], mat[8]};
+    Vector3 v = object.support(InOut(object), {-mat[2], -mat[5], -mat[8]});
     double dist = dot(normal, subtract(v, first_frame.pos));
     if (dist > margin) {
       return 0;
@@ -2111,9 +2114,9 @@ auto collide_convex(const Geom& first, const GeomFrame& first_frame,
     constexpr double PERTURBATION = 1e-3;
 
     // mju_makeFrame of the normal alone: its two tangents are the axes.
-    Array3 x = out[0].normal;
+    Vector3 x = out[0].normal;
     normalize3(InOut(x));
-    Array3 y{0, 0, 0};
+    Vector3 y{0, 0, 0};
     if (x[1] < 0.5 && x[1] > -0.5) {
       y[1] = 1;
     } else {
@@ -2121,18 +2124,18 @@ auto collide_convex(const Geom& first, const GeomFrame& first_frame,
     }
     y = subtract(y, scale(x, dot(x, y)));
     normalize3(InOut(y));
-    Array3 z = cross(x, y);
+    Vector3 z = cross(x, y);
 
     double tolerance =
         RELATIVE_TOLERANCE * std::min(first_radius, second_radius);
-    for (const Array3& axis : std::array<Array3, 2>{y, z}) {
+    for (const Vector3& axis : std::array<Vector3, 2>{y, z}) {
       for (double angle : {-PERTURBATION, PERTURBATION}) {
         // mji_axisAngle2Quat, mju_quat2Mat.
         double s = std::sin(angle * 0.5);
         Quaternion4 quat{std::cos(angle * 0.5), axis[0] * s, axis[1] * s,
                          axis[2] * s};
         Matrix3 rot = articulated::convert_to_matrix(quat);
-        Array3 origin = out[0].pos;
+        Vector3 origin = out[0].pos;
         rotate_frame(origin, rot, InOut(object1.mat), InOut(object1.pos));
         rotate_frame(origin, transpose(rot), InOut(object2.mat),
                      InOut(object2.pos));

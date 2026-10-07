@@ -149,9 +149,9 @@ namespace {
 constexpr std::array<double, 5> NO_FRICTION{};
 
 // MuJoCo's quaternion as a rotation vector (mju_quat2Vel, dt 1).
-auto convert_to_rotation(model::Quaternion4 quat) -> model::Array3 {
+auto convert_to_rotation(model::Quaternion4 quat) -> Vector3 {
   model::articulated::normalize4(InOut(quat));
-  model::Array3 axis{quat[1], quat[2], quat[3]};
+  Vector3 axis{quat[1], quat[2], quat[3]};
   double sin_half = model::articulated::normalize3(InOut(axis));
   double angle = 2 * std::atan2(sin_half, quat[0]);
   if (angle > std::numbers::pi) {
@@ -281,7 +281,7 @@ auto Solve::prepare(SystemWorld& world) -> bool {
       const double* qpos = data_[t].qpos;
       std::uint32_t q = joint.qpos - tree.first_qpos;
       if (joint.type == model::JointType::BALL) {
-        model::Array3 r = convert_to_rotation(
+        Vector3 r = convert_to_rotation(
             {qpos[q], qpos[q + 1], qpos[q + 2], qpos[q + 3]});
         double angle = model::articulated::normalize3(InOut(r));
         marked[t] =
@@ -505,7 +505,7 @@ auto Solve::solve_island(std::span<const std::uint32_t> members,
       std::uint32_t q = joint.qpos - tree.first_qpos;
       std::uint32_t c = offset[t] + joint.dof - tree.first_dof;
       if (joint.type == model::JointType::BALL) {
-        model::Array3 r = convert_to_rotation(
+        Vector3 r = convert_to_rotation(
             {qpos[q], qpos[q + 1], qpos[q + 2], qpos[q + 3]});
         double angle = model::articulated::normalize3(InOut(r));
         double dist = std::max(joint.range[0], joint.range[1]) - angle;

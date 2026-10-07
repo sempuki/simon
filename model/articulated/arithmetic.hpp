@@ -39,7 +39,7 @@ inline auto normalize4(InOut<Quaternion4> q) -> double {
   return norm;
 }
 
-inline auto normalize3(InOut<Array3> v) -> double {
+inline auto normalize3(InOut<Vector3> v) -> double {
   double norm =
       std::sqrt((*v)[0] * (*v)[0] + (*v)[1] * (*v)[1] + (*v)[2] * (*v)[2]);
   if (norm < MINVAL) {
@@ -61,22 +61,22 @@ inline auto multiply(const Quaternion4& a, const Quaternion4& b)
           a[0] * b[3] + a[1] * b[2] - a[2] * b[1] + a[3] * b[0]};
 }
 
-inline auto rotate(const Array3& v, const Quaternion4& q) -> Array3 {
+inline auto rotate(const Vector3& v, const Quaternion4& q) -> Vector3 {
   if (v[0] == 0 && v[1] == 0 && v[2] == 0) {
     return {0.0, 0.0, 0.0};
   }
   if (q[0] == 1 && q[1] == 0 && q[2] == 0 && q[3] == 0) {
     return v;
   }
-  Array3 t{q[0] * v[0] + q[2] * v[2] - q[3] * v[1],
-           q[0] * v[1] + q[3] * v[0] - q[1] * v[2],
-           q[0] * v[2] + q[1] * v[1] - q[2] * v[0]};
+  Vector3 t{q[0] * v[0] + q[2] * v[2] - q[3] * v[1],
+            q[0] * v[1] + q[3] * v[0] - q[1] * v[2],
+            q[0] * v[2] + q[1] * v[1] - q[2] * v[0]};
   return {v[0] + 2 * (q[2] * t[2] - q[3] * t[1]),
           v[1] + 2 * (q[3] * t[0] - q[1] * t[2]),
           v[2] + 2 * (q[1] * t[1] - q[2] * t[0])};
 }
 
-inline auto convert_axis_angle(const Array3& axis, double angle)
+inline auto convert_axis_angle(const Vector3& axis, double angle)
     -> Quaternion4 {
   if (angle == 0) {
     return {1.0, 0.0, 0.0, 0.0};
@@ -104,54 +104,56 @@ inline auto convert_to_matrix(const Quaternion4& q) -> Matrix3 {
           2 * (q13 - q02),       2 * (q23 + q01),       q00 - q11 - q22 + q33};
 }
 
-inline auto multiply(const Matrix3& m, const Array3& v) -> Array3 {
+inline auto multiply(const Matrix3& m, const Vector3& v) -> Vector3 {
   return {m[0] * v[0] + m[1] * v[1] + m[2] * v[2],
           m[3] * v[0] + m[4] * v[1] + m[5] * v[2],
           m[6] * v[0] + m[7] * v[1] + m[8] * v[2]};
 }
 
-inline auto cross(const Array3& a, const Array3& b) -> Array3 {
+inline auto cross(const Vector3& a, const Vector3& b) -> Vector3 {
   return {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
           a[0] * b[1] - a[1] * b[0]};
 }
 
-inline auto dot(const Array3& a, const Array3& b) -> double {
+inline auto dot(const Vector3& a, const Vector3& b) -> double {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
-inline auto norm(const Array3& v) -> double { return std::sqrt(dot(v, v)); }
+inline auto norm(const Vector3& v) -> double { return std::sqrt(dot(v, v)); }
 
-inline auto add(const Array3& a, const Array3& b) -> Array3 {
+inline auto add(const Vector3& a, const Vector3& b) -> Vector3 {
   return {a[0] + b[0], a[1] + b[1], a[2] + b[2]};
 }
 
-inline auto subtract(const Array3& a, const Array3& b) -> Array3 {
+inline auto subtract(const Vector3& a, const Vector3& b) -> Vector3 {
   return {a[0] - b[0], a[1] - b[1], a[2] - b[2]};
 }
 
-inline auto scale(const Array3& v, double s) -> Array3 {
+inline auto scale(const Vector3& v, double s) -> Vector3 {
   return {v[0] * s, v[1] * s, v[2] * s};
 }
 
 // a + s b (mji_addScl3).
-inline auto add_scaled(const Array3& a, const Array3& b, double s) -> Array3 {
+inline auto add_scaled(const Vector3& a, const Vector3& b, double s)
+    -> Vector3 {
   return {a[0] + s * b[0], a[1] + s * b[1], a[2] + s * b[2]};
 }
 
 // v += w s (mji_addToScl3).
-inline auto add_to_scaled(InOut<Array3> v, const Array3& w, double s) -> void {
+inline auto add_to_scaled(InOut<Vector3> v, const Vector3& w, double s)
+    -> void {
   (*v)[0] += w[0] * s;
   (*v)[1] += w[1] * s;
   (*v)[2] += w[2] * s;
 }
 
-inline auto multiply_transposed(const Matrix3& m, const Array3& v) -> Array3 {
+inline auto multiply_transposed(const Matrix3& m, const Vector3& v) -> Vector3 {
   return {m[0] * v[0] + m[3] * v[1] + m[6] * v[2],
           m[1] * v[0] + m[4] * v[1] + m[7] * v[2],
           m[2] * v[0] + m[5] * v[1] + m[8] * v[2]};
 }
 
-inline auto column(const Matrix3& m, int c) -> Array3 {
+inline auto column(const Matrix3& m, int c) -> Vector3 {
   return {m[c], m[c + 3], m[c + 6]};
 }
 

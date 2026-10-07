@@ -159,7 +159,7 @@ struct Island final {
 // Where a tree is, the world's spatial component: the sphere about its
 // center of mass that holds every geom but planes, with its margin and gap.
 struct TreeBound final {
-  model::Array3 center{};
+  Vector3 center = Vector3::Zero();
   double radius = 0.0;  // m.
 };
 
