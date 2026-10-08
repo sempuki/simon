@@ -5,7 +5,8 @@ area that grows with their number so traffic density stays the same. It is
 the application for flight control algorithms of the class JSBSim runs, and
 it shows fidelity as an opt-in: most aircraft fly a single-pass model, and
 those whose archetype opts in are integrated with Runge-Kutta 4.
-`bazel run //application/aeronautic -- <aircraft> <precise> <seed>` flies one
+`bazel run //application/aeronautic -- <aircraft> <precise> <rigid> <fighters>
+<seed>` flies one
 scenario headless and prints how many waypoints were reached.
 
 The code is in three layers:

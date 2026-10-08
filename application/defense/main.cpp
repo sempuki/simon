@@ -8,18 +8,26 @@
 #include <cstdint>
 #include <cstdlib>
 #include <print>
+#include <string_view>
 
+#include "application/arguments.hpp"
 #include "application/defense/simulation.hpp"
 #include "core/argument.hpp"
 #include "engine/driver.hpp"
+
+// How the program is called.
+constexpr std::string_view USAGE = "defense [seed]";
 
 auto main(int argc, char** argv) -> int {
   using namespace simon;
   using namespace std::chrono_literals;
 
   defense::Scenario scenario;
-  if (argc > 1) {
-    scenario.seed = std::strtoull(argv[1], nullptr, 10);
+  application::Arguments arguments{argc, argv};
+  scenario.seed = static_cast<std::uint64_t>(
+      arguments.integer(0, static_cast<std::int64_t>(scenario.seed)));
+  if (arguments.report_error(USAGE)) {
+    return EXIT_FAILURE;
   }
   defense::Simulation simulation{scenario};
   engine::BatchDriver driver{engine::Timing{.max_step = 10ms},

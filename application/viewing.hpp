@@ -5,18 +5,17 @@
 #include <SDL2/SDL.h>
 
 #include <algorithm>
-#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
-#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "application/arguments.hpp"
 #include "core/argument.hpp"
 #include "engine/driver.hpp"
 #include "imgui/imgui.h"
@@ -45,41 +44,15 @@ struct WindowOptions final {
   std::string screenshot;
 };
 
-// Takes the window options out of `argv`, and returns the rest.
-inline auto parse_window_options(int argc, char** argv,
-                                 InOut<WindowOptions> options)
-    -> std::vector<std::string_view> {
-  std::vector<std::string_view> rest;
-  for (int i = 1; i < argc; ++i) {
-    std::string_view argument = argv[i];
-    if (argument.starts_with("--scale=")) {
-      options->scale = std::strtof(argv[i] + 8, nullptr);
-    } else if (argument.starts_with("--frames=")) {
-      options->frames = std::atoi(argv[i] + 9);
-    } else if (argument.starts_with("--screenshot=")) {
-      options->screenshot = std::string{argument.substr(13)};
-    } else {
-      rest.push_back(argument);
-    }
-  }
-  return rest;
-}
-
-// The integer argument at `index` of `arguments`, or `fallback` if there is
-// none or it is not an integer.
-inline auto parse_integer(std::span<const std::string_view> arguments,
-                          std::size_t index, std::int64_t fallback)
-    -> std::int64_t {
-  if (index >= arguments.size()) {
-    return fallback;
-  }
-  std::string_view argument = arguments[index];
-  std::int64_t value = 0;
-  auto [end, error] = std::from_chars(argument.data(),
-                                      argument.data() + argument.size(), value);
-  return error == std::errc{} && end == argument.data() + argument.size()
-             ? value
-             : fallback;
+// Reads the window options from `arguments`.
+inline auto read_window_options(std::string title,
+                                InOut<application::Arguments> arguments)
+    -> WindowOptions {
+  return WindowOptions{
+      .title = std::move(title),
+      .scale = static_cast<float>(arguments->option_number("scale", 0.0)),
+      .frames = static_cast<int>(arguments->option_integer("frames", 0)),
+      .screenshot = std::string{arguments->option_text("screenshot", "")}};
 }
 
 // Computes the interface's scale on `display`: its height in screen

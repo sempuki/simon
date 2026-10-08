@@ -14,7 +14,7 @@ simon's runner finds it, from the galaxy's disk.
 REBOUND 5.2.2:
 
   pip install rebound numpy
-  bazel run -c opt //application/galactic -- collision 2000 2000 \\
+  bazel run -c opt //application/galactic -- 2000 2000 \\
       --start=/tmp/collision_start.csv
   python application/galactic/reference/rebound_collision.py \\
       /tmp/collision_start.csv

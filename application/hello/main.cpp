@@ -8,10 +8,15 @@
 #include <chrono>
 #include <cstdlib>
 #include <print>
+#include <string_view>
 
+#include "application/arguments.hpp"
 #include "application/hello/hello.hpp"
 #include "core/argument.hpp"
 #include "engine/driver.hpp"
+
+// How the program is called.
+constexpr std::string_view USAGE = "hello [balls] [seconds] [restitution]";
 
 auto main(int argc, char** argv) -> int {
   using namespace simon;
@@ -19,10 +24,14 @@ auto main(int argc, char** argv) -> int {
   using WallClock = std::chrono::steady_clock;
 
   hello::Scenario scenario;
-  if (argc > 1) scenario.balls = std::strtoull(argv[1], nullptr, 10);
-  int seconds = argc > 2 ? std::atoi(argv[2]) : 10;
-  if (argc > 3) {
-    scenario.springiness.restitution = std::strtod(argv[3], nullptr);
+  application::Arguments arguments{argc, argv};
+  scenario.balls = static_cast<std::size_t>(
+      arguments.integer(0, static_cast<std::int64_t>(scenario.balls)));
+  auto seconds = static_cast<int>(arguments.integer(1, 10));
+  scenario.springiness.restitution =
+      arguments.number(2, scenario.springiness.restitution);
+  if (arguments.report_error(USAGE)) {
+    return EXIT_FAILURE;
   }
 
   hello::Simulation simulation{scenario};

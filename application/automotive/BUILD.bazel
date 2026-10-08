@@ -59,6 +59,7 @@ cc_binary(
     copts = COPTS,
     data = glob(["roads/*.xodr"]) + ["//3rd_party:carla"],
     deps = [
+        "//application:arguments",
         ":automotive_library",
         "//engine:driver",
         "//core:argument",
@@ -96,6 +97,7 @@ cc_binary(
     copts = COPTS,
     data = ["//3rd_party:esmini"],
     deps = [
+        "//application:arguments",
         ":automotive_library",
         "//format:openscenario",
     ],
@@ -384,6 +386,7 @@ cc_test(
 )
 
 VIEWER_DEPS = [
+    "//application:arguments",
     ":automotive_library",
     ":road_drawing",
     "//application:viewing",

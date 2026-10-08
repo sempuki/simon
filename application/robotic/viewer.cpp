@@ -15,12 +15,14 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <memory>
 #include <numbers>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "application/arguments.hpp"
 #include "application/robotic/simulation.hpp"
 #include "application/viewing.hpp"
 #include "base/core.hpp"
@@ -447,12 +449,19 @@ class Viewer final {
 }  // namespace
 }  // namespace simon::robotic
 
+// How the viewer is called.
+constexpr std::string_view USAGE =
+    "robotic viewer [model.xml] [--scale=N] [--frames=N] [--screenshot=PATH]";
+
 auto main(int argc, char** argv) -> int {
   using namespace simon;
-  viewing::WindowOptions options{.title = "Robotic"};
-  std::vector<std::string_view> arguments =
-      viewing::parse_window_options(argc, argv, InOut(options));
-  std::string model{arguments.empty() ? robotic::HUMANOID : arguments[0]};
+  application::Arguments arguments{argc, argv};
+  viewing::WindowOptions options =
+      viewing::read_window_options("Robotic", InOut(arguments));
+  std::string model{arguments.text(0, robotic::HUMANOID)};
+  if (arguments.report_error(USAGE)) {
+    return EXIT_FAILURE;
+  }
   return viewing::run(
       options, [&](float scale) { return robotic::Viewer{model, scale}; });
 }

@@ -23,6 +23,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <deque>
 #include <limits>
 #include <memory>
@@ -32,6 +33,7 @@
 #include <string_view>
 #include <vector>
 
+#include "application/arguments.hpp"
 #include "application/automotive/road_drawing.hpp"
 #include "application/automotive/scenario_batch.hpp"
 #include "application/automotive/scenario_simulation.hpp"
@@ -888,26 +890,34 @@ class ScenarioViewer final {
 }  // namespace
 }  // namespace simon::automotive
 
+// How the viewer is called.
+constexpr std::string_view USAGE =
+    "automotive viewer [roads.xodr | scenario.xosc] [vehicles] [seed] "
+    "[pedestrians] [--scale=N] [--frames=N] [--screenshot=PATH]";
+
 auto main(int argc, char** argv) -> int {
   using namespace simon;
-  viewing::WindowOptions options{.title = "Automotive"};
-  std::vector<std::string_view> arguments =
-      viewing::parse_window_options(argc, argv, InOut(options));
-  std::string file = arguments.empty()
-                         ? std::string{"application/automotive/roads/ring.xodr"}
-                         : std::string{arguments[0]};
+  application::Arguments arguments{argc, argv};
+  viewing::WindowOptions options =
+      viewing::read_window_options("Automotive", InOut(arguments));
+  std::string file{arguments.text(0, "application/automotive/roads/ring.xodr")};
   if (file.ends_with(".xosc")) {
+    if (arguments.report_error(USAGE)) {
+      return EXIT_FAILURE;
+    }
     return viewing::run(options, [&](float scale) {
       return automotive::ScenarioViewer{file, scale};
     });
   }
   automotive::Scenario scenario{
-      .seed =
-          static_cast<std::uint64_t>(viewing::parse_integer(arguments, 2, 1)),
+      .seed = static_cast<std::uint64_t>(arguments.integer(2, 1)),
       .roads = file,
-      .vehicles = static_cast<int>(viewing::parse_integer(arguments, 1, 40)),
-      .pedestrians = static_cast<int>(viewing::parse_integer(arguments, 3, 0)),
+      .vehicles = static_cast<int>(arguments.integer(1, 40)),
+      .pedestrians = static_cast<int>(arguments.integer(3, 0)),
   };
+  if (arguments.report_error(USAGE)) {
+    return EXIT_FAILURE;
+  }
   return viewing::run(options, [&](float scale) {
     return automotive::TrafficViewer{scenario, scale};
   });

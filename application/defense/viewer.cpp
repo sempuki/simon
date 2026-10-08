@@ -14,6 +14,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <memory>
 #include <numbers>
 #include <string>
@@ -21,6 +22,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "application/arguments.hpp"
 #include "application/defense/simulation.hpp"
 #include "application/viewing.hpp"
 #include "base/core.hpp"
@@ -293,13 +295,19 @@ class Viewer final {
 }  // namespace
 }  // namespace simon::defense
 
+// How the viewer is called.
+constexpr std::string_view USAGE =
+    "defense viewer [seed] [--scale=N] [--frames=N] [--screenshot=PATH]";
+
 auto main(int argc, char** argv) -> int {
   using namespace simon;
-  viewing::WindowOptions options{.title = "Defense"};
-  std::vector<std::string_view> arguments =
-      viewing::parse_window_options(argc, argv, InOut(options));
-  auto seed =
-      static_cast<std::uint64_t>(viewing::parse_integer(arguments, 0, 1));
+  application::Arguments arguments{argc, argv};
+  viewing::WindowOptions options =
+      viewing::read_window_options("Defense", InOut(arguments));
+  auto seed = static_cast<std::uint64_t>(arguments.integer(0, 1));
+  if (arguments.report_error(USAGE)) {
+    return EXIT_FAILURE;
+  }
   return viewing::run(
       options, [&](float scale) { return defense::Viewer{seed, scale}; });
 }

@@ -69,8 +69,8 @@ years, so a run can last billions of years.
 ```sh
 bazel test //application/galactic/...
 bazel run -c opt //application/galactic:viewer             # watch two galaxies collide
-bazel run -c opt //application/galactic -- collision       # run it headless
-bazel run -c opt //application/galactic -- disk 4000 500   # one galaxy alone
+bazel run -c opt //application/galactic                    # run it headless
+bazel run -c opt //application/galactic -- 4000 500 --disk # one galaxy alone
 bazel run -c opt //application/galactic:galactic_benchmark -- tree 100000 5
 ```
 

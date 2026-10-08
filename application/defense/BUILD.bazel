@@ -49,6 +49,7 @@ cc_binary(
     srcs = ["main.cpp"],
     copts = COPTS,
     deps = [
+        "//application:arguments",
         "//core:argument",
         ":defense_library",
         "//engine:driver",
@@ -57,6 +58,7 @@ cc_binary(
 
 application_viewer(
     deps = [
+        "//application:arguments",
         "//core:argument",
         ":defense_library",
         "//application:viewing",

@@ -190,6 +190,7 @@ cc_test(
 
 application_viewer(
     deps = [
+        "//application:arguments",
         "//core:argument",
         "//core:math",
         ":aeronautic_library",
@@ -221,6 +222,7 @@ cc_binary(
         "//3rd_party:jsbsim",
     ],
     deps = [
+        "//application:arguments",
         "//core:argument",
         ":aeronautic_library",
         "//engine:driver",

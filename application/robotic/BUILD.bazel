@@ -156,6 +156,7 @@ cc_binary(
 )
 
 VIEWER_DEPS = [
+    "//application:arguments",
     ":robotic_library",
     "//application:viewing",
     "//engine:driver",

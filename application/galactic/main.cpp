@@ -2,11 +2,12 @@
 
 // Runs a galactic scenario as fast as possible and prints how it goes:
 //
-//   bazel run -c opt //application/galactic -- collision [disk bodies]
+//   bazel run -c opt //application/galactic -- [disk bodies]
 //       [million years] [--step=YEARS] [--start=PATH] [--track=PATH]
-//   bazel run -c opt //application/galactic -- disk [disk bodies]
-//       [million years]
+//   bazel run -c opt //application/galactic -- [disk bodies]
+//       [million years] --disk
 //
+// Its first argument is the viewer's.
 // A collision prints, every 50 million years, the energy's drift, the
 // distance between the galaxies' centers, and the share of their disks more
 // than 30 kpc from their own galaxy's center, in tails and bridges. Steps
@@ -26,6 +27,7 @@
 #include <string_view>
 #include <vector>
 
+#include "application/arguments.hpp"
 #include "application/galactic/simulation.hpp"
 #include "core/argument.hpp"
 #include "core/math.hpp"
@@ -169,37 +171,25 @@ auto run_disk(std::size_t disk_bodies, int million_years) -> int {
 }  // namespace
 }  // namespace simon::galactic
 
+// How the program is called.
+constexpr std::string_view USAGE =
+    "galactic [disk bodies] [million years] [--disk] [--step=YEARS] "
+    "[--start=PATH] [--track=PATH]";
+
 auto main(int argc, char** argv) -> int {
   using namespace simon::galactic;
-  std::vector<std::string_view> arguments;
-  std::string_view start;
-  std::string_view track;
-  Year step{1000000};
-  for (int i = 1; i < argc; ++i) {
-    std::string_view argument = argv[i];
-    if (argument.starts_with("--start=")) {
-      start = argument.substr(8);
-    } else if (argument.starts_with("--track=")) {
-      track = argument.substr(8);
-    } else if (argument.starts_with("--step=")) {
-      step = Year{std::atoll(argument.substr(7).data())};
-    } else {
-      arguments.push_back(argument);
-    }
+  simon::application::Arguments arguments{argc, argv};
+  auto bodies = static_cast<std::size_t>(arguments.integer(0, 2000));
+  auto million_years = static_cast<int>(arguments.integer(1, 2000));
+  bool disk = arguments.flag("disk");
+  Year step{arguments.option_integer("step", 1000000)};
+  std::string_view start = arguments.option_text("start", "");
+  std::string_view track = arguments.option_text("track", "");
+  if (arguments.report_error(USAGE)) {
+    return EXIT_FAILURE;
   }
-  std::string_view what = arguments.empty() ? "collision" : arguments[0];
-  std::size_t bodies = arguments.size() > 1
-                           ? std::strtoull(arguments[1].data(), nullptr, 10)
-                           : 2000;
-  int million_years =
-      arguments.size() > 2 ? std::atoi(arguments[2].data()) : 2000;
-  if (what == "collision") {
-    return run_collision(bodies, million_years, step, start, track);
+  if (disk) {
+    return run_disk(bodies, million_years);
   }
-  if (what == "disk") return run_disk(bodies, million_years);
-  std::println(stderr,
-               "Usage: galactic [collision|disk] [disk bodies] "
-               "[million years] [--step=YEARS] [--start=PATH] "
-               "[--track=PATH]");
-  return EXIT_FAILURE;
+  return run_collision(bodies, million_years, step, start, track);
 }

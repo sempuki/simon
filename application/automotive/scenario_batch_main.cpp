@@ -8,29 +8,41 @@
 //       <distribution.xosc> [threads]
 
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <print>
 #include <string>
+#include <string_view>
 #include <thread>
 
+#include "application/arguments.hpp"
 #include "application/automotive/scenario_batch.hpp"
 #include "format/openscenario.hpp"
+
+// How the program is called.
+constexpr std::string_view USAGE =
+    "scenario_batch <distribution.xosc> [threads]";
 
 auto main(int argc, char** argv) -> int {
   using namespace std::chrono_literals;
   using namespace simon;
   using namespace simon::automotive;
-  if (argc != 2 && argc != 3) {
-    std::println(stderr, "scenario_batch <distribution.xosc> [threads]");
-    return 1;
+  application::Arguments arguments{argc, argv};
+  std::string_view file = arguments.text(0, "");
+  auto threads = static_cast<std::size_t>(arguments.integer(
+      1, static_cast<std::int64_t>(std::thread::hardware_concurrency())));
+  if (arguments.report_error(USAGE)) {
+    return EXIT_FAILURE;
   }
-  auto distribution = format::load_parameter_distribution(argv[1]);
+  if (file.empty()) {
+    std::println(stderr, "Usage: {}", USAGE);
+    return EXIT_FAILURE;
+  }
+  auto distribution = format::load_parameter_distribution(std::string{file});
   if (!distribution) {
     std::println(stderr, "{}", distribution.error().message());
-    return 1;
+    return EXIT_FAILURE;
   }
-  std::size_t threads = argc == 3 ? std::strtoul(argv[2], nullptr, 10)
-                                  : std::thread::hardware_concurrency();
   constexpr std::size_t LIMIT = 72'000;  // An hour of steps.
   std::vector<BatchRun> runs = run_batch(*distribution, threads, 50ms, LIMIT);
 

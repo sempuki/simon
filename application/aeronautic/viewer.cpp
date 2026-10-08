@@ -17,6 +17,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <deque>
 #include <memory>
 #include <numbers>
@@ -26,6 +27,7 @@
 #include <vector>
 
 #include "application/aeronautic/simulation.hpp"
+#include "application/arguments.hpp"
 #include "application/viewing.hpp"
 #include "base/core.hpp"
 #include "core/argument.hpp"
@@ -446,21 +448,26 @@ class Viewer final {
 }  // namespace
 }  // namespace simon::aeronautic
 
+// How the viewer is called.
+constexpr std::string_view USAGE =
+    "aeronautic viewer [aircraft] [precise] [rigid] [fighters] [seed] "
+    "[--scale=N] [--frames=N] [--screenshot=PATH]";
+
 auto main(int argc, char** argv) -> int {
   using namespace simon;
-  viewing::WindowOptions options{.title = "Aeronautic"};
-  std::vector<std::string_view> arguments =
-      viewing::parse_window_options(argc, argv, InOut(options));
-  auto integer = [&](std::size_t index, std::int64_t fallback) {
-    return viewing::parse_integer(arguments, index, fallback);
-  };
+  application::Arguments arguments{argc, argv};
+  viewing::WindowOptions options =
+      viewing::read_window_options("Aeronautic", InOut(arguments));
   aeronautic::Scenario scenario{
-      .seed = static_cast<std::uint64_t>(integer(4, 1)),
-      .aircraft = static_cast<int>(integer(0, 2000)),
-      .precise = static_cast<int>(integer(1, 20)),
-      .rigid = static_cast<int>(integer(2, 4)),
-      .fighters = static_cast<int>(integer(3, 4)),
+      .seed = static_cast<std::uint64_t>(arguments.integer(4, 1)),
+      .aircraft = static_cast<int>(arguments.integer(0, 2000)),
+      .precise = static_cast<int>(arguments.integer(1, 20)),
+      .rigid = static_cast<int>(arguments.integer(2, 4)),
+      .fighters = static_cast<int>(arguments.integer(3, 4)),
   };
+  if (arguments.report_error(USAGE)) {
+    return EXIT_FAILURE;
+  }
   return viewing::run(options, [&](float scale) {
     return aeronautic::Viewer{scenario, scale};
   });

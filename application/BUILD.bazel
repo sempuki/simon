@@ -2,6 +2,7 @@
 
 load("@lib//bazel:copts.bzl", "COPTS")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -10,6 +11,7 @@ cc_library(
     hdrs = ["viewing.hpp"],
     copts = COPTS,
     deps = [
+        ":arguments",
         "//engine:driver",
         "//core:argument",
         "//3rd_party:imgui",
@@ -26,4 +28,22 @@ cc_library(
     hdrs = ["testing.hpp"],
     copts = COPTS,
     deps = ["@lib//base:testing"],
+)
+
+cc_library(
+    name = "arguments",
+    srcs = ["arguments.cpp"],
+    hdrs = ["arguments.hpp"],
+    copts = COPTS,
+)
+
+cc_test(
+    name = "arguments_test",
+    size = "small",
+    srcs = ["arguments_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":arguments",
+        "@lib//base:testing",
+    ],
 )

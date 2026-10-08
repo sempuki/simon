@@ -11,10 +11,12 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <memory>
 #include <string_view>
 #include <vector>
 
+#include "application/arguments.hpp"
 #include "application/hello/hello.hpp"
 #include "application/viewing.hpp"
 #include "base/core.hpp"
@@ -154,13 +156,20 @@ class Viewer final {
 }  // namespace
 }  // namespace simon::hello
 
+// How the viewer is called.
+constexpr std::string_view USAGE =
+    "hello viewer [balls] [--scale=N] [--frames=N] [--screenshot=PATH]";
+
 auto main(int argc, char** argv) -> int {
   using namespace simon;
-  viewing::WindowOptions options{.title = "Hello"};
-  std::vector<std::string_view> arguments =
-      viewing::parse_window_options(argc, argv, InOut(options));
-  auto balls = static_cast<std::size_t>(viewing::parse_integer(
-      arguments, 0, static_cast<std::int64_t>(hello::Scenario{}.balls)));
+  application::Arguments arguments{argc, argv};
+  viewing::WindowOptions options =
+      viewing::read_window_options("Hello", InOut(arguments));
+  auto balls = static_cast<std::size_t>(
+      arguments.integer(0, static_cast<std::int64_t>(hello::Scenario{}.balls)));
+  if (arguments.report_error(USAGE)) {
+    return EXIT_FAILURE;
+  }
   return viewing::run(options,
                       [&](float scale) { return hello::Viewer{balls, scale}; });
 }
