@@ -275,11 +275,14 @@ auto fly(const Checked& checked, Case flown, Duration dt,
   REQUIRE(aircraft);
   world.sync();
 
-  framework::Scheduler<World, CheckSchedule> scheduler{CheckSchedule{
-      Pilot{checked, flown, trim, data.engines.size()}, Blow{flown},
-      RunFlightControls{earth, checked.flight_control_period},
-      RunEngines{earth}, Rigid{SystemList{RigidAircraftRates{earth}}},
-      BurnFuel{}, FollowRigidBody{earth}}};
+  framework::Scheduler<World, CheckSchedule> scheduler{
+      CheckSchedule{Pilot{checked, flown, trim, data.engines.size()},
+                    Blow{flown}, RunFlightControls{earth}, RunEngines{earth},
+                    Rigid{SystemList{RigidAircraftRates{earth}}}, BurnFuel{},
+                    FollowRigidBody{earth}}};
+  if (checked.flight_control_period) {
+    scheduler.set_period<RunFlightControls>(*checked.flight_control_period);
+  }
   std::vector<RigidBody> samples{body};
   constexpr Duration SAMPLE = 200ms;
   for (TimePoint time{}; time < TimePoint{30s}; time += dt) {
@@ -519,18 +522,20 @@ auto hold(const Checked& checked) -> std::pair<Wander, Wander> {
   aircraft::Earth fixed = earth;
   auto systems = [&] {
     if constexpr (std::same_as<ScheduleType, HoldSchedule>) {
-      return HoldSchedule{
-          RunFlightControls{fixed, checked.flight_control_period},
-          RunEngines{fixed}, Rigid{SystemList{RigidAircraftRates{fixed}}},
-          BurnFuel{}, FollowRigidBody{fixed}};
+      return HoldSchedule{RunFlightControls{fixed}, RunEngines{fixed},
+                          Rigid{SystemList{RigidAircraftRates{fixed}}},
+                          BurnFuel{}, FollowRigidBody{fixed}};
     } else {
-      return HeldMassSchedule{
-          RunFlightControls{fixed, checked.flight_control_period},
-          RunEngines{fixed}, Rigid{SystemList{RigidAircraftRates{fixed}}},
-          FollowRigidBody{fixed}};
+      return HeldMassSchedule{RunFlightControls{fixed}, RunEngines{fixed},
+                              Rigid{SystemList{RigidAircraftRates{fixed}}},
+                              FollowRigidBody{fixed}};
     }
   };
   framework::Scheduler<World, ScheduleType> scheduler{systems()};
+  if (checked.flight_control_period) {
+    scheduler.template set_period<RunFlightControls>(
+        *checked.flight_control_period);
+  }
   Wander simon;
   for (TimePoint time{}; time < TimePoint{30s}; time += 8ms) {
     scheduler.step(Step{.time = time, .dt = 8ms}, InOut(world));

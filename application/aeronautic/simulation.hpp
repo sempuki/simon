@@ -12,6 +12,7 @@
 #include "base/core.hpp"
 #include "core/argument.hpp"
 #include "engine/lifecycle.hpp"
+#include "framework/timeline.hpp"
 #include "model/aircraft/trim.hpp"
 
 namespace simon::aeronautic {
@@ -118,6 +119,9 @@ class Simulation final {
 
   auto step(const Step& step) -> engine::PhaseResult;
 
+  // When work is next due, for the driver to end its steps there.
+  auto timeline() const -> const framework::Timeline& { return timeline_; }
+
   // The world: empty until configured.
   auto world() const -> const World& { return world_; }
 
@@ -137,6 +141,7 @@ class Simulation final {
   std::unique_ptr<aircraft::Definition> airliner_;
   std::unique_ptr<aircraft::Definition> fighter_;
   World world_;  // Empty until configure builds it.
+  framework::Timeline timeline_;
   Scheduler scheduler_;
 };
 

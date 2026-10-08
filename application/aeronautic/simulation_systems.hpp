@@ -10,7 +10,6 @@
 #include "application/aeronautic/simulation_components.hpp"
 #include "core/argument.hpp"
 #include "core/math.hpp"
-#include "engine/rate_gate.hpp"
 #include "framework/continuous.hpp"
 #include "framework/system.hpp"
 #include "model/aircraft/flight_path.hpp"
@@ -73,11 +72,8 @@ struct FollowRoute final      //
              Autopilot> {
   using SystemWorld = ProjectedWorld<FollowRoute>;
 
+  static constexpr Duration PERIOD = 1s;
   static constexpr Length CAPTURE = 3000.0 * meter;
-
-  auto prepare(SystemWorld&, Step step) -> bool {
-    return gate_.fire(step).has_value();
-  }
 
   auto operator()(SystemWorld&, Entity,   //
                   Route& route,           //
@@ -96,9 +92,6 @@ struct FollowRoute final      //
     autopilot->altitude = aircraft::altitude_of(waypoint);
     autopilot->speed = route.speed;
   }
-
- private:
-  engine::RateGate gate_{1s};
 };
 
 // The autopilot's gains, shared by every aircraft.
@@ -130,18 +123,15 @@ struct FlyAutopilot final           //
   using SystemWorld = ProjectedWorld<FlyAutopilot>;
   using SequenceAfterSystemList = SystemList<FollowRoute>;
 
-  auto prepare(SystemWorld&, Step step) -> bool {
-    auto firing = gate_.fire(step);
-    elapsed_ = firing ? seconds(firing->elapsed) : 0.0 * second;
-    return firing.has_value();
-  }
+  static constexpr Duration PERIOD = 100ms;
 
   auto operator()(SystemWorld&, Entity,            //
                   Commands& commands,              //
                   const AirState* state,           //
                   const Handling* handling,        //
                   const FlightControls* controls,  //
-                  Autopilot* autopilot) const -> void {
+                  Autopilot* autopilot,            //
+                  Step step) const -> void {
     if (!state || !handling || !controls || !autopilot) {
       return;
     }
@@ -160,13 +150,12 @@ struct FlyAutopilot final           //
         std::clamp(aircraft::compute_load_factor_command(
                        *state, climb, controls->bank, gains_.climb),
                    handling->min_load_factor, handling->max_load_factor);
-    commands.throttle = model::pi_control(speed_error, gains_.speed, elapsed_,
-                                          InOut(autopilot->throttle_integral));
+    commands.throttle =
+        model::pi_control(speed_error, gains_.speed, seconds(step.dt),
+                          InOut(autopilot->throttle_integral));
   }
 
  private:
-  engine::RateGate gate_{100ms};
-  Time elapsed_ = 0.0 * second;  // Since the gate last fired.
   AutopilotGains gains_;
 };
 
@@ -384,22 +373,8 @@ struct RunFlightControls final        //
              const Wind> {
   using SystemWorld = ProjectedWorld<RunFlightControls>;
 
-  explicit RunFlightControls(aircraft::Earth earth = aircraft::Earth::flat(),
-                             std::optional<Duration> period = std::nullopt)
-      : earth_{earth} {
-    if (period) {
-      gate_ = engine::RateGate{*period};
-    }
-  }
-
-  auto prepare(SystemWorld&, Step step) -> bool {
-    if (!gate_) {
-      dt_ = seconds(step.dt);
-      return true;
-    }
-    dt_ = seconds(gate_->period());
-    return gate_->fire(step).has_value();
-  }
+  explicit RunFlightControls(aircraft::Earth earth = aircraft::Earth::flat())
+      : earth_{earth} {}
 
   auto operator()(SystemWorld&, Entity,          //
                   FlightSignals& signals,        //
@@ -416,15 +391,13 @@ struct RunFlightControls final        //
         *body, *felt, *mass, *type->data, earth_, air_, wind ? *wind : still_,
         seconds(step.time.time_since_epoch()), InOut(signals));
     aircraft::run_flight_controls(type->data->flight_controls, InOut(signals),
-                                  dt_);
+                                  seconds(step.dt));
   }
 
  private:
   aircraft::Earth earth_;
   earth::StandardAirTable air_;
   Wind still_;
-  std::optional<engine::RateGate> gate_;
-  Time dt_ = 0.0 * second;  // The blocks' step.
 };
 
 // Each step, each rigid aircraft's engines run at their throttles in the air

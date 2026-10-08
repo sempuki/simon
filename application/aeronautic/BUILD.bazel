@@ -22,7 +22,6 @@ cc_library(
         "//core:argument",
         "//core:math",
         "//engine:lifecycle",
-        "//engine:rate_gate",
         "//framework",
         "//framework:continuous",
         "//model/earth:atmosphere",

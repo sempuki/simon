@@ -245,6 +245,7 @@ auto build_scenario(const Scenario& scenario, const RigidTypes& types,
 }
 
 auto Simulation::configure() -> engine::PhaseResult {
+  scheduler_.attach(Depend(timeline_));
   if (scenario_.rigid > 0) {
     RETURN_OR_ASSIGN(aircraft::Definition loaded,
                      format::load_aircraft(scenario_.rigid_aircraft));
