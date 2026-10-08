@@ -16,6 +16,7 @@
 #include "core/random.hpp"
 #include "engine/event_queue.hpp"
 #include "engine/lifecycle.hpp"
+#include "framework/timeline.hpp"
 
 namespace simon::defense {
 
@@ -234,6 +235,9 @@ class Simulation final {
   // subscribers.
   auto events() -> engine::EventQueue& { return events_; }
 
+  // When work is next due, for the driver to end its steps there.
+  auto timeline() const -> const framework::Timeline& { return timeline_; }
+
   // Interceptors fired so far, from what the launchers have left.
   auto interceptors_fired() const -> std::uint32_t;
 
@@ -255,6 +259,7 @@ class Simulation final {
 
   Scenario scenario_;
   World world_;  // Empty until configure builds it.
+  framework::Timeline timeline_;
   Scheduler scheduler_;
   engine::EventQueue events_;
   Entity asset_;

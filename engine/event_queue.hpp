@@ -9,11 +9,15 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
+#include "base/core.hpp"
+#include "core/argument.hpp"
 #include "core/time.hpp"
+#include "framework/timeline.hpp"
 
 namespace simon::engine {
 
@@ -89,6 +93,16 @@ class EventQueue final {
             time, std::forward<DeducedMessageArgumentTypes>(args)...),
     });
     std::push_heap(events_.begin(), events_.end(), Later{});
+    tell_timeline();
+  }
+
+  // Tells `timeline` when the earliest event is due, for as long as the queue
+  // lives, so a driver ends a step at each event's own time.
+  auto attach(Depend<framework::Timeline> timeline) -> void {
+    CHECK_PRECONDITION(!timeline_);
+    timeline_ = timeline.get();
+    source_ = timeline_->add();
+    tell_timeline();
   }
 
   // Delivers every event at or before `time`, earliest first, and events with
@@ -116,8 +130,19 @@ class EventQueue final {
     }
   };
 
+  auto tell_timeline() -> void {
+    if (timeline_) {
+      timeline_->set(source_,
+                     events_.empty()
+                         ? std::nullopt
+                         : std::optional{events_.front().event->time()});
+    }
+  }
+
   std::vector<Entry> events_;
   std::uint64_t next_sequence_ = 0;
+  framework::Timeline* timeline_ = nullptr;
+  framework::Timeline::Source source_ = 0;
   std::map<EventType,
            std::deque<std::function<void(TimePoint, const EventBase*)>>>
       handlers_;

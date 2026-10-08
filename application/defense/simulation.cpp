@@ -147,6 +147,8 @@ auto build_scenario(const Scenario& scenario, InOut<World> world)
 }
 
 auto Simulation::configure() -> engine::PhaseResult {
+  scheduler_.attach(Depend(timeline_));
+  events_.attach(Depend(timeline_));
   RETURN_IF_UNEXPECTED(build_world(scenario_, Out(world_)));
   RETURN_OR_ASSIGN(asset_, build_scenario(scenario_, InOut(world_)));
   stock_ = remaining_interceptors();

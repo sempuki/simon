@@ -32,6 +32,7 @@ auto EventQueue::process_until(TimePoint time) -> void {
       handlers[i](event->time(), event.get());
     }
   }
+  tell_timeline();
 }
 
 }  // namespace simon::engine

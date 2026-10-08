@@ -3,9 +3,12 @@
 #include "engine/event_queue.hpp"
 
 #include <functional>
+#include <optional>
 #include <vector>
 
 #include "base/testing.hpp"
+#include "core/argument.hpp"
+#include "framework/timeline.hpp"
 
 namespace simon::engine {
 
@@ -121,6 +124,19 @@ TEST_CASE("EventQueue") {
 
     CHECK(m_calls == 0);
     CHECK(n_calls == 1);
+  }
+
+  SECTION("ShouldTellTimelineEarliestEventGivenAttached") {
+    framework::Timeline timeline;
+    events.attach(Depend(timeline));
+    CHECK(timeline.earliest() == std::nullopt);
+    events.publish<M>(later, mesg);
+    events.start_timer(start, [](TimePoint) {});
+    CHECK(timeline.earliest() == start);
+    events.process_until(start);
+    CHECK(timeline.earliest() == later);
+    events.process_until(later);
+    CHECK(timeline.earliest() == std::nullopt);
   }
 
   SECTION("ShouldRepeatTimerGivenTimerThatRestartsItself") {

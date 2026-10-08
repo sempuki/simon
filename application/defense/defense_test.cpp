@@ -204,6 +204,27 @@ TEST_CASE("DefenseSimulation") {
     CHECK(simulation.interceptors_fired() > 0u);
   }
 
+  SECTION("ShouldExpireAtItsOwnTimeGivenHoldEndingBetweenSteps") {
+    Scenario scenario;
+    const TimePoint end = TimePoint{90s} + 5ms;  // Half a step past 90 s.
+    scenario.holds = {TimedHold{.sector = {.radius = 1000.0 * meter},
+                                .from = TimePoint{},
+                                .lasting = end.time_since_epoch()}};
+    Simulation simulation{scenario};
+    std::vector<TimePoint> expired;
+    simulation.events().subscribe<WeaponsHoldExpired>(
+        [&](TimePoint time, const WeaponsHoldExpired&) {
+          expired.push_back(time);
+        });
+    engine::Driver driver{engine::Timing{.max_step = DT}, Depend(simulation)};
+    REQUIRE(driver.start());
+
+    // The driver ends a step at the hold's end, so the step after starts
+    // there and delivers it; a step from 90 s would not.
+    REQUIRE(driver.advance_to(end + 1ms));
+    CHECK(expired == std::vector{end});
+  }
+
   SECTION("ShouldStayHeldGivenOverlappingHoldExpiresFirst") {
     Scenario scenario;
     const Sector home{.radius = 1000.0 * meter};
