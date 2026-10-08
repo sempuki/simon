@@ -9,6 +9,8 @@
 #include <string>
 
 #include "Eigen/Dense"
+#include "core/argument.hpp"
+#include "core/math.hpp"
 
 template <>
 const std::array<lib::StatusConditionEntry, simon::aircraft::TRIM_ERROR_COUNT>

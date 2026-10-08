@@ -9,6 +9,7 @@
 #include <memory>
 #include <vector>
 
+#include "core/math.hpp"
 #include "core/units.hpp"
 #include "framework/archetype.hpp"
 #include "framework/spatial.hpp"

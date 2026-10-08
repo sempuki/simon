@@ -3,6 +3,7 @@
 // EPL-2.0 OR GPL-2.0-or-later; translated to C++ and changed. See NOTICE.md.
 
 #include "model/traffic/right_of_way.hpp"
+#include "core/math.hpp"
 
 #include <algorithm>
 #include <cmath>

@@ -1,6 +1,7 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "application/automotive/road_drawing.hpp"
+#include "core/math.hpp"
 
 #include <algorithm>
 #include <array>

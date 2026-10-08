@@ -47,6 +47,7 @@ cc_library(
     hdrs = ["aircraft_file.hpp"],
     copts = COPTS,
     deps = [
+        "//core:argument",
         ":format_error",
         ":text",
         "//model/aircraft:definition",
@@ -61,6 +62,7 @@ cc_library(
     hdrs = ["opendrive.hpp"],
     copts = COPTS,
     deps = [
+        "//core:argument",
         ":format_error",
         ":text",
         ":xml",
@@ -77,6 +79,8 @@ cc_library(
     hdrs = ["mjcf.hpp"],
     copts = COPTS,
     deps = [
+        "//core:argument",
+        "//core:math",
         ":format_error",
         ":text",
         ":xml",
@@ -93,6 +97,7 @@ cc_library(
     hdrs = ["openscenario.hpp"],
     copts = COPTS,
     deps = [
+        "//core:argument",
         ":format_error",
         ":text",
         ":xml",

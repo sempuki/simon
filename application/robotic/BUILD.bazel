@@ -18,6 +18,7 @@ cc_test(
         "//3rd_party:mujoco",
     ],
     deps = [
+        "//core:math",
         ":testing",
         "//format:mjcf",
         "//model/articulated:articulated",
@@ -83,6 +84,7 @@ cc_test(
         "reference/mujoco_dynamics.csv",
     ],
     deps = [
+        "//core:argument",
         ":testing",
         ":robotic_library",
         "@lib//base:testing",
@@ -99,6 +101,7 @@ cc_test(
         "reference/mujoco_feedback.csv",
     ],
     deps = [
+        "//core:argument",
         ":testing",
         ":robotic_library",
         "@lib//base:testing",
@@ -116,6 +119,7 @@ cc_test(
         "reference/mujoco_convex.csv",
     ],
     deps = [
+        "//core:argument",
         ":testing",
         ":robotic_library",
         "@lib//base:testing",
@@ -133,6 +137,7 @@ cc_test(
         "//3rd_party:mujoco",
     ],
     deps = [
+        "//core:argument",
         ":testing",
         ":robotic_library",
         "@lib//base:testing",
@@ -204,6 +209,7 @@ cc_test(
         "//3rd_party:menagerie",
     ],
     deps = [
+        "//core:argument",
         ":testing",
         ":robotic_library",
         "@lib//base:testing",

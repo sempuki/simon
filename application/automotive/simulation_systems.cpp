@@ -3,6 +3,7 @@
 // MPL-2.0; translated to C++ and changed. See NOTICE.md.
 
 #include "application/automotive/simulation_systems.hpp"
+#include "core/argument.hpp"
 #include "core/units.hpp"
 
 #include <algorithm>

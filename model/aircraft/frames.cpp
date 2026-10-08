@@ -1,6 +1,7 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "model/aircraft/frames.hpp"
+#include "core/math.hpp"
 
 #include <cmath>
 

@@ -11,6 +11,7 @@
 #include "application/robotic/simulation.hpp"
 #include "application/robotic/testing.hpp"
 #include "base/testing.hpp"
+#include "core/argument.hpp"
 
 // Contacts by simon and by MuJoCo, against the table
 // reference/mujoco_contacts.py recorded: every primitive pair, at 400 poses

@@ -13,6 +13,7 @@
 #include <thread>
 #include <utility>
 
+#include "core/math.hpp"
 #include "core/units.hpp"
 #include "model/collision.hpp"
 #include "model/traffic/driving_metrics.hpp"

@@ -24,6 +24,7 @@ cc_library(
     hdrs = ["galaxy.hpp"],
     copts = COPTS,
     deps = [
+        "//core:math",
         ":gravity",
         "//core:argument",
         "//core:random",

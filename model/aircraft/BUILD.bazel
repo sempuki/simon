@@ -12,6 +12,7 @@ cc_library(
     hdrs = ["aerodynamics.hpp"],
     copts = COPTS,
     deps = [
+        "//core:math",
         "//model:control",
         "//core:units",
     ],
@@ -62,6 +63,7 @@ cc_library(
     hdrs = ["frames.hpp"],
     copts = COPTS,
     deps = [
+        "//core:math",
         "//model/earth:earth",
         ":flight_path",
         "//model:rigid_body",
@@ -78,6 +80,7 @@ cc_library(
     hdrs = ["mass_balance.hpp"],
     copts = COPTS,
     deps = [
+        "//core:math",
         ":definition",
         "//model:rigid_body",
         "//core:units",
@@ -111,6 +114,7 @@ cc_library(
     hdrs = ["sensing.hpp"],
     copts = COPTS,
     deps = [
+        "//core:math",
         ":definition",
         "//model/earth:atmosphere",
         ":frames",
@@ -129,6 +133,7 @@ cc_library(
     hdrs = ["rigid_aircraft.hpp"],
     copts = COPTS,
     deps = [
+        "//core:math",
         ":aerodynamics",
         ":definition",
         "//model/earth:atmosphere",
@@ -152,6 +157,7 @@ cc_test(
     srcs = ["rigid_aircraft_test.cpp"],
     copts = COPTS,
     deps = [
+        "//core:math",
         ":rigid_aircraft",
         "@lib//base:testing",
     ],
@@ -164,6 +170,8 @@ cc_library(
     hdrs = ["trim.hpp"],
     copts = COPTS,
     deps = [
+        "//core:argument",
+        "//core:math",
         ":definition",
         "//model/earth:atmosphere",
         ":flight_control",
@@ -182,6 +190,7 @@ cc_library(
     hdrs = ["flight_path.hpp"],
     copts = COPTS,
     deps = [
+        "//core:math",
         "//model/earth:atmosphere",
         "//model:kinematics",
         "//core:coordinates",

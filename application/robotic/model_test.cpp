@@ -8,6 +8,7 @@
 
 #include "application/robotic/testing.hpp"
 #include "base/testing.hpp"
+#include "core/math.hpp"
 #include "format/mjcf.hpp"
 #include "model/articulated/articulated.hpp"
 

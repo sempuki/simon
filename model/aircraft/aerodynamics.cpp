@@ -1,6 +1,7 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "model/aircraft/aerodynamics.hpp"
+#include "core/math.hpp"
 
 #include <algorithm>
 #include <cmath>

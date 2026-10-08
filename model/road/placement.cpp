@@ -9,6 +9,7 @@
 #include <numbers>
 #include <queue>
 
+#include "core/math.hpp"
 #include "core/units.hpp"
 
 namespace simon::road {

@@ -20,6 +20,7 @@ cc_library(
     hdrs = ["earth.hpp"],
     copts = COPTS,
     deps = [
+        "//core:math",
         "//core:units",
         "//3rd_party:eigen",
     ],
@@ -48,6 +49,8 @@ cc_library(
     copts = COPTS,
     deps = [
         ":" + test,
+        "//core:argument",
+        "//core:math",
         "@lib//base:testing",
     ],
 ) for test in [

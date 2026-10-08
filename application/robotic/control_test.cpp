@@ -7,6 +7,7 @@
 #include "application/robotic/simulation.hpp"
 #include "application/robotic/testing.hpp"
 #include "base/testing.hpp"
+#include "core/argument.hpp"
 
 // Actuators and feedback by simon and by MuJoCo, against the tables
 // reference/mujoco_control.py and reference/mujoco_checks.py recorded: an

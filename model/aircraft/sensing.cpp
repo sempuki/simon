@@ -3,6 +3,7 @@
 // authors, LGPL-2.0-or-later; translated to C++ and changed. See NOTICE.md.
 
 #include "model/aircraft/sensing.hpp"
+#include "core/math.hpp"
 
 #include <algorithm>
 #include <cmath>

@@ -17,6 +17,8 @@
 
 #include "Eigen/Eigenvalues"
 #include "base/core.hpp"
+#include "core/argument.hpp"
+#include "core/math.hpp"
 #include "format/text.hpp"
 #include "format/xml.hpp"
 #include "pugixml.hpp"

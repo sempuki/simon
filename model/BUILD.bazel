@@ -64,6 +64,7 @@ cc_library(
     hdrs = ["rigid_body.hpp"],
     copts = COPTS,
     deps = [
+        "//core:math",
         ":kinematics",
         "//core:time",
         "//core:units",
@@ -78,6 +79,7 @@ cc_test(
     srcs = ["rigid_body_test.cpp"],
     copts = COPTS,
     deps = [
+        "//core:math",
         ":rigid_body",
         "//framework:continuous",
         "@lib//base:testing",

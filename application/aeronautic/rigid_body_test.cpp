@@ -10,6 +10,7 @@
 
 #include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
+#include "core/math.hpp"
 #include "core/units.hpp"
 #include "format/aircraft_file.hpp"
 #include "model/aircraft/definition.hpp"

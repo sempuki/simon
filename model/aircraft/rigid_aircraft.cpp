@@ -3,6 +3,7 @@
 // authors, LGPL-2.0-or-later; translated to C++ and changed. See NOTICE.md.
 
 #include "model/aircraft/rigid_aircraft.hpp"
+#include "core/math.hpp"
 
 #include <cmath>
 #include <cstddef>

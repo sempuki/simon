@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "base/core.hpp"
+#include "core/argument.hpp"
 #include "format/text.hpp"
 #include "format/xml.hpp"
 #include "pugixml.hpp"

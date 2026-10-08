@@ -1,6 +1,7 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "model/rigid_body.hpp"
+#include "core/math.hpp"
 
 #include <chrono>
 

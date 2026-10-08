@@ -11,6 +11,7 @@
 #include <string_view>
 #include <utility>
 
+#include "core/argument.hpp"
 #include "format/mjcf.hpp"
 
 namespace simon::robotic {

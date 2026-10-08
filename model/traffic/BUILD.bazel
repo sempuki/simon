@@ -12,6 +12,7 @@ cc_library(
     hdrs = ["right_of_way.hpp"],
     copts = COPTS,
     deps = [
+        "//core:math",
         "//model/road:lane_graph",
         "//model/road:road",
         ":signals",

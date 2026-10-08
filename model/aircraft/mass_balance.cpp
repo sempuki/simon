@@ -7,6 +7,7 @@
 #include <cstddef>
 
 #include "base/core.hpp"
+#include "core/math.hpp"
 
 namespace simon::aircraft {
 

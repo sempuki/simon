@@ -8,6 +8,7 @@
 
 #include "base/core.hpp"
 #include "core/argument.hpp"
+#include "core/math.hpp"
 #include "core/random.hpp"
 #include "core/units.hpp"
 

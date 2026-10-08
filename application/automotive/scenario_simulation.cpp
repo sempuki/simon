@@ -4,6 +4,7 @@
 
 #include <utility>
 
+#include "core/argument.hpp"
 #include "format/opendrive.hpp"
 #include "format/openscenario.hpp"
 

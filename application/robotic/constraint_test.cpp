@@ -9,6 +9,7 @@
 #include "application/robotic/simulation.hpp"
 #include "application/robotic/testing.hpp"
 #include "base/testing.hpp"
+#include "core/argument.hpp"
 
 // Contacts, limits and dry friction by simon and by MuJoCo, against the
 // table reference/mujoco_constraints.py recorded, and against physics.

@@ -11,6 +11,7 @@
 #include "application/automotive/scenario_simulation.hpp"
 #include "application/automotive/testing.hpp"
 #include "base/testing.hpp"
+#include "core/math.hpp"
 
 // esmini's scenarios played by simon and by esmini, from the table
 // reference/esmini_scenarios.py recorded: every entity's position, heading

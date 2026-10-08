@@ -1,6 +1,8 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "model/earth/wind.hpp"
+#include "core/argument.hpp"
+#include "core/math.hpp"
 
 #include <cmath>
 #include <numbers>

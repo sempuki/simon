@@ -10,6 +10,7 @@
 #include "application/robotic/simulation.hpp"
 #include "application/robotic/testing.hpp"
 #include "base/testing.hpp"
+#include "core/argument.hpp"
 
 // Four robots of MuJoCo Menagerie by simon and by MuJoCo, against the table
 // reference/mujoco_menagerie.py recorded: each from its home keyframe, its

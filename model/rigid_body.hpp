@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Eigen/Geometry"
+#include "core/math.hpp"
 #include "core/time.hpp"
 #include "core/units.hpp"
 #include "model/kinematics.hpp"

@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "Eigen/Geometry"
+#include "core/math.hpp"
 #include "core/units.hpp"
 
 // The Earth, for vehicles whose fidelity needs it: the WGS84 ellipsoid, its

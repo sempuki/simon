@@ -1,6 +1,7 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "model/road/road.hpp"
+#include "core/math.hpp"
 
 #include <cmath>
 #include <numbers>

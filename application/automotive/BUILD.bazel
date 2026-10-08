@@ -83,6 +83,7 @@ cc_library(
     hdrs = ["road_drawing.hpp"],
     copts = COPTS,
     deps = [
+        "//core:math",
         "//model:collision",
         "//model/road:road",
     ],
@@ -130,6 +131,7 @@ cc_library(
     hdrs = ["testing.hpp"],
     copts = COPTS,
     deps = [
+        "//core:math",
         ":automotive_library",
         "//application:testing",
         "//model:collision",
@@ -340,6 +342,7 @@ cc_test(
         "//3rd_party:esmini",
     ],
     deps = [
+        "//core:math",
         ":automotive_library",
         ":testing",
         "@lib//base:testing",

@@ -7,6 +7,7 @@
 #include "application/robotic/simulation.hpp"
 #include "application/robotic/testing.hpp"
 #include "base/testing.hpp"
+#include "core/argument.hpp"
 
 // robotic's test models stepped without constraints by simon and by MuJoCo,
 // against the tables reference/mujoco_dynamics.py and

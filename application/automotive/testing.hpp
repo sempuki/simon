@@ -12,6 +12,7 @@
 #include "application/automotive/simulation.hpp"
 #include "application/testing.hpp"
 #include "base/testing.hpp"
+#include "core/math.hpp"
 #include "core/units.hpp"
 #include "model/collision.hpp"
 #include "model/vehicle/vehicle.hpp"

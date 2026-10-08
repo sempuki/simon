@@ -15,6 +15,7 @@
 #include <utility>
 
 #include "base/core.hpp"
+#include "core/math.hpp"
 
 namespace simon::road {
 

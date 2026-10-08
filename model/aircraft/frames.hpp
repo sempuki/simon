@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Eigen/Geometry"
+#include "core/math.hpp"
 #include "core/units.hpp"
 #include "model/aircraft/flight_path.hpp"
 #include "model/earth/earth.hpp"

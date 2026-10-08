@@ -7,6 +7,7 @@
 #include <cmath>
 #include <numbers>
 
+#include "core/math.hpp"
 #include "model/gravity/gravity.hpp"
 
 namespace simon::gravity {
