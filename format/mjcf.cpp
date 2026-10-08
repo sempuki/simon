@@ -6,12 +6,16 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <map>
 #include <numbers>
 #include <optional>
 #include <span>
 #include <sstream>
+#include <string>
+#include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -193,6 +197,19 @@ struct CompilerSpec final {
 };
 
 //-- Reading -------------------------------------------------------------------
+
+// Each name's first index among a model's joints or bodies.
+using NameIndex = std::unordered_map<std::string_view, std::uint32_t>;
+
+template <typename ItemType>
+auto create_index_by_name(const std::vector<ItemType>& items) -> NameIndex {
+  NameIndex index;
+  index.reserve(items.size());
+  for (std::uint32_t i = 0; i < items.size(); ++i) {
+    index.try_emplace(items[i].name, i);
+  }
+  return index;
+}
 
 // Reads one document, saying on which line anything in the text is wrong,
 // and compiles it, naming the body or joint anything in the model is wrong
@@ -1161,17 +1178,21 @@ class Reader final {
       return limited == Limited::YES ||
              (limited == Limited::AUTO && compiler_.auto_limits && has_range);
     };
+    // A model of many robots names thousands of joints and bodies, so each
+    // lookup by name goes through an index, not a scan.
+    const NameIndex joints = create_index_by_name(model->joints);
+    const NameIndex bodies = create_index_by_name(model->bodies);
     for (ActuatorSpec& spec : actuators_) {
-      auto joint = std::ranges::find(model->joints, spec.joint, &Joint::name);
-      if (joint == model->joints.end()) {
+      auto found = joints.find(spec.joint);
+      if (found == joints.end()) {
         return fail("no joint " + spec.joint + " for actuator");
       }
-      if (joint->type == JointType::FREE || joint->type == JointType::BALL) {
+      const Joint& joint = model->joints[found->second];
+      if (joint.type == JointType::FREE || joint.type == JointType::BALL) {
         return refuse("actuator on a ball or free joint");
       }
       Actuator actuator = spec.actuator;
-      actuator.joint =
-          static_cast<std::uint32_t>(joint - model->joints.begin());
+      actuator.joint = found->second;
       actuator.control_limited =
           resolve_limited(spec.control_limited, actuator.control_range);
       actuator.force_limited =
@@ -1181,31 +1202,28 @@ class Reader final {
     for (TendonSpec& spec : tendons_) {
       Tendon tendon = spec.tendon;
       for (const std::string& name : spec.joints) {
-        auto joint = std::ranges::find(model->joints, name, &Joint::name);
-        if (joint == model->joints.end()) {
+        auto found = joints.find(name);
+        if (found == joints.end()) {
           return fail("no joint " + name + " for tendon " + tendon.name);
         }
-        if (joint->type == JointType::FREE || joint->type == JointType::BALL) {
+        const Joint& joint = model->joints[found->second];
+        if (joint.type == JointType::FREE || joint.type == JointType::BALL) {
           return fail("tendon " + tendon.name + " on a ball or free joint");
         }
-        tendon.joints.push_back(
-            static_cast<std::uint32_t>(joint - model->joints.begin()));
+        tendon.joints.push_back(found->second);
       }
       tendon.limited = resolve_limited(spec.limited, tendon.range);
       model->tendons.push_back(std::move(tendon));
     }
     for (const auto& [first, second] : excludes_) {
-      auto a =
-          std::ranges::find(model->bodies, first, &articulated::Body::name);
-      auto b =
-          std::ranges::find(model->bodies, second, &articulated::Body::name);
-      if (a == model->bodies.end() || b == model->bodies.end()) {
-        return fail("no body " + (a == model->bodies.end() ? first : second) +
+      auto a = bodies.find(first);
+      auto b = bodies.find(second);
+      if (a == bodies.end() || b == bodies.end()) {
+        return fail("no body " + (a == bodies.end() ? first : second) +
                     " for a contact exclusion");
       }
-      auto i = static_cast<std::uint32_t>(a - model->bodies.begin());
-      auto j = static_cast<std::uint32_t>(b - model->bodies.begin());
-      model->excludes.push_back({std::min(i, j), std::max(i, j)});
+      model->excludes.push_back(
+          {std::min(a->second, b->second), std::max(a->second, b->second)});
     }
     std::ranges::sort(model->excludes);
     classify_frames(model);
