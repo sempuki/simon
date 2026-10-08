@@ -12,11 +12,9 @@
 // against the standard: phases in turn from a delay after their reference's,
 // a controller action jumping to a phase, a signal action holding until the
 // next phase, and a condition on the phase.
-namespace simon::automotive {
+namespace simon::scenario {
 
 namespace {
-
-namespace osc = scenario;
 
 // Two controllers, the second 5 s behind the first; at 40 s the first jumps
 // to its stop phase, and at 42 s signal 1 is set by hand. An event starts
@@ -105,7 +103,7 @@ TEST_CASE("Storyboard") {
     auto scenario = format::parse_openscenario(CONTROLLED, ".");
     REQUIRE(scenario.has_value());
     road::Map roads;
-    osc::StoryboardPlayer player{*scenario, roads};
+    StoryboardPlayer player{*scenario, roads};
     struct Expected final {
       double time = 0.0;
       std::string main;
@@ -141,8 +139,7 @@ TEST_CASE("Storyboard") {
     std::vector<double> started;
     for (const auto& transition : player.transitions()) {
       if (transition.element == "stopped" &&
-          transition.transition ==
-              osc::StoryboardElementState::START_TRANSITION) {
+          transition.transition == StoryboardElementState::START_TRANSITION) {
         started.push_back(transition.time);
       }
     }
@@ -150,4 +147,4 @@ TEST_CASE("Storyboard") {
   }
 }
 
-}  // namespace simon::automotive
+}  // namespace simon::scenario

@@ -192,44 +192,4 @@ TEST_CASE("BatchAgainstEsminiAndNuPlan") {
   }
 }
 
-TEST_CASE("ParameterDistribution") {
-  SECTION("ShouldStepRangesToTheirUpperLimit") {
-    auto distribution = format::parse_parameter_distribution(
-        R"(<OpenSCENARIO><ParameterValueDistribution>
-             <ScenarioFile filepath="s.xosc"/>
-             <Deterministic>
-               <DeterministicSingleParameterDistribution parameterName="a">
-                 <DistributionRange stepWidth="0.1">
-                   <Range lowerLimit="0.1" upperLimit="0.7"/>
-                 </DistributionRange>
-               </DeterministicSingleParameterDistribution>
-             </Deterministic>
-           </ParameterValueDistribution></OpenSCENARIO>)",
-        "here");
-    REQUIRE(distribution);
-    CHECK(distribution->scenario == "here/s.xosc");
-    REQUIRE(scenario::count_permutations(*distribution) == 7);
-    CHECK(scenario::find_permutation(*distribution, 2)[0].value == "0.3");
-    CHECK(scenario::find_permutation(*distribution, 6)[0].value == "0.7");
-  }
-
-  SECTION("ShouldRefuseStochasticDistributions") {
-    auto distribution = format::parse_parameter_distribution(
-        R"(<OpenSCENARIO><ParameterValueDistribution>
-             <ScenarioFile filepath="s.xosc"/>
-             <Stochastic numberOfTestRuns="5"/>
-           </ParameterValueDistribution></OpenSCENARIO>)",
-        "here");
-    CHECK_FALSE(distribution);
-  }
-
-  SECTION("ShouldRefuseAssigningUndeclaredParameters") {
-    std::vector<scenario::ParameterAssignment> assignments = {
-        {.name = "Nonesuch", .value = "1"}};
-    auto scenario = format::load_openscenario(
-        "3rd_party/esmini/xosc/cut-in.xosc", assignments);
-    CHECK_FALSE(scenario);
-  }
-}
-
 }  // namespace simon::automotive

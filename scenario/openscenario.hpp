@@ -145,11 +145,10 @@ struct TeleportAction final {
   Position position;
 };
 
-// A point of a route, and how the way to it is chosen: "shortest", the only
-// strategy simon has, or another, taken as shortest.
+// A point of a route, reached by the shortest way, the only route strategy
+// simon has.
 struct Waypoint final {
   Position position;
-  std::string strategy;
 };
 
 // A route through the road network, which picks the way an entity takes at
@@ -425,7 +424,6 @@ struct Storyboard final {
 // ground, and how fast it may go and change speed.
 struct Vehicle final {
   std::string name;
-  std::string category;
   std::array<double, 3> center{};      // m, from the reference point.
   std::array<double, 3> dimensions{};  // Length, width, height, m.
   double max_speed = 0.0;

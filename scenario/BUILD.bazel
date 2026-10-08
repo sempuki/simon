@@ -2,6 +2,7 @@
 
 load("@lib//bazel:copts.bzl", "COPTS")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -37,4 +38,42 @@ cc_library(
     srcs = ["parameter_distribution.cpp"],
     hdrs = ["parameter_distribution.hpp"],
     copts = COPTS,
+)
+
+cc_test(
+    name = "parameter_distribution_test",
+    size = "small",
+    srcs = ["parameter_distribution_test.cpp"],
+    copts = COPTS,
+    data = ["//3rd_party:esmini"],
+    deps = [
+        ":parameter_distribution",
+        "//format:openscenario",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "storyboard_test",
+    size = "small",
+    srcs = ["storyboard_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":storyboard",
+        "//format:openscenario",
+        "//model/road:road",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "transition_test",
+    size = "small",
+    srcs = ["transition_test.cpp"],
+    copts = COPTS,
+    deps = [
+        ":openscenario",
+        ":transition",
+        "@lib//base:testing",
+    ],
 )

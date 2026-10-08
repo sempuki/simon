@@ -207,19 +207,6 @@ cc_test(
 )
 
 cc_test(
-    name = "openscenario_test",
-    size = "small",
-    srcs = ["openscenario_test.cpp"],
-    copts = COPTS,
-    data = ["//3rd_party:esmini"],
-    deps = [
-        "//format:openscenario",
-        "//scenario:openscenario",
-        "@lib//base:testing",
-    ],
-)
-
-cc_test(
     name = "right_of_way_test",
     size = "medium",
     srcs = ["right_of_way_test.cpp"],
@@ -315,19 +302,6 @@ cc_test(
         ":road_drawing",
         ":testing",
         "//format:opendrive",
-        "@lib//base:testing",
-    ],
-)
-
-cc_test(
-    name = "storyboard_test",
-    size = "small",
-    srcs = ["storyboard_test.cpp"],
-    copts = COPTS,
-    deps = [
-        "//format:openscenario",
-        "//model/road:road",
-        "//scenario:storyboard",
         "@lib//base:testing",
     ],
 )

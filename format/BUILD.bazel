@@ -134,7 +134,33 @@ cc_library(
     ],
 ) for test in [
     "aircraft_file",
+    "mjcf",
     "opendrive",
     "text",
     "xml",
 ]]
+
+cc_test(
+    name = "openscenario_test",
+    size = "small",
+    srcs = ["openscenario_test.cpp"],
+    copts = COPTS,
+    data = ["//3rd_party:esmini"],
+    deps = [
+        ":openscenario",
+        "//scenario:openscenario",
+        "@lib//base:testing",
+    ],
+)
+
+cc_test(
+    name = "tire_file_test",
+    size = "small",
+    srcs = ["tire_file_test.cpp"],
+    copts = COPTS,
+    data = ["//3rd_party:chrono"],
+    deps = [
+        ":tire_file",
+        "@lib//base:testing",
+    ],
+)

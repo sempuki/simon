@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <string>
+#include <string_view>
 #include <variant>
 
 #include "base/testing.hpp"
@@ -10,7 +11,7 @@
 // Reading esmini's scenarios (see 3rd_party/esmini/LICENSE): their entities
 // from the vehicle and pedestrian catalogs, parameters and expressions,
 // storyboards, routes, trajectories and traffic signals.
-namespace simon::automotive {
+namespace simon::format {
 
 namespace {
 
@@ -207,6 +208,28 @@ TEST_CASE("OpenScenario") {
     REQUIRE(!followed.has_value());
     CHECK(followed.error().message().find("follow") != std::string::npos);
   }
+
+  SECTION("ShouldRefuseRouteStrategiesButShortest") {
+    auto routed = [](std::string_view strategy) {
+      return std::string{R"(<OpenSCENARIO>
+      <RoadNetwork><LogicFile filepath="road.xodr"/></RoadNetwork>
+      <Entities/>
+      <Storyboard><Init><Actions><Private entityRef="Ego"><PrivateAction>
+        <RoutingAction><AssignRouteAction><Route name="r" closed="false">
+          <Waypoint routeStrategy=")"} +
+             std::string{strategy} + R"(">
+            <Position><WorldPosition x="0" y="0"/></Position></Waypoint>
+          <Waypoint routeStrategy="shortest">
+            <Position><WorldPosition x="9" y="0"/></Position></Waypoint>
+        </Route></AssignRouteAction></RoutingAction>
+      </PrivateAction></Private></Actions></Init></Storyboard>
+    </OpenSCENARIO>)";
+    };
+    CHECK(format::parse_openscenario(routed("shortest"), ".").has_value());
+    auto fastest = format::parse_openscenario(routed("fastest"), ".");
+    REQUIRE(!fastest.has_value());
+    CHECK(fastest.error().message().find("fastest") != std::string::npos);
+  }
 }
 
-}  // namespace simon::automotive
+}  // namespace simon::format

@@ -76,14 +76,6 @@ TEST_CASE("MagicFormulaTireAgainstChrono") {
     return std::abs(ours - theirs) / std::max(1.0, scale);
   };
 
-  SECTION("ShouldReadTheSedanTire") {
-    CHECK(tire.fnomin == 4850.0);
-    CHECK(tire.unloaded_radius == 0.344);
-    CHECK(tire.lfzo == 0.81);
-    CHECK(tire.pky1 == -21.92);
-    CHECK(tire.qbz1 == 10.904);
-  }
-
   SECTION("ShouldMatchForcesWhereChronoKeepsTheFormula") {
     // Without camber and inside the clamp, the forces differ only by
     // Chrono's 0.1 in each B, relative to the load.

@@ -17,9 +17,11 @@
 // classes and childclass, every orientation, fromto shapes, each geom's mass
 // and inertia from its shape and density, a body's inertia combined from its
 // geoms on principal axes, angles in degrees by default, and limits from
-// ranges. Anything that would change how the model moves and that simon does
-// not yet run is refused, tendons, equalities, meshes, contact pairs and
-// actuators other than motors among them, so that a model never runs other
+// ranges, fixed tendons, and motor, position, velocity and general
+// actuators. Anything that would change how the model moves and that simon
+// does not yet run is refused, spatial tendons and tendon springs,
+// equalities, meshes that collide or weigh, contact pairs and other
+// actuators among them, so that a model never runs other
 // than as written; what only shows a model, its visuals, assets, lights,
 // cameras, sites and sensors, is left out. A failure is a FormatError: what
 // is wrong in the text says its line, and what is wrong in the compiled

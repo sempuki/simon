@@ -515,12 +515,10 @@ class Parser final {
   auto read_pedestrian(pugi::xml_node node)
       -> std::expected<Vehicle, lib::Status> {
     constexpr double UNLIMITED = 1e10;
-    Vehicle pedestrian{
-        .name = node.attribute("name").as_string(),
-        .category = node.attribute("pedestrianCategory").as_string(),
-        .max_speed = UNLIMITED,
-        .max_acceleration = UNLIMITED,
-        .max_deceleration = UNLIMITED};
+    Vehicle pedestrian{.name = node.attribute("name").as_string(),
+                       .max_speed = UNLIMITED,
+                       .max_acceleration = UNLIMITED,
+                       .max_deceleration = UNLIMITED};
     RETURN_IF_UNEXPECTED(
         read_box(node.child("BoundingBox"), InOut(pedestrian)));
     return pedestrian;
@@ -528,8 +526,7 @@ class Parser final {
 
   auto read_vehicle(pugi::xml_node node)
       -> std::expected<Vehicle, lib::Status> {
-    Vehicle vehicle{.name = node.attribute("name").as_string(),
-                    .category = node.attribute("vehicleCategory").as_string()};
+    Vehicle vehicle{.name = node.attribute("name").as_string()};
     RETURN_IF_UNEXPECTED(read_box(node.child("BoundingBox"), InOut(vehicle)));
     pugi::xml_node performance = node.child("Performance");
     RETURN_OR_ASSIGN(vehicle.max_speed, read_number(performance, "maxSpeed"));
@@ -775,8 +772,14 @@ class Parser final {
       return refuse(route, "closed");
     }
     for (pugi::xml_node waypoint : route.children("Waypoint")) {
+      // simon routes by the shortest way only; it refuses the others rather
+      // than take them as shortest.
+      RETURN_OR_ASSIGN(std::string strategy,
+                       read_text(waypoint, "routeStrategy"));
+      if (strategy != "shortest") {
+        return refuse(waypoint, "routeStrategy " + strategy);
+      }
       Waypoint read;
-      RETURN_OR_ASSIGN(read.strategy, read_text(waypoint, "routeStrategy"));
       RETURN_OR_ASSIGN(read.position,
                        read_position(waypoint.child("Position")));
       action.route.waypoints.push_back(std::move(read));
