@@ -22,6 +22,7 @@ cc_library(
     hdrs = ["text.hpp"],
     copts = COPTS,
     deps = [
+        "//core:text",
         ":format_error",
         "@lib//base:status",
     ],

@@ -3,15 +3,15 @@
 #pragma once
 
 #include <algorithm>
-#include <charconv>
 #include <cstddef>
 #include <fstream>
+#include <optional>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <vector>
 
 #include "base/testing.hpp"
+#include "core/text.hpp"
 
 // Shared by every application's tests: the reference tables they check
 // against, comma-separated with a header line, and the numbers in them.
@@ -48,22 +48,21 @@ inline auto load_table(std::string_view path) -> Table {
   return table;
 }
 
-// The number `text` holds.
-inline auto parse_number(std::string_view text) -> double {
-  double value = 0.0;
-  auto [end, error] =
-      std::from_chars(text.data(), text.data() + text.size(), value);
-  REQUIRE(error == std::errc{});
-  return value;
+// The number `text` holds, failing the test if it holds none.
+inline auto require_number(std::string_view text) -> double {
+  std::optional<double> value = simon::parse_number(text);
+  REQUIRE(value.has_value());
+  return *value;
 }
 
-// The numbers `text` holds, separated by spaces.
-inline auto parse_numbers(std::string_view text) -> std::vector<double> {
+// The numbers `text` holds, separated by spaces, failing the test if one is
+// not a number.
+inline auto require_numbers(std::string_view text) -> std::vector<double> {
   std::vector<double> values;
   for (std::size_t at = text.find_first_not_of(' ');
        at != std::string_view::npos; at = text.find_first_not_of(' ', at)) {
     std::size_t end = std::min(text.find(' ', at), text.size());
-    values.push_back(parse_number(text.substr(at, end - at)));
+    values.push_back(require_number(text.substr(at, end - at)));
     at = end;
   }
   return values;

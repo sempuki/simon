@@ -3,38 +3,14 @@
 #include "application/arguments.hpp"
 
 #include <algorithm>
-#include <charconv>
 #include <cstdio>
 #include <format>
 #include <print>
-#include <system_error>
 #include <utility>
 
+#include "core/text.hpp"
+
 namespace simon::application {
-
-namespace {
-
-auto parse_integer(std::string_view text) -> std::optional<std::int64_t> {
-  std::int64_t value = 0;
-  auto [end, error] =
-      std::from_chars(text.data(), text.data() + text.size(), value);
-  if (error != std::errc{} || end != text.data() + text.size()) {
-    return std::nullopt;
-  }
-  return value;
-}
-
-auto parse_number(std::string_view text) -> std::optional<double> {
-  double value = 0.0;
-  auto [end, error] =
-      std::from_chars(text.data(), text.data() + text.size(), value);
-  if (error != std::errc{} || end != text.data() + text.size()) {
-    return std::nullopt;
-  }
-  return value;
-}
-
-}  // namespace
 
 Arguments::Arguments(int argc, char** argv) {
   for (int i = 1; i < argc; ++i) {

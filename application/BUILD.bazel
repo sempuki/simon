@@ -27,7 +27,10 @@ cc_library(
     testonly = True,
     hdrs = ["testing.hpp"],
     copts = COPTS,
-    deps = ["@lib//base:testing"],
+    deps = [
+        "//core:text",
+        "@lib//base:testing",
+    ],
 )
 
 cc_library(
@@ -35,6 +38,7 @@ cc_library(
     srcs = ["arguments.cpp"],
     hdrs = ["arguments.hpp"],
     copts = COPTS,
+    deps = ["//core:text"],
 )
 
 cc_test(

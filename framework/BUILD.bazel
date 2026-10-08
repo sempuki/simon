@@ -135,6 +135,7 @@ cc_library(
         "//framework:__pkg__",
     ],
     deps = [
+        "//core:text",
         ":framework",
         "//core:argument",
         "//core:time",

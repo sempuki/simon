@@ -39,7 +39,7 @@ auto load_rows() -> std::vector<Row> {
                        .element = cells[1],
                        .index = std::stoul(cells[2]),
                        .field = cells[3],
-                       .values = parse_numbers(cells[4])});
+                       .values = require_numbers(cells[4])});
   }
   return rows;
 }

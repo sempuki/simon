@@ -3,10 +3,10 @@
 // MPL-2.0; translated to C++ and changed. See NOTICE.md.
 
 #include "scenario/storyboard.hpp"
+#include "core/text.hpp"
 #include "core/units.hpp"
 
 #include <algorithm>
-#include <charconv>
 #include <cmath>
 #include <limits>
 #include <numbers>
@@ -22,16 +22,6 @@ namespace {
 constexpr std::size_t ROOT = 0;
 constexpr std::size_t NO_ENTITY = std::numeric_limits<std::size_t>::max();
 constexpr double SMALL = 1e-10;
-
-auto parse_number(std::string_view text) -> std::optional<double> {
-  double value = 0.0;
-  auto [end, error] =
-      std::from_chars(text.data(), text.data() + text.size(), value);
-  if (error != std::errc{} || end != text.data() + text.size()) {
-    return std::nullopt;
-  }
-  return value;
-}
 
 auto compare(double a, double b, Rule rule) -> bool {
   switch (rule) {

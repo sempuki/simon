@@ -69,9 +69,9 @@ auto load_poses(std::string_view table = "mujoco_contacts.csv")
        load_table(std::string{REFERENCE} + std::string{table}).lines) {
     REQUIRE(cells.size() == 3);
     if (cells[1] == "qpos") {
-      poses.push_back(Pose{.qpos = parse_numbers(cells[2])});
+      poses.push_back(Pose{.qpos = require_numbers(cells[2])});
     } else {
-      poses.back().contacts.push_back(parse_numbers(cells[2]));
+      poses.back().contacts.push_back(require_numbers(cells[2]));
     }
   }
   return poses;

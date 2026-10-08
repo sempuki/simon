@@ -31,9 +31,9 @@ auto make_balance() -> Scenario {
       load_table(std::string{REFERENCE} + "mujoco_feedback.csv").lines.at(0);
   return Scenario{.model = std::string{MODELS} + "cartpole.xml",
                   .qpos = {{1, 0.2}},
-                  .feedback = {.gains = parse_numbers(law[1]),
-                               .reference = parse_numbers(law[2]),
-                               .offset = parse_numbers(law[3])},
+                  .feedback = {.gains = require_numbers(law[1]),
+                               .reference = require_numbers(law[2]),
+                               .offset = require_numbers(law[3])},
                   .constrained = false};
 }
 

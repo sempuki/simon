@@ -40,9 +40,9 @@ auto read_vector(const testing::Table& table,
                  const std::vector<std::string>& line, std::string_view x)
     -> Vector3 {
   std::size_t column = find_column(table, x);
-  return Vector3{testing::parse_number(line[column]),
-                 testing::parse_number(line[column + 1]),
-                 testing::parse_number(line[column + 2])};
+  return Vector3{testing::require_number(line[column]),
+                 testing::require_number(line[column + 1]),
+                 testing::require_number(line[column + 2])};
 }
 
 // The median and 99th percentile of `errors`.
@@ -81,7 +81,7 @@ auto compute_accelerations(const Scenario& scenario) -> std::vector<Vector3> {
 TEST_CASE("Tree") {
   testing::Table table = testing::load_table(TREE);
   Scenario scenario{
-      .softening = testing::parse_number(
+      .softening = testing::require_number(
                        table.lines.front()[find_column(table, "softening")]) *
                    meter};
   std::vector<Vector3> direct;
@@ -89,7 +89,7 @@ TEST_CASE("Tree") {
     scenario.bodies.push_back(gravity::BodyStart{
         .position = QuantityVector{read_vector(table, line, "x")} * meter,
         .mass =
-            testing::parse_number(line[find_column(table, "m")]) * kilogram});
+            testing::require_number(line[find_column(table, "m")]) * kilogram});
     direct.push_back(read_vector(table, line, "ax"));
   }
 

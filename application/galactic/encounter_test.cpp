@@ -29,7 +29,7 @@ const Year STEP{250000};
 
 auto read_state(const std::vector<std::string>& line) -> gravity::BodyStart {
   auto number = [&](std::size_t column) {
-    return testing::parse_number(line[column]);
+    return testing::require_number(line[column]);
   };
   return gravity::BodyStart{
       .position = meters(number(2), number(3), number(4)),
@@ -84,7 +84,7 @@ TEST_CASE("Encounter") {
     std::size_t compared = 0;
     for (const std::vector<std::string>& line : table.lines) {
       if (line[0] != "0") continue;
-      auto body = static_cast<std::size_t>(testing::parse_number(line[1]));
+      auto body = static_cast<std::size_t>(testing::require_number(line[1]));
       gravity::BodyStart theirs = read_state(line);
       CHECK(ours[body].position == theirs.position);  // Bit for bit.
       CHECK(ours[body].velocity == theirs.velocity);
@@ -103,8 +103,8 @@ TEST_CASE("Encounter") {
 
     // Under Test.
     for (const std::vector<std::string>& line : table.lines) {
-      auto step = static_cast<int>(testing::parse_number(line[0]));
-      auto body = static_cast<std::size_t>(testing::parse_number(line[1]));
+      auto step = static_cast<int>(testing::require_number(line[0]));
+      auto body = static_cast<std::size_t>(testing::require_number(line[1]));
       REQUIRE(driver.advance_to(BasicTimePoint<Year>{} + step * STEP));
       gravity::BodyStart ours = collect_states(simulation)[body];
       gravity::BodyStart theirs = read_state(line);

@@ -6,7 +6,11 @@
 #include <charconv>
 #include <cstdint>
 #include <format>
+#include <limits>
+#include <optional>
 #include <system_error>
+
+#include "core/text.hpp"
 
 namespace simon::framework::benchmark {
 
@@ -64,13 +68,11 @@ auto Contention::describe(unsigned threads) -> std::string {
 }
 
 auto parse_count(std::string_view text) -> std::optional<int> {
-  int count = 0;
-  auto [end, error] =
-      std::from_chars(text.data(), text.data() + text.size(), count);
-  if (error != std::errc{} || end != text.data() + text.size() || count <= 0) {
+  std::optional<std::int64_t> count = parse_integer(text);
+  if (!count || *count <= 0 || *count > std::numeric_limits<int>::max()) {
     return std::nullopt;
   }
-  return count;
+  return static_cast<int>(*count);
 }
 
 auto parse_arguments(int argc, char** argv)

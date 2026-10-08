@@ -35,7 +35,7 @@ inline auto load_rows(std::string_view path) -> std::vector<Row> {
     REQUIRE(cells.size() == table.header.size());
     Row row;
     for (std::size_t i = 0; i < cells.size(); ++i) {
-      row[table.header[i]] = simon::testing::parse_number(cells[i]);
+      row[table.header[i]] = simon::testing::require_number(cells[i]);
     }
     rows.push_back(std::move(row));
   }

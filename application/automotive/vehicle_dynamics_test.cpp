@@ -201,16 +201,16 @@ auto compare_rates(std::string_view name,
       continue;
     }
     const vehicle::VehicleParameters& vehicle =
-        vehicles.at(static_cast<int>(parse_number(cells[1])));
+        vehicles.at(static_cast<int>(require_number(cells[1])));
     vehicle::Input input{
-        .steering_rate = parse_number(cells[2]) * radian_per_second,
-        .acceleration = parse_number(cells[3]) * meter_per_second_squared};
+        .steering_rate = require_number(cells[2]) * radian_per_second,
+        .acceleration = require_number(cells[3]) * meter_per_second_squared};
     std::size_t n = (cells.size() - 4) / 2;
     Numbers x(n);
     Numbers theirs(n);
     for (std::size_t i = 0; i < n; ++i) {
-      x[i] = parse_number(cells[4 + i]);
-      theirs[i] = parse_number(cells[4 + n + i]);
+      x[i] = require_number(cells[4 + i]);
+      theirs[i] = require_number(cells[4 + n + i]);
     }
     Numbers ours = Model::rate_numbers(x, input, vehicle);
     REQUIRE(ours.size() == n);
@@ -238,14 +238,14 @@ auto compare_paths(std::string_view name, int id,
   std::vector<Numbers> theirs;
   std::vector<Numbers> converged;
   for (const std::vector<std::string>& cells : lines) {
-    if (cells[0] != name || static_cast<int>(parse_number(cells[1])) != id) {
+    if (cells[0] != name || static_cast<int>(require_number(cells[1])) != id) {
       continue;
     }
     Numbers x;
     for (std::size_t i = 4; i < cells.size(); ++i) {
-      x.push_back(parse_number(cells[i]));
+      x.push_back(require_number(cells[i]));
     }
-    (parse_number(cells[2]) == 0.001 ? theirs : converged).push_back(x);
+    (require_number(cells[2]) == 0.001 ? theirs : converged).push_back(x);
   }
   std::vector<Numbers> ours = drive<Model>(vehicle, 1ms);
   REQUIRE(ours.size() == theirs.size());

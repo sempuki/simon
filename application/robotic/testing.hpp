@@ -25,7 +25,7 @@
 namespace simon::robotic::testing {
 
 using simon::testing::load_table;
-using simon::testing::parse_numbers;
+using simon::testing::require_numbers;
 
 inline constexpr std::string_view MODELS = "application/robotic/models/";
 inline constexpr std::string_view REFERENCE = "application/robotic/reference/";
@@ -53,11 +53,11 @@ inline auto load_runs(std::string_view name)
     REQUIRE(cells.size() >= 4);
     Run& run = runs[cells[0]];
     if (cells[1] == "start") {
-      run.start = parse_numbers(cells[2]);
-      run.control = parse_numbers(cells[3]);
+      run.start = require_numbers(cells[2]);
+      run.control = require_numbers(cells[3]);
     } else {
-      run.qpos.push_back(parse_numbers(cells[2]));
-      run.qvel.push_back(parse_numbers(cells[3]));
+      run.qpos.push_back(require_numbers(cells[2]));
+      run.qvel.push_back(require_numbers(cells[3]));
     }
   }
   return runs;
@@ -215,7 +215,7 @@ inline auto load_solved_runs()
        load_table(std::string{REFERENCE} + "mujoco_solved.csv").lines) {
     REQUIRE(cells.size() == 4);
     runs[cells[0]][static_cast<std::size_t>(std::stoull(cells[1]))] = {
-        parse_numbers(cells[2]), parse_numbers(cells[3])};
+        require_numbers(cells[2]), require_numbers(cells[3])};
   }
   return runs;
 }
@@ -242,14 +242,14 @@ inline auto load_local_steps()
     REQUIRE(cells.size() == 10);
     steps[cells[0]].push_back(
         LocalStep{.step = static_cast<std::size_t>(std::stoull(cells[1])),
-                  .qpos = parse_numbers(cells[2]),
-                  .qvel = parse_numbers(cells[3]),
-                  .next_qpos = parse_numbers(cells[4]),
-                  .next_qvel = parse_numbers(cells[5]),
+                  .qpos = require_numbers(cells[2]),
+                  .qvel = require_numbers(cells[3]),
+                  .next_qpos = require_numbers(cells[4]),
+                  .next_qvel = require_numbers(cells[5]),
                   .spread = {.position = std::stod(cells[6]),
                              .velocity = std::stod(cells[7])},
-                  .solved_qpos = parse_numbers(cells[8]),
-                  .solved_qvel = parse_numbers(cells[9])});
+                  .solved_qpos = require_numbers(cells[8]),
+                  .solved_qvel = require_numbers(cells[9])});
   }
   return steps;
 }

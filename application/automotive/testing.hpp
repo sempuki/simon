@@ -22,7 +22,7 @@
 namespace simon::automotive::testing {
 
 using simon::testing::load_table;
-using simon::testing::parse_number;
+using simon::testing::require_number;
 using simon::testing::split_cells;
 
 inline constexpr std::string_view ROADS = "application/automotive/roads/";
@@ -94,7 +94,7 @@ inline auto load_rows(std::string_view name) -> std::vector<Row> {
 
 // The number in `row`'s `column`.
 inline auto number(const Row& row, std::string_view column) -> double {
-  return parse_number(row.find(column)->second);
+  return require_number(row.find(column)->second);
 }
 
 // CommonRoad's vehicles 1, 2 and 3 by number, every parameter from

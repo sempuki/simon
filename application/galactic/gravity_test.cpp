@@ -36,9 +36,9 @@ auto vector_of(const testing::Table& table,
     -> QuantityVector {
   std::size_t column = 0;
   while (table.header[column] != x) ++column;
-  return {testing::parse_number(line[column]),
-          testing::parse_number(line[column + 1]),
-          testing::parse_number(line[column + 2])};
+  return {testing::require_number(line[column]),
+          testing::require_number(line[column + 1]),
+          testing::require_number(line[column + 2])};
 }
 
 auto number_of(const testing::Table& table,
@@ -46,7 +46,7 @@ auto number_of(const testing::Table& table,
     -> double {
   std::size_t column = 0;
   while (table.header[column] != name) ++column;
-  return testing::parse_number(line[column]);
+  return testing::require_number(line[column]);
 }
 
 // The bodies of one case of the forces table, and REBOUND's accelerations.
