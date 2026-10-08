@@ -458,4 +458,52 @@ TEST_CASE("RealTimeDriver") {
   }
 }
 
+TEST_CASE("RealTimeDriverNextWake") {
+  FakeClock::current = FakeClock::time_point{};
+  TimedRecorder timed;
+  timed.timeline_.due = {TimePoint{1s}};
+
+  SECTION("ShouldWakeAtNextDueWallTimeGivenIdling") {
+    // Preconditions.
+    RealTimeDriver<TimedRecorder, FakeClock> driver{
+        Timing{.max_step = 10ms, .idle = true}, 2.0, Depend(timed)};
+    REQUIRE(driver.tick() == Flow::CONTINUE);  // Starts at wall time zero.
+
+    // Under Test.
+    auto wake = driver.next_wake();
+
+    // Postconditions.
+    // 1 s simulated at twice real time is half a second of wall time.
+    CHECK(wake == FakeClock::time_point{500ms});
+  }
+
+  SECTION("ShouldNotWakeGivenPaused") {
+    // Preconditions.
+    RealTimeDriver<TimedRecorder, FakeClock> driver{
+        Timing{.max_step = 10ms, .idle = true}, 2.0, Depend(timed)};
+    REQUIRE(driver.tick() == Flow::CONTINUE);
+
+    // Under Test.
+    driver.pause();
+
+    // Postconditions.
+    CHECK(driver.next_wake() == std::nullopt);
+  }
+
+  SECTION("ShouldWakeNowGivenSomethingEveryStep") {
+    // Preconditions.
+    timed.timeline_.every_step = true;
+    RealTimeDriver<TimedRecorder, FakeClock> driver{
+        Timing{.max_step = 10ms, .idle = true}, 2.0, Depend(timed)};
+    REQUIRE(driver.tick() == Flow::CONTINUE);
+    FakeClock::current = FakeClock::time_point{3ms};
+
+    // Under Test.
+    auto wake = driver.next_wake();
+
+    // Postconditions.
+    CHECK(wake == FakeClock::time_point{3ms});
+  }
+}
+
 }  // namespace simon::engine

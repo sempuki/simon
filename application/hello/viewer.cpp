@@ -9,10 +9,12 @@
 // speed. See application/viewing.hpp for the window's options.
 
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -50,6 +52,12 @@ class Viewer final {
 
   // Whether the Quit button was pressed.
   auto quitting() const -> bool { return quitting_; }
+
+  // When the run next needs a tick, so the window can sleep until then.
+  auto next_wake() const
+      -> std::optional<std::chrono::steady_clock::time_point> {
+    return session_->next_wake();
+  }
 
  private:
   auto restart() -> void {

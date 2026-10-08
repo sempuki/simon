@@ -292,6 +292,28 @@ class RealTimeDriver final {
   }
   auto paused() const -> bool { return paused_; }
 
+  // When the run next needs a tick, for a frame loop that can wait: now while
+  // something runs every step, the wall time of the next due work while
+  // idling, and nothing while paused, stopped, or idling with nothing due,
+  // until something else wakes it.
+  auto next_wake() const -> std::optional<typename WallClockType::time_point> {
+    Phase phase = driver_.phase();
+    if (phase == Phase::NEW) {
+      return WallClockType::now();
+    }
+    if (paused_ || phase != Phase::RUNNING) {
+      return std::nullopt;
+    }
+    if (!driver_.idling()) {
+      return WallClockType::now();
+    }
+    std::optional<TimePoint> due = driver_.next_due();
+    if (!due) {
+      return std::nullopt;
+    }
+    return to_wall_time(*due);
+  }
+
   // Changes how many simulated seconds pass per wall second, from now on.
   // Simulated time does not jump.
   auto set_speed(double speed) -> void {

@@ -1793,7 +1793,10 @@ between them without calling the simulation, since nothing would run there.
 `BatchDriver` jumps over an hour of quiet in one move. `RealTimeDriver::run`
 sleeps until the next due time on a condition variable instead of waking
 every step, and `wake()` ends the sleep from another thread, after an input
-publishes an event. Results are the same with idling on or off, since the
+publishes an event. A viewer's window sleeps the same way: it asks its run's
+`next_wake()` and waits for that time or for input, drawing only then, so a
+paused, finished or quiet run leaves the CPU alone; a run with something
+every step draws every frame as before. Results are the same with idling on or off, since the
 steps it skips run nothing. `engine/idle_benchmark` runs a thousand bodies on
 timers of 1 to 60 s with two systems at 1 s and 5 s for an hour: 3,600
 instants where stepping every 10 ms takes 360,000 steps, in about half the

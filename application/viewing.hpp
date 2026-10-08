@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -111,9 +112,25 @@ inline auto save_screenshot(SDL_Renderer* renderer, const std::string& path)
   return saved;
 }
 
+// Waits for an event until `wake`, or for good without one. Returns whether
+// an event came, in `event`; none if `wake` has already passed.
+inline auto wait_for(std::optional<std::chrono::steady_clock::time_point> wake,
+                     Out<SDL_Event> event) -> bool {
+  if (!wake) {
+    return SDL_WaitEvent(&*event) == 1;
+  }
+  auto left = std::chrono::ceil<std::chrono::milliseconds>(
+      *wake - std::chrono::steady_clock::now());
+  if (left <= std::chrono::milliseconds::zero()) {
+    return false;
+  }
+  return SDL_WaitEventTimeout(&*event, static_cast<int>(left.count())) == 1;
+}
+
 // Opens a window, makes a viewer by `make(scale)`, and draws its `frame()`
 // until the user quits, it asks to with `quitting()`, or `options.frames`
-// run out. Returns the process's exit code.
+// run out. A viewer with `next_wake()` is drawn only when its run needs a
+// tick or input comes. Returns the process's exit code.
 template <typename MakeType>
 auto run(const WindowOptions& options, MakeType make) -> int {
   // Prefer Wayland: SDL2 defaults to X11, where this SDL build has no GPU
@@ -159,22 +176,43 @@ auto run(const WindowOptions& options, MakeType make) -> int {
   {
     auto viewer = make(scale);
     bool done = false;
+    auto handle = [&](const SDL_Event& event) {
+      ImGui_ImplSDL2_ProcessEvent(&event);
+      if (event.type == SDL_QUIT ||
+          (event.type == SDL_WINDOWEVENT &&
+           event.window.event == SDL_WINDOWEVENT_CLOSE &&
+           event.window.windowID == SDL_GetWindowID(window))) {
+        done = true;
+      }
+      if (event.type == SDL_KEYDOWN && !ImGui::GetIO().WantTextInput &&
+          (event.key.keysym.sym == SDLK_ESCAPE ||
+           (event.key.keysym.sym == SDLK_q &&
+            (event.key.keysym.mod & KMOD_CTRL) != 0))) {
+        done = true;
+      }
+    };
+    // A viewer that says when its run next needs a tick lets the loop sleep
+    // until then, or until input, drawing a few frames after each input so
+    // that ImGui settles; one that does not draws every frame.
+    constexpr int SETTLING_FRAMES = 3;
+    int settling = SETTLING_FRAMES;
     for (int frame = 1; !done; ++frame) {
       SDL_Event event;
+      if constexpr (requires { viewer.next_wake(); }) {
+        // A run of so many frames, as tests have, never waits: no input
+        // would come to end the wait.
+        if (settling == 0 && options.frames == 0 &&
+            wait_for(viewer.next_wake(), Out(event))) {
+          handle(event);
+          settling = SETTLING_FRAMES;
+        }
+      }
       while (SDL_PollEvent(&event)) {
-        ImGui_ImplSDL2_ProcessEvent(&event);
-        if (event.type == SDL_QUIT ||
-            (event.type == SDL_WINDOWEVENT &&
-             event.window.event == SDL_WINDOWEVENT_CLOSE &&
-             event.window.windowID == SDL_GetWindowID(window))) {
-          done = true;
-        }
-        if (event.type == SDL_KEYDOWN && !ImGui::GetIO().WantTextInput &&
-            (event.key.keysym.sym == SDLK_ESCAPE ||
-             (event.key.keysym.sym == SDLK_q &&
-              (event.key.keysym.mod & KMOD_CTRL) != 0))) {
-          done = true;
-        }
+        handle(event);
+        settling = SETTLING_FRAMES;
+      }
+      if (settling > 0) {
+        --settling;
       }
       ImGui_ImplSDLRenderer2_NewFrame();
       ImGui_ImplSDL2_NewFrame();
@@ -253,6 +291,16 @@ class Session final {
     return std::chrono::duration<double>(
                driver_->driver().now().time_since_epoch())
         .count();
+  }
+
+  // When the run next needs a tick (see RealTimeDriver::next_wake); nothing
+  // once it has finished.
+  auto next_wake() const
+      -> std::optional<std::chrono::steady_clock::time_point> {
+    if (finished_) {
+      return std::nullopt;
+    }
+    return driver_->next_wake();
   }
 
   auto scenario() const -> const ScenarioType& { return scenario_; }
