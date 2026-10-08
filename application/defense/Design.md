@@ -90,7 +90,10 @@ the sector and starts a second timer for `lasting`. That timer publishes
 `WeaponsHoldExpired`, and the simulation's subscriber frees the sector, except
 where another hold is still in force, so overlapping holds end with the last of
 them. `Simulation::step` delivers the events due by the step's time before it
-runs the schedule, and `Simulation::events()` lets anyone else subscribe.
+runs the schedule, and `Simulation::events()` lets anyone else subscribe. The
+event queue and the scheduler feed the simulation's timeline, so the driver
+ends a step at each timer's time and a hold ends at its own time, not at the
+next step.
 
 Launchers under another hold are never freed, rather than freed and held again
 in the same batch, so nothing churns through the `WeaponsHold` store.

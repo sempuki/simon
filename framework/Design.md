@@ -1099,7 +1099,7 @@ using Schedule = SystemList<Sensing, Engaging, GuideInterceptors,
 - **Schedule elements can run themselves.** `Continuous` is one: it steps the
   systems it holds several times per step (see
   [Continuous state](#continuous-state)). A system that runs at its own rate
-  gates itself with a `RateGate` (see [Rate gates](#rate-gates)).
+  declares a period (see [Periods and the timeline](#periods-and-the-timeline)).
 - **The schedule can be printed.** `Scheduler::describe()` lists the flattened
   schedule with each system's identity, writes, reads, allow list and
   exclusions, generated from the type, and `hello_test` checks it. This
@@ -1406,10 +1406,13 @@ the few things near it, never "for each X, visit every Y".
 
 ### Do nothing on steps with nothing to do
 
-A system whose work is rate-gated (radar scans) or event-driven (blasts) should
-not touch every entity on the steps in between. A `prepare` stage that returns
-`bool` skips the per-entity loop, and the `resolve` stage with it, when it
-returns false.
+A system that runs at its own rate declares a period, and is skipped whole
+between its boundaries (see
+[Periods and the timeline](#periods-and-the-timeline)). A system whose work
+depends on the data (radars that scanned, blasts that went off) should not
+touch every entity on the steps in between either. A `prepare` stage that
+returns `bool` skips the per-entity loop, and the `resolve` stage with it,
+when it returns false.
 
 ```cpp
 // Steps without a scan have nothing to detect.
@@ -1704,8 +1707,10 @@ A simulation is anything that implements the lifecycle's
 
 Every driver uses one contract, `advance_to(T)`. The driver is told a target
 time and substeps toward it at no more than the maximum `dt`, clamping the last
-substep so it lands exactly on `T`. Drivers differ only in where `T` comes
-from:
+substep so it lands exactly on `T`, and ending a substep wherever the
+simulation's timeline says work is due (see
+[Periods and the timeline](#periods-and-the-timeline)). Drivers differ only in
+where `T` comes from:
 
 | Driver | Source of `T` | Use |
 |---|---|---|
@@ -1733,7 +1738,9 @@ simulation's time and phase. The other drivers wrap it:
 - **Real-time runs are deterministic.** `RealTimeDriver` only ever targets whole
   multiples of the maximum step, so the wall clock decides when steps happen,
   never how long they are. A test checks that irregular wall-clock ticks take
-  exactly the steps a batch run takes.
+  exactly the steps a batch run takes. While idling, a target also reaches any
+  due time the wall clock has passed; the steps then differ from a batch run's
+  only by steps in which nothing runs.
 
 `hello`'s viewer runs under `RealTimeDriver`; its test runs the same
 simulation under `BatchDriver` and checks that two runs end with bit-identical
@@ -1744,11 +1751,60 @@ simulation will not produce events earlier than `now + lookahead`. HLA time
 management needs it, so it arrives with `LockstepDriver`, which waits until a
 second process exists.
 
+### Periods and the timeline
+
+A system can run at its own period instead of every step. It declares a
+default on its type, and a scenario can change it on the scheduler:
+
+```cpp
+struct FlyAutopilot final : System<Commands, const AirState, Autopilot> {
+  static constexpr Duration PERIOD = 100ms;
+  ...
+};
+
+scheduler.set_period<RunFlightControls>(8ms);           // From the aircraft.
+scheduler.set_period<FollowRoute>(2s, 500ms);          // A phase within it.
+scheduler.clear_period<FlyAutopilot>();                 // Every step again.
+```
+
+- **Boundaries count from time zero:** the phase, then whole periods. They
+  are known before the first step.
+- **Between boundaries the system is skipped whole:** no `prepare`, no loop,
+  no `resolve`. What it writes holds its last value, as Simulink holds a
+  block's output between its samples.
+- **At a boundary its step lasts the time since it last ran,** its period on
+  the first run. A step that spans several of its boundaries runs it once.
+- **`describe()` prints declared periods.** A period costs one compare per
+  system per step; a system without one runs as before.
+
+A `framework::Timeline` asks its sources when work is due: `earliest()`,
+perhaps already reached, and `earliest_after(time)`, the next due time after
+a step's start, before the work due at it runs. A scheduler attached to it
+answers for its systems with periods, and an event queue for its events. It
+also counts the systems that run every step. A simulation that owns a
+timeline and exposes it as `timeline()` has its driver end each step at the
+next due time, so each system with a period runs in a step that starts at its
+own boundary, and each event is delivered at its own time.
+
+**Idling is opt in,** `Timing{.idle = true}`, and takes effect only while the
+timeline has nothing that runs every step. The driver then runs only
+instants, steps of no length at the times work is due, and moves the clock
+between them without calling the simulation, since nothing would run there.
+`BatchDriver` jumps over an hour of quiet in one move. `RealTimeDriver::run`
+sleeps until the next due time on a condition variable instead of waking
+every step, and `wake()` ends the sleep from another thread, after an input
+publishes an event. Results are the same with idling on or off, since the
+steps it skips run nothing. `engine/idle_benchmark` runs a thousand bodies on
+timers of 1 to 60 s with two systems at 1 s and 5 s for an hour: 3,600
+instants where stepping every 10 ms takes 360,000 steps, in about half the
+wall time, with the same final state.
+
 ### Rate gates
 
-A component that works at a lower rate than the step (a radar scanning at
-10 Hz on a 100 Hz step) holds a `RateGate` value. Its system asks the gate
-whether to run this step.
+A system that gates part of its work, or a component that runs at its own
+rate, holds a `RateGate` value and asks it each step. automotive's `Decide`
+runs every step and weighs lane changes once a second through one; each of
+defense's radars scans at its own rate through one.
 
 `RateGate::fire(step)` returns a `Firing` when the gate fires, and nothing
 otherwise:
@@ -1767,6 +1823,17 @@ otherwise:
   radar's gate fires on the same step, that step does all the scanning; giving
   each radar a different `first` spreads the work over the period. The gate
   already keeps its next firing time, so this adds no field.
+
+**An entity that runs at its own rate** has two ways to do it:
+
+- **A `RateGate` in a component,** asked by its system each step. It costs a
+  check per entity per step, and its work lands on the first step after each
+  boundary. It suits many entities at rates near the step's, such as radars.
+- **A timer per entity** on an event queue attached to the timeline. The
+  handler does the work and starts the next timer. It costs nothing between
+  firings, lands at its exact time, and lets an idling driver sleep. It suits
+  slow or irregular rates, such as a sensor that reports every minute, or a
+  maintenance check.
 
 ### Continuous state
 
@@ -1841,7 +1908,10 @@ entity created. It is not for anything that happens every step, which belongs
 in components.
 
 Events are delivered in time order, ties in publish order, with the event's own
-time. simon's current `EventQueue` already does this. defense's timed weapons
+time. An event queue attached to a timeline is also delivered at its own time:
+the driver ends a step there, and the step that starts there delivers it. An
+event that a handler schedules inside the step it handles waits for the next
+step, at most `max_step`, unless the driver is idling. defense's timed weapons
 holds use it: a timer starts each hold, and a second timer raises
 `WeaponsHoldExpired` when it ends.
 
@@ -2138,8 +2208,9 @@ already bounded quantities through `model`'s helpers, got 6% and 3% faster.
 simon/
   core/          What every layer speaks and no layer owns: Vector3 and the parameter vocabulary, units, Duration and Step,
                  Coordinates, Random, and the Lie groups SO(3) and SE(3)
-  framework/     Entity, ComponentStore, World, Spatial, names, builders, commands, System, schedules, and this design
-  engine/        Lifecycle, drivers, RateGate, EventQueue
+  framework/     Entity, ComponentStore, World, Spatial, names, builders, commands, System, schedules, periods and the
+                 timeline, and this design
+  engine/        Lifecycle, drivers and idling, RateGate, EventQueue
   model/         Reusable physics and maths, as free functions, and the data they work on. Kinematics,
                  rigid bodies, control, guidance and planar collision at the top, in simon::model; then by
                  domain, each folder its own namespace (simon::aircraft, simon::road, ...):
@@ -2232,6 +2303,9 @@ application's own steps are in its `Design.md`.
      spatial index, `system_benchmark` (the cost of reaching a sibling) and
      `churn_benchmark` (layouts under churn).
    - Done: archetype segments (see [Stores](#stores)).
+   - Done: per-system periods, a timeline that drivers end steps on, events
+     at their own time, and opt-in idling (see
+     [Periods and the timeline](#periods-and-the-timeline)).
    - Done: the defense simulation measured idle and contended (see
      [Contention](#contention)). At 100,000 drones, 4 contending threads slow it
      4.3 times.

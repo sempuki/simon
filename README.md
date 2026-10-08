@@ -15,7 +15,7 @@ carry a world-class simulation of that kind.
 |---|---|
 | [core/](core) | What every layer speaks: the vocabulary of vectors and parameters, units, integer-nanosecond time, random numbers, and the Lie groups of rotations and rigid motions |
 | [framework/](framework) | Entities, component stores in archetype segments, the world, systems and schedules, names, builders and commands, spatial indexes |
-| [engine/](engine) | The lifecycle, batch and real-time drivers, rate gates, continuous state with Euler, midpoint and Runge-Kutta 4, events |
+| [engine/](engine) | The lifecycle, batch and real-time drivers that land on due times and can idle, rate gates, continuous state with Euler, midpoint and Runge-Kutta 4, events |
 | [model/](model) | Physics shared by applications, as free functions, by domain: aircraft, the Earth and its air, roads, traffic, vehicles, articulated bodies, gravity |
 | [format/](format) | Readers into model data: OpenDRIVE, OpenSCENARIO, tire property files, converted aircraft |
 | [scenario/](scenario) | OpenSCENARIO scenarios, parameter distributions, and the player that runs their storyboards |

@@ -57,8 +57,10 @@ Decisions made while building it:
   a call per precise aircraft under Clang, which does not inline the call
   operator: 0.23 ms per step at 100,000, against 0.06 ms with GCC. Excluding
   costs nothing under both.
-- **Guidance and control run at their own rates, gated once per system** in
-  `prepare`, so the steps in between skip their loops. Per-entity staggered
+- **Guidance and control run at their own periods,** `FollowRoute` at 1 s and
+  `FlyAutopilot` at 100 ms, declared on their types, and a rigid aircraft's
+  flight controls at its flight control computer's period where it has one;
+  the scheduler skips them whole between boundaries. Per-entity staggered
   gates would spread the work, at the cost of a gate in each component and a
   check per entity per step.
 - **Speed comes first.** The steepest climb the autopilot commands shrinks as
