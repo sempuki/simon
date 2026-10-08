@@ -13,6 +13,7 @@ cc_library(
     srcs = [
         "build_error.cpp",
         "name.cpp",
+        "name_table.cpp",
         "spatial_index.cpp",
     ],
     hdrs = [
@@ -22,6 +23,7 @@ cc_library(
         "command.hpp",
         "entity.hpp",
         "name.hpp",
+        "name_table.hpp",
         "query_builder.hpp",
         "spatial.hpp",
         "spatial_index.hpp",
@@ -82,6 +84,7 @@ cc_test(
 ) for test in [
     "entity",
     "name",
+    "name_table",
     "spatial_index",
     "component_store",
     "system",

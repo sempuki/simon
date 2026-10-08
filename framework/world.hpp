@@ -12,13 +12,11 @@
 #include <format>
 #include <functional>
 #include <limits>
-#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <tuple>
 #include <type_traits>
-#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -32,6 +30,7 @@
 #include "framework/entity.hpp"
 #include "framework/entity_builder.hpp"
 #include "framework/name.hpp"
+#include "framework/name_table.hpp"
 #include "framework/query_builder.hpp"
 #include "framework/spatial.hpp"
 #include "framework/spatial_index.hpp"
@@ -373,7 +372,7 @@ class World<SpatialType,                  //
   // An entity's name. Known as soon as the entity is created, before sync.
   auto name_of(Entity entity) const -> Name {
     CHECK_PRECONDITION(alive(entity));
-    return Name{Kind::ENTITY, instance_of_index_[entity.index]};
+    return Name{Kind::ENTITY, names_.instance_of(entity)};
   }
 
   template <typename ComponentType>
@@ -394,9 +393,7 @@ class World<SpatialType,                  //
         !is_entity_component(name)) {
       return std::nullopt;
     }
-    auto iter = entity_of_instance_.find(name.instance);
-    return iter != entity_of_instance_.end() ? std::optional{iter->second}
-                                             : std::nullopt;
+    return names_.entity_of(name.instance);
   }
 
   auto format_identity(Name name) const -> Identity {
@@ -414,18 +411,12 @@ class World<SpatialType,                  //
 
   // Every name with `alias`, in the order the aliases were given.
   auto find_name_of(const Alias& alias) const -> std::vector<Name> {
-    std::vector<Name> names;
-    auto [begin, end] = aliases_.equal_range(alias);
-    for (auto iter = begin; iter != end; ++iter) {
-      names.push_back(iter->second);
-    }
-    return names;
+    return names_.find_names(alias);
   }
 
   // Every alias `name` has, in the order they were given.
   auto aliases_of(Name name) const -> std::vector<Alias> {
-    auto iter = aliases_of_name_.find(name);
-    return iter != aliases_of_name_.end() ? iter->second : std::vector<Alias>{};
+    return names_.aliases_of(name);
   }
 
   // A one-line description for a console, e.g.
@@ -711,15 +702,9 @@ class World<SpatialType,                  //
     spatial_index_current_ = false;
     destroying_.assign(configuration.entities, false);
     destroying_list_.clear();
-    next_entity_instance_ = 0;
-    instance_of_index_.assign(configuration.entities, 0);
+    names_.reset(configuration.entities);
     archetype_of_index_.assign(configuration.entities, 0);
-    entity_of_instance_.clear();
-    next_archetype_instance_ = 0;
-    archetypes_.clear();
     archetype_names_ = {};
-    aliases_.clear();
-    aliases_of_name_.clear();
     // Components are aliased by their type names, qualified and short.
     for_each_type(ComponentList{}, [&]<typename ComponentType>() {
       std::string type_name = lib::to_type_string<ComponentType>();
@@ -754,7 +739,7 @@ class World<SpatialType,                  //
       case Kind::WORLD:
         return name.instance == number_;
       case Kind::ARCHETYPE:
-        return name.instance < next_archetype_instance_;
+        return name.instance < names_.archetype_count();
       case Kind::COMPONENT:
         return name.instance < ComponentList::size;
       case Kind::SYSTEM:
@@ -815,40 +800,21 @@ class World<SpatialType,                  //
 
   template <Archetypal ArchetypeType>
   auto archetype_name() -> Name {
-    auto [iter, inserted] =
-        archetypes_.try_emplace(std::string{ArchetypeType::name});
-    if (inserted) {
-      iter->second = Name{Kind::ARCHETYPE, next_archetype_instance_++};
-      give_alias(iter->second, ArchetypeType::name);
-      archetype_names_[index_of_v<ArchetypeList, ArchetypeType>] = iter->second;
-    }
-    return iter->second;
+    Name name = names_.name_archetype(ArchetypeType::name);
+    archetype_names_[index_of_v<ArchetypeList, ArchetypeType>] = name;
+    return name;
   }
 
   auto give_alias(Name name, const Alias& alias) -> void {
-    aliases_.emplace(alias, name);
-    aliases_of_name_[name].push_back(alias);
+    names_.give_alias(name, alias);
   }
 
   auto take_alias(Name name, const Alias& alias) -> void {
-    auto [begin, end] = aliases_.equal_range(alias);
-    for (auto iter = begin; iter != end; ++iter) {
-      if (iter->second == name) {
-        aliases_.erase(iter);
-        break;
-      }
-    }
-    std::vector<Alias>& given = aliases_of_name_[name];
-    std::erase(given, alias);
-    if (given.empty()) {
-      aliases_of_name_.erase(name);
-    }
+    names_.take_alias(name, alias);
   }
 
   auto has_alias(Name name, const Alias& alias) const -> bool {
-    auto iter = aliases_of_name_.find(name);
-    return iter != aliases_of_name_.end() &&
-           std::ranges::contains(iter->second, alias);
+    return names_.has_alias(name, alias);
   }
 
   //-- Transactions ------------------------------------------------------------
@@ -1000,17 +966,12 @@ class World<SpatialType,                  //
     if (std::optional<Status> failure = check_room<InitialTypes...>()) {
       return std::unexpected(*failure);
     }
-    CHECK_PRECONDITION(next_entity_instance_ <
-                       std::numeric_limits<std::uint32_t>::max());
-
     Entity entity = entities_.create();
-    std::uint32_t instance = next_entity_instance_++;
-    instance_of_index_[entity.index] = instance;
+    std::uint32_t instance = names_.name_entity(entity);
     archetype_of_index_[entity.index] =
         static_cast<std::uint8_t>(index_of_v<ArchetypeList, ArchetypeType>);
-    entity_of_instance_.emplace(instance, entity);
     remember([this, entity, instance] {
-      entity_of_instance_.erase(instance);
+      names_.forget_entity(instance);
       entities_.destroy(entity);
     });
     if (!alias.empty()) {
@@ -1194,7 +1155,7 @@ class World<SpatialType,                  //
     for (const Alias& alias : aliases_of(name)) {
       take_alias(name, alias);
     }
-    entity_of_instance_.erase(name.instance);
+    names_.forget_entity(name.instance);
     spatial_index_current_ =
         spatial_index_current_ && !store_of<SpatialType>().contains(entity);
     std::apply(
@@ -1225,20 +1186,13 @@ class World<SpatialType,                  //
   std::vector<std::function<void()>> undo_;
   std::size_t transaction_depth_ = 0;
 
-  // Names. Entity instances are never reused; Entity indices are.
-  std::uint32_t next_entity_instance_ = 0;
-  std::vector<std::uint32_t> instance_of_index_;
   // Each live entity's archetype, as its position in ArchetypeList.
   std::vector<std::uint8_t> archetype_of_index_;
-  std::unordered_map<std::uint32_t, Entity> entity_of_instance_;
-  std::uint32_t next_archetype_instance_ = 0;
-  std::map<std::string, Name, std::less<>> archetypes_;
   // Each archetype's Name, by its position in ArchetypeList, once created.
   std::array<Name, sizeof...(ArchetypeTypes)> archetype_names_{};
-
-  // Aliases, many-to-many. A multimap keeps equal aliases in the order given.
-  std::multimap<Alias, Name> aliases_;
-  std::unordered_map<Name, std::vector<Alias>> aliases_of_name_;
+  // Entities' and archetypes' names, and aliases. Entity instances are never
+  // reused; Entity indices are.
+  NameTable names_;
 };
 
 }  // namespace simon::framework
