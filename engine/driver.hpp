@@ -5,9 +5,10 @@
 #include <algorithm>
 #include <chrono>
 #include <concepts>
+#include <condition_variable>
 #include <expected>
+#include <mutex>
 #include <optional>
-#include <thread>
 
 #include "base/core.hpp"
 #include "core/argument.hpp"
@@ -23,23 +24,35 @@
 //   RealTimeDriver  the wall clock, paced
 namespace simon::engine {
 
-// When a run starts and its longest step, in ticks of `TickType`.
+// When a run starts and its longest step, in ticks of `TickType`, and
+// whether it may idle: step straight to the next time work is due, sleeping
+// in real time, while its timeline has nothing that runs every step.
 template <typename TickType = Duration>
 struct BasicTiming final {
   BasicTimePoint<TickType> start{};
   TickType max_step{};
+  bool idle = false;
 };
 
 using Timing = BasicTiming<>;
 
 // A simulation that says when it next has work, through a timeline whose
-// `earliest()` is the next due time (see framework/timeline.hpp). Its driver
-// ends each step there.
+// `earliest()` is the next due time, perhaps already reached,
+// `earliest_after(time)` the next one after a time, and `continuous()`
+// whether something runs every step (see framework/timeline.hpp). Its driver
+// ends each step at the next due time. An event a handler schedules inside
+// the step it handles waits for the next step, at most `max_step`, unless the
+// driver is idling.
 template <typename SimulationType>
 concept HasTimeline = requires(const SimulationType& simulation) {
   {
     simulation.timeline().earliest()
   } -> std::same_as<std::optional<BasicTimePoint<tick_of_t<SimulationType>>>>;
+  {
+    simulation.timeline().earliest_after(
+        BasicTimePoint<tick_of_t<SimulationType>>{})
+  } -> std::same_as<std::optional<BasicTimePoint<tick_of_t<SimulationType>>>>;
+  { simulation.timeline().continuous() } -> std::same_as<bool>;
 };
 
 // The lifecycle and `advance_to`, shared by every driver.
@@ -54,12 +67,33 @@ class Driver final {
   Driver(BasicTiming<Duration> timing, Depend<SimulationType> simulation)
       : simulation_{simulation.get()},
         now_{timing.start},
-        max_step_{timing.max_step} {
+        max_step_{timing.max_step},
+        idle_{timing.idle} {
     CHECK_PRECONDITION(max_step_ > Duration::zero());
   }
 
   auto now() const -> TimePoint { return now_; }
   auto max_step() const -> Duration { return max_step_; }
+
+  // Whether it steps straight to the next due time: it may idle, and nothing
+  // runs every step.
+  auto idling() const -> bool {
+    if constexpr (HasTimeline<SimulationType>) {
+      return idle_ && !simulation_->timeline().continuous();
+    }
+    return false;
+  }
+
+  // When the simulation next has work: the next due time while idling (none
+  // if nothing is due), else the next step.
+  auto next_due() const -> std::optional<TimePoint> {
+    if constexpr (HasTimeline<SimulationType>) {
+      if (idling()) {
+        return simulation_->timeline().earliest();
+      }
+    }
+    return now_ + max_step_;
+  }
   auto phase() const -> Phase { return phase_; }
 
   // Configures and initializes the simulation.
@@ -77,15 +111,25 @@ class Driver final {
   }
 
   // Steps toward `target`, at most `max_step` at a time, landing exactly on it,
-  // and on each time the simulation's timeline says work is due.
+  // and on each time the simulation's timeline says work is due. While
+  // idling, it runs only the instants at which work is due, and moves the
+  // clock between them without stepping, since nothing runs there.
   // Stops early, and for good, when a step returns Flow::STOP or an error.
   auto advance_to(TimePoint target) -> PhaseResult {
     CHECK_PRECONDITION(phase_ == Phase::RUNNING);
     while (now_ < target) {
+      if (idling()) {
+        PhaseResult result = idle_toward(target);
+        if (!result || *result == Flow::STOP) {
+          phase_ = Phase::STOPPED;
+          return result;
+        }
+        continue;
+      }
       Duration dt = std::min(max_step_, target - now_);
       if constexpr (HasTimeline<SimulationType>) {
-        if (std::optional<TimePoint> due = simulation_->timeline().earliest();
-            due && *due > now_) {
+        if (std::optional<TimePoint> due =
+                simulation_->timeline().earliest_after(now_)) {
           dt = std::min(dt, *due - now_);
         }
       }
@@ -95,6 +139,20 @@ class Driver final {
         phase_ = Phase::STOPPED;
         return result;
       }
+    }
+    return Flow::CONTINUE;
+  }
+
+  // While idling, one move toward `target`: an instant, a step of no length,
+  // when work is due now, so that what it schedules is seen before the clock
+  // moves on; else the clock straight to the next due time or `target`.
+  auto idle_toward(TimePoint target) -> PhaseResult {
+    if constexpr (HasTimeline<SimulationType>) {
+      std::optional<TimePoint> due = simulation_->timeline().earliest();
+      if (due && *due <= now_) {
+        return simulation_->step(Step{.time = now_, .dt = Duration::zero()});
+      }
+      now_ = due ? std::min(*due, target) : target;
     }
     return Flow::CONTINUE;
   }
@@ -128,6 +186,7 @@ class Driver final {
   SimulationType* simulation_ = nullptr;
   TimePoint now_;
   Duration max_step_;
+  bool idle_;
   Phase phase_ = Phase::NEW;
 };
 
@@ -163,7 +222,9 @@ class BatchDriver final {
 // Paces a simulation to a wall clock, `speed` simulated seconds per wall
 // second. Targets are always whole multiples of the maximum step, so a
 // real-time run takes exactly the steps a batch run would: the wall clock
-// decides when steps happen, never how long they are.
+// decides when steps happen, never how long they are. While idling, a target
+// also reaches any due time the wall clock has passed; the steps then differ
+// from a batch run's, but only by steps in which nothing runs.
 template <Simulation SimulationType,
           typename WallClockType = std::chrono::steady_clock>
 class RealTimeDriver final {
@@ -198,7 +259,16 @@ class RealTimeDriver final {
     if (paused_) {
       return Flow::CONTINUE;
     }
-    TimePoint target = target_at(WallClockType::now());
+    typename WallClockType::time_point wall = WallClockType::now();
+    TimePoint target = target_at(wall);
+    if (driver_.idling()) {
+      // Due times need not fall on whole steps; reach one the wall clock has
+      // passed.
+      if (std::optional<TimePoint> due = driver_.next_due();
+          due && *due <= simulated_at(wall)) {
+        target = std::max(target, *due);
+      }
+    }
     TimePoint most = driver_.now() + most_steps();
     if (target <= most) {
       return driver_.advance_to(target);
@@ -231,8 +301,9 @@ class RealTimeDriver final {
   }
   auto speed() const -> double { return speed_; }
 
-  // Ticks until the simulation stops, sleeping until each step is due. For
-  // headless runs; it needs a WallClockType that sleep_until understands.
+  // Ticks until the simulation stops, sleeping until each step is due, or,
+  // while idling, until work is due or `wake` is called. For headless runs;
+  // it needs a WallClockType a condition variable can wait on.
   auto run() -> FinishResult {
     for (;;) {
       PhaseResult result = tick();
@@ -244,9 +315,26 @@ class RealTimeDriver final {
       if (*result == Flow::STOP) {
         return driver_.finish();
       }
-      std::this_thread::sleep_until(
-          to_wall_time(driver_.now() + driver_.max_step()));
+      std::optional<TimePoint> due = driver_.next_due();
+      std::unique_lock lock{mutex_};
+      auto woken = [this] { return woken_; };
+      if (due) {
+        wake_.wait_until(lock, to_wall_time(*due), woken);
+      } else {
+        wake_.wait(lock, woken);  // Nothing is due until something wakes it.
+      }
+      woken_ = false;
     }
+  }
+
+  // Ends `run`'s sleep now, from any thread: after publishing an event, say,
+  // so that it is delivered without waiting for the next due time.
+  auto wake() -> void {
+    {
+      std::lock_guard lock{mutex_};
+      woken_ = true;
+    }
+    wake_.notify_one();
   }
 
   auto finish() -> FinishResult { return driver_.finish(); }
@@ -254,14 +342,20 @@ class RealTimeDriver final {
   auto driver() const -> const Driver<SimulationType>& { return driver_; }
 
  private:
-  // The last whole step at or before the simulated time `wall` corresponds to.
-  auto target_at(typename WallClockType::time_point wall) const -> TimePoint {
+  // The simulated time `wall` corresponds to.
+  auto simulated_at(typename WallClockType::time_point wall) const
+      -> TimePoint {
     // Rounded, not truncated: at an exact step boundary the floating-point
     // product can fall a fraction of a nanosecond short.
-    auto simulated = std::chrono::round<Duration>(
-        std::chrono::duration<double>(wall - wall_start_) * speed_);
+    return start_ +
+           std::chrono::round<Duration>(
+               std::chrono::duration<double>(wall - wall_start_) * speed_);
+  }
+
+  // The last whole step at or before the simulated time `wall` corresponds to.
+  auto target_at(typename WallClockType::time_point wall) const -> TimePoint {
     Duration step = driver_.max_step();
-    return start_ + (simulated / step) * step;
+    return start_ + ((simulated_at(wall) - start_) / step) * step;
   }
 
   // MAX_LAG at the current speed, in whole steps, and at least one.
@@ -294,6 +388,9 @@ class RealTimeDriver final {
   double speed_;
   typename WallClockType::time_point wall_start_{};
   bool paused_ = false;
+  std::mutex mutex_;  // Guards woken_.
+  std::condition_variable wake_;
+  bool woken_ = false;
 };
 
 }  // namespace simon::engine

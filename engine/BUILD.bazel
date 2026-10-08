@@ -60,3 +60,24 @@ cc_library(
     "event_queue",
     "rate_gate",
 ]]
+
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+
+cc_binary(
+    name = "idle_benchmark",
+    srcs = [
+        "idle_benchmark.cpp",
+        "//framework:test_world.hpp",
+    ],
+    copts = COPTS,
+    deps = [
+        ":driver",
+        ":event_queue",
+        ":lifecycle",
+        "//core:argument",
+        "//core:time",
+        "//framework",
+        "//framework:benchmarking",
+        "@lib//base:core",
+    ],
+)

@@ -509,7 +509,7 @@ concept HasPeriod = requires {
 // the next one runs. Holds one instance of each system, so systems may keep
 // state between stages and steps.
 template <typename WorldType, typename ScheduleType>
-class Scheduler final {
+class Scheduler final : private Timeline::Source {
  public:
   using FlattenedSystemList = flattened_list_t<ScheduleType>;
 
@@ -539,11 +539,12 @@ class Scheduler final {
         systems_);
   }
 
-  // Runs `SystemType` once per `period` instead of every step, at its first
-  // step plus `phase` and every period after, skipping it whole between: no
-  // prepare, no loop, no resolve. Each run's step lasts the time since its
-  // last run, its period on the first. Periods count nanoseconds, so only a
-  // simulation stepped in nanoseconds can use them.
+  // Runs `SystemType` once per `period` instead of every step, at `phase`
+  // plus whole periods from time zero, skipping it whole between: no
+  // prepare, no loop, no resolve. A boundary that passed before it is next
+  // stepped makes it run on that step. Each run's step lasts the time since
+  // its last run, its period on the first. Periods count nanoseconds, so only
+  // a simulation stepped in nanoseconds can use them.
   template <typename SystemType>
   auto set_period(Duration period, Duration phase = Duration::zero()) -> void {
     CHECK_PRECONDITION(period > Duration::zero());
@@ -552,8 +553,7 @@ class Scheduler final {
     if (timeline_ && !rate.period) {
       timeline_->add_continuous(-1);
     }
-    rate = Rate{.period = period, .phase = phase, .source = rate.source};
-    publish(rate);
+    rate = Rate{.period = period, .next = TimePoint{} + phase};
   }
 
   // Runs `SystemType` every step again.
@@ -563,8 +563,7 @@ class Scheduler final {
     if (timeline_ && rate.period) {
       timeline_->add_continuous(1);
     }
-    rate = Rate{.source = rate.source};
-    publish(rate);
+    rate = Rate{};
   }
 
   template <typename SystemType>
@@ -573,16 +572,16 @@ class Scheduler final {
   }
 
   // Tells `timeline` when each system with a period is next due, and how many
-  // systems run every step, for as long as the scheduler lives.
+  // systems run every step, for as long as the scheduler lives and stays in
+  // place.
   auto attach(Depend<Timeline> timeline) -> void {
     CHECK_PRECONDITION(!timeline_);
     timeline_ = timeline.get();
-    for (Rate& rate : rates_) {
-      rate.source = timeline_->add();
+    timeline_->add(Depend<const Timeline::Source>(*this));
+    for (const Rate& rate : rates_) {
       if (!rate.period) {
         timeline_->add_continuous(1);
       }
-      publish(rate);
     }
   }
 
@@ -633,14 +632,12 @@ class Scheduler final {
     }
   }
 
-  // When a system runs: every step without a period; with one, at its first
-  // step plus its phase, and every period after.
+  // When a system runs: every step without a period; with one, at each of
+  // its boundaries.
   struct Rate final {
     std::optional<Duration> period;
-    Duration phase{};
-    std::optional<TimePoint> next;  // Its next boundary, once it has stepped.
+    TimePoint next{};               // Its next boundary, with a period.
     std::optional<TimePoint> last;  // When it last ran.
-    Timeline::Source source = 0;
   };
 
   using Rates = std::array<Rate, FlattenedSystemList::size>;
@@ -652,6 +649,7 @@ class Scheduler final {
     for_each_type(FlattenedSystemList{}, [&]<typename SystemType>() {
       if constexpr (HasPeriod<SystemType>) {
         rates[index].period = Duration{SystemType::PERIOD};
+        rates[index].next = TimePoint{};
       }
       ++index;
     });
@@ -665,15 +663,41 @@ class Scheduler final {
     return rates_[index_of_v<FlattenedSystemList, SystemType>];
   }
 
-  // Tells the timeline when `rate` is next due.
-  auto publish(const Rate& rate) -> void {
-    if (timeline_) {
-      timeline_->set(rate.source, rate.period ? rate.next : std::nullopt);
+  // The earliest boundary of any system with a period.
+  auto earliest() const -> std::optional<TimePoint> override {
+    std::optional<TimePoint> first;
+    for (const Rate& rate : rates_) {
+      if (rate.period && (!first || rate.next < *first)) {
+        first = rate.next;
+      }
     }
+    return first;
+  }
+
+  // The earliest boundary after `time` of any system with a period.
+  auto earliest_after(TimePoint time) const
+      -> std::optional<TimePoint> override {
+    std::optional<TimePoint> first;
+    for (const Rate& rate : rates_) {
+      if (!rate.period) {
+        continue;
+      }
+      TimePoint after =
+          rate.next > time
+              ? rate.next
+              : rate.next +
+                    ((time - rate.next) / *rate.period + 1) * *rate.period;
+      if (!first || after < *first) {
+        first = after;
+      }
+    }
+    return first;
   }
 
   // Runs `system` for `step` if it runs every step, or if `step` holds one of
-  // its boundaries, then moves its next boundary past the step.
+  // its boundaries or starts at or after one (an instant, a step of no
+  // length, holds the one at its time), then moves its next boundary past the
+  // step.
   template <typename StepType, typename SystemType>
   auto run_at_rate(Rate& rate, const StepType& step, SystemType& system,
                    InOut<WorldType> world) -> void {
@@ -684,19 +708,15 @@ class Scheduler final {
     }
     if constexpr (std::same_as<StepType, Step>) {
       TimePoint end = step.time + step.dt;
-      if (!rate.next) {
-        rate.next = step.time + rate.phase;
-      }
-      if (*rate.next < end) {
+      if (rate.next < end || rate.next <= step.time) {
         Duration dt = rate.last ? step.time - *rate.last : *rate.period;
         run(Step{.time = step.time, .dt = dt}, system, world);
         world->sync();
         rate.last = step.time;
-        // Past every boundary the step holds.
-        *rate.next += ((end - *rate.next - Duration{1}) / *rate.period + 1) *
-                      *rate.period;
+        // Past every boundary the step holds, and the one at an instant.
+        Duration passed = std::max(end - rate.next, Duration{1});
+        rate.next += ((passed - Duration{1}) / *rate.period + 1) * *rate.period;
       }
-      publish(rate);
     } else {
       // Periods count nanoseconds; a simulation with a coarser tick cannot
       // set one.

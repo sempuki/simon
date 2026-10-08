@@ -276,7 +276,8 @@ TEST_CASE("Period") {
     CHECK(timeline.continuous());
     scheduler.set_period<Tally>(milliseconds{100}, milliseconds{30});
     CHECK_FALSE(timeline.continuous());
-    CHECK(timeline.earliest() == std::nullopt);  // Neither has stepped.
+    // Boundaries count from time zero, so Paced is due there already.
+    CHECK(timeline.earliest() == TimePoint{});
 
     scheduler.step(Step{.time = TimePoint{}, .dt = milliseconds{30}},
                    InOut(world));

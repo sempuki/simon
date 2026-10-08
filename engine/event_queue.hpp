@@ -60,7 +60,7 @@ class Event final : public EventBase {
 
 // Rare, discrete happenings, delivered in time order. Per-step traffic belongs
 // in components, not here.
-class EventQueue final {
+class EventQueue final : private framework::Timeline::Source {
  public:
   EventQueue();
 
@@ -93,16 +93,12 @@ class EventQueue final {
             time, std::forward<DeducedMessageArgumentTypes>(args)...),
     });
     std::push_heap(events_.begin(), events_.end(), Later{});
-    tell_timeline();
   }
 
-  // Tells `timeline` when the earliest event is due, for as long as the queue
-  // lives, so a driver ends a step at each event's own time.
+  // Tells `timeline` when events are due, for as long as the queue lives and
+  // stays in place, so a driver ends a step at each event's own time.
   auto attach(Depend<framework::Timeline> timeline) -> void {
-    CHECK_PRECONDITION(!timeline_);
-    timeline_ = timeline.get();
-    source_ = timeline_->add();
-    tell_timeline();
+    timeline->add(Depend<const framework::Timeline::Source>(*this));
   }
 
   // Delivers every event at or before `time`, earliest first, and events with
@@ -130,19 +126,21 @@ class EventQueue final {
     }
   };
 
-  auto tell_timeline() -> void {
-    if (timeline_) {
-      timeline_->set(source_,
-                     events_.empty()
-                         ? std::nullopt
-                         : std::optional{events_.front().event->time()});
+  // The earliest event's time.
+  auto earliest() const -> std::optional<TimePoint> override {
+    if (events_.empty()) {
+      return std::nullopt;
     }
+    return events_.front().event->time();
   }
+
+  // The earliest event after `time`: the earliest event unless that is due at
+  // `time`, and then a scan, as events are rare.
+  auto earliest_after(TimePoint time) const
+      -> std::optional<TimePoint> override;
 
   std::vector<Entry> events_;
   std::uint64_t next_sequence_ = 0;
-  framework::Timeline* timeline_ = nullptr;
-  framework::Timeline::Source source_ = 0;
   std::map<EventType,
            std::deque<std::function<void(TimePoint, const EventBase*)>>>
       handlers_;

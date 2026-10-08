@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <utility>
 
 namespace simon::engine {
@@ -32,7 +33,26 @@ auto EventQueue::process_until(TimePoint time) -> void {
       handlers[i](event->time(), event.get());
     }
   }
-  tell_timeline();
+}
+
+auto EventQueue::earliest_after(TimePoint time) const
+    -> std::optional<TimePoint> {
+  if (events_.empty()) {
+    return std::nullopt;
+  }
+  // Most steps have no event due at their start, and then the earliest is
+  // the answer; only events due at `time` need a scan for the next.
+  if (TimePoint top = events_.front().event->time(); top > time) {
+    return top;
+  }
+  std::optional<TimePoint> first;
+  for (const Entry& entry : events_) {
+    TimePoint at = entry.event->time();
+    if (at > time && (!first || at < *first)) {
+      first = at;
+    }
+  }
+  return first;
 }
 
 }  // namespace simon::engine

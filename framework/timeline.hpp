@@ -7,43 +7,50 @@
 #include <vector>
 
 #include "base/core.hpp"
+#include "core/argument.hpp"
 #include "core/time.hpp"
 
-// When a simulation next has work: the next boundary of each system that runs
-// at its own period, and the next event. A driver ends each step at the
-// earliest of them, so each fires in a step that starts at its own time.
+// When a simulation next has work, asked of each thing whose work falls due:
+// a scheduler's systems that run at their own periods, and an event queue. A
+// driver ends each step at the next of those times, so each fires in a step
+// that starts at its own time.
 namespace simon::framework {
 
 class Timeline final {
  public:
-  // A source's place in the timeline.
-  using Source = std::uint32_t;
+  // Something whose work falls due at times it knows.
+  class Source {
+   public:
+    virtual ~Source() = default;
 
-  // Adds a source with nothing due yet.
-  auto add() -> Source {
-    due_.emplace_back();
-    return static_cast<Source>(due_.size() - 1);
+    // The earliest time its work is due, perhaps already past, or nothing.
+    virtual auto earliest() const -> std::optional<TimePoint> = 0;
+
+    // The earliest time after `time` its work is due, as far as it knows
+    // before the work due at `time` runs.
+    virtual auto earliest_after(TimePoint time) const
+        -> std::optional<TimePoint> = 0;
+  };
+
+  // Asks `source` when it is due, for as long as the timeline lives.
+  auto add(Depend<const Source> source) -> void {
+    sources_.push_back(source.get());
   }
 
-  // Makes `source` due at `time`, or at nothing.
-  auto set(Source source, std::optional<TimePoint> time) -> void {
-    CHECK_PRECONDITION(source < due_.size());
-    due_[source] = time;
-  }
-
-  auto due(Source source) const -> std::optional<TimePoint> {
-    CHECK_PRECONDITION(source < due_.size());
-    return due_[source];
-  }
-
-  // The earliest time any source is due, or nothing. A linear scan: a
-  // timeline holds one source per rated system and one for events.
+  // The earliest time any source is due, perhaps already past, or nothing.
   auto earliest() const -> std::optional<TimePoint> {
     std::optional<TimePoint> first;
-    for (const std::optional<TimePoint>& time : due_) {
-      if (time && (!first || *time < *first)) {
-        first = time;
-      }
+    for (const Source* source : sources_) {
+      first = sooner(first, source->earliest());
+    }
+    return first;
+  }
+
+  // The earliest time after `time` any source is due, or nothing.
+  auto earliest_after(TimePoint time) const -> std::optional<TimePoint> {
+    std::optional<TimePoint> first;
+    for (const Source* source : sources_) {
+      first = sooner(first, source->earliest_after(time));
     }
     return first;
   }
@@ -60,7 +67,18 @@ class Timeline final {
   }
 
  private:
-  std::vector<std::optional<TimePoint>> due_;
+  static auto sooner(std::optional<TimePoint> a, std::optional<TimePoint> b)
+      -> std::optional<TimePoint> {
+    if (!a) {
+      return b;
+    }
+    if (!b) {
+      return a;
+    }
+    return *a < *b ? a : b;
+  }
+
+  std::vector<const Source*> sources_;  // Never null; Depend checks each.
   std::int32_t continuous_ = 0;
 };
 

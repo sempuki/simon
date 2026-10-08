@@ -3,8 +3,10 @@
 #include "engine/driver.hpp"
 
 #include <chrono>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "base/testing.hpp"
@@ -57,32 +59,45 @@ struct Recorder final {
   std::optional<TimePoint> fail_at;
 };
 
-// A timeline that is due at the times it is given, the earliest still ahead.
+// A timeline due at the times it is given, each until a step covers it.
 struct FakeTimeline final {
   auto earliest() const -> std::optional<TimePoint> {
     std::optional<TimePoint> first;
     for (TimePoint time : due) {
-      if (time > *now && (!first || time < *first)) {
+      if (!first || time < *first) {
         first = time;
       }
     }
     return first;
   }
+  auto earliest_after(TimePoint time) const -> std::optional<TimePoint> {
+    std::optional<TimePoint> first;
+    for (TimePoint due_at : due) {
+      if (due_at > time && (!first || due_at < *first)) {
+        first = due_at;
+      }
+    }
+    return first;
+  }
+  auto continuous() const -> bool { return every_step; }
+
   std::vector<TimePoint> due;
-  const TimePoint* now = nullptr;
+  bool every_step = false;
 };
 
-// A Recorder whose work falls due at set times.
+// A Recorder whose work falls due at set times; a step does the work due in
+// it, or at it if it has no length.
 struct TimedRecorder final {
   auto step(const Step& step) -> PhaseResult {
-    now = step.time + step.dt;
+    std::erase_if(timeline_.due, [&](TimePoint time) {
+      return time < step.time + step.dt || time <= step.time;
+    });
     return recorder.step(step);
   }
   auto timeline() const -> const FakeTimeline& { return timeline_; }
 
   Recorder recorder;
-  TimePoint now{};
-  FakeTimeline timeline_{.now = &now};
+  FakeTimeline timeline_;
 };
 
 // A wall clock the test moves by hand.
@@ -129,6 +144,32 @@ TEST_CASE("Driver") {
 
     CHECK(step_lengths(timed.recorder) ==
           std::vector<Duration>{30ms, 15ms, 15ms, 30ms, 10ms});
+  }
+
+  SECTION("ShouldStepStraightToDueTimesGivenIdleAndNothingEveryStep") {
+    TimedRecorder timed;
+    timed.timeline_.due = {TimePoint{45ms}, TimePoint{60ms}};
+    Driver idling{Timing{.max_step = 30ms, .idle = true}, Depend(timed)};
+    REQUIRE(idling.start());
+    REQUIRE(idling.advance_to(TimePoint{100ms}) == Flow::CONTINUE);
+
+    // Instants at the due times, the clock moved between them.
+    CHECK(step_lengths(timed.recorder) == std::vector<Duration>{0ms, 0ms});
+    CHECK(timed.recorder.steps.at(0).time == TimePoint{45ms});
+    CHECK(timed.recorder.steps.at(1).time == TimePoint{60ms});
+    CHECK(idling.now() == TimePoint{100ms});
+  }
+
+  SECTION("ShouldStepAsUsualGivenIdleButSomethingEveryStep") {
+    TimedRecorder timed;
+    timed.timeline_.due = {TimePoint{45ms}};
+    timed.timeline_.every_step = true;
+    Driver idling{Timing{.max_step = 30ms, .idle = true}, Depend(timed)};
+    REQUIRE(idling.start());
+    REQUIRE(idling.advance_to(TimePoint{100ms}) == Flow::CONTINUE);
+
+    CHECK(step_lengths(timed.recorder) ==
+          std::vector<Duration>{30ms, 15ms, 30ms, 25ms});
   }
 
   SECTION("ShouldThrowGivenAdvanceBeforeStart") {
@@ -300,6 +341,35 @@ TEST_CASE("RealTimeDriver") {
     CHECK(driver.tick() == Flow::STOP);
     CHECK(driver.tick() == Flow::STOP);
     CHECK(recorder.steps.size() == 1u);
+  }
+
+  SECTION("ShouldSleepUntilDueGivenIdleRun") {
+    // 10 s of simulated time at 1000x is 10 ms of wall time, which a 1 ms
+    // step would cross in 10,000 steps.
+    TimedRecorder timed;
+    timed.timeline_.due = {TimePoint{10s}};
+    timed.recorder.stop_at = TimePoint{10s};
+    RealTimeDriver<TimedRecorder> sleeper{Timing{.max_step = 1ms, .idle = true},
+                                          1000.0, Depend(timed)};
+    REQUIRE(sleeper.run());
+    CHECK(timed.recorder.steps.size() < 10u);
+    CHECK(timed.recorder.steps.back().time == TimePoint{10s});
+  }
+
+  SECTION("ShouldStepGivenWakeWithNothingDue") {
+    TimedRecorder timed;
+    timed.recorder.stop_at = TimePoint{};
+    RealTimeDriver<TimedRecorder> sleeper{Timing{.max_step = 1ms, .idle = true},
+                                          1000.0, Depend(timed)};
+    // As an input thread would: publish work due now, then wake the driver.
+    std::thread waker{[&] {
+      std::this_thread::sleep_for(20ms);
+      timed.timeline_.due.push_back(TimePoint{});
+      sleeper.wake();
+    }};
+    REQUIRE(sleeper.run());
+    waker.join();
+    CHECK(timed.recorder.steps.size() == 1u);
   }
 }
 
