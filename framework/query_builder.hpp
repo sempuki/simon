@@ -145,6 +145,99 @@ class Query final {
   std::vector<bool (*)(const WorldType&, Entity)> conditions_;
 };
 
+// The selection both query forms begin with: `each` chooses entities by
+// archetype or component, and `within`, `where`, `having` and `lacking`
+// narrow them. A query form derives from it, names the form `each` turns it
+// into as `Choosing<NextType>`, and adds its own words after the selection.
+template <typename DerivedType, typename WorldType, typename ReadPolicyType,
+          typename ChosenType>
+class QuerySelection {
+ public:
+  using SpatialType = typename WorldType::SpatialComponent;
+  using DistanceType = distance_of_t<SpatialType>;
+
+  // Selects every entity of archetype `NextType`, or every entity with
+  // component `NextType`.
+  template <typename NextType>
+    requires std::is_void_v<ChosenType>
+  auto each() && {
+    static_assert(
+        Archetypal<NextType> || ReadPolicyType::template can_read<NextType>,
+        "Declare this component in the system's AllowComponentList "
+        "to select by it.");
+    return typename DerivedType::template Choosing<NextType>{Depend(*world_)};
+  }
+
+  // Keeps only entities whose spatial component is within `radius` of
+  // `center`.
+  auto within(const SpatialType& center, DistanceType radius) && -> DerivedType
+    requires(!std::is_void_v<ChosenType>)
+  {
+    static_assert(ReadPolicyType::template can_read<SpatialType>,
+                  "Declare the spatial component in the system's "
+                  "AllowComponentList to query space.");
+    query_.near(center, radius);
+    return std::move(derived());
+  }
+
+  // Keeps only entities for which `predicate(Entity)` is true. Predicates add
+  // up.
+  template <typename PredicateType>
+  auto where(PredicateType&& predicate) && -> DerivedType
+    requires(!std::is_void_v<ChosenType>)
+  {
+    query_.keep(std::forward<PredicateType>(predicate));
+    return std::move(derived());
+  }
+
+  // Keeps only entities that will have `ComponentType` once pending commands
+  // apply.
+  template <typename ComponentType>
+  auto having() && -> DerivedType
+    requires(!std::is_void_v<ChosenType>)
+  {
+    check_readable<ComponentType>();
+    query_.template having<ComponentType>();
+    return std::move(derived());
+  }
+
+  // Keeps only entities that will lack `ComponentType` once pending commands
+  // apply.
+  template <typename ComponentType>
+  auto lacking() && -> DerivedType
+    requires(!std::is_void_v<ChosenType>)
+  {
+    check_readable<ComponentType>();
+    query_.template lacking<ComponentType>();
+    return std::move(derived());
+  }
+
+ protected:
+  struct Unchosen final {};
+  using QueryType = std::conditional_t<std::is_void_v<ChosenType>, Unchosen,
+                                       Query<WorldType, ChosenType>>;
+
+  // Keeps a reference to `world` until the utterance is built.
+  explicit QuerySelection(Depend<WorldType> world) : world_{world.get()} {}
+  QuerySelection(Depend<WorldType> world, QueryType query)
+      : world_{world.get()}, query_{std::move(query)} {}
+
+  WorldType* world_ = nullptr;
+  QueryType query_;
+
+ private:
+  auto derived() -> DerivedType& { return static_cast<DerivedType&>(*this); }
+
+  template <typename ComponentType>
+  static constexpr auto check_readable() -> void {
+    static_assert(contains_v<typename WorldType::ComponentList, ComponentType>,
+                  "This component is not in the world's component list.");
+    static_assert(ReadPolicyType::template can_read<ComponentType>,
+                  "Declare this component in the system's AllowComponentList "
+                  "to select by it.");
+  }
+};
+
 // Destroys every entity a query selects, atomically, and returns how many:
 //
 //   world.destroy()
@@ -156,102 +249,32 @@ class Query final {
 // `each` comes first. `build()` plans every destruction in one transaction,
 // so it destroys all of the selected entities or none.
 template <typename WorldType, typename ReadPolicyType, typename ChosenType>
-class [[nodiscard]] DestroyQueryBuilder final {
+class [[nodiscard]] DestroyQueryBuilder final
+    : public QuerySelection<
+          DestroyQueryBuilder<WorldType, ReadPolicyType, ChosenType>, WorldType,
+          ReadPolicyType, ChosenType> {
  public:
-  using SpatialType = typename WorldType::SpatialComponent;
-  using DistanceType = distance_of_t<SpatialType>;
+  template <typename NextType>
+  using Choosing = DestroyQueryBuilder<WorldType, ReadPolicyType, NextType>;
 
   // Keeps a reference to `world` until the utterance is built.
-  explicit DestroyQueryBuilder(Depend<WorldType> world) : world_{world.get()} {}
-
-  // Selects every entity of archetype `NextType`, or every entity with
-  // component `NextType`.
-  template <typename NextType>
-    requires std::is_void_v<ChosenType>
-  auto each() && {
-    static_assert(
-        Archetypal<NextType> || ReadPolicyType::template can_read<NextType>,
-        "Declare this component in the system's AllowComponentList "
-        "to select by it.");
-    return DestroyQueryBuilder<WorldType, ReadPolicyType, NextType>{
-        Depend(*world_)};
-  }
-
-  // Keeps only entities whose spatial component is within `radius` of
-  // `center`.
-  auto within(const SpatialType& center, DistanceType radius) &&
-    requires(!std::is_void_v<ChosenType>)
-  {
-    static_assert(ReadPolicyType::template can_read<SpatialType>,
-                  "Declare the spatial component in the system's "
-                  "AllowComponentList to query space.");
-    query_.near(center, radius);
-    return std::move(*this);
-  }
-
-  // Keeps only entities for which `predicate(Entity)` is true. Predicates add
-  // up.
-  template <typename PredicateType>
-  auto where(PredicateType&& predicate) &&
-    requires(!std::is_void_v<ChosenType>)
-  {
-    query_.keep(std::forward<PredicateType>(predicate));
-    return std::move(*this);
-  }
-
-  // Keeps only entities that will have `ComponentType` once pending commands
-  // apply.
-  template <typename ComponentType>
-  auto having() &&
-    requires(!std::is_void_v<ChosenType>)
-  {
-    check_readable<ComponentType>();
-    query_.template having<ComponentType>();
-    return std::move(*this);
-  }
-
-  // Keeps only entities that will lack `ComponentType` once pending commands
-  // apply.
-  template <typename ComponentType>
-  auto lacking() &&
-    requires(!std::is_void_v<ChosenType>)
-  {
-    check_readable<ComponentType>();
-    query_.template lacking<ComponentType>();
-    return std::move(*this);
-  }
+  explicit DestroyQueryBuilder(Depend<WorldType> world) : Selection{world} {}
 
   auto build() && -> std::expected<std::size_t, Status>
     requires(!std::is_void_v<ChosenType>)
   {
-    std::vector<Entity> selected = query_.select(InOut(*world_));
-    auto transaction = world_->transaction();
+    std::vector<Entity> selected = this->query_.select(InOut(*this->world_));
+    auto transaction = this->world_->transaction();
     for (Entity entity : selected) {
-      RETURN_IF_UNEXPECTED(world_->destroy(entity).build());
+      RETURN_IF_UNEXPECTED(this->world_->destroy(entity).build());
     }
     transaction.commit();
     return selected.size();
   }
 
  private:
-  template <typename, typename, typename>
-  friend class DestroyQueryBuilder;
-
-  template <typename ComponentType>
-  static constexpr auto check_readable() -> void {
-    static_assert(contains_v<typename WorldType::ComponentList, ComponentType>,
-                  "This component is not in the world's component list.");
-    static_assert(ReadPolicyType::template can_read<ComponentType>,
-                  "Declare this component in the system's AllowComponentList "
-                  "to select by it.");
-  }
-
-  struct Unchosen final {};
-  using QueryType = std::conditional_t<std::is_void_v<ChosenType>, Unchosen,
-                                       Query<WorldType, ChosenType>>;
-
-  WorldType* world_ = nullptr;
-  QueryType query_;
+  using Selection = QuerySelection<DestroyQueryBuilder, WorldType,
+                                   ReadPolicyType, ChosenType>;
 };
 
 // Makes the same change to every entity a query selects, atomically, and
@@ -279,70 +302,18 @@ class [[nodiscard]]
 ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
                    TypeList<AttachedTypes...>, TypeList<DetachedTypes...>,
                    Aliasing>
-    final {
+    final : public QuerySelection<
+                ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
+                                   TypeList<AttachedTypes...>,
+                                   TypeList<DetachedTypes...>, Aliasing>,
+                WorldType, ReadPolicyType, ChosenType> {
  public:
-  using SpatialType = typename WorldType::SpatialComponent;
-  using DistanceType = distance_of_t<SpatialType>;
+  template <typename NextType>
+  using Choosing = ChangeQueryBuilder<WorldType, ReadPolicyType, NextType,
+                                      TypeList<>, TypeList<>, false>;
 
   // Keeps a reference to `world` until the utterance is built.
-  explicit ChangeQueryBuilder(Depend<WorldType> world) : world_{world.get()} {}
-
-  // Selects every entity of archetype `NextType`, or every entity with
-  // component `NextType`.
-  template <typename NextType>
-    requires std::is_void_v<ChosenType>
-  auto each() && {
-    static_assert(
-        Archetypal<NextType> || ReadPolicyType::template can_read<NextType>,
-        "Declare this component in the system's AllowComponentList "
-        "to select by it.");
-    return ChangeQueryBuilder<WorldType, ReadPolicyType, NextType, TypeList<>,
-                              TypeList<>, false>{Depend(*world_)};
-  }
-
-  // Keeps only entities whose spatial component is within `radius` of
-  // `center`.
-  auto within(const SpatialType& center, DistanceType radius) &&
-    requires(!std::is_void_v<ChosenType>)
-  {
-    static_assert(ReadPolicyType::template can_read<SpatialType>,
-                  "Declare the spatial component in the system's "
-                  "AllowComponentList to query space.");
-    query_.near(center, radius);
-    return std::move(*this);
-  }
-
-  // Keeps only entities for which `predicate(Entity)` is true. Predicates add
-  // up.
-  template <typename PredicateType>
-  auto where(PredicateType&& predicate) &&
-    requires(!std::is_void_v<ChosenType>)
-  {
-    query_.keep(std::forward<PredicateType>(predicate));
-    return std::move(*this);
-  }
-
-  // Keeps only entities that will have `ComponentType` once pending commands
-  // apply.
-  template <typename ComponentType>
-  auto having() &&
-    requires(!std::is_void_v<ChosenType>)
-  {
-    check_readable<ComponentType>();
-    query_.template having<ComponentType>();
-    return std::move(*this);
-  }
-
-  // Keeps only entities that will lack `ComponentType` once pending commands
-  // apply.
-  template <typename ComponentType>
-  auto lacking() &&
-    requires(!std::is_void_v<ChosenType>)
-  {
-    check_readable<ComponentType>();
-    query_.template lacking<ComponentType>();
-    return std::move(*this);
-  }
+  explicit ChangeQueryBuilder(Depend<WorldType> world) : Selection{world} {}
 
   // Attaches a copy of `component` to every selected entity.
   template <typename ArgumentType>
@@ -354,7 +325,7 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
     return ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
                               TypeList<AttachedTypes..., ComponentType>,
                               TypeList<DetachedTypes...>, Aliasing>{
-        Depend(*world_), std::move(query_),
+        Depend(*this->world_), std::move(this->query_),
         std::tuple_cat(
             std::move(components_),
             std::tuple<ComponentType>{std::forward<ArgumentType>(component)}),
@@ -370,7 +341,7 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
     return ChangeQueryBuilder<
         WorldType, ReadPolicyType, ChosenType, TypeList<AttachedTypes...>,
         TypeList<DetachedTypes..., ComponentType>, Aliasing>{
-        Depend(*world_), std::move(query_), std::move(components_),
+        Depend(*this->world_), std::move(this->query_), std::move(components_),
         std::move(aliases_)};
   }
 
@@ -382,7 +353,7 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
     return ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
                               TypeList<AttachedTypes...>,
                               TypeList<DetachedTypes...>, true>{
-        Depend(*world_), std::move(query_), std::move(components_),
+        Depend(*this->world_), std::move(this->query_), std::move(components_),
         std::move(aliases_)};
   }
 
@@ -394,7 +365,7 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
     return ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
                               TypeList<AttachedTypes...>,
                               TypeList<DetachedTypes...>, true>{
-        Depend(*world_), std::move(query_), std::move(components_),
+        Depend(*this->world_), std::move(this->query_), std::move(components_),
         std::move(aliases_)};
   }
 
@@ -404,13 +375,14 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
     static_assert(
         sizeof...(AttachedTypes) + sizeof...(DetachedTypes) > 0 || Aliasing,
         "A change must attach, detach, alias or unalias something.");
-    std::vector<Entity> selected = query_.select(InOut(*world_));
-    auto transaction = world_->transaction();
+    std::vector<Entity> selected = this->query_.select(InOut(*this->world_));
+    auto transaction = this->world_->transaction();
     for (Entity entity : selected) {
-      RETURN_IF_UNEXPECTED((ChangeBuilder<WorldType, TypeList<AttachedTypes...>,
-                                          TypeList<DetachedTypes...>, Aliasing>{
-                                entity, components_, aliases_, Depend(*world_)})
-                               .build());
+      RETURN_IF_UNEXPECTED(
+          (ChangeBuilder<WorldType, TypeList<AttachedTypes...>,
+                         TypeList<DetachedTypes...>, Aliasing>{
+               entity, components_, aliases_, Depend(*this->world_)})
+              .build());
     }
     transaction.commit();
     return selected.size();
@@ -420,24 +392,14 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
   template <typename, typename, typename, typename, typename, bool>
   friend class ChangeQueryBuilder;
 
-  template <typename ComponentType>
-  static constexpr auto check_readable() -> void {
-    static_assert(contains_v<typename WorldType::ComponentList, ComponentType>,
-                  "This component is not in the world's component list.");
-    static_assert(ReadPolicyType::template can_read<ComponentType>,
-                  "Declare this component in the system's AllowComponentList "
-                  "to select by it.");
-  }
-
-  struct Unchosen final {};
-  using QueryType = std::conditional_t<std::is_void_v<ChosenType>, Unchosen,
-                                       Query<WorldType, ChosenType>>;
+  using Selection =
+      QuerySelection<ChangeQueryBuilder, WorldType, ReadPolicyType, ChosenType>;
+  using QueryType = typename Selection::QueryType;
 
   ChangeQueryBuilder(Depend<WorldType> world, QueryType query,
                      std::tuple<AttachedTypes...> components,
                      AliasChanges aliases)
-      : world_{world.get()},
-        query_{std::move(query)},
+      : Selection{world, std::move(query)},
         components_{std::move(components)},
         aliases_{std::move(aliases)} {}
 
@@ -454,8 +416,6 @@ ChangeQueryBuilder<WorldType, ReadPolicyType, ChosenType,
         "Each component may be attached or detached once per change.");
   }
 
-  WorldType* world_ = nullptr;
-  QueryType query_;
   std::tuple<AttachedTypes...> components_;
   AliasChanges aliases_;
 };
