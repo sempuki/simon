@@ -112,6 +112,7 @@ auto wait_for_gap(std::span<const std::pair<double, double>> on, double at,
 
 TEST_CASE("Crossing") {
   SECTION("ShouldWaitAsTheManualSaysGivenLight") {
+    // Preconditions.
     // A light on a 60 s cycle, green 30 s and yellow 3 s for the road, red
     // 27 s; a pedestrian walks while the road has red and there is time to
     // walk the 9 m across, so its effective walk time g is 27 s less 6.7 s.
@@ -143,6 +144,8 @@ TEST_CASE("Crossing") {
     constexpr long EVERY = 151;     // Steps of 0.1 s between them.
     std::map<Entity, double> due;   // When each would reach the kerb alone.
     std::vector<double> waits;
+
+    // Under Test.
     for (long k = 0; k < 600 * EVERY + 1200; ++k) {
       double now = static_cast<double>(k) * 0.1;
       if (k % EVERY == 0 && k < 600 * EVERY) {
@@ -171,6 +174,8 @@ TEST_CASE("Crossing") {
       }
       world.sync();
     }
+
+    // Postconditions.
     double mean = 0.0;
     for (double w : waits) {
       mean += w;
@@ -185,6 +190,7 @@ TEST_CASE("Crossing") {
   }
 
   SECTION("ShouldWaitAsTheManualSaysGivenVehiclesArrivingAtRandom") {
+    // Preconditions.
     // The manual's delay for a pedestrian where drivers do not yield,
     // (e^(q t_c) - q t_c - 1) / q, assumes vehicles arriving at random, and
     // passing in no time: its rule gives it for 20,000 pedestrians arriving
@@ -199,16 +205,21 @@ TEST_CASE("Crossing") {
       on.emplace_back(t, t);
     }
     std::uniform_real_distribution<double> arrival{0.0, HOURS * 3600.0 - 600.0};
+
+    // Under Test.
     double mean = 0.0;
     for (int k = 0; k < 20000; ++k) {
       mean += wait_for_gap(on, arrival(random), T_C) / 20000.0;
     }
+
+    // Postconditions.
     double manual = (std::exp(Q * T_C) - Q * T_C - 1.0) / Q;
     CAPTURE(mean, manual);
     CHECK(std::abs(mean - manual) < 0.02 * manual);
   }
 
   SECTION("ShouldWaitForGapsAsTheManualSaysGivenTrafficThatDoesNotYield") {
+    // Preconditions.
     // Vehicles that do not yield, set off at random, 300 an hour each way,
     // and pedestrians needing a gap t_c of their 6.7 s across and a 2 s
     // start-up, and a crosswalk clear of vehicles: each waits as the
@@ -261,6 +272,8 @@ TEST_CASE("Crossing") {
     std::vector<double> waits;
     std::map<Entity, double> entered;
     std::vector<std::pair<double, double>> on;
+
+    // Under Test.
     for (long k = 0; k < PEDESTRIANS * EVERY + 1200; ++k) {
       double now = static_cast<double>(k) * 0.1;
       for (auto& [lane, at] : next) {
@@ -324,6 +337,8 @@ TEST_CASE("Crossing") {
       }
       world.sync();
     }
+
+    // Postconditions.
     std::ranges::sort(on);
     double mean = 0.0;
     double manual = 0.0;
@@ -338,6 +353,7 @@ TEST_CASE("Crossing") {
   }
 
   SECTION("ShouldStopForPedestriansGivenTrafficThatYields") {
+    // Preconditions.
     // Vehicles that yield, 300 an hour each way, and a pedestrian every
     // 10 s: every pedestrian crosses, vehicles stop for them, and none
     // touches one.
@@ -378,6 +394,8 @@ TEST_CASE("Crossing") {
     int stops = 0;
     int touches = 0;
     std::set<Entity> stopped;
+
+    // Under Test.
     for (long k = 0; k < PEDESTRIANS * EVERY + 1200; ++k) {
       double now = static_cast<double>(k) * 0.1;
       for (auto& [lane, at] : next) {
@@ -428,6 +446,8 @@ TEST_CASE("Crossing") {
       }
       world.sync();
     }
+
+    // Postconditions.
     CAPTURE(crossed, stops, touches);
     CHECK(crossed == PEDESTRIANS);
     CHECK(stops > 10);

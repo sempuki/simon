@@ -141,14 +141,20 @@ auto collect_owners(const World& world) -> std::vector<Entity> {
 
 TEST_CASE("DefenseSimulation") {
   SECTION("ShouldBlueWinGivenDefaultScenario") {
+    // Under Test.
     Run result = run(Scenario{});
+
+    // Postconditions.
     CHECK(result.outcome == Outcome::BLUE_WINS);
     CHECK(result.asset_health > 0.0);
   }
 
   SECTION("ShouldRepeatExactlyGivenSameSeed") {
+    // Under Test.
     Run first = run(Scenario{.seed = 7});
     Run second = run(Scenario{.seed = 7});
+
+    // Postconditions.
     CHECK(first.outcome == second.outcome);
     CHECK(first.end == second.end);
     CHECK(first.fired == second.fired);
@@ -156,31 +162,44 @@ TEST_CASE("DefenseSimulation") {
   }
 
   SECTION("ShouldDifferGivenDifferentSeeds") {
+    // Postconditions.
     CHECK(run(Scenario{.seed = 1}).end != run(Scenario{.seed = 3}).end);
   }
 
   SECTION("ShouldRedWinGivenNoLaunchers") {
+    // Under Test.
     Run result = run(Scenario{.launchers = 0});
+
+    // Postconditions.
     CHECK(result.outcome == Outcome::RED_WINS);
     CHECK(result.fired == 0u);
   }
 
   SECTION("ShouldRedWinGivenMoreDronesThanInterceptors") {
+    // Under Test.
     Run result = run(Scenario{.inventory = 3, .drones = 40});
+
+    // Postconditions.
     CHECK(result.outcome == Outcome::RED_WINS);
     CHECK(result.fired == 9u);  // Every interceptor was used.
   }
 
   SECTION("ShouldCountNoneFiredGivenSeveralSitesBeforeAnyLaunch") {
+    // Under Test.
     Simulation simulation{Scenario{.drones = 10, .sites = 4}};
+
+    // Postconditions.
     CHECK(simulation.interceptors_fired() == 0u);  // Before configure.
 
+    // Under Test.
     REQUIRE(simulation.configure());
 
+    // Postconditions.
     CHECK(simulation.interceptors_fired() == 0u);
   }
 
   SECTION("ShouldHoldFireUntilHoldExpiresGivenTimedHold") {
+    // Preconditions.
     Scenario scenario;
     scenario.holds = {TimedHold{.sector = {.radius = 1000.0 * meter},
                                 .from = TimePoint{},
@@ -193,18 +212,25 @@ TEST_CASE("DefenseSimulation") {
         });
     Simulation unheld;
 
+    // Under Test.
     run_until(TimePoint{90s}, InOut(simulation));
     run_until(TimePoint{90s}, InOut(unheld));
+
+    // Postconditions.
     REQUIRE(unheld.interceptors_fired() > 0u);  // So the hold mattered.
     CHECK(simulation.interceptors_fired() == 0u);
     CHECK(expired.empty());
 
+    // Under Test.
     advance(TimePoint{90s}, TimePoint{100s}, InOut(simulation));
+
+    // Postconditions.
     CHECK(expired == std::vector{TimePoint{90s}});
     CHECK(simulation.interceptors_fired() > 0u);
   }
 
   SECTION("ShouldExpireAtItsOwnTimeGivenHoldEndingBetweenSteps") {
+    // Preconditions.
     Scenario scenario;
     const TimePoint end = TimePoint{90s} + 5ms;  // Half a step past 90 s.
     scenario.holds = {TimedHold{.sector = {.radius = 1000.0 * meter},
@@ -219,13 +245,17 @@ TEST_CASE("DefenseSimulation") {
     engine::Driver driver{engine::Timing{.max_step = DT}, Depend(simulation)};
     REQUIRE(driver.start());
 
+    // Under Test.
     // The driver ends a step at the hold's end, so the step after starts
     // there and delivers it; a step from 90 s would not.
     REQUIRE(driver.advance_to(end + 1ms));
+
+    // Postconditions.
     CHECK(expired == std::vector{end});
   }
 
   SECTION("ShouldStayHeldGivenOverlappingHoldExpiresFirst") {
+    // Preconditions.
     Scenario scenario;
     const Sector home{.radius = 1000.0 * meter};
     scenario.holds = {
@@ -233,13 +263,16 @@ TEST_CASE("DefenseSimulation") {
         TimedHold{.sector = home, .from = TimePoint{30s}, .lasting = 30s}};
     Simulation simulation{scenario};
 
+    // Under Test.
     run_until(TimePoint{100s}, InOut(simulation));
 
+    // Postconditions.
     CHECK(simulation.interceptors_fired() == 0u);
     CHECK(simulation.world().store_of<WeaponsHold>().size() == 3u);
   }
 
   SECTION("ShouldLeaveNothingOfSiteGivenWorldRefusesADrone") {
+    // Preconditions.
     Scenario scenario{.radars = 3, .launchers = 3, .drones = 10};
     World world;
     // Room for the asset, radars and launchers, but only half the drones.
@@ -250,10 +283,12 @@ TEST_CASE("DefenseSimulation") {
                 .holding<archetype::RedDrone>(5)
                 .build(Out(world)));
 
+    // Under Test.
     std::expected<Entity, framework::Status> asset =
         build_scenario(scenario, InOut(world));
     world.sync();
 
+    // Postconditions.
     REQUIRE_FALSE(asset.has_value());
     CHECK(asset.error() ==
           lib::watch(framework::BuildError::ENTITY_CAPACITY_EXHAUSTED));
@@ -265,13 +300,17 @@ TEST_CASE("DefenseSimulation") {
   }
 
   SECTION("ShouldAimEachSitesDronesAtItsOwnAssetGivenSeveralSites") {
+    // Preconditions.
     Scenario scenario{.drones = 10, .sites = 4};
     World world;
     REQUIRE(build_world(scenario, Out(world)));
+
+    // Under Test.
     std::expected<Entity, framework::Status> first =
         build_scenario(scenario, InOut(world));
-    REQUIRE(first.has_value());
 
+    // Postconditions.
+    REQUIRE(first.has_value());
     std::vector<Entity> assets = collect_owners<Asset>(world);
     REQUIRE(assets.size() == 4u);
     CHECK(assets.front() == *first);
@@ -320,11 +359,13 @@ TEST_CASE("ScanRadars") {
   };
 
   SECTION("ShouldScanTogetherGivenSite") {
+    // Postconditions.
     CHECK(scans_per_step(create_site(meters(0, 0, 0), Depend(world))) ==
           std::vector<int>{4, 0, 0, 0});
   }
 
   SECTION("ShouldScanInTurnGivenSiteScanningInTurn") {
+    // Postconditions.
     CHECK(scans_per_step(
               create_site(meters(0, 0, 0), Depend(world)).scanning_in_turn()) ==
           std::vector<int>{1, 1, 1, 1});
@@ -337,13 +378,16 @@ TEST_CASE("DetectDrones") {
   framework::Scheduler<World, SystemList<ScanRadars, DetectDrones>> scheduler;
 
   SECTION("ShouldCreateOneTrackGivenTwoRadarsSeeingOneDrone") {
+    // Preconditions.
     make_radar(meters(0.0, 0.0, 0.0), InOut(world));
     make_radar(meters(100.0, 0.0, 0.0), InOut(world));
     Entity drone = make_drone(meters(500.0, 0.0, 0.0), Entity{}, InOut(world));
     world.sync();
 
+    // Under Test.
     step(TimePoint{}, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     REQUIRE(world.store_of<Track>().size() == 1u);
     Entity track = collect_owners<Track>(world).front();
     CHECK(world.store_of<Track>().component_of(track).target == drone);
@@ -351,24 +395,30 @@ TEST_CASE("DetectDrones") {
   }
 
   SECTION("ShouldNotTrackGivenDroneOutOfRange") {
+    // Preconditions.
     make_radar(meters(0.0, 0.0, 0.0), InOut(world));
     make_drone(meters(5000.0, 0.0, 0.0), Entity{}, InOut(world));
     world.sync();
 
+    // Under Test.
     step(TimePoint{}, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     CHECK(world.store_of<Track>().size() == 0u);
   }
 
   SECTION("ShouldNotTrackAgainGivenDroneAlreadyTracked") {
+    // Preconditions.
     make_radar(meters(0.0, 0.0, 0.0), InOut(world));
     make_drone(meters(500.0, 0.0, 0.0), Entity{}, InOut(world));
     world.sync();
 
+    // Under Test.
     step(TimePoint{}, InOut(scheduler), InOut(world));
     step(TimePoint{1s}, InOut(scheduler),
          InOut(world));  // The next scan.
 
+    // Postconditions.
     CHECK(world.store_of<Track>().size() == 1u);
   }
 }
@@ -379,13 +429,16 @@ TEST_CASE("UpdateTracks") {
   framework::Scheduler<World, SystemList<ScanRadars, UpdateTracks>> scheduler;
 
   SECTION("ShouldUpdateEstimateGivenScanningRadarCoversTarget") {
+    // Preconditions.
     make_radar(meters(0.0, 0.0, 0.0), InOut(world));
     Entity drone = make_drone(meters(500.0, 0.0, 0.0), Entity{}, InOut(world));
     Entity track = make_track(drone, meters(0.0, 0.0, 0.0), InOut(world));
     world.sync();
 
+    // Under Test.
     step(TimePoint{2s}, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     CHECK(world.store_of<Estimate>().component_of(track).position ==
           meters(500.0, 0.0, 0.0));
     CHECK(world.store_of<Track>().component_of(track).last_seen ==
@@ -393,13 +446,16 @@ TEST_CASE("UpdateTracks") {
   }
 
   SECTION("ShouldKeepEstimateGivenTargetOutOfRange") {
+    // Preconditions.
     make_radar(meters(0.0, 0.0, 0.0), InOut(world));
     Entity drone = make_drone(meters(5000.0, 0.0, 0.0), Entity{}, InOut(world));
     Entity track = make_track(drone, meters(4500.0, 0.0, 0.0), InOut(world));
     world.sync();
 
+    // Under Test.
     step(TimePoint{2s}, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     CHECK(world.store_of<Estimate>().component_of(track).position ==
           meters(4500.0, 0.0, 0.0));
     CHECK(world.store_of<Track>().component_of(track).last_seen == TimePoint{});
@@ -412,14 +468,17 @@ TEST_CASE("DropStaleTracks") {
   framework::Scheduler<World, SystemList<DropStaleTracks>> scheduler;
 
   SECTION("ShouldDropTrackAndUnmarkDroneGivenNotSeenForTimeout") {
+    // Preconditions.
     Entity drone = make_drone(meters(0.0, 0.0, 0.0), Entity{}, InOut(world));
     Entity track = make_track(drone, meters(0.0, 0.0, 0.0), InOut(world));
     world.sync();
     REQUIRE(world.change(drone).attach(Tracked{.track = track}).build());
     world.sync();
 
+    // Under Test.
     step(TimePoint{6s}, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     CHECK_FALSE(world.alive(track));
     CHECK_FALSE(world.store_of<Tracked>().contains(drone));
   }
@@ -431,14 +490,17 @@ TEST_CASE("Engaging") {
   framework::Scheduler<World, Engaging> scheduler;
 
   SECTION("ShouldLaunchOneInterceptorGivenTwoLaunchersProposingOneTrack") {
+    // Preconditions.
     make_launcher(meters(0.0, 0.0, 0.0), InOut(world));
     make_launcher(meters(50.0, 0.0, 0.0), InOut(world));
     Entity drone = make_drone(meters(2000.0, 0.0, 0.0), Entity{}, InOut(world));
     make_track(drone, meters(2000.0, 0.0, 0.0), InOut(world));
     world.sync();
 
+    // Under Test.
     step(TimePoint{}, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     REQUIRE(world.store_of<Interceptor>().size() == 1u);
     // The nearer launcher, at 50 m, won the engagement.
     Entity interceptor = collect_owners<Interceptor>(world).front();
@@ -449,6 +511,7 @@ TEST_CASE("Engaging") {
   }
 
   SECTION("ShouldWaitForReloadGivenSecondTrack") {
+    // Preconditions.
     Entity launcher = make_launcher(meters(0.0, 0.0, 0.0), InOut(world));
     for (double x : {1000.0, 2000.0}) {
       Entity drone = make_drone(meters(x, 0.0, 0.0), Entity{}, InOut(world));
@@ -456,23 +519,32 @@ TEST_CASE("Engaging") {
     }
     world.sync();
 
+    // Under Test.
     step(TimePoint{}, InOut(scheduler), InOut(world));
     step(TimePoint{1s}, InOut(scheduler), InOut(world));
+
+    // Postconditions.
     CHECK(world.store_of<Interceptor>().size() == 1u);  // Reloading.
 
+    // Under Test.
     step(TimePoint{2s}, InOut(scheduler), InOut(world));
+
+    // Postconditions.
     CHECK(world.store_of<Interceptor>().size() == 2u);
     CHECK(world.store_of<Launcher>().component_of(launcher).inventory == 3u);
   }
 
   SECTION("ShouldNotEngageGivenTrackOutOfRange") {
+    // Preconditions.
     make_launcher(meters(0.0, 0.0, 0.0), InOut(world));
     Entity drone = make_drone(meters(9000.0, 0.0, 0.0), Entity{}, InOut(world));
     make_track(drone, meters(9000.0, 0.0, 0.0), InOut(world));
     world.sync();
 
+    // Under Test.
     step(TimePoint{}, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     CHECK(world.store_of<Interceptor>().size() == 0u);
   }
 }
@@ -486,18 +558,22 @@ TEST_CASE("OperatorCommands") {
   make_track(drone, meters(2000.0, 0.0, 0.0), InOut(world));
 
   SECTION("ShouldNotEngageGivenWeaponsHold") {
+    // Preconditions.
     make_launcher(meters(0.0, 0.0, 0.0), InOut(world));
     world.sync();
 
+    // Under Test.
     auto held = hold_weapons(home, InOut(world));
     world.sync();  // Commands apply at the next sync.
     step(TimePoint{}, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     CHECK(held == 1u);
     CHECK(world.store_of<Interceptor>().size() == 0u);
   }
 
   SECTION("ShouldEngageAgainGivenWeaponsFree") {
+    // Preconditions.
     make_launcher(meters(0.0, 0.0, 0.0), InOut(world));
     world.sync();
     REQUIRE(hold_weapons(home, InOut(world)));
@@ -505,49 +581,60 @@ TEST_CASE("OperatorCommands") {
     step(TimePoint{}, InOut(scheduler), InOut(world));
     REQUIRE(world.store_of<Interceptor>().size() == 0u);
 
+    // Under Test.
     auto freed = free_weapons(home, {}, InOut(world));
     world.sync();
     step(TimePoint{1s}, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     CHECK(freed == 1u);
     CHECK(world.store_of<Interceptor>().size() == 1u);
   }
 
   SECTION("ShouldHoldOnlyLaunchersInSectorGivenSector") {
+    // Preconditions.
     make_launcher(meters(0.0, 0.0, 0.0), InOut(world));
     Entity distant = make_launcher(meters(4000.0, 0.0, 0.0), InOut(world));
     world.sync();
 
+    // Under Test.
     REQUIRE(hold_weapons(home, InOut(world)) == 1u);
     world.sync();
     step(TimePoint{}, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     REQUIRE(world.store_of<Interceptor>().size() == 1u);
     CHECK(world.parent_of(collect_owners<Interceptor>(world).front()) ==
           distant);
   }
 
   SECTION("ShouldSkipHeldLaunchersGivenSecondHoldBeforeSync") {
+    // Preconditions.
     make_launcher(meters(0.0, 0.0, 0.0), InOut(world));
     world.sync();
 
+    // Under Test.
     auto first = hold_weapons(home, InOut(world));
     auto second = hold_weapons(home, InOut(world));
 
+    // Postconditions.
     CHECK(first == 1u);
     CHECK(second == 0u);
   }
 
   SECTION("ShouldDestroyInterceptorsInSectorGivenCommandDestruct") {
+    // Preconditions.
     Entity near = make_interceptor(meters(100.0, 0.0, 0.0), drone,
                                    TimePoint{1min}, InOut(world));
     Entity far = make_interceptor(meters(1500.0, 0.0, 0.0), drone,
                                   TimePoint{1min}, InOut(world));
     world.sync();
 
+    // Under Test.
     auto destroyed = destruct_interceptors(home, InOut(world));
     world.sync();
 
+    // Postconditions.
     CHECK(destroyed == 1u);
     CHECK_FALSE(world.alive(near));
     CHECK(world.alive(far));
@@ -560,36 +647,45 @@ TEST_CASE("GuideInterceptors") {
   framework::Scheduler<World, SystemList<GuideInterceptors>> scheduler;
 
   SECTION("ShouldRetargetNearestDroneGivenTargetGone") {
+    // Preconditions.
     Entity near = make_drone(meters(300.0, 0.0, 0.0), Entity{}, InOut(world));
     make_drone(meters(600.0, 0.0, 0.0), Entity{}, InOut(world));
     Entity interceptor = make_interceptor(meters(0.0, 0.0, 0.0), Entity{},
                                           TimePoint{1min}, InOut(world));
     world.sync();
 
+    // Under Test.
     step(TimePoint{}, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     CHECK(world.store_of<Target>().component_of(interceptor).entity == near);
   }
 
   SECTION("ShouldSelfDestructGivenNoDroneInSeekerRange") {
+    // Preconditions.
     make_drone(meters(5000.0, 0.0, 0.0), Entity{}, InOut(world));
     Entity interceptor = make_interceptor(meters(0.0, 0.0, 0.0), Entity{},
                                           TimePoint{1min}, InOut(world));
     world.sync();
 
+    // Under Test.
     step(TimePoint{}, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     CHECK_FALSE(world.alive(interceptor));
   }
 
   SECTION("ShouldSelfDestructGivenFlightTimeUp") {
+    // Preconditions.
     Entity drone = make_drone(meters(300.0, 0.0, 0.0), Entity{}, InOut(world));
     Entity interceptor = make_interceptor(meters(0.0, 0.0, 0.0), drone,
                                           TimePoint{5s}, InOut(world));
     world.sync();
 
+    // Under Test.
     step(TimePoint{5s}, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     CHECK_FALSE(world.alive(interceptor));
   }
 }
@@ -600,19 +696,23 @@ TEST_CASE("Blasts") {
   framework::Scheduler<World, Blasts> scheduler;
 
   SECTION("ShouldDestroyDroneAndInterceptorGivenFuseDistance") {
+    // Preconditions.
     Entity drone = make_drone(meters(10.0, 0.0, 0.0), Entity{}, InOut(world));
     Entity interceptor = make_interceptor(meters(0.0, 0.0, 0.0), drone,
                                           TimePoint{1min}, InOut(world));
     world.sync();
 
+    // Under Test.
     step(TimePoint{}, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     CHECK_FALSE(world.alive(interceptor));
     CHECK_FALSE(world.alive(drone));
     CHECK(world.store_of<Blast>().size() == 0u);  // Expired within the step.
   }
 
   SECTION("ShouldDamageAssetOnceGivenDroneDetonatingAtIt") {
+    // Preconditions.
     Entity asset = *world.create<archetype::Asset>()
                         .with(Kinematics{})
                         .with(Health{.points = 30.0})
@@ -621,8 +721,10 @@ TEST_CASE("Blasts") {
     Entity drone = make_drone(meters(20.0, 0.0, 0.0), asset, InOut(world));
     world.sync();
 
+    // Under Test.
     step(TimePoint{}, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     CHECK_FALSE(world.alive(drone));
     CHECK(world.store_of<Health>().component_of(asset).points == 20.0);
   }

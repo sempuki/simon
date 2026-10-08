@@ -19,24 +19,37 @@ TEST_CASE("AeroTerm") {
   inputs[AeroVariable::MACH] = 0.5;
 
   SECTION("ShouldMultiplyConstantByFactors") {
+    // Preconditions.
     AeroTerm term{.constant = 2.0,
                   .factors = {aero_input(AeroVariable::DYNAMIC_PRESSURE),
                               aero_input(AeroVariable::ALPHA)}};
-    CHECK_THAT(term(inputs), WithinAbs(200.0, 1e-12));
+
+    // Under Test.
+    double value = term(inputs);
+
+    // Postconditions.
+    CHECK_THAT(value, WithinAbs(200.0, 1e-12));
   }
 
   SECTION("ShouldReadSignalsGivenSignalAndMagnitudeFactors") {
+    // Preconditions.
     std::array<double, 3> signals{7.0, 0.5, -0.25};
     std::array<AeroSignal, 2> read{AeroSignal{.signal = 1},
                                    AeroSignal{.signal = 2, .magnitude = true}};
-    inputs.read(read, signals);
     AeroTerm term{.constant = 2.0,
                   .factors = {AeroInput{.index = AERO_VARIABLE_COUNT},
                               AeroInput{.index = AERO_VARIABLE_COUNT + 1}}};
-    CHECK_THAT(term(inputs), WithinAbs(2.0 * 0.5 * 0.25, 1e-12));
+
+    // Under Test.
+    inputs.read(read, signals);
+    double value = term(inputs);
+
+    // Postconditions.
+    CHECK_THAT(value, WithinAbs(2.0 * 0.5 * 0.25, 1e-12));
   }
 
   SECTION("ShouldMultiplyByTablesGivenTablesOfOneAndTwoVariables") {
+    // Preconditions.
     AeroTerm term{
         .constant = 1.0,
         .tables = {
@@ -47,20 +60,29 @@ TEST_CASE("AeroTerm") {
                 .column = aero_input(AeroVariable::ALPHA),
                 .table = model::Table2<>{{0.0, 1.0}, {0.0, 0.2}, {1, 1, 3, 3}}},
         }};
+
+    // Under Test.
+    double value = term(inputs);
+
+    // Postconditions.
     // 1.0 from the first table, times 2.0 from the second.
-    CHECK_THAT(term(inputs), WithinAbs(2.0, 1e-12));
+    CHECK_THAT(value, WithinAbs(2.0, 1e-12));
   }
 }
 
 TEST_CASE("AeroModel") {
   SECTION("ShouldSumTermsByAxis") {
+    // Preconditions.
     AeroModel model;
     model.axes[static_cast<std::size_t>(AeroAxis::LIFT)] = {
         AeroTerm{.constant = 3.0}, AeroTerm{.constant = 4.0}};
     model.axes[static_cast<std::size_t>(AeroAxis::YAW)] = {
         AeroTerm{.constant = -1.0}};
 
+    // Under Test.
     AeroSums sums = model(AeroInputs{});
+
+    // Postconditions.
     CHECK(sums[static_cast<std::size_t>(AeroAxis::LIFT)] == 7.0);
     CHECK(sums[static_cast<std::size_t>(AeroAxis::YAW)] == -1.0);
     CHECK(sums[static_cast<std::size_t>(AeroAxis::DRAG)] == 0.0);
@@ -73,24 +95,35 @@ TEST_CASE("AeroLoads") {
   sums[static_cast<std::size_t>(AeroAxis::LIFT)] = 10.0;
 
   SECTION("ShouldPointDragBackAndLiftUpGivenNoAngles") {
+    // Under Test.
     AeroLoads loads = compute_aero_loads(sums, 0.0 * radian, 0.0 * radian,
                                          meters(0.0, 0.0, 0.0));
+
+    // Postconditions.
     CHECK(loads.force.numerical_value_in(newton).is_approximately(
         QuantityVector{-1.0, 0.0, -10.0}));
   }
 
   SECTION("ShouldTiltLiftForwardGivenAngleOfAttack") {
+    // Preconditions.
     double alpha = std::numbers::pi / 2.0;
+
+    // Under Test.
     AeroLoads loads = compute_aero_loads(sums, alpha * radian, 0.0 * radian,
                                          meters(0.0, 0.0, 0.0));
+
+    // Postconditions.
     // The air comes from below: drag pushes up, lift pushes forward.
     CHECK(loads.force.numerical_value_in(newton).is_approximately(
         QuantityVector{10.0, 0.0, -1.0}));
   }
 
   SECTION("ShouldPitchUpGivenLiftAheadOfCenterOfMass") {
+    // Under Test.
     AeroLoads loads = compute_aero_loads(sums, 0.0 * radian, 0.0 * radian,
                                          meters(2.0, 0.0, 0.0));
+
+    // Postconditions.
     CHECK_THAT(loads.moment.numerical_value_in(newton_meter).eigen().y(),
                WithinAbs(20.0, 1e-12));
   }

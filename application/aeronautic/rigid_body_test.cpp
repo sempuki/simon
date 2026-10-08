@@ -38,8 +38,11 @@ TEST_CASE("RigidBody737") {
   REQUIRE(rows.size() > 400);
 
   SECTION("ShouldMatchJsbsimRatesGivenRecordedStates") {
+    // Preconditions.
     double worst_acceleration = 0.0;
     double worst_angular = 0.0;
+
+    // Under Test.
     for (const Row& row : rows) {
       RigidBody body = read_body(row);
       // JSBSim reports the tensor's xz element as it is, but its xy and yz
@@ -82,6 +85,8 @@ TEST_CASE("RigidBody737") {
                                magnitude(angular - expected_angular) /
                                    std::max(magnitude(expected_angular), 1e-3));
     }
+
+    // Postconditions.
     CAPTURE(worst_acceleration, worst_angular);
     CHECK(worst_acceleration < 1e-12);
     CHECK(worst_angular < 1e-12);
@@ -93,9 +98,12 @@ TEST_CASE("RigidBody737") {
   earth::StandardAirTable air;
 
   SECTION("ShouldMatchJsbsimMassBalanceGivenRecordedFuel") {
+    // Preconditions.
     double worst_inertia = 0.0;
     double worst_center = 0.0;
     double worst_mass = 0.0;
+
+    // Under Test.
     for (const Row& row : rows) {
       std::array<Mass, 3> fuel{row.at("fuel_0") * kilogram,
                                row.at("fuel_1") * kilogram,
@@ -117,6 +125,8 @@ TEST_CASE("RigidBody737") {
       worst_inertia = worse(worst_inertia, j(0, 2), row.at("ixz"), scale);
       worst_inertia = worse(worst_inertia, j(1, 2), -row.at("iyz"), scale);
     }
+
+    // Postconditions.
     // JSBSim turns pounds into slugs by a rounded 1/32.174049, which is
     // 1.4e-8 off the definition simon uses.
     CAPTURE(worst_mass, worst_center, worst_inertia);
@@ -126,12 +136,15 @@ TEST_CASE("RigidBody737") {
   }
 
   SECTION("ShouldMatchJsbsimAirDataGivenRecordedStates") {
+    // Preconditions.
     double worst_angle = 0.0;     // Radians.
     double worst_speed = 0.0;     // Relative.
     double worst_rate = 0.0;      // Radians per second.
     double worst_altitude = 0.0;  // Meters.
     double worst_density = 0.0;   // Relative: dynamic pressure and Mach.
     double worst_ground = 0.0;    // Height over span.
+
+    // Under Test.
     for (const Row& row : rows) {
       RigidBody body = read_body(row);
       Time time = row.at("time") * second;
@@ -167,6 +180,8 @@ TEST_CASE("RigidBody737") {
           worse(worst_ground, inputs[HEIGHT_OVER_SPAN],
                 row.at("height_over_span"), row.at("height_over_span"));
     }
+
+    // Postconditions.
     CAPTURE(worst_angle, worst_speed, worst_rate, worst_altitude, worst_density,
             worst_ground);
     CHECK(worst_angle < 1e-12);

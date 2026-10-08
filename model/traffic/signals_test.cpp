@@ -47,10 +47,13 @@ auto network_with_light() -> road::Map {
 
 TEST_CASE("traffic::Signals") {
   SECTION("ShouldCycleThroughPhasesGivenPlan") {
+    // Preconditions.
     SignalPlan plan{.phases = {{.duration = 20s, .aspect = Aspect::GREEN},
                                {.duration = 3s, .aspect = Aspect::YELLOW},
                                {.duration = 27s, .aspect = Aspect::RED}},
                     .offset = 5s};
+
+    // Postconditions.
     CHECK(plan.cycle() == 50s);
     CHECK(plan.aspect_at(5s) == Aspect::GREEN);
     CHECK(plan.aspect_at(24s) == Aspect::GREEN);
@@ -66,7 +69,10 @@ TEST_CASE("traffic::Signals") {
   }
 
   SECTION("ShouldGiveOneGroupGreenAtATimeGivenTurns") {
+    // Under Test.
     std::vector<SignalPlan> plans = plan_in_turn(3, 20s, 3s, 2s);
+
+    // Postconditions.
     REQUIRE(plans.size() == 3);
     for (const SignalPlan& plan : plans) {
       CHECK(plan.cycle() == 75s);
@@ -84,8 +90,13 @@ TEST_CASE("traffic::Signals") {
   }
 
   SECTION("ShouldPutStopLinesOnLanesTheLightHoldsFor") {
+    // Preconditions.
     road::Map network = network_with_light();
+
+    // Under Test.
     Signals signals = build_signals(network);
+
+    // Postconditions.
     REQUIRE(signals.groups().size() == 1);
     CHECK(signals.groups()[0].junction == "9");
     CHECK(signals.groups()[0].sequence == 3);
@@ -98,11 +109,16 @@ TEST_CASE("traffic::Signals") {
   }
 
   SECTION("ShouldPutStopLinesAgainstSGivenNegativeOrientation") {
+    // Preconditions.
     road::Map network = network_with_light();
     road::Signal& light = network.roads[0].signals[0];
     light.orientation = road::Orientation::NEGATIVE;
     light.validities.clear();
+
+    // Under Test.
     Signals signals = build_signals(network);
+
+    // Postconditions.
     REQUIRE(signals.stop_lines().size() == 2);
     CHECK(signals.stop_lines()[0].lane.lane == 1);
     CHECK(signals.stop_lines()[0].along == 10.0);  // Measured against s.
@@ -110,12 +126,18 @@ TEST_CASE("traffic::Signals") {
   }
 
   SECTION("ShouldStopForLightsAsMovsimDrivers") {
+    // Preconditions.
     IntelligentDriver driver{.desired_speed = 15.0 * meter_per_second};
     LightBraking braking;
     auto stops = [&](Aspect aspect, double speed, double distance) {
       return stops_at_light(driver, braking, aspect, speed * meter_per_second,
                             distance * meter);
     };
+    // movsim's kinematic test: at 20 m/s, 33.3 m to stop at 6 m/s^2,
+    // whatever the IDM would brake.
+    LightBraking bold{.yellow = 100.0 * meter_per_second_squared};
+
+    // Postconditions.
     CHECK_FALSE(stops(Aspect::GREEN, 10.0, 100.0));
     CHECK(stops(Aspect::YELLOW, 10.0, 100.0));  // Far off: brakes gently.
     // Close: the IDM's braking to the light would pass 4 m/s^2.
@@ -126,9 +148,6 @@ TEST_CASE("traffic::Signals") {
     // Creeping up to the line, it can still stop at it.
     CHECK(stops(Aspect::RED, 0.05, 0.01));
     CHECK(stops(Aspect::RED, 0.0, 0.5));  // Waiting at the line.
-    // movsim's kinematic test: at 20 m/s, 33.3 m to stop at 6 m/s^2,
-    // whatever the IDM would brake.
-    LightBraking bold{.yellow = 100.0 * meter_per_second_squared};
     CHECK_FALSE(stops_at_light(driver, bold, Aspect::YELLOW,
                                20.0 * meter_per_second, 30.0 * meter));
     CHECK(stops_at_light(driver, bold, Aspect::YELLOW, 20.0 * meter_per_second,
@@ -136,7 +155,10 @@ TEST_CASE("traffic::Signals") {
   }
 
   SECTION("ShouldStopAtTheLineGivenNoMinimumGap") {
+    // Preconditions.
     IntelligentDriver driver;
+
+    // Postconditions.
     // Standing at the line it wants nothing more; short of it, it creeps.
     CHECK(
         compute_stop_acceleration(driver, 0.0 * meter_per_second, 1.0 * meter) >

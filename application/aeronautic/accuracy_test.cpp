@@ -199,8 +199,10 @@ TEST_CASE("Accuracy") {
   // which turns into 470 m over 130 km flown. Integration adds little at a
   // small step.
   SECTION("ShouldFollowJsbsimGivenSmallStep") {
+    // Under Test.
     Drifts drifts = replay(samples, 20ms);
 
+    // Postconditions.
     for (const Drift& drift : {drifts.simple, drifts.precise}) {
       CAPTURE(drift.position, drift.altitude, drift.speed, drift.heading);
       CHECK(drift.position < 600.0);
@@ -213,8 +215,10 @@ TEST_CASE("Accuracy") {
   // At a one-second step the single pass drifts further, mostly in
   // altitude; Runge-Kutta 4 barely changes.
   SECTION("ShouldFollowJsbsimGivenLargeStep") {
+    // Under Test.
     Drifts drifts = replay(samples, 1s);
 
+    // Postconditions.
     CAPTURE(drifts.simple.position, drifts.simple.altitude, drifts.simple.speed,
             drifts.simple.heading);
     CAPTURE(drifts.precise.position, drifts.precise.altitude,

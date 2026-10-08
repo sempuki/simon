@@ -45,6 +45,7 @@ auto convert_to_meters(const Position& position) -> Vector3 {
 
 TEST_CASE("Road") {
   SECTION("ShouldFollowFresnelIntegralsGivenClothoid") {
+    // Under Test.
     // Heading pi u^2 / 2 over u in [0, 1], so the end is (C(1), S(1)), the
     // Fresnel integrals, to double precision (DLMF section 7.2(iii); see
     // model/REFERENCES.md).
@@ -52,6 +53,8 @@ TEST_CASE("Road") {
         geometry(1.0, SpiralGeometry{.curvature_start = 0.0,
                                      .curvature_end = std::numbers::pi}),
         1.0);
+
+    // Postconditions.
     CHECK_THAT(end.x - 10.0, WithinAbs(0.7798934003768228, 1e-15));
     CHECK_THAT(end.y + 5.0, WithinAbs(0.4382591473903548, 1e-15));
     CHECK_THAT(end.heading, WithinAbs(std::numbers::pi / 2.0, 1e-15));
@@ -59,9 +62,12 @@ TEST_CASE("Road") {
   }
 
   SECTION("ShouldBeArcGivenSpiralOfConstantCurvature") {
+    // Preconditions.
     PlanGeometry spiral = geometry(
         80.0, SpiralGeometry{.curvature_start = 0.01, .curvature_end = 0.01});
     PlanGeometry arc = geometry(80.0, ArcGeometry{.curvature = 0.01});
+
+    // Under Test.
     for (double ds : {0.0, 13.0, 47.5, 80.0}) {
       PlanPoint a = compute_plan_point(spiral, ds);
       PlanPoint b = compute_plan_point(arc, ds);
@@ -71,26 +77,37 @@ TEST_CASE("Road") {
   }
 
   SECTION("ShouldTurnQuarterCircleGivenArc") {
+    // Preconditions.
     double radius = 100.0;
+
+    // Under Test.
     PlanPoint end =
         compute_plan_point(geometry(radius * std::numbers::pi / 2.0,
                                     ArcGeometry{.curvature = 1.0 / radius}),
                            radius * std::numbers::pi / 2.0);
+
+    // Postconditions.
     CHECK_THAT(end.x, WithinAbs(10.0 + radius, 1e-12));
     CHECK_THAT(end.y, WithinAbs(-5.0 + radius, 1e-12));
     CHECK_THAT(end.heading, WithinAbs(std::numbers::pi / 2.0, 1e-15));
   }
 
   SECTION("ShouldBeLineGivenArcOfNoCurvature") {
-    // It strays from the line by k s^2 / 2 to first order.
+    // Preconditions.
     double curvature = 1e-15;
+
+    // Under Test.
     PlanPoint end = compute_plan_point(
         geometry(50.0, ArcGeometry{.curvature = curvature}), 50.0);
+
+    // Postconditions.
+    // It strays from the line by k s^2 / 2 to first order.
     CHECK_THAT(end.x, WithinAbs(60.0, 1e-12));
     CHECK_THAT(end.y + 5.0, WithinAbs(curvature * 50.0 * 50.0 / 2.0, 1e-15));
   }
 
   SECTION("ShouldGoByArcLengthGivenParamPoly3") {
+    // Preconditions.
     // u = 10 p and v = 100 c p^2 over p in [0, 1]: a parabola whose arc length
     // to x is x sqrt(1 + 4 c^2 x^2) / 2 + asinh(2 c x) / (4 c).
     double c = 0.1;
@@ -102,13 +119,18 @@ TEST_CASE("Road") {
                                   ParamPoly3Geometry{.u = Cubic{.b = 10.0},
                                                      .v = Cubic{.c = 100.0 * c},
                                                      .normalized = true});
+
+    // Under Test.
     PlanPoint point = compute_plan_point(curve, arc_length(4.0));
+
+    // Postconditions.
     CHECK_THAT(point.x, WithinAbs(10.0 + 4.0, 1e-12));
     CHECK_THAT(point.y, WithinAbs(-5.0 + c * 16.0, 1e-12));
     CHECK_THAT(point.heading, WithinAbs(std::atan(2.0 * c * 4.0), 1e-14));
   }
 
   SECTION("ShouldEndAtCurveEndGivenLengthOffArcLength") {
+    // Preconditions.
     // Over pRange arcLength, p runs over [0, length], and here the curve's arc
     // length over that range is longer than the length: s still runs from
     // the curve's start to its end, in proportion to its arc length.
@@ -116,14 +138,23 @@ TEST_CASE("Road") {
         geometry(20.0, ParamPoly3Geometry{.u = Cubic{.b = 1.0},
                                           .v = Cubic{.c = 0.02},
                                           .normalized = false});
+
+    // Under Test.
     PlanPoint end = compute_plan_point(curve, 20.0);
+
+    // Postconditions.
     CHECK_THAT(end.x, WithinAbs(10.0 + 20.0, 1e-12));
     CHECK_THAT(end.y, WithinAbs(-5.0 + 0.02 * 400.0, 1e-12));
+
+    // Under Test.
     PlanPoint start = compute_plan_point(curve, 0.0);
+
+    // Postconditions.
     CHECK_THAT(start.x, WithinAbs(10.0, 1e-15));
   }
 
   SECTION("ShouldTiltAcrossGivenSlopeAndSuperelevation") {
+    // Preconditions.
     // Along x, climbing at slope g and rolled by r: e_s = (1, 0, g) / |.|, and
     // the horizontal normal (0, 1, 0) turned about it by r is
     // (-sin(r) e_s.z, cos(r), sin(r) e_s.x).
@@ -133,9 +164,13 @@ TEST_CASE("Road") {
     road.elevation.pieces = {
         {.start = 0.0, .cubic = Cubic{.a = 2.0, .b = slope}}};
     road.superelevation.pieces = {{.start = 0.0, .cubic = Cubic{.a = roll}}};
+    double norm = std::sqrt(1.0 + slope * slope);
+
+    // Under Test.
     Vector3 at =
         convert_to_meters(compute_position(road, 30.0 * meter, 3.0 * meter));
-    double norm = std::sqrt(1.0 + slope * slope);
+
+    // Postconditions.
     CHECK_THAT(at.x(),
                WithinAbs(30.0 - 3.0 * std::sin(roll) * slope / norm, 1e-12));
     CHECK_THAT(at.y(), WithinAbs(3.0 * std::cos(roll), 1e-12));
@@ -145,6 +180,7 @@ TEST_CASE("Road") {
   }
 
   SECTION("ShouldSumWidthsGivenLaneBorders") {
+    // Preconditions.
     Road road = road_along({PlanGeometry{.length = 100.0}});
     road.lane_offset.pieces = {{.start = 0.0, .cubic = Cubic{.a = 0.5}}};
     road.lane_sections = {LaneSection{
@@ -156,6 +192,8 @@ TEST_CASE("Road") {
                                   .cubic = Cubic{.a = 3.0, .b = 0.01}}}}},
         .right = {Lane{.id = -1, .widths = {{.cubic = Cubic{.a = 3.25}}}}},
     }};
+
+    // Postconditions.
     CHECK(compute_lane_border(road, 60.0 * meter, 0) == 0.5 * meter);
     CHECK_THAT(
         compute_lane_border(road, 60.0 * meter, 2).numerical_value_in(meter),
@@ -173,6 +211,7 @@ TEST_CASE("Road") {
   }
 
   SECTION("ShouldFindRoadCoordinatesGivenPosition") {
+    // Preconditions.
     // A line, a spiral into an arc, and a spiral out to the other hand.
     std::vector<PlanGeometry> plan;
     PlanGeometry line{.length = 40.0, .shape = LineGeometry{}};
@@ -192,6 +231,8 @@ TEST_CASE("Road") {
     append(40.0,
            SpiralGeometry{.curvature_start = 0.02, .curvature_end = -0.01});
     Road road = road_along(std::move(plan));
+
+    // Under Test.
     for (double s : {5.0, 39.0, 41.0, 63.0, 100.0, 141.0, 155.0}) {
       for (double t : {-4.0, -1.0, 0.0, 2.5, 6.0}) {
         CAPTURE(s, t);

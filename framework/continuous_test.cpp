@@ -202,6 +202,7 @@ auto period_error(int steps) -> double {
 
 TEST_CASE("Continuous") {
   SECTION("ShouldConvergeAtEachMethodsOrder") {
+    // Under Test.
     // Halving the step divides the error by 2^order.
     double euler = period_error<Euler>(1000) / period_error<Euler>(2000);
     double midpoint =
@@ -209,6 +210,7 @@ TEST_CASE("Continuous") {
     double rk4 =
         period_error<RungeKutta4>(100) / period_error<RungeKutta4>(200);
 
+    // Postconditions.
     CHECK_THAT(euler, WithinAbs(2.0, 0.1));
     CHECK_THAT(midpoint, WithinAbs(4.0, 0.2));
     CHECK_THAT(rk4, WithinAbs(16.0, 1.0));
@@ -216,6 +218,7 @@ TEST_CASE("Continuous") {
   }
 
   SECTION("ShouldShowEachStageOtherEntitiesTrialState") {
+    // Preconditions.
     TestWorld world;
     build(Out(world));
     auto leader = world.create<Mass>().with(Point{}).with(PointRate{}).build();
@@ -226,17 +229,19 @@ TEST_CASE("Continuous") {
                 .with(Follow{.leader = *leader})
                 .build());
     world.sync();
-
     Scheduler<
         TestWorld,
         SystemList<Continuous<RungeKutta4, TypeList<Point>, SystemList<Lead>>>>
         scheduler;
     TimePoint time{};
+
+    // Under Test.
     for (int i = 0; i < 10; ++i) {
       scheduler.step(Step{.time = time, .dt = 100ms}, InOut(world));
       time += 100ms;
     }
 
+    // Postconditions.
     // RK4 integrates the follower's t^2 / 2 exactly, but only if every stage
     // sees the leader where that stage put it.
     CHECK_THAT(world.store_of<Point>().component_of(*leader).x,
@@ -248,21 +253,24 @@ TEST_CASE("Continuous") {
   }
 
   SECTION("ShouldGiveDerivativeSystemsTheStagesTime") {
+    // Preconditions.
     TestWorld world;
     build(Out(world));
     REQUIRE(world.create<Mass>().with(Point{}).with(PointRate{}).build());
     world.sync();
-
     Scheduler<
         TestWorld,
         SystemList<Continuous<Midpoint, TypeList<Point>, SystemList<Clock>>>>
         scheduler;
     TimePoint time{};
+
+    // Under Test.
     for (int i = 0; i < 4; ++i) {
       scheduler.step(Step{.time = time, .dt = 250ms}, InOut(world));
       time += 250ms;
     }
 
+    // Postconditions.
     // The midpoint rule integrates a linear rate exactly.
     world.store_of<Point>().for_each([](Entity, const Point& point) {
       CHECK_THAT(point.x, WithinAbs(0.5, 1e-9));
@@ -270,6 +278,7 @@ TEST_CASE("Continuous") {
   }
 
   SECTION("ShouldKeepStateGivenEntityWithoutRate") {
+    // Preconditions.
     TestWorld world;
     build(Out(world));
     auto without =
@@ -279,80 +288,97 @@ TEST_CASE("Continuous") {
     REQUIRE(without);
     REQUIRE(with);
     world.sync();
-
     Scheduler<TestWorld, SystemList<Oscillate<RungeKutta4>>> scheduler;
+
+    // Under Test.
     scheduler.step(Step{.time = TimePoint{}, .dt = 100ms}, InOut(world));
 
+    // Postconditions.
     CHECK(world.store_of<Point>().component_of(*without).x == 3.0);
     CHECK(world.store_of<Point>().component_of(*with).x < 1.0);
   }
 
   SECTION("ShouldSkipArchetypeThatCannotHaveRate") {
+    // Preconditions.
     TestWorld world;
     build(Out(world));
     auto rigid = world.create<Rigid>().with(Point{.x = 2.0, .v = 1.0}).build();
     REQUIRE(rigid);
     world.sync();
-
     Scheduler<TestWorld, SystemList<Oscillate<RungeKutta4>>> scheduler;
+
+    // Under Test.
     scheduler.step(Step{.time = TimePoint{}, .dt = 100ms}, InOut(world));
 
+    // Postconditions.
     CHECK(world.store_of<Point>().component_of(*rigid).x == 2.0);
   }
 
   SECTION("ShouldMatchEulerGivenOneStageMethod") {
+    // Preconditions.
     TestWorld world;
     build(Out(world));
     auto mass =
         world.create<Mass>().with(Point{.x = 1.0}).with(PointRate{}).build();
     REQUIRE(mass);
     world.sync();
-
     Scheduler<TestWorld, SystemList<Oscillate<Euler>>> scheduler;
+
+    // Under Test.
     scheduler.step(Step{.time = TimePoint{}, .dt = 500ms}, InOut(world));
 
+    // Postconditions.
     const Point& point = world.store_of<Point>().component_of(*mass);
     CHECK(point.x == 1.0);
     CHECK(point.v == -0.5);
   }
 
   SECTION("ShouldFailContractGivenDerivativeSystemThatPlansChanges") {
+    // Preconditions.
     TestWorld world;
     build(Out(world));
     REQUIRE(world.create<Mass>().with(Point{}).with(PointRate{}).build());
     world.sync();
-
     Scheduler<TestWorld,
               SystemList<Continuous<Euler, TypeList<Point>, SystemList<Spawn>>>>
         scheduler;
+
+    // Postconditions.
     CHECK_THROWS_AS(
         scheduler.step(Step{.time = TimePoint{}, .dt = 100ms}, InOut(world)),
         std::logic_error);
   }
 
   SECTION("ShouldQuerySpaceAtStagesState") {
+    // Preconditions.
     TestWorld world;
     build(Out(world));
     REQUIRE(world.create<Mass>().with(Point{}).with(PointRate{}).build());
     world.sync();
-
     using Dynamics =
         Continuous<RungeKutta4, TypeList<Point>, SystemList<Locate>>;
     Scheduler<TestWorld, SystemList<Dynamics>> scheduler;
+
+    // Under Test.
     scheduler.step(Step{.time = TimePoint{}, .dt = 100ms}, InOut(world));
 
+    // Postconditions.
     CHECK(scheduler.system<Dynamics>().system<Locate>().located == 4);
   }
 
   SECTION("ShouldDescribeWhatItWritesAndReads") {
+    // Preconditions.
     using Dynamics = Continuous<RungeKutta4, TypeList<Point>, SystemList<Lead>>;
+
+    // Under Test.
+    std::string text = Scheduler<TestWorld, SystemList<Dynamics>>::describe();
+
+    // Postconditions.
     static_assert(
         std::is_same_v<write_list_of_t<Dynamics>, TypeList<Point, PointRate>>);
     static_assert(std::is_same_v<read_list_of_t<Dynamics>, TypeList<Follow>>);
     static_assert(
         std::is_same_v<allow_component_list_of_t<Dynamics>, TypeList<Point>>);
-
-    std::string text = Scheduler<TestWorld, SystemList<Dynamics>>::describe();
     CHECK(text.find("writes: ") != std::string::npos);
   }
 }

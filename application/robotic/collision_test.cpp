@@ -184,10 +184,13 @@ auto compare_poses(std::string_view model, std::string_view table)
 
 TEST_CASE("CollisionAgainstMuJoCo") {
   SECTION("ShouldFindMuJoCosContactsGivenEveryPrimitivePair") {
+    // Under Test.
     // Each pose's contacts, as many as MuJoCo's between the same geoms, and
     // every value of each as MuJoCo's to rounding: within 1e-12, or within
     // what rounding moves MuJoCo's own contacts at that pose.
     Comparison c = compare_poses("collisions.xml", "mujoco_contacts.csv");
+
+    // Postconditions.
     CAPTURE(c.total, c.miscounted, c.mismatched, c.largest, c.beyond,
             c.beyond_pose, c.beyond_geoms[0], c.beyond_geoms[1], c.beyond_value,
             c.beyond_apart, c.beyond_allowed);
@@ -198,12 +201,15 @@ TEST_CASE("CollisionAgainstMuJoCo") {
   }
 
   SECTION("ShouldFindMuJoCosContactsGivenPairsOnlyItsConvexColliderTakes") {
+    // Under Test.
     // Ellipsoids and cylinders by GJK and EPA, their faces clipped or the
     // geoms turned for more: every contact as MuJoCo's to rounding. At some
     // poses rounding alone moves MuJoCo's contact far, where a box's edge
     // meets a cylinder's, and where EPA stops within its tolerance moves it
     // too; the spread MuJoCo measures of both says how far.
     Comparison c = compare_poses("convex.xml", "mujoco_convex.csv");
+
+    // Postconditions.
     CAPTURE(c.total, c.miscounted, c.mismatched, c.largest, c.beyond,
             c.beyond_pose, c.beyond_geoms[0], c.beyond_geoms[1], c.beyond_value,
             c.beyond_apart, c.beyond_allowed);
@@ -214,6 +220,7 @@ TEST_CASE("CollisionAgainstMuJoCo") {
   }
 
   SECTION("ShouldCountEachTreesContacts") {
+    // Preconditions.
     // The arm's tree is in every contact of its four geoms.
     std::vector<Pose> poses = load_poses();
     Scenario scenario{.model = std::string{MODELS} + "collisions.xml"};
@@ -222,6 +229,8 @@ TEST_CASE("CollisionAgainstMuJoCo") {
     }
     Simulation simulation{scenario};
     REQUIRE(simulation.configure());
+
+    // Under Test.
     step_once(InOut(simulation), 0);
     const articulated::Scene& m = simulation.mechanics().model();
     std::uint32_t arm =
@@ -241,6 +250,8 @@ TEST_CASE("CollisionAgainstMuJoCo") {
             counted = touching.contacts;
           }
         });
+
+    // Postconditions.
     CAPTURE(expected, m.geoms.size());
     CHECK(expected > 0);
     CHECK(counted == expected);

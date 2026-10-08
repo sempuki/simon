@@ -80,34 +80,56 @@ TEST_CASE("RigidAircraft") {
   earth::Wind wind{.north_east_down = meters_per_second(8.0, -12.0, 2.0)};
 
   SECTION("ShouldGiveAirAccelerationGivenWindOverFlatEarth") {
+    // Preconditions.
     Moving m = moving(Earth::flat(), wind);
-    CHECK((computed(m, wind) - differenced(m, wind)).norm() < 1e-6);
+
+    // Under Test.
+    Vector3 air = computed(m, wind);
+
+    // Postconditions.
+    CHECK((air - differenced(m, wind)).norm() < 1e-6);
   }
 
   SECTION("ShouldGiveAirAccelerationGivenWindRoundEarth") {
+    // Preconditions.
     // Within the local frame's turning as the body moves over the Earth,
     // which it leaves out: 200 m/s over 6,400 km in a 15 m/s wind.
     Moving m = moving(Earth::round(earth::wgs84::Geodetic{}), wind);
-    CHECK((computed(m, wind) - differenced(m, wind)).norm() < 1e-3);
+
+    // Under Test.
+    Vector3 air = computed(m, wind);
+
+    // Postconditions.
+    CHECK((air - differenced(m, wind)).norm() < 1e-3);
   }
 
   SECTION("ShouldGiveAirAccelerationGivenStillAir") {
+    // Preconditions.
     Moving m = moving(Earth::round(earth::wgs84::Geodetic{}), earth::Wind{});
-    CHECK((computed(m, earth::Wind{}) - differenced(m, earth::Wind{})).norm() <
-          1e-6);
+
+    // Under Test.
+    Vector3 air = computed(m, earth::Wind{});
+
+    // Postconditions.
+    CHECK((air - differenced(m, earth::Wind{})).norm() < 1e-6);
   }
 
   SECTION("ShouldDifferFromGroundRateByTurningWindGivenWind") {
+    // Preconditions.
     // JSBSim takes the rate of angle of attack from the rate of the velocity
     // over the ground, which leaves out w x R^T u.
     Moving m = moving(Earth::flat(), wind);
-    Vector3 ground = computed(m, earth::Wind{});
     Vector3 u =
         m.body.attitude.conjugate() *
         (m.earth.place(m.body, 0.0 * second).north_east_down *
          wind.north_east_down.numerical_value_in(meter_per_second).eigen());
     Vector3 turning =
         m.body.rate.numerical_value_in(radian_per_second).eigen().cross(u);
+
+    // Under Test.
+    Vector3 ground = computed(m, earth::Wind{});
+
+    // Postconditions.
     CHECK(turning.norm() > 0.1);
     CHECK((differenced(m, wind) - (ground + turning)).norm() < 1e-6);
   }

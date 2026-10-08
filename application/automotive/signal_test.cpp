@@ -77,6 +77,7 @@ struct Queue final {
 
 TEST_CASE("SignalAgainstSumo") {
   SECTION("ShouldQueueAtRedAndLeaveOnGreenAsSumo") {
+    // Preconditions.
     // SUMO's time counts from the step that inserts the vehicles, so its
     // light turns green a step sooner on that clock.
     constexpr auto STEP = 1ms;
@@ -91,6 +92,8 @@ TEST_CASE("SignalAgainstSumo") {
     double farthest = 0.0;
     double fastest = 0.0;
     double front_stop = 0.0;
+
+    // Under Test.
     // Until 50 s, before the road's end, a dead end to simon's drivers, comes
     // within their lookahead.
     for (long k = 0; k <= 50000; ++k) {
@@ -114,6 +117,8 @@ TEST_CASE("SignalAgainstSumo") {
       scheduler.step(Step{.time = TimePoint{} + k * STEP, .dt = STEP},
                      InOut(queue.world));
     }
+
+    // Postconditions.
     CAPTURE(farthest, fastest, front_stop);
     // SUMO's stop: 498.990007 m.
     CHECK(std::abs(front_stop - 498.990007) < 1e-6);
@@ -122,6 +127,7 @@ TEST_CASE("SignalAgainstSumo") {
   }
 
   SECTION("ShouldGoOnYellowWhenTooNearAndHoldThroughRed") {
+    // Under Test.
     // Two vehicles at 15 m/s, alone on the road, as the light turns yellow
     // for 3 s and then red: one 15 m from the line, which cannot stop
     // comfortably, and one 80 m away, which can.
@@ -172,6 +178,7 @@ TEST_CASE("SignalAgainstSumo") {
   }
 
   SECTION("ShouldNeverCrossOnRedUncommittedGivenJunction") {
+    // Preconditions.
     // The signalized junction's four approaches, two groups taking turns,
     // 40 vehicles for 10 min: every crossing of a stop line is on green or
     // yellow, or on red by a driver that committed to it before.
@@ -188,6 +195,8 @@ TEST_CASE("SignalAgainstSumo") {
     std::map<Entity, std::uint32_t> committed;
     int crossings = 0;
     int on_red = 0;
+
+    // Under Test.
     for (long k = 0; k < 6000; ++k) {
       simulation.world().store_of<LaneState>().for_each(
           [&](Entity owner, const LaneState& state) { before[owner] = state; });
@@ -222,6 +231,8 @@ TEST_CASE("SignalAgainstSumo") {
             }
           });
     }
+
+    // Postconditions.
     CAPTURE(crossings, on_red);
     CHECK(crossings > 100);
   }

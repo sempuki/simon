@@ -268,6 +268,7 @@ TEST_CASE("TireAgainstCommonRoad") {
       std::get<vehicle::CommonRoadTire>(load_commonroad_vehicles().at(1).tire);
 
   SECTION("ShouldMatchCorrectedMagicFormulaGivenSlipsAndLoads") {
+    // Preconditions.
     // simon's forces agree with CommonRoad's, corrected, to rounding.
     // CommonRoad's own differ by hundreds of newtons through its two slips:
     // the side force longitudinal slip induces, turned the wrong way, and the
@@ -277,6 +278,8 @@ TEST_CASE("TireAgainstCommonRoad") {
     double original_x = 0.0;
     double original_y = 0.0;
     std::size_t rows = 0;
+
+    // Under Test.
     for (const Row& row : load_rows("commonroad_tires.csv")) {
       vehicle::TireForce force =
           vehicle::compute_tire_force(tire,
@@ -297,6 +300,8 @@ TEST_CASE("TireAgainstCommonRoad") {
           std::max(original_y, std::abs(fy - number(row, "original_fy")));
       ++rows;
     }
+
+    // Postconditions.
     CAPTURE(largest, original_x, original_y);
     CHECK(rows == 2000);
     CHECK(largest < 1e-13);
@@ -305,6 +310,7 @@ TEST_CASE("TireAgainstCommonRoad") {
   }
 
   SECTION("ShouldPushNothingGivenNoLoad") {
+    // Under Test.
     for (double load : {0.0, -500.0}) {
       vehicle::TireForce force = vehicle::compute_tire_force(
           tire, {.longitudinal = 0.1, .lateral = 0.05 * radian}, load * newton);
@@ -320,14 +326,19 @@ TEST_CASE("VehicleDynamicsAgainstCommonRoad") {
   REQUIRE(vehicles.size() == 3);
 
   SECTION("ShouldMatchRatesGivenStatesFromCrawlToFast") {
+    // Preconditions.
     std::vector<std::vector<std::string>> lines =
         load_cells("commonroad_dynamic_rates.csv");
+
+    // Under Test.
     auto [dynamic, dynamic_rows] =
         compare_rates<DynamicModel>("st", vehicles, lines);
     auto [drift, drift_rows] =
         compare_rates<DriftModel>("std", vehicles, lines);
     auto [multibody, multibody_rows] =
         compare_rates<MultibodyModel>("mb", vehicles, lines);
+
+    // Postconditions.
     CAPTURE(dynamic, drift, multibody, multibody_rows);
     CHECK(dynamic_rows == 900);
     CHECK(drift_rows == 900);
@@ -338,12 +349,15 @@ TEST_CASE("VehicleDynamicsAgainstCommonRoad") {
   }
 
   SECTION("ShouldMatchPathsGivenRungeKutta4") {
+    // Preconditions.
     // The same Runge-Kutta 4 at 0.001 s agrees with CommonRoad's to rounding.
     // Against the path converged at 0.0001 s, the dynamic model is within
     // 0.04 nm, the drift model, whose wheels spin fast, 4 um, and the
     // multibody model, stiff in its tires and pins, 0.5 mm.
     std::vector<std::vector<std::string>> lines =
         load_cells("commonroad_dynamic_paths.csv");
+
+    // Under Test.
     for (const auto& [id, vehicle] : vehicles) {
       CAPTURE(id);
       PathAgreement dynamic =

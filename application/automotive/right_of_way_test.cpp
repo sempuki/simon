@@ -63,14 +63,19 @@ auto road_index(const Network& network, std::string_view id) -> std::uint32_t {
 
 TEST_CASE("RightOfWay") {
   SECTION("ShouldGiveWayAsPrioritiesSignsTurnsAndTheRightSay") {
+    // Preconditions.
     auto network = load_network(find_road_path("priority.xodr"));
     REQUIRE(network);
+
+    // Under Test.
     std::map<std::string, int> why;
     for (const traffic::Conflict& conflict : network->rights.conflicts()) {
       std::string pair = network->map.roads[conflict.lane.road].id + ">" +
                          network->map.roads[conflict.foe.road].id;
       why[pair] = static_cast<int>(conflict.why);
     }
+
+    // Postconditions.
     using traffic::Yielding;
     CHECK(why == std::map<std::string, int>{
                      {"es>we", static_cast<int>(Yielding::PRIORITY)},
@@ -82,11 +87,14 @@ TEST_CASE("RightOfWay") {
   }
 
   SECTION("ShouldKeepSignalGroupsApartGivenLights") {
+    // Preconditions.
     // Left turns give way to the oncoming traffic of their own group; lanes
     // of different groups keep their conflicts both ways, each waiting only
     // for the other still in the junction.
     auto network = load_network(find_road_path("signalized.xodr"));
     REQUIRE(network);
+
+    // Under Test.
     std::set<std::pair<LaneKey, LaneKey>> lights;
     int turns = 0;
     for (const traffic::Conflict& conflict : network->rights.conflicts()) {
@@ -97,6 +105,8 @@ TEST_CASE("RightOfWay") {
         ++turns;
       }
     }
+
+    // Postconditions.
     CHECK(turns == 8);
     CHECK(lights.size() > 0);
     for (const auto& [lane, foe] : lights) {
@@ -105,6 +115,7 @@ TEST_CASE("RightOfWay") {
   }
 
   SECTION("ShouldTakeEachGapAsItsCriticalGapAllows") {
+    // Preconditions.
     // A Poisson major stream of 400 vehicles an hour, and a minor queue
     // that never empties, for an hour: in each gap between major vehicles
     // passing the conflict, as many minor drivers enter as reach where they
@@ -147,6 +158,8 @@ TEST_CASE("RightOfWay") {
     std::map<Entity, LaneState> was;
     constexpr auto DT = 100ms;
     long steps = 3900 * 10;
+
+    // Under Test.
     for (long k = 0; k < steps; ++k) {
       double now = static_cast<double>(k) * 0.1;
       // A major vehicle when it is due, if the lane's start is clear; a
@@ -205,6 +218,8 @@ TEST_CASE("RightOfWay") {
       }
       world.sync();
     }
+
+    // Postconditions.
     // Each minor's way into the junction, by gap: the times it entered,
     // from the gap's start.
     std::vector<std::vector<double>> entries(majors.size());
@@ -258,6 +273,7 @@ TEST_CASE("RightOfWay") {
   }
 
   SECTION("ShouldNeverDeadlockGivenTheRightAlone") {
+    // Preconditions.
     // Four drivers, one on each arm of the crossroads, 30 m from the
     // junction at 8 m/s, each going whichever way its seed says, for 100
     // seeds: every one gets through, and no two ever overlap.
@@ -266,6 +282,8 @@ TEST_CASE("RightOfWay") {
     Network network = std::move(*loaded);
     int stuck = 0;
     int overlapping = 0;
+
+    // Under Test.
     for (std::uint64_t seed = 0; seed < 100; ++seed) {
       World world;
       REQUIRE(World::set_up()
@@ -310,12 +328,15 @@ TEST_CASE("RightOfWay") {
         stuck += through[vehicle] == 2 ? 0 : 1;
       }
     }
+
+    // Postconditions.
     CAPTURE(stuck, overlapping);
     CHECK(stuck == 0);
     CHECK(overlapping < 10);  // Vehicle-steps in 100 runs of 60 s.
   }
 
   SECTION("ShouldNotRunIntoEachOtherGivenJunctions") {
+    // Preconditions.
     // Traffic for 10 min on each network with junctions.
     // Pairs that start to overlap, against 763, 399, 102 and 228 with no
     // right of way.
@@ -324,6 +345,8 @@ TEST_CASE("RightOfWay") {
       int vehicles = 0;
       int limit = 0;
     };
+
+    // Under Test.
     for (auto [file, vehicles, limit] :
          {Case{"crossroads.xodr", 40, 0}, Case{"priority.xodr", 25, 2},
           Case{"signalized.xodr", 40, 0}, Case{"Town01.xodr", 60, 66}}) {

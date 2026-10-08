@@ -36,12 +36,17 @@ auto lanes(std::span<const LaneKey> keys) -> std::vector<LaneKey> {
 
 TEST_CASE("LaneGraph") {
   SECTION("ShouldFollowTravelGivenRingOfTwoRoads") {
+    // Preconditions.
     // a's end meets b's start and b's end meets a's start.
     Map network{.roads = {road("a", to_road("b", Link::Contact::END),
                                to_road("b", Link::Contact::START)),
                           road("b", to_road("a", Link::Contact::END),
                                to_road("a", Link::Contact::START))}};
+
+    // Under Test.
     LaneGraph graph = build_lane_graph(network);
+
+    // Postconditions.
     // Right lanes run with s, from a into b; left lanes against it, into the
     // road before.
     CHECK(lanes(graph.successors_of({.road = 0, .lane = -1})) ==
@@ -57,6 +62,7 @@ TEST_CASE("LaneGraph") {
   }
 
   SECTION("ShouldEnterConnectingRoadGivenJunction") {
+    // Preconditions.
     Map network{
         .roads = {road("in", {}, {.kind = Link::Kind::JUNCTION, .id = "j"}),
                   road("through", {}, {})},
@@ -67,7 +73,11 @@ TEST_CASE("LaneGraph") {
                                    .contact = Link::Contact::START,
                                    .lane_links = {{.from = -1, .to = -1},
                                                   {.from = -9, .to = -1}}}}}}};
+
+    // Under Test.
     LaneGraph graph = build_lane_graph(network);
+
+    // Postconditions.
     CHECK(lanes(graph.successors_of({.road = 0, .lane = -1})) ==
           std::vector<LaneKey>{{.road = 1, .lane = -1}});
     // A link to a lane the road lacks adds nothing.

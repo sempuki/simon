@@ -92,17 +92,23 @@ auto check_against_jsbsim(std::string_view path, std::string_view reference,
 
 TEST_CASE("Turbine737") {
   SECTION("ShouldMatchJsbsimGivenRecordedAirAndThrottle") {
+    // Postconditions.
     check_against_jsbsim(BOEING_737, REFERENCE, DT);
   }
 
   SECTION("ShouldMatchJsbsimGivenSettledEngine") {
+    // Preconditions.
     auto aircraft = format::load_aircraft(std::string{BOEING_737});
     REQUIRE(aircraft);
     // By the end, the second engine has held 0.9 for 13 s.
     std::vector<Row> rows = load_rows(REFERENCE);
     const Row& last = rows.back();
+
+    // Under Test.
     aircraft::TurbineState steady =
         compute_steady_turbine(aircraft->engines[1], 0.9, read_air(last));
+
+    // Postconditions.
     CHECK(std::abs(steady.n2 - last.at("n2_1")) < 1e-9);
     CHECK(std::abs(steady.thrust.numerical_value_in(newton) -
                    last.at("thrust_1")) /
@@ -113,6 +119,7 @@ TEST_CASE("Turbine737") {
 
 TEST_CASE("TurbineF16") {
   SECTION("ShouldMatchJsbsimGivenRecordedAirAndThrottleThroughReheat") {
+    // Postconditions.
     check_against_jsbsim(
         F16, "application/aeronautic/reference/jsbsim_f16_turbine.csv",
         1.0 / 120.0);

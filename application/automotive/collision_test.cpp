@@ -28,11 +28,14 @@ auto read_box(const Row& row, std::string_view which) -> model::OrientedBox {
 }  // namespace
 
 TEST_CASE("CollisionAgainstShapely") {
+  // Preconditions.
   std::vector<Row> rows = load_rows("shapely_boxes.csv");
   REQUIRE(rows.size() == 2000);
   int agree = 0;
   int overlapping = 0;
   double distance = 0.0;
+
+  // Under Test.
   for (const Row& row : rows) {
     model::OrientedBox a = read_box(row, "a");
     model::OrientedBox b = read_box(row, "b");
@@ -42,6 +45,8 @@ TEST_CASE("CollisionAgainstShapely") {
     distance = std::max(
         distance, std::abs(model::compute_gap(a, b) - number(row, "distance")));
   }
+
+  // Postconditions.
   CAPTURE(agree, overlapping, distance);
   CHECK(agree == 2000);
   CHECK(overlapping == 669);

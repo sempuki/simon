@@ -170,8 +170,11 @@ auto apart(const std::vector<Platoon>& a, const std::vector<Platoon>& b)
 
 TEST_CASE("TrafficAgainstMovsimAndSumo") {
   SECTION("ShouldMatchMovsimGivenIdm") {
+    // Preconditions.
     double largest = 0.0;
     int rows = 0;
+
+    // Under Test.
     for (const Row& row : load_rows("movsim_idm.csv")) {
       IntelligentDriver driver{
           .desired_speed = number(row, "v0") * meter_per_second,
@@ -190,14 +193,19 @@ TEST_CASE("TrafficAgainstMovsimAndSumo") {
           largest, std::abs(ours - theirs) / std::max(1.0, std::abs(theirs)));
       ++rows;
     }
+
+    // Postconditions.
     CAPTURE(largest);
     CHECK(rows == 1000);
     CHECK(largest < 1e-14);
   }
 
   SECTION("ShouldDecideAsMovsimGivenMobil") {
+    // Preconditions.
     int differ = 0;
     int changes = 0;
+
+    // Under Test.
     for (const Row& row : load_rows("movsim_mobil.csv")) {
       LaneChanger changer{
           .politeness = 0.0,
@@ -216,20 +224,27 @@ TEST_CASE("TrafficAgainstMovsimAndSumo") {
       differ += ours != theirs ? 1 : 0;
       changes += theirs ? 1 : 0;
     }
+
+    // Postconditions.
     CHECK(changes == 207);
     CHECK(differ == 0);
   }
 
   SECTION("ShouldFollowSumoGivenPlatoon") {
+    // Preconditions.
     // SUMO's Euler update is first order: 1.06 m from its converged platoon
     // at its usual 0.1 s step, so about 1 cm at 0.001 s. simon by Runge-Kutta
     // 4 at 0.1 s is within 0.1 mm of its own converged platoon, and 1.07 cm
     // from SUMO's at 0.001 s: SUMO's remaining error.
     std::vector<Row> rows = load_rows("sumo_platoon.csv");
     std::vector<Platoon> converged = sumo(rows, 0.001);
+
+    // Under Test.
     double ours = apart(drive(0.1), converged);
     double theirs = apart(sumo(rows, 0.1), converged);
     double exact = apart(drive(0.1), drive(0.001));
+
+    // Postconditions.
     CAPTURE(ours, theirs, exact);
     CHECK(exact < 2e-4);
     CHECK(ours < 0.02);

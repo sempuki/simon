@@ -75,7 +75,11 @@ TEST_CASE("Transition") {
     // Postconditions.
     // A cubic's rate peaks at 1.5 |b| / c, halfway.
     CHECK(transition.end == 3.0);
+
+    // Under Test.
     transition.parameter = 1.5;
+
+    // Postconditions.
     CHECK(transition.compute_slope() == 1.5);
   }
 }

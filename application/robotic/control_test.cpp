@@ -49,24 +49,34 @@ TEST_CASE("ControlAgainstMuJoCo") {
     // implicitly, and a general actuator against its force range, held at
     // their controls for 3 s: each step from MuJoCo's states, and the whole
     // run, as MuJoCo's to rounding.
-    check_local_steps(make_arm(), local.at("arm"));
+    // Preconditions.
     Simulation simulation{make_arm()};
     REQUIRE(simulation.configure());
     const Run& theirs = runs.at("arm");
-    check_run(record_run(InOut(simulation), theirs.qpos.size() - 1), theirs,
-              spreads.at("arm"));
+
+    // Under Test.
+    Run ours = record_run(InOut(simulation), theirs.qpos.size() - 1);
+
+    // Postconditions.
+    check_local_steps(make_arm(), local.at("arm"));
+    check_run(ours, theirs, spreads.at("arm"));
   }
 
   SECTION("ShouldBalanceAsMuJoCoDoesGivenFeedback") {
     // The cart-pole from 0.2 rad, its motor driven by MuJoCo's linear
     // quadratic regulator each step, for 15 s: as MuJoCo's to rounding, and
     // the pole upright within a microradian at the end.
-    check_local_steps(make_balance(), local.at("balance"));
+    // Preconditions.
     Simulation simulation{make_balance()};
     REQUIRE(simulation.configure());
     const Run& theirs = runs.at("balance");
-    check_run(record_run(InOut(simulation), theirs.qpos.size() - 1), theirs,
-              spreads.at("balance"));
+
+    // Under Test.
+    Run ours = record_run(InOut(simulation), theirs.qpos.size() - 1);
+
+    // Postconditions.
+    check_local_steps(make_balance(), local.at("balance"));
+    check_run(ours, theirs, spreads.at("balance"));
     CHECK(std::abs(simulation.read_qpos()[1]) < 1e-6);
   }
 }

@@ -59,32 +59,48 @@ auto route_length(const Network& network, const std::vector<road::Leg>& legs)
 
 TEST_CASE("Walking") {
   SECTION("ShouldJoinSidewalksByCrossingsAndCorners") {
+    // Under Test.
     // Four arms, each sidewalk split by its crosswalk; four corners, 7.8 m
     // across; every sidewalk reachable.
     Census signalized = take_census(create_network("signalized.xodr"));
+
+    // Postconditions.
     CHECK(signalized.sidewalks == 16);
     CHECK(signalized.crossings == 4);
     CHECK(signalized.corners == 4);
     CHECK(signalized.components == 1);
+
+    // Under Test.
     // A curve with two crosswalks and no junction.
     Census crosswalks = take_census(create_network("crosswalks.xodr"));
+
+    // Postconditions.
     CHECK(crosswalks.sidewalks == 6);
     CHECK(crosswalks.crossings == 2);
     CHECK(crosswalks.corners == 0);
     CHECK(crosswalks.components == 1);
+
+    // Under Test.
     // A T with no crosswalks: its far side, and each corner of the minor
     // road, cut off from each other by the roads.
     Census priority = take_census(create_network("priority.xodr"));
+
+    // Postconditions.
     CHECK(priority.corners == 3);
     CHECK(priority.components == 3);
+
+    // Under Test.
     // Town01 has no crosswalks: each block is its own.
     Census town = take_census(create_network("Town01.xodr"));
+
+    // Postconditions.
     CHECK(town.sidewalks == 52);
     CHECK(town.crossings == 0);
     CHECK(town.components == 8);
   }
 
   SECTION("ShouldRouteByTheShortestWayGivenAnyTwoPlaces") {
+    // Under Test.
     // Every route's length against Floyd and Warshall's all-pairs shortest
     // distances.
     for (const char* file : {"signalized.xodr", "Town01.xodr"}) {
@@ -136,6 +152,7 @@ TEST_CASE("Walking") {
   }
 
   SECTION("ShouldKeepHalfAMeterGivenSlowerWalkerAhead") {
+    // Preconditions.
     // A walker at 1.6 m/s behind one at 0.8 m/s, 10 m apart on one
     // sidewalk: it closes in and walks at 0.8 m/s behind, its half meter and
     // a second's walk, 1.3 m, behind.
@@ -165,6 +182,8 @@ TEST_CASE("Walking") {
     world.sync();
     Scheduler scheduler{make_schedule(network)};
     double nearest = std::numeric_limits<double>::infinity();
+
+    // Under Test.
     for (long k = 0; k < 200; ++k) {
       scheduler.step(Step{.time = TimePoint{} + k * 100ms, .dt = 100ms},
                      InOut(world));
@@ -173,6 +192,8 @@ TEST_CASE("Walking") {
                                    states.component_of(walkers[1]).along)
                                       .numerical_value_in(meter));
     }
+
+    // Postconditions.
     const WalkState& behind =
         world.store_of<WalkState>().component_of(walkers[1]);
     CAPTURE(nearest, behind.speed.numerical_value_in(meter_per_second));
@@ -183,12 +204,15 @@ TEST_CASE("Walking") {
   }
 
   SECTION("ShouldDrawWalkingSpeedsAsWeidmann") {
+    // Under Test.
     // 2,000 pedestrians on Town01's sidewalks: their speeds' mean and
     // spread, 1.34 and 0.26 m/s, within four standard errors.
     Simulation simulation{Scenario{.roads = find_road_path("Town01.xodr"),
                                    .vehicles = 0,
                                    .pedestrians = 2000}};
     REQUIRE(simulation.configure());
+
+    // Postconditions.
     double sum = 0.0;
     double squares = 0.0;
     int count = 0;
@@ -208,6 +232,7 @@ TEST_CASE("Walking") {
   }
 
   SECTION("ShouldWalkFromPlaceToPlaceGivenJunction") {
+    // Preconditions.
     // 60 pedestrians for 10 min at the signalized junction: every one walks
     // somewhere and on, and one half a meter or more behind another on the
     // same way never comes nearer. Two can meet nearer where they step onto
@@ -219,6 +244,8 @@ TEST_CASE("Walking") {
     REQUIRE(simulation.configure());
     double nearest = std::numeric_limits<double>::infinity();
     std::map<std::pair<Entity, Entity>, double> spaced;  // Behind, ahead.
+
+    // Under Test.
     for (long k = 0; k < 6000; ++k) {
       REQUIRE(
           simulation.step(Step{.time = TimePoint{} + k * 100ms, .dt = 100ms}));
@@ -248,6 +275,8 @@ TEST_CASE("Walking") {
       }
       spaced = std::move(now);
     }
+
+    // Postconditions.
     int trips = 0;
     int idle = 0;
     simulation.world().store_of<WalkRoute>().for_each(

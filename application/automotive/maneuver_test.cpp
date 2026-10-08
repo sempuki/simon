@@ -440,9 +440,12 @@ TEST_CASE("ManeuversAgainstChronoSedan") {
       measure(chrono, sedan.wheelbase().numerical_value_in(meter));
 
   SECTION("ShouldMatchGivenMultibodySteeredAsChronoSteersEachWheel") {
+    // Under Test.
     Comparison ours =
         measure(drive_all<MultibodyModel<true>>(multibody, chrono),
                 multibody.wheelbase().numerical_value_in(meter));
+
+    // Postconditions.
     capture(theirs, ours);
     CHECK(std::abs(ours.understeer[0] - theirs.understeer[0]) < 0.02);
     CHECK(std::abs(ours.understeer[1] - theirs.understeer[1]) < 0.05);
@@ -457,9 +460,12 @@ TEST_CASE("ManeuversAgainstChronoSedan") {
   }
 
   SECTION("ShouldMatchGivenMultibodySteeredByTheMean") {
+    // Under Test.
     Comparison ours =
         measure(drive_all<MultibodyModel<false>>(multibody, chrono),
                 multibody.wheelbase().numerical_value_in(meter));
+
+    // Postconditions.
     capture(theirs, ours);
     CHECK(std::abs(ours.understeer[0] - theirs.understeer[0]) < 0.04);
     CHECK(std::abs(ours.understeer[1] - theirs.understeer[1]) < 0.06);
@@ -470,8 +476,11 @@ TEST_CASE("ManeuversAgainstChronoSedan") {
   }
 
   SECTION("ShouldMatchGivenDriftSingleTrack") {
+    // Under Test.
     Comparison ours = measure(drive_all<DriftModel>(sedan, chrono),
                               sedan.wheelbase().numerical_value_in(meter));
+
+    // Postconditions.
     capture(theirs, ours);
     CHECK(std::abs(ours.understeer[0] - theirs.understeer[0]) < 0.04);
     CHECK(std::abs(ours.understeer[1] - theirs.understeer[1]) < 0.07);

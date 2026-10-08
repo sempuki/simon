@@ -140,11 +140,15 @@ auto run_binary(const Scenario& scenario, Time dt, int steps) -> Separation {
 TEST_CASE("Gravity") {
   for (std::string_view name : {"cluster", "unsoftened"}) {
     SECTION("ShouldMatchReboundGivenCase " + std::string{name}) {
+      // Preconditions.
       ForcesCase loaded = load_forces_case(name);
       Simulation simulation{loaded.scenario};
       REQUIRE(simulation.configure());
+
+      // Under Test.
       REQUIRE(simulation.initialize());
 
+      // Postconditions.
       double worst = 0.0;
       for (std::size_t i = 0; i < loaded.accelerations.size(); ++i) {
         Vector3 ours =
@@ -163,14 +167,16 @@ TEST_CASE("Gravity") {
 
 TEST_CASE("Leapfrog") {
   SECTION("ShouldFollowReboundGivenCluster") {
+    // Preconditions.
     ForcesCase loaded = load_forces_case("cluster");
     Simulation simulation{loaded.scenario};
     engine::Driver driver{Timing{.max_step = Year{50000}}, Depend(simulation)};
     REQUIRE(driver.start());
-
     testing::Table table = testing::load_table(LEAPFROG);
     double worst_position = 0.0;
     double worst_velocity = 0.0;
+
+    // Under Test.
     for (const std::vector<std::string>& line : table.lines) {
       auto step = static_cast<int>(number_of(table, line, "step"));
       auto body = static_cast<std::size_t>(number_of(table, line, "body"));
@@ -189,6 +195,8 @@ TEST_CASE("Leapfrog") {
           worst_velocity,
           (velocity - vector_of(table, line, "vx").eigen()).norm() / 100e3);
     }
+
+    // Postconditions.
     CHECK(worst_position == 0.0);  // Bit for bit, 400 steps.
     CHECK(worst_velocity == 0.0);
     REQUIRE(driver.finish());
@@ -204,22 +212,31 @@ TEST_CASE("Leapfrog") {
   const Scenario binary = make_binary(a, e, m1, m2);
 
   SECTION("ShouldReturnToPericenterGivenKeplerOrbit") {
+    // Preconditions.
     int steps = 4000;
+
+    // Under Test.
     Separation run = run_binary(binary, period / steps * second, steps);
 
+    // Postconditions.
     // 1.1 parsecs: the leapfrog's error at 4,000 steps an orbit.
     OrbitState exact = solve_kepler_orbit(a, e, mu, run.time);
     CHECK((run.position - exact.position).norm() / a < 1.2e-4);
   }
 
   SECTION("ShouldConvergeAtSecondOrderGivenKeplerOrbit") {
+    // Preconditions.
     auto error = [&](int steps) {
       Separation run = run_binary(binary, period / steps * second, steps);
       return (run.position - solve_kepler_orbit(a, e, mu, run.time).position)
           .norm();
     };
+
+    // Under Test.
     double coarse = error(1000);
     double fine = error(2000);
+
+    // Postconditions.
     CHECK(std::abs(coarse / fine - 4.0) < 0.4);
   }
 }

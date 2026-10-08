@@ -37,11 +37,15 @@ TEST_CASE("Plummer") {
   const std::array<double, 5> fractions{0.1, 0.25, 0.5, 0.75, 0.9};
 
   SECTION("ShouldFollowPlummersProfileGivenSample") {
+    // Preconditions.
     Simulation simulation{make_plummer_scenario(4000, 0.0)};
     REQUIRE(simulation.configure());
 
+    // Under Test.
     std::vector<Length> radii =
         compute_mass_radii(simulation.world(), fractions);
+
+    // Postconditions.
     for (std::size_t i = 0; i < fractions.size(); ++i) {
       double expected = number_of(
           radii[i] / gravity::compute_plummer_radius(PLUMMER, fractions[i]));
@@ -50,11 +54,15 @@ TEST_CASE("Plummer") {
   }
 
   SECTION("ShouldStartInEquilibriumGivenSample") {
+    // Preconditions.
     Simulation simulation{make_plummer_scenario(4000, 0.0)};
     REQUIRE(simulation.configure());
 
+    // Under Test.
     Mechanics mechanics =
         measure_mechanics(simulation.world(), simulation.scenario().softening);
+
+    // Postconditions.
     CHECK(std::abs(mechanics.virial_ratio() - 1.0) < 0.05);
     CHECK(std::abs(
               mechanics.energy() /
@@ -67,12 +75,12 @@ TEST_CASE("Plummer") {
 
   // 256 bodies, softened by 0.05 a, for ten crossing times of 128 steps.
   SECTION("ShouldStayInEquilibriumGivenTenCrossingTimes") {
+    // Preconditions.
     Scenario scenario = make_plummer_scenario(256, 0.05);
     Time crossing = gravity::compute_crossing_time(
         PLUMMER.mass, gravity::compute_plummer_energy(PLUMMER));
     Year step = std::chrono::round<Year>(std::chrono::duration<double>(
         crossing.numerical_value_in(second) / 128.0));
-
     Simulation simulation{scenario};
     engine::BatchDriver driver{Timing{.max_step = step}, Depend(simulation)};
     Simulation start{scenario};
@@ -81,8 +89,10 @@ TEST_CASE("Plummer") {
     std::vector<Length> radii_before =
         compute_mass_radii(start.world(), fractions);
 
+    // Under Test.
     REQUIRE(driver.run(BasicTimePoint<Year>{} + 1280 * step));
 
+    // Postconditions.
     Mechanics after = measure_mechanics(simulation.world(), scenario.softening);
     std::vector<Length> radii_after =
         compute_mass_radii(simulation.world(), fractions);
@@ -93,7 +103,6 @@ TEST_CASE("Plummer") {
                   PLUMMER.scale.numerical_value_in(meter));
     double scale_angular =
         scale_momentum * PLUMMER.scale.numerical_value_in(meter);
-
     // Measured: energy to 1.5e-4, momentum and angular momentum to rounding,
     // the virial ratio at 1.036 and the half-mass radius within 2.5%.
     CHECK(std::abs(after.energy() / before.energy() - 1.0) < 3e-4);

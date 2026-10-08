@@ -22,6 +22,7 @@ TEST_CASE("EventQueue") {
   } mesg{5};
 
   SECTION("ShouldSubscribeToPublishedMessages") {
+    // Preconditions.
     bool called = false;
     events.subscribe<M>([&called, later](auto time, M mesg) {
       CHECK(time == later);
@@ -29,117 +30,176 @@ TEST_CASE("EventQueue") {
       called = true;
     });
 
+    // Under Test.
     events.process_until(start);
+
+    // Postconditions.
     CHECK(!called);
 
+    // Under Test.
     events.publish<M>(later, mesg);
+
+    // Postconditions.
     CHECK(!called);
 
+    // Under Test.
     events.process_until(later);
+
+    // Postconditions.
     CHECK(called);
   }
 
   SECTION("ShouldCallImmidateTimers") {
+    // Preconditions.
     bool called = false;
+
+    // Under Test.
     events.start_timer(start, [&called](auto /*time*/) { called = true; });
     events.process_until(start);
+
+    // Postconditions.
     CHECK(called);
   }
 
   SECTION("ShouldCallDelayedTimers") {
+    // Preconditions.
     bool called = false;
+
+    // Under Test.
     events.start_timer(later, [&called](auto /*time*/) { called = true; });
     events.process_until(start);
+
+    // Postconditions.
     CHECK(!called);
+
+    // Under Test.
     events.process_until(later);
+
+    // Postconditions.
     CHECK(called);
   }
 
   SECTION("ShouldDeliverEarliestFirstGivenEventsPublishedOutOfOrder") {
+    // Preconditions.
     std::vector<int> seen;
     events.subscribe<M>(
         [&seen](auto /*time*/, M mesg) { seen.push_back(mesg.value); });
 
+    // Under Test.
     events.publish<M>(TimePoint{std::chrono::seconds{5}}, M{5});
     events.publish<M>(TimePoint{std::chrono::seconds{1}}, M{1});
     events.publish<M>(TimePoint{std::chrono::seconds{3}}, M{3});
-
     events.process_until(TimePoint{std::chrono::seconds{2}});
+
+    // Postconditions.
     CHECK(seen == std::vector<int>{1});
 
+    // Under Test.
     events.process_until(TimePoint{std::chrono::seconds{10}});
+
+    // Postconditions.
     CHECK(seen == std::vector<int>{1, 3, 5});
   }
 
   SECTION("ShouldDeliverInPublishOrderGivenEqualTimes") {
+    // Preconditions.
     std::vector<int> seen;
     events.subscribe<M>(
         [&seen](auto /*time*/, M mesg) { seen.push_back(mesg.value); });
+    std::vector<int> expected;
+    for (int value = 0; value < 20; ++value) {
+      expected.push_back(value);
+    }
 
+    // Under Test.
     for (int value = 0; value < 20; ++value) {
       events.publish<M>(later, M{value});
     }
     events.process_until(later);
 
-    std::vector<int> expected;
-    for (int value = 0; value < 20; ++value) {
-      expected.push_back(value);
-    }
+    // Postconditions.
     CHECK(seen == expected);
   }
 
   SECTION("ShouldPassEventTimeGivenLaterProcessTime") {
+    // Preconditions.
     TimePoint received;
     events.subscribe<M>(
         [&received](auto time, M /*mesg*/) { received = time; });
 
+    // Under Test.
     events.publish<M>(later, mesg);
     events.process_until(TimePoint{std::chrono::seconds{3}});
 
+    // Postconditions.
     CHECK(received == later);
   }
 
   SECTION("ShouldCallEverySubscriberInOrderGivenSeveralSubscribers") {
+    // Preconditions.
     std::vector<int> seen;
     events.subscribe<M>(
         [&seen](auto /*time*/, M /*mesg*/) { seen.push_back(1); });
     events.subscribe<M>(
         [&seen](auto /*time*/, M /*mesg*/) { seen.push_back(2); });
 
+    // Under Test.
     events.publish<M>(start, mesg);
     events.process_until(start);
 
+    // Postconditions.
     CHECK(seen == std::vector<int>{1, 2});
   }
 
   SECTION("ShouldNotCrossDispatchGivenDifferentMessageTypes") {
+    // Preconditions.
     struct N final {};
     int m_calls = 0;
     int n_calls = 0;
     events.subscribe<M>([&m_calls](auto /*time*/, M /*mesg*/) { m_calls++; });
     events.subscribe<N>([&n_calls](auto /*time*/, N /*mesg*/) { n_calls++; });
 
+    // Under Test.
     events.publish<N>(start);
     events.process_until(start);
 
+    // Postconditions.
     CHECK(m_calls == 0);
     CHECK(n_calls == 1);
   }
 
   SECTION("ShouldTellTimelineEarliestEventGivenAttached") {
+    // Preconditions.
     framework::Timeline timeline;
+
+    // Under Test.
     events.attach(Depend(timeline));
+
+    // Postconditions.
     CHECK(timeline.earliest() == std::nullopt);
+
+    // Under Test.
     events.publish<M>(later, mesg);
     events.start_timer(start, [](TimePoint) {});
+
+    // Postconditions.
     CHECK(timeline.earliest() == start);
+
+    // Under Test.
     events.process_until(start);
+
+    // Postconditions.
     CHECK(timeline.earliest() == later);
+
+    // Under Test.
     events.process_until(later);
+
+    // Postconditions.
     CHECK(timeline.earliest() == std::nullopt);
   }
 
   SECTION("ShouldRepeatTimerGivenTimerThatRestartsItself") {
+    // Preconditions.
     std::vector<TimePoint> fired;
     std::function<void(TimePoint)> tick = [&](TimePoint time) {
       fired.push_back(time);
@@ -149,14 +209,17 @@ TEST_CASE("EventQueue") {
     };
     events.start_timer(start, tick);
 
+    // Under Test.
     events.process_until(TimePoint{std::chrono::seconds{10}});
 
+    // Postconditions.
     CHECK(fired == std::vector<TimePoint>{start, later,
                                           TimePoint{std::chrono::seconds{2}}});
   }
 
   SECTION(
       "ShouldDeliverToNewSubscriberFromNextEventGivenSubscribeInsideHandler") {
+    // Preconditions.
     int outer_calls = 0;
     int inner_calls = 0;
     events.subscribe<M>([&](auto /*time*/, M /*mesg*/) {
@@ -168,13 +231,19 @@ TEST_CASE("EventQueue") {
       }
     });
 
+    // Under Test.
     events.publish<M>(start, mesg);
     events.process_until(start);
+
+    // Postconditions.
     CHECK(outer_calls == 1);
     CHECK(inner_calls == 0);
 
+    // Under Test.
     events.publish<M>(later, mesg);
     events.process_until(later);
+
+    // Postconditions.
     CHECK(outer_calls == 2);
     CHECK(inner_calls == 64);
   }

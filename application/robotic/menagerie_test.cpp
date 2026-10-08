@@ -29,11 +29,14 @@ TEST_CASE("MenagerieAgainstMuJoCo") {
     // tree of 20 bodies; UR5e by implicitfast; ANYmal C standing: each step
     // from MuJoCo's states, and every step of each run, as MuJoCo's to
     // rounding.
+    // Preconditions.
     std::map<std::string, Run, std::less<>> runs =
         load_runs("mujoco_menagerie.csv");
     auto local = load_local_steps();
     auto spreads = load_spreads();
     auto solved = load_solved_runs();
+
+    // Under Test.
     for (const std::string& robot :
          {"unitree_go1", "unitree_h1", "universal_robots_ur5e",
           "anybotics_anymal_c"}) {

@@ -69,6 +69,7 @@ auto states(const Simulation& simulation) -> std::vector<LaneState> {
 
 TEST_CASE("Automotive") {
   SECTION("ShouldCirculateWithoutOverlapGivenRing") {
+    // Preconditions.
     // 40 vehicles on a ring of 628 m, two lanes each way.
     Simulation simulation{Scenario{.seed = 3, .vehicles = 40}};
     REQUIRE(simulation.configure());
@@ -79,6 +80,8 @@ TEST_CASE("Automotive") {
         [&](Entity owner, const LaneState& state) {
           lanes[owner] = state.lane.lane;
         });
+
+    // Under Test.
     run(simulation, 300s, [&](TimePoint) {
       shortest = std::min(shortest, shortest_gap(simulation));
       simulation.world().store_of<LaneState>().for_each(
@@ -89,12 +92,13 @@ TEST_CASE("Automotive") {
             }
           });
     });
+
+    // Postconditions.
     CAPTURE(shortest, changes, mean_speed(simulation));
     // Never closer than 1.09 m, after a lane change cuts in.
     CHECK(shortest > 0.5);
     CHECK(mean_speed(simulation) > 15.0);
     CHECK(changes > 0);
-
     // Keeping right, more drive in the outer lanes, the right of travel.
     int outer = 0;
     for (const LaneState& state : states(simulation)) {
@@ -105,14 +109,19 @@ TEST_CASE("Automotive") {
   }
 
   SECTION("ShouldRepeatGivenSameSeed") {
+    // Preconditions.
     auto final_states = [] {
       Simulation simulation{Scenario{.seed = 9, .vehicles = 30}};
       REQUIRE(simulation.configure());
       run(simulation, 60s, [](TimePoint) {});
       return states(simulation);
     };
+
+    // Under Test.
     std::vector<LaneState> first = final_states();
     std::vector<LaneState> again = final_states();
+
+    // Postconditions.
     REQUIRE(first.size() == again.size());
     for (std::size_t i = 0; i < first.size(); ++i) {
       CHECK(first[i].lane == again[i].lane);
@@ -122,6 +131,7 @@ TEST_CASE("Automotive") {
   }
 
   SECTION("ShouldFlowThroughJunctionsGivenTown") {
+    // Preconditions.
     // CARLA's Town01: one lane each way through twelve junctions.
     Simulation simulation{
         Scenario{.seed = 5,
@@ -130,7 +140,11 @@ TEST_CASE("Automotive") {
                  .following = {.desired_speed = 11.0 * meter_per_second}}};
     REQUIRE(simulation.configure());
     std::uint32_t turns = 0;
+
+    // Under Test.
     run(simulation, 120s, [](TimePoint) {});
+
+    // Postconditions.
     for (const LaneState& state : states(simulation)) {
       turns += state.turns;
     }

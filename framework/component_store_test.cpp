@@ -56,27 +56,34 @@ TEST_CASE("ComponentStore") {
   Entity c = entities.create();
 
   SECTION("ShouldFindValueGivenAppended") {
+    // Under Test.
     store.append(a, Mass{1.0});
+
+    // Postconditions.
     REQUIRE(store.maybe_component_of(a));
     CHECK(store.component_of(a).kilograms == 1.0);
     CHECK(store.size() == 1u);
   }
 
   SECTION("ShouldReturnNullGivenAbsent") {
+    // Postconditions.
     CHECK(store.maybe_component_of(a) == nullptr);
     CHECK_THROWS_AS(store.component_of(a), std::logic_error);
   }
 
   SECTION("ShouldStayDenseGivenMiddleErased") {
+    // Preconditions.
     store.append(a, Mass{1.0});
     store.append(b, Mass{2.0});
     store.append(c, Mass{3.0});
 
+    // Under Test.
     store.erase(a);
-
-    CHECK(store.size() == 2u);
     std::vector<Entity> owners;
     store.for_each([&](Entity owner, const Mass&) { owners.push_back(owner); });
+
+    // Postconditions.
+    CHECK(store.size() == 2u);
     CHECK(owners == std::vector<Entity>{c, b});  // The last moved into the gap.
     CHECK(store.component_of(c).kilograms == 3.0);
     CHECK(store.component_of(b).kilograms == 2.0);
@@ -84,6 +91,7 @@ TEST_CASE("ComponentStore") {
   }
 
   SECTION("ShouldReturnNullGivenStaleEntityWhoseIndexWasReused") {
+    // Preconditions.
     store.append(a, Mass{1.0});
     store.erase(a);
     entities.destroy(a);
@@ -92,36 +100,51 @@ TEST_CASE("ComponentStore") {
       reused = entities.create();
     }
     REQUIRE(reused.index == a.index);
+
+    // Under Test.
     store.append(reused, Mass{9.0});
 
+    // Postconditions.
     CHECK(store.maybe_component_of(a) == nullptr);
     CHECK(store.component_of(reused).kilograms == 9.0);
   }
 
   SECTION("ShouldKeepAddressesGivenAddsWithinCapacity") {
+    // Preconditions.
     store.append(a, Mass{1.0});
     const Mass* before = store.maybe_component_of(a);
+
+    // Under Test.
     store.append(b, Mass{2.0});
     store.append(c, Mass{3.0});
+
+    // Postconditions.
     CHECK(store.maybe_component_of(a) == before);
   }
 
   SECTION("ShouldThrowGivenAppendBeyondCapacity") {
+    // Preconditions.
     Entity d = entities.create();
     Entity e = entities.create();
     store.append(a, Mass{});
     store.append(b, Mass{});
     store.append(c, Mass{});
     store.append(d, Mass{});
+
+    // Postconditions.
     CHECK_THROWS_AS(store.append(e, Mass{}), std::logic_error);
   }
 
   SECTION("ShouldVisitSegmentsInOrderGivenAppendsToEach") {
+    // Preconditions.
     ComponentStore<Mass> segmented{4, 8, 2, 2};
+
+    // Under Test.
     segmented.append(a, Mass{1.0}, 1);
     segmented.append(b, Mass{2.0}, 0);
     segmented.append(c, Mass{3.0}, 1);
 
+    // Postconditions.
     CHECK(collect_owners(segmented) == std::vector<Entity>{b, a, c});
     CHECK(ComponentStoreInternals::segment_size(segmented, 0) == 1u);
     CHECK(ComponentStoreInternals::segment_size(segmented, 1) == 2u);
@@ -129,6 +152,7 @@ TEST_CASE("ComponentStore") {
   }
 
   SECTION("ShouldTakeAndReturnChunksGivenAppendsAndErasesAcrossChunks") {
+    // Preconditions.
     ComponentStore<Mass> chunked{8, 8, 1, 2};
     std::vector<Entity> more{a, b, c, entities.create(), entities.create()};
     for (std::size_t i = 0; i < more.size(); ++i) {
@@ -136,21 +160,25 @@ TEST_CASE("ComponentStore") {
     }
     REQUIRE(ComponentStoreInternals::chunks_in(chunked, 0) == 3u);
 
+    // Under Test.
     chunked.erase(more[0]);
     chunked.erase(more[1]);
     chunked.erase(more[2]);
 
+    // Postconditions.
     CHECK(ComponentStoreInternals::chunks_in(chunked, 0) == 1u);
     CHECK(chunked.component_of(more[3]).kilograms == 3.0);
     CHECK(chunked.component_of(more[4]).kilograms == 4.0);
   }
 
   SECTION("ShouldNameSameComponentGivenSlotBeforeNextChange") {
+    // Preconditions.
     ComponentStore<Mass> segmented{4, 8, 2, 2};
     segmented.append(a, Mass{1.0}, 1);
     segmented.append(b, Mass{2.0}, 0);
-
     int visited = 0;
+
+    // Under Test.
     segmented.for_each_slot(
         [&](ComponentStore<Mass>::Slot slot, Entity owner, const Mass& mass) {
           CHECK(segmented.owner_at(slot) == owner);
@@ -158,24 +186,36 @@ TEST_CASE("ComponentStore") {
           CHECK(&segmented.component_of(owner) == &mass);
           ++visited;
         });
+
+    // Postconditions.
     CHECK(visited == 2);
   }
 
   SECTION("ShouldDestroyEveryComponentGivenEraseOrDestruction") {
+    // Preconditions.
     Counted::alive = 0;
+
+    // Under Test.
     {
       ComponentStore<Counted> counted{4, 8};
       counted.append(a, Counted{});
       counted.append(b, Counted{});
       counted.append(c, Counted{});
       counted.erase(a);
+
+      // Postconditions.
       CHECK(Counted::alive == 2);
     }
+
+    // Postconditions.
     CHECK(Counted::alive == 0);
   }
 
   SECTION("ShouldThrowGivenDuplicateAppend") {
+    // Preconditions.
     store.append(a, Mass{});
+
+    // Postconditions.
     CHECK_THROWS_AS(store.append(a, Mass{}), std::logic_error);
   }
 }

@@ -66,10 +66,12 @@ TEST_CASE("DiskGalaxy") {
   const double h = GALAXY.disk_scale.numerical_value_in(meter);
 
   SECTION("ShouldStartAsDesignedGivenSample") {
+    // Preconditions.
     Simulation simulation{make_galaxy_scenario()};
     REQUIRE(simulation.configure());
-    Disk disk = collect_disk(simulation);
 
+    // Under Test.
+    Disk disk = collect_disk(simulation);
     // Mean rotation and radial dispersion in a ring about 2.5 h.
     double rotation = 0.0;
     double radial2 = 0.0;
@@ -91,6 +93,7 @@ TEST_CASE("DiskGalaxy") {
     Mechanics mechanics =
         measure_mechanics(simulation.world(), simulation.scenario().softening);
 
+    // Postconditions.
     // Toomre's Q from the measured dispersion: sigma_R kappa / 3.36 G Sigma.
     double r = 2.5 * h;
     auto v2 = [&](double x) {
@@ -121,20 +124,23 @@ TEST_CASE("DiskGalaxy") {
 
   // 100 million years, about half a turn at 2.5 h, on the tree.
   SECTION("ShouldStayADiskGivenHundredMillionYears") {
+    // Preconditions.
     Simulation start{make_galaxy_scenario()};
     REQUIRE(start.configure());
     Disk before = collect_disk(start);
     Mechanics mechanics_before =
         measure_mechanics(start.world(), start.scenario().softening);
-
     Simulation simulation{make_galaxy_scenario()};
     const Year step{2000000};
     engine::BatchDriver driver{Timing{.max_step = step}, Depend(simulation)};
+
+    // Under Test.
     REQUIRE(driver.run(BasicTimePoint<Year>{} + 50 * step));
+
+    // Postconditions.
     Disk after = collect_disk(simulation);
     Mechanics mechanics_after =
         measure_mechanics(simulation.world(), simulation.scenario().softening);
-
     // Measured: the half-mass radius from 1.661 h to 1.670, the thickness
     // from 0.557 kpc to 0.555, and the energy to 9.8e-4.
     CHECK(std::abs(compute_half_mass_radius(after) /

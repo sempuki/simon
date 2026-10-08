@@ -87,7 +87,10 @@ TEST_CASE("Trim") {
                                    "jsbsim_737_check_initial.csv"}},
         std::pair{F16, std::string_view{"application/aeronautic/reference/"
                                         "jsbsim_f16_check_initial.csv"}}}) {
+    // Under Test.
     Compared c = compare(path, initial);
+
+    // Postconditions.
     CAPTURE(path);
     // simon balances to rounding; JSBSim's trim stops at a tolerance, which
     // leaves its controls a few parts in 10^5 from simon's.

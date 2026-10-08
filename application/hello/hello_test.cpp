@@ -58,11 +58,14 @@ TEST_CASE("Hello") {
   Scheduler scheduler;
 
   SECTION("ShouldSwapVelocitiesGivenEqualBallsHeadOn") {
+    // Preconditions.
     Entity left = create_ball(10.0, 10.0, 1.0, 0.0, 0.5, 1.0, InOut(world));
     Entity right = create_ball(11.2, 10.0, -1.0, 0.0, 0.5, 1.0, InOut(world));
 
+    // Under Test.
     run(1.0 * second, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     CHECK(velocity_of(world, left)
               .is_approximately(QuantityVector{-1.0, 0.0, 0.0}, 0.01));
     CHECK(velocity_of(world, right)
@@ -70,13 +73,16 @@ TEST_CASE("Hello") {
   }
 
   SECTION("ShouldConserveMomentumAndEnergyGivenGlancingBlow") {
+    // Preconditions.
     create_ball(10.0, 10.0, 3.0, 0.0, 0.5, 1.0, InOut(world));
     create_ball(13.0, 10.6, 0.0, 0.0, 0.8, 4.1, InOut(world));
     Momentum momentum = compute_momentum(world);
     Energy energy = compute_energy(world, 0.0 * meter_per_second_squared);
 
+    // Under Test.
     run(2.0 * second, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     CHECK(compute_momentum(world)
               .numerical_value_in(kilogram * meter_per_second)
               .is_approximately(
@@ -86,12 +92,15 @@ TEST_CASE("Hello") {
   }
 
   SECTION("ShouldPartSlowerGivenRestitution") {
+    // Preconditions.
     scheduler.system<DetectContacts>().springiness.restitution = 0.5;
     Entity left = create_ball(10.0, 10.0, 1.0, 0.0, 0.5, 1.0, InOut(world));
     Entity right = create_ball(11.2, 10.0, -1.0, 0.0, 0.5, 1.0, InOut(world));
 
+    // Under Test.
     run(1.0 * second, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     // Ten steps a contact damp a little more than the dashpot would: the
     // balls part at 0.467 m/s.
     CHECK(velocity_of(world, left)
@@ -101,16 +110,22 @@ TEST_CASE("Hello") {
   }
 
   SECTION("ShouldBounceOffWallGivenBallHeadingIntoIt") {
+    // Preconditions.
     Entity ball = create_ball(78.0, 10.0, 2.0, 1.0, 0.5, 1.0, InOut(world));
 
+    // Under Test.
     run(1.5 * second, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     CHECK(velocity_of(world, ball)
               .is_approximately(QuantityVector{-2.0, 1.0, 0.0}, 0.01));
   }
 
   SECTION("ShouldListSystemsInOrderGivenSchedule") {
+    // Under Test.
     std::string text = Scheduler::describe();
+
+    // Postconditions.
     CHECK(text.find("Integrate") < text.find("DetectContacts"));
     CHECK(text.find("DetectContacts") < text.find("ApplyContacts"));
   }
@@ -121,18 +136,23 @@ TEST_CASE("HelloSimulation") {
   const Scenario scenario{.balls = 300};
 
   SECTION("ShouldRefuseGivenMoreBallsThanCells") {
+    // Preconditions.
     Simulation simulation{Scenario{.balls = compute_capacity(scenario) + 1}};
     engine::BatchDriver driver{timing, Depend(simulation)};
 
+    // Postconditions.
     CHECK_FALSE(driver.run(TimePoint{1s}));
   }
 
   SECTION("ShouldKeepBallsInBoxGivenLongRun") {
+    // Preconditions.
     Simulation simulation{scenario};
     engine::BatchDriver driver{timing, Depend(simulation)};
 
+    // Under Test.
     REQUIRE(driver.run(TimePoint{20s}));
 
+    // Postconditions.
     double width = scenario.box.width.numerical_value_in(meter);
     double height = scenario.box.height.numerical_value_in(meter);
     std::size_t outside = 0;
@@ -148,19 +168,23 @@ TEST_CASE("HelloSimulation") {
   }
 
   SECTION("ShouldKeepEnergyGivenElasticRun") {
+    // Preconditions.
     Simulation simulation{scenario};
     engine::Driver driver{timing, Depend(simulation)};
     REQUIRE(driver.start());
     Energy start = compute_energy(simulation.world(), scenario.gravity);
 
+    // Under Test.
     REQUIRE(driver.advance_to(TimePoint{20s}));
 
+    // Postconditions.
     Energy end = compute_energy(simulation.world(), scenario.gravity);
     CHECK(std::abs(number_of(end / start) - 1.0) < 0.03);
     REQUIRE(driver.finish());
   }
 
   SECTION("ShouldLoseEnergyGivenInelasticRun") {
+    // Preconditions.
     Scenario inelastic = scenario;
     inelastic.springiness.restitution = 0.5;
     Simulation simulation{inelastic};
@@ -168,21 +192,26 @@ TEST_CASE("HelloSimulation") {
     REQUIRE(driver.start());
     Energy start = compute_energy(simulation.world(), inelastic.gravity);
 
+    // Under Test.
     REQUIRE(driver.advance_to(TimePoint{20s}));
 
+    // Postconditions.
     CHECK(compute_energy(simulation.world(), inelastic.gravity) < 0.5 * start);
     REQUIRE(driver.finish());
   }
 
   SECTION("ShouldEndInSameStateGivenTwoRuns") {
+    // Preconditions.
     Simulation first{scenario};
     Simulation second{scenario};
     engine::BatchDriver first_driver{timing, Depend(first)};
     engine::BatchDriver second_driver{timing, Depend(second)};
 
+    // Under Test.
     REQUIRE(first_driver.run(TimePoint{5s}));
     REQUIRE(second_driver.run(TimePoint{5s}));
 
+    // Postconditions.
     std::vector<Kinematics> first_balls;
     std::vector<Kinematics> second_balls;
     first.world().store_of<Kinematics>().for_each(

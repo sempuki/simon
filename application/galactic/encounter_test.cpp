@@ -57,23 +57,30 @@ auto collect_states(const Simulation& simulation)
 
 TEST_CASE("Encounter") {
   SECTION("ShouldTakeToomresPeriodGivenOuterRing") {
+    // Under Test.
     // Toomre and Toomre's outermost ring, 15 kpc about 10^11 suns, turns in
     // 5.442 of their units of 10^8 years.
     double gm = gravity::GRAVITATIONAL_CONSTANT *
                 TOOMRE.victim.numerical_value_in(kilogram);
     double r = (0.6 * TOOMRE.pericenter).numerical_value_in(meter);
     double period = 2.0 * std::numbers::pi * std::sqrt(r * r * r / gm);
+
+    // Postconditions.
     CHECK(std::abs(period / (5.442e8 *
                              gravity::JULIAN_YEAR.numerical_value_in(second)) -
                    1.0) < 1e-4);
   }
 
   SECTION("ShouldStartAsReboundGivenDirectPassage") {
+    // Preconditions.
     Simulation simulation{make_encounter_scenario(TOOMRE)};
     REQUIRE(simulation.configure());
+    testing::Table table = testing::load_table(ENCOUNTER);
+
+    // Under Test.
     std::vector<gravity::BodyStart> ours = collect_states(simulation);
 
-    testing::Table table = testing::load_table(ENCOUNTER);
+    // Postconditions.
     std::size_t compared = 0;
     for (const std::vector<std::string>& line : table.lines) {
       if (line[0] != "0") continue;
@@ -87,12 +94,14 @@ TEST_CASE("Encounter") {
   }
 
   SECTION("ShouldFollowReboundGivenDirectPassage") {
+    // Preconditions.
     Simulation simulation{make_encounter_scenario(TOOMRE)};
     engine::Driver driver{Timing{.max_step = STEP}, Depend(simulation)};
     REQUIRE(driver.start());
-
     testing::Table table = testing::load_table(ENCOUNTER);
     std::size_t differing = 0;
+
+    // Under Test.
     for (const std::vector<std::string>& line : table.lines) {
       auto step = static_cast<int>(testing::parse_number(line[0]));
       auto body = static_cast<std::size_t>(testing::parse_number(line[1]));
@@ -104,6 +113,8 @@ TEST_CASE("Encounter") {
         ++differing;
       }
     }
+
+    // Postconditions.
     CHECK(differing == 0);  // Bit for bit, 8,000 steps.
     REQUIRE(driver.finish());
   }
@@ -115,13 +126,17 @@ TEST_CASE("Encounter") {
   // with every ring turned half a spacing, since their rings' phase is not
   // given.
   SECTION("ShouldCaptureAsToomresGivenDirectPassage") {
+    // Preconditions.
     Encounter converged = TOOMRE;
     converged.softening = 0.02 * KILOPARSEC;
     const Year step{15625};
     Simulation simulation{make_encounter_scenario(converged)};
     engine::BatchDriver driver{Timing{.max_step = step}, Depend(simulation)};
+
+    // Under Test.
     REQUIRE(driver.run(BasicTimePoint<Year>{} + 128000 * step));
 
+    // Postconditions.
     std::vector<gravity::BodyStart> states = collect_states(simulation);
     double gm = gravity::GRAVITATIONAL_CONSTANT *
                 converged.companion.numerical_value_in(kilogram);

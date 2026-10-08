@@ -217,6 +217,7 @@ auto find_value(const articulated::Scene& m, const Row& row)
 
 TEST_CASE("ModelAgainstMuJoCo") {
   SECTION("ShouldCompileAsMuJoCoDoesGivenEveryTestModel") {
+    // Preconditions.
     // Every field of every model to rounding, relative to the field's size
     // where it is more than 1; counts and kinds exactly.
     std::map<std::string, articulated::Scene> models;
@@ -231,6 +232,8 @@ TEST_CASE("ModelAgainstMuJoCo") {
         inertias[{row.model, row.index}] = row.values;
       }
     }
+
+    // Under Test.
     for (const Row& row : rows) {
       if (!models.contains(row.model)) {
         std::string path = row.model == "humanoid.xml" ? std::string{HUMANOID}
@@ -266,6 +269,8 @@ TEST_CASE("ModelAgainstMuJoCo") {
       }
       ++compared;
     }
+
+    // Postconditions.
     CAPTURE(compared, worst, where);
     CHECK(compared > 1000);
     CHECK(worst <= 1e-12);
@@ -274,6 +279,7 @@ TEST_CASE("ModelAgainstMuJoCo") {
 
 TEST_CASE("Mjcf") {
   SECTION("ShouldRefuseWhatItDoesNotRun") {
+    // Preconditions.
     // Spatial tendons, explicit contact pairs, meshes and actuators with
     // activation change how a model moves, and are refused with their
     // names.
@@ -282,6 +288,8 @@ TEST_CASE("Mjcf") {
       REQUIRE(!read.has_value());
       return read.error().message();
     };
+
+    // Postconditions.
     CHECK(refused(R"(<mujoco><tendon><spatial/></tendon></mujoco>)")
               .find("spatial") != std::string::npos);
     CHECK(refused(R"(<mujoco><contact><pair geom1="a" geom2="b"/></contact>
@@ -296,6 +304,7 @@ TEST_CASE("Mjcf") {
   }
 
   SECTION("ShouldNotReadGivenMalformedModel") {
+    // Postconditions.
     CHECK(!format::parse_mjcf("<mujoco><worldbody>").has_value());
     CHECK(!format::parse_mjcf(R"(<mujoco><worldbody><body><joint/>
             <geom size="0.1" class="missing"/></body></worldbody></mujoco>)")

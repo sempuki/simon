@@ -42,20 +42,30 @@ TEST_CASE("Timeline") {
   Timeline timeline;
 
   SECTION("ShouldHaveNothingDueGivenNoSourceDue") {
+    // Preconditions.
     Fixed idle;
+
+    // Under Test.
     timeline.add(Depend<const Timeline::Source>(idle));
+
+    // Postconditions.
     CHECK(timeline.earliest() == std::nullopt);
     CHECK(timeline.earliest_after(TimePoint{}) == std::nullopt);
     CHECK_FALSE(timeline.continuous());
   }
 
   SECTION("ShouldGiveEarliestOverSourcesGivenSeveralSources") {
+    // Preconditions.
     Fixed a;
     a.due = {TimePoint{300ms}};
     Fixed b;
     b.due = {TimePoint{100ms}, TimePoint{200ms}};
+
+    // Under Test.
     timeline.add(Depend<const Timeline::Source>(a));
     timeline.add(Depend<const Timeline::Source>(b));
+
+    // Postconditions.
     CHECK(timeline.earliest() == TimePoint{100ms});
     // After 100 ms, as before the work due then has run.
     CHECK(timeline.earliest_after(TimePoint{100ms}) == TimePoint{200ms});
@@ -63,10 +73,17 @@ TEST_CASE("Timeline") {
   }
 
   SECTION("ShouldBeContinuousWhileAnyEveryStepWorkGivenCounts") {
+    // Under Test.
     timeline.add_continuous(2);
     timeline.add_continuous(-1);
+
+    // Postconditions.
     CHECK(timeline.continuous());
+
+    // Under Test.
     timeline.add_continuous(-1);
+
+    // Postconditions.
     CHECK_FALSE(timeline.continuous());
   }
 }

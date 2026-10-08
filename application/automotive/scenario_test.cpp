@@ -130,6 +130,7 @@ auto compare(const Run& ours, const Run& theirs) -> Apart {
 }  // namespace
 
 TEST_CASE("ScenariosAgainstEsmini") {
+  // Preconditions.
   // Every step of every entity, until the storyboard stops: positions to
   // esmini's log's six decimals but on e6mini's curves, 1.2 mm; speeds to
   // rounding, or to the six decimals where the log's speed feeds back, but
@@ -140,6 +141,8 @@ TEST_CASE("ScenariosAgainstEsmini") {
     double position = 0.0;
     double speed = 0.0;
   };
+
+  // Under Test.
   for (Bounds bounds : {Bounds{"cut-in_simple.xosc", 1e-6, 1e-12},
                         Bounds{"cut-in.xosc", 0.002, 1e-12},
                         Bounds{"lane_change_simple.xosc", 1e-6, 0.004},

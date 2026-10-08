@@ -64,7 +64,10 @@ TEST_CASE("DynamicsAgainstMuJoCo") {
   SECTION("ShouldStepAsMuJoCoDoesGivenItsStates") {
     // From 50 of each run's states, one step lands where MuJoCo's does, to
     // rounding.
+    // Preconditions.
     auto local = load_local_steps();
+
+    // Under Test.
     for (const Case& c : make_cases()) {
       CAPTURE(c.name);
       check_local_steps(c.scenario, local.at(c.name));
@@ -75,9 +78,12 @@ TEST_CASE("DynamicsAgainstMuJoCo") {
     // Every step of every run within what nudging MuJoCo's own numbers by
     // a few units in the last place moves its run by then: the double
     // pendulum, chaotic, through all 3,000 steps.
+    // Preconditions.
     std::map<std::string, Run, std::less<>> runs =
         load_runs("mujoco_dynamics.csv");
     auto spreads = load_spreads();
+
+    // Under Test.
     for (const Case& c : make_cases()) {
       CAPTURE(c.name);
       const Run& theirs = runs.at(c.name);
@@ -89,10 +95,13 @@ TEST_CASE("DynamicsAgainstMuJoCo") {
   SECTION("ShouldBeAsAccurateAsMuJoCoGivenConvergedSolution") {
     // Each run's largest error from Runge-Kutta 4 at a fiftieth of the
     // timestep is no more than MuJoCo's own.
+    // Preconditions.
     std::map<std::string, Run, std::less<>> runs =
         load_runs("mujoco_dynamics.csv");
     std::map<std::string, Run, std::less<>> converged =
         load_runs("mujoco_converged.csv");
+
+    // Under Test.
     for (const Case& c : make_cases()) {
       CAPTURE(c.name);
       const Run& theirs = runs.at(c.name);

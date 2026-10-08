@@ -59,7 +59,17 @@ end
 
 TEST_CASE("ParseAircraft") {
   SECTION("ShouldReadEveryEntryGivenWellFormedText") {
+    // Preconditions.
+    AeroInputs inputs;
+    inputs[AeroVariable::MACH] = 0.5;
+    inputs[AeroVariable::DENSITY_ALTITUDE] = 500.0;
+    inputs[AeroVariable::DYNAMIC_PRESSURE] = 2.0;
+    inputs[AeroVariable::ALPHA] = 0.1;
+
+    // Under Test.
     auto data = parse_aircraft(GLIDER);
+
+    // Postconditions.
     REQUIRE(data);
     CHECK(data->name == "glider");
     CHECK(data->wing_area == 10.0 * square_meter);
@@ -69,21 +79,15 @@ TEST_CASE("ParseAircraft") {
     REQUIRE(data->engines.size() == 1);
     CHECK(data->engines[0].feeds == std::vector<std::size_t>{0});
     REQUIRE(data->engines[0].idle_thrust);
-
-    AeroInputs inputs;
-    inputs[AeroVariable::MACH] = 0.5;
-    inputs[AeroVariable::DENSITY_ALTITUDE] = 500.0;
     CHECK_THAT((*data->engines[0].idle_thrust)(inputs), WithinAbs(0.25, 1e-12));
-
     const auto& lift =
         data->aero.axes[static_cast<std::size_t>(AeroAxis::LIFT)];
     REQUIRE(lift.size() == 1);
-    inputs[AeroVariable::DYNAMIC_PRESSURE] = 2.0;
-    inputs[AeroVariable::ALPHA] = 0.1;
     CHECK_THAT(lift[0](inputs), WithinAbs(10.0 * 2.0 * 0.7, 1e-12));
   }
 
   SECTION("ShouldReadSignalsGivenFlightControlsBeforeTerms") {
+    // Preconditions.
     std::string text = GLIDER;
     text.replace(text.find("term lift"), 0, R"(flight_controls
   block pure_gain flap
@@ -97,7 +101,11 @@ term drag CDflap
   factor |flap|
 end
 )");
+
+    // Under Test.
     auto data = parse_aircraft(text);
+
+    // Postconditions.
     REQUIRE(data);
     std::optional<std::size_t> flap =
         find_signal(data->flight_controls, "flap");
@@ -113,6 +121,7 @@ end
   }
 
   SECTION("ShouldReadSwitchesPidsAndFunctionsGivenTheirEntries") {
+    // Preconditions.
     std::string text = GLIDER;
     text.replace(text.find("term lift"), 0, R"(flight_controls
   signal override
@@ -138,7 +147,11 @@ end
   end
 end
 )");
+
+    // Under Test.
     auto data = parse_aircraft(text);
+
+    // Postconditions.
     REQUIRE(data);
     const FlightControlData& controls = data->flight_controls;
     REQUIRE(controls.blocks.size() == 3);
@@ -156,6 +169,7 @@ end
   }
 
   SECTION("ShouldRefuseGivenFunctionThatLeavesTwoValues") {
+    // Preconditions.
     std::string text = GLIDER;
     text.replace(text.find("term lift"), 0, R"(flight_controls
   block function both
@@ -164,51 +178,76 @@ end
   end
 end
 )");
+
+    // Under Test.
     auto data = parse_aircraft(text);
+
+    // Postconditions.
     REQUIRE_FALSE(data);
     CHECK_THAT(std::string{data.error().message()},
                ContainsSubstring("leave one value"));
   }
 
   SECTION("ShouldSayWhereGivenUnknownVariable") {
+    // Preconditions.
     std::string text = GLIDER;
     text.replace(text.find("factor dynamic_pressure"), 23, "factor wind");
+
+    // Under Test.
     auto data = parse_aircraft(text);
+
+    // Postconditions.
     REQUIRE_FALSE(data);
     CHECK_THAT(std::string{data.error().message()},
                ContainsSubstring("line 29") && ContainsSubstring("wind"));
   }
 
   SECTION("ShouldRefuseGivenBreakpointsOutOfOrder") {
+    // Preconditions.
     std::string text = GLIDER;
     text.replace(text.find("    0.2 1.2"), 11, "    -1 1.2");
+
+    // Under Test.
     auto data = parse_aircraft(text);
+
+    // Postconditions.
     REQUIRE_FALSE(data);
     CHECK_THAT(std::string{data.error().message()},
                ContainsSubstring("increasing"));
   }
 
   SECTION("ShouldRefuseGivenNonFiniteNumber") {
+    // Preconditions.
     std::string text = GLIDER;
     text.replace(text.find("    0.2 1.2"), 11, "    nan 1.2");
+
+    // Under Test.
     auto data = parse_aircraft(text);
+
+    // Postconditions.
     REQUIRE_FALSE(data);
     CHECK_THAT(std::string{data.error().message()},
                ContainsSubstring("finite"));
   }
 
   SECTION("ShouldRefuseGivenEngineWithoutThrustTable") {
+    // Preconditions.
     std::string text = GLIDER;
     std::size_t from = text.find("  military_thrust_factor");
     std::size_t to = text.find("    end\n", from) + 8;
     text.erase(from, to - from);
+
+    // Under Test.
     auto data = parse_aircraft(text);
+
+    // Postconditions.
     REQUIRE_FALSE(data);
     CHECK_THAT(std::string{data.error().message()},
                ContainsSubstring("both thrust tables"));
   }
 
   SECTION("ShouldRefuseGivenNoHeader") {
+    // Postconditions.
     CHECK_FALSE(parse_aircraft("name glider\n"));
   }
 }

@@ -355,18 +355,19 @@ auto measure(const Checked& checked, Case flown) -> Distances {
 TEST_CASE("CheckCases737") {
   for (Case flown : {Case::HOLD, Case::ELEVATOR, Case::AILERON, Case::RUDDER,
                      Case::THROTTLE}) {
+    // Under Test.
     auto [physics, simon, theirs] = measure(BOEING_737_CASES, flown);
+
+    // Postconditions.
     CAPTURE(static_cast<int>(flown));
     CAPTURE(physics.position, physics.velocity, physics.attitude, physics.rate);
     CAPTURE(simon.position, simon.velocity, simon.attitude, simon.rate);
     CAPTURE(theirs.position, theirs.velocity, theirs.attitude, theirs.rate);
-
     // With integration error gone, simon's physics and JSBSim's agree to
     // millimeters, and to 2.4 cm after the rudder doublet.
     CHECK(physics.position < 0.05);
     CHECK(physics.velocity < 0.003);
     CHECK(physics.attitude < 3e-4);
-
     // At 8 ms simon stays within 6 cm of the reference, and is closer to it
     // than JSBSim is at the same frame, down to a floor of 5 mm where both
     // are at the physics' own agreement.
@@ -377,11 +378,13 @@ TEST_CASE("CheckCases737") {
 }
 
 TEST_CASE("CheckCases737InWind") {
+  // Under Test.
   auto [physics, simon, theirs] = measure(BOEING_737_CASES, Case::WIND);
+
+  // Postconditions.
   CAPTURE(physics.position, physics.velocity, physics.attitude, physics.rate);
   CAPTURE(simon.position, simon.velocity, simon.attitude, simon.rate);
   CAPTURE(theirs.position, theirs.velocity, theirs.attitude, theirs.rate);
-
   // The 737's pitching moment reads the rate of angle of attack, which
   // JSBSim takes from the velocity over the ground. That leaves out the
   // wind turning in body axes as the 737 pitches (see
@@ -395,13 +398,18 @@ TEST_CASE("CheckCases737InWind") {
 
 TEST_CASE("CheckCasesF16") {
   SECTION("ShouldMatchJsbsimGivenTrimmedMassBalance") {
+    // Preconditions.
     auto data = format::load_aircraft(std::string{F16});
     REQUIRE(data);
     std::vector<Row> initial = load_rows(F16_CASES.initial);
     REQUIRE(initial.size() == 1);
     const Row& trim = initial[0];
+
+    // Under Test.
     MassBalance mass =
         aircraft::compute_mass_balance(*data, trimmed_tanks(*data, trim));
+
+    // Postconditions.
     // JSBSim turns pounds into slugs by a rounded factor, 1.4e-8 off.
     CHECK_THAT(mass.properties.mass.numerical_value_in(kilogram),
                Catch::Matchers::WithinRel(trim.at("mass"), 2e-8));
@@ -434,16 +442,17 @@ TEST_CASE("CheckCasesF16") {
 }
 
 TEST_CASE("CheckCasesF16InWind") {
+  // Under Test.
   auto [physics, simon, theirs] = measure(F16_CASES, Case::WIND);
+
+  // Postconditions.
   CAPTURE(physics.position, physics.velocity, physics.attitude, physics.rate);
   CAPTURE(simon.position, simon.velocity, simon.attitude, simon.rate);
   CAPTURE(theirs.position, theirs.velocity, theirs.attitude, theirs.rate);
-
   // The F-16's aerodynamics do not read the rate of angle of attack, and
   // in wind simon's physics and JSBSim's agree to 4.4 mm, as in still air.
   CHECK(physics.position < 0.01);
   CHECK(physics.attitude < 1e-4);
-
   // The wind starts between 8 ms steps, so at 8 ms simon and JSBSim each
   // start it 4 ms off the reference: simon stays within 4 cm.
   CHECK(simon.position < 0.05);
@@ -558,18 +567,25 @@ auto hold(const Checked& checked) -> std::pair<Wander, Wander> {
 
 TEST_CASE("HoldsTrim") {
   for (const Checked* checked : {&BOEING_737_CASES, &F16_CASES}) {
+    // Preconditions.
     CAPTURE(checked->aircraft);
 
+    // Under Test.
     // Burning fuel lightens the aircraft, which climbs and speeds up: 2 m and
     // 0.1 m/s for the 737, 16 cm for the F-16, against 4 m and 2 m from
     // JSBSim's trims.
     auto [burning, theirs] = hold<HoldSchedule>(*checked);
+
+    // Postconditions.
     CAPTURE(burning.altitude, burning.speed, theirs.altitude, theirs.speed);
     CHECK(burning.altitude < theirs.altitude);
     CHECK(burning.speed < theirs.speed);
 
+    // Under Test.
     // With the mass held, level over the Earth to millimeters in 30 s.
     auto held = hold<HeldMassSchedule>(*checked).first;
+
+    // Postconditions.
     CAPTURE(held.altitude, held.speed);
     CHECK(held.altitude < 0.01);
     CHECK(held.speed < 0.001);

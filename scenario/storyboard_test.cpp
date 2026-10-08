@@ -100,6 +100,7 @@ constexpr std::string_view CONTROLLED = R"(<OpenSCENARIO>
 
 TEST_CASE("Storyboard") {
   SECTION("ShouldRunTrafficSignalControllersAsTheStandardSays") {
+    // Preconditions.
     auto scenario = format::parse_openscenario(CONTROLLED, ".");
     REQUIRE(scenario.has_value());
     road::Map roads;
@@ -120,6 +121,8 @@ TEST_CASE("Storyboard") {
         {42.0, "stop", "a", "off;on;off"}, {49.5, "stop", "a", "off;on;off"},
         {50.0, "go", "b", "off;off;on"},   {70.0, "stop", "a", "on;off;off"}};
     std::size_t next = 0;
+
+    // Under Test.
     for (int k = 0; k <= 140; ++k) {
       double time = 0.5 * k;
       if (k == 0) {
@@ -134,6 +137,8 @@ TEST_CASE("Storyboard") {
         ++next;
       }
     }
+
+    // Postconditions.
     CHECK(next == expected.size());
     // The event on the phase started as the main controller first stopped.
     std::vector<double> started;

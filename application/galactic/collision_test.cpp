@@ -56,6 +56,7 @@ TEST_CASE("Collision") {
   REQUIRE(scenario.bodies.size() == 2 * (500 + 2000));
 
   SECTION("ShouldPlaceGalaxiesOnTheirOrbitGivenStandardCollision") {
+    // Preconditions.
     const gravity::DiskGalaxy& galaxy = collision.galaxy;
     double cut = number_of(galaxy.halo_cutoff /
                            (galaxy.halo_cutoff + galaxy.halo_scale));
@@ -68,6 +69,7 @@ TEST_CASE("Collision") {
     Vector3 expected_velocity =
         separation.velocity.numerical_value_in(meter_per_second).eigen();
 
+    // Postconditions.
     // Each galaxy's disk and halo are centered on its place on the orbit.
     for (std::size_t g = 0; g < 4; ++g) {
       Measure measure = measure_group(scenario, scenario.groups[g]);
@@ -81,8 +83,11 @@ TEST_CASE("Collision") {
   }
 
   SECTION("ShouldTiltSecondDiskGivenInclination") {
+    // Under Test.
     Vector3 first = measure_group(scenario, scenario.groups[0]).spin;
     Vector3 second = measure_group(scenario, scenario.groups[2]).spin;
+
+    // Postconditions.
     double angle = std::acos(first.normalized().dot(second.normalized()));
     // The first disk turns about z, as the orbit does; the second is tilted
     // 45 degrees about x, toward -y.
@@ -92,8 +97,11 @@ TEST_CASE("Collision") {
   }
 
   SECTION("ShouldStartFarApartGivenStandardCollision") {
+    // Preconditions.
     Simulation simulation{scenario};
     REQUIRE(simulation.configure());
+
+    // Under Test.
     double separation =
         (compute_group_center(simulation.world(), simulation.bodies(),
                               scenario.groups[0], 10.0 * gravity::KILOPARSEC) -
@@ -103,6 +111,8 @@ TEST_CASE("Collision") {
             .eigen()
             .norm() /
         gravity::KILOPARSEC.numerical_value_in(meter);
+
+    // Postconditions.
     CHECK(separation > 170.0);
     CHECK(separation < 180.0);
   }

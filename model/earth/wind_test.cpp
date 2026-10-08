@@ -60,11 +60,16 @@ auto covariance(const std::vector<double>& x, std::size_t lag) -> double {
 
 TEST_CASE("Wind") {
   SECTION("ShouldReadMilF8785cTableGivenHighAltitude") {
+    // Preconditions.
     // 6 km is 19,685 ft, between the table's 15,000 and 25,000 ft.
-    TurbulenceScales scales =
-        find_turbulence_scales(Turbulence::MODERATE, 6000.0 * meter);
     double feet = 6000.0 / FOOT;
     double expected = 8.0 + (feet - 15000.0) / 10000.0 * (6.6 - 8.0);
+
+    // Under Test.
+    TurbulenceScales scales =
+        find_turbulence_scales(Turbulence::MODERATE, 6000.0 * meter);
+
+    // Postconditions.
     CHECK_THAT(scales.sigma_w.numerical_value_in(meter_per_second),
                WithinRel(expected * FOOT, 1e-12));
     CHECK(scales.sigma_u == scales.sigma_w);
@@ -75,20 +80,26 @@ TEST_CASE("Wind") {
   }
 
   SECTION("ShouldFollowWindAt20FeetGivenLowAltitude") {
+    // Preconditions.
+    double factor = 0.177 + 0.000823 * 500.0;
+
+    // Under Test.
     // At 500 ft in light turbulence, sigma_w is a tenth of 15 knots, and w's
     // scale is the altitude.
     TurbulenceScales scales =
         find_turbulence_scales(Turbulence::LIGHT, 500.0 * FOOT * meter);
+
+    // Postconditions.
     CHECK_THAT(scales.sigma_w.numerical_value_in(meter_per_second),
                WithinRel(1.5 * 1852.0 / 3600.0, 1e-12));
     CHECK_THAT(scales.length_w.numerical_value_in(meter),
                WithinRel(500.0 * FOOT, 1e-12));
-    double factor = 0.177 + 0.000823 * 500.0;
     CHECK_THAT(scales.sigma_u.numerical_value_in(meter_per_second),
                WithinRel(1.5 * 1852.0 / 3600.0 / std::pow(factor, 0.4), 1e-12));
   }
 
   SECTION("ShouldBeContinuousGivenAltitudesBetweenModels") {
+    // Under Test.
     for (double feet : {1000.0, 2000.0}) {
       TurbulenceScales below = find_turbulence_scales(
           Turbulence::SEVERE, (feet - 1e-6) * FOOT * meter);
@@ -103,11 +114,14 @@ TEST_CASE("Wind") {
   }
 
   SECTION("ShouldHaveDrydenStatisticsGivenAnyStep") {
+    // Preconditions.
     TurbulenceScales scales =
         find_turbulence_scales(Turbulence::SEVERE, 6000.0 * meter);
     double sigma = scales.sigma_w.numerical_value_in(meter_per_second);
     double length_u = scales.length_u.numerical_value_in(meter);
     double length_w = scales.length_w.numerical_value_in(meter);
+
+    // Under Test.
     // From simon's step to steps a quarter of w's scale long: the filters
     // are sampled exactly, so the statistics do not change with the step.
     for (double dt : {0.02, 0.25}) {
@@ -138,7 +152,7 @@ TEST_CASE("Wind") {
   }
 
   SECTION("ShouldHaveMilF8785cRollVarianceGivenSpan") {
-    Series series = fly(Turbulence::SEVERE, 0.02, 1'000'000, 5);
+    // Preconditions.
     TurbulenceScales scales =
         find_turbulence_scales(Turbulence::SEVERE, 6000.0 * meter);
     double sigma_w = scales.sigma_w.numerical_value_in(meter_per_second);
@@ -148,31 +162,47 @@ TEST_CASE("Wind") {
                       std::cbrt(std::numbers::pi * length_w / (4.0 * b)) *
                       std::numbers::pi * std::numbers::pi /
                       (8.0 * b * length_w);
+
+    // Under Test.
+    Series series = fly(Turbulence::SEVERE, 0.02, 1'000'000, 5);
+
+    // Postconditions.
     CHECK_THAT(covariance(series.p, 0), WithinRel(expected, 0.05));
   }
 
   SECTION("ShouldRepeatGivenSameSeed") {
+    // Under Test.
     Series first = fly(Turbulence::MODERATE, 0.02, 100, 3);
     Series again = fly(Turbulence::MODERATE, 0.02, 100, 3);
     Series other = fly(Turbulence::MODERATE, 0.02, 100, 4);
+
+    // Postconditions.
     CHECK(first.w == again.w);
     CHECK(first.w != other.w);
   }
 
   SECTION("ShouldBeCalmGivenNoTurbulence") {
+    // Under Test.
     Series series = fly(Turbulence::NONE, 0.02, 10, 1);
+
+    // Postconditions.
     for (double w : series.w) {
       CHECK(w == 0.0);
     }
   }
 
   SECTION("ShouldTurnGustsByHeadingGivenWind") {
+    // Preconditions.
     Gusts gusts{.velocity = meters_per_second(3.0, 1.0, -2.0)};
     WindField field{.north_east_down = meters_per_second(5.0, 0.0, 0.0)};
+
+    // Under Test.
     // Heading east: along the path is east, and to the right is south.
     Wind wind = compute_wind(field, gusts, std::numbers::pi / 2.0 * radian);
     Vector3 ned =
         wind.north_east_down.numerical_value_in(meter_per_second).eigen();
+
+    // Postconditions.
     CHECK_THAT(ned.x(), WithinAbs(5.0 - 1.0, 1e-12));
     CHECK_THAT(ned.y(), WithinAbs(3.0, 1e-12));
     CHECK_THAT(ned.z(), WithinAbs(-2.0, 1e-12));

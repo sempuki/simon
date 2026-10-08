@@ -87,11 +87,13 @@ auto brute_nearest(const std::vector<Coordinates>& points,
 
 TEST_CASE("SpatialIndex") {
   SECTION("ShouldMatchBruteForceGivenRandomPointsAndRadii") {
+    // Preconditions.
     std::vector<Coordinates> points = random_points(2000, 500.0, 1);
     SpatialIndex index = build_index(points, points.size(), 10.0);
     std::vector<Coordinates> centers = random_points(50, 600.0, 2);
     auto odd = [](std::uint32_t slot) { return slot % 2 == 1; };
 
+    // Postconditions.
     // Small radii search the grid; large ones read every point.
     for (double radius : {0.0, 3.0, 10.0, 25.0, 80.0, 2000.0}) {
       for (const Coordinates& center : centers) {
@@ -104,12 +106,14 @@ TEST_CASE("SpatialIndex") {
   }
 
   SECTION("ShouldVisitEachPointOnceGivenMoreCellsThanBuckets") {
+    // Preconditions.
     // A fine grid: a query covers thousands of cells, but there are only 512
     // buckets, so many cells share one.
     std::vector<Coordinates> points = random_points(500, 200.0, 3);
     SpatialIndex index = build_index(points, points.size(), 1.0);
     auto any = [](std::uint32_t) { return true; };
 
+    // Postconditions.
     for (const Coordinates& center : random_points(20, 200.0, 4)) {
       CHECK(within(index, center, 20.0) == brute_within(points, center, 20.0));
       CHECK(index.nearest(center, 20.0, any) ==
@@ -118,11 +122,13 @@ TEST_CASE("SpatialIndex") {
   }
 
   SECTION("ShouldVisitEveryPointGivenInfiniteOrHugeRadius") {
+    // Preconditions.
     std::vector<Coordinates> points = random_points(50, 100.0, 5);
     SpatialIndex index = build_index(points, points.size(), 10.0);
     auto any = [](std::uint32_t) { return true; };
     Coordinates center{0.0, 0.0, 0.0};
 
+    // Postconditions.
     for (double radius : {std::numeric_limits<double>::infinity(), 1e30}) {
       CHECK(within(index, center, radius).size() == points.size());
       CHECK(index.nearest(center, radius, any) ==
@@ -131,30 +137,38 @@ TEST_CASE("SpatialIndex") {
   }
 
   SECTION("ShouldGiveTiesToLowestSlotGivenEqualDistances") {
+    // Preconditions.
     std::vector<Coordinates> points{{3.0, 0.0, 0.0}, {-3.0, 0.0, 0.0}};
     SpatialIndex index = build_index(points, points.size(), 1.0);
     auto any = [](std::uint32_t) { return true; };
 
+    // Postconditions.
     CHECK(index.nearest({0.0, 0.0, 0.0}, 10.0, any) == 0u);
   }
 
   SECTION("ShouldFindNothingGivenEmptyIndexOrNegativeRadius") {
+    // Preconditions.
     SpatialIndex empty{8, 1.0};
     std::vector<Coordinates> points{{0.0, 0.0, 0.0}};
     SpatialIndex index = build_index(points, 8, 1.0);
     auto any = [](std::uint32_t) { return true; };
 
+    // Postconditions.
     CHECK(within(empty, {0.0, 0.0, 0.0}, 5.0).empty());
     CHECK(empty.nearest({0.0, 0.0, 0.0}, 5.0, any) == std::nullopt);
     CHECK(within(index, {0.0, 0.0, 0.0}, -1.0).empty());
   }
 
   SECTION("ShouldReplaceContentsGivenRebuild") {
+    // Preconditions.
     std::vector<Coordinates> before{{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
     std::vector<Coordinates> after{{100.0, 0.0, 0.0}};
     SpatialIndex index = build_index(before, 4, 1.0);
+
+    // Under Test.
     index.rebuild(after.size(), [&](std::size_t slot) { return after[slot]; });
 
+    // Postconditions.
     CHECK(index.size() == 1u);
     CHECK(within(index, {0.0, 0.0, 0.0}, 5.0).empty());
     CHECK(within(index, {100.0, 0.0, 0.0}, 5.0) ==
@@ -172,11 +186,13 @@ TEST_CASE("SpatialIndexSizedToPoints") {
   };
 
   SECTION("ShouldMatchBruteForceGivenRandomPointsAndRadii") {
+    // Preconditions.
     std::vector<Coordinates> points = random_points(2000, 500.0, 1);
     SpatialIndex index = sized(points);
     std::vector<Coordinates> centers = random_points(50, 600.0, 2);
     auto odd = [](std::uint32_t slot) { return slot % 2 == 1; };
 
+    // Postconditions.
     for (double radius : {0.0, 3.0, 10.0, 25.0, 80.0, 2000.0}) {
       for (const Coordinates& center : centers) {
         CHECK(within(index, center, radius) ==
@@ -188,6 +204,7 @@ TEST_CASE("SpatialIndexSizedToPoints") {
   }
 
   SECTION("ShouldSizeCellsToSpacingGivenPointsOnAPlane") {
+    // Preconditions.
     // 100 by 100 points 10 apart, all at height 0: a plane, so height is
     // ignored, and one point per cell means cells about 10 across.
     std::vector<Coordinates> points;
@@ -197,37 +214,47 @@ TEST_CASE("SpatialIndexSizedToPoints") {
       }
     }
 
+    // Postconditions.
     CHECK_THAT(sized(points).cell_size(), WithinRel(9.9, 1e-12));
   }
 
   SECTION("ShouldResizeCellsGivenRebuildWithSparserPoints") {
+    // Preconditions.
     std::vector<Coordinates> dense = random_points(1000, 100.0, 3);
     std::vector<Coordinates> sparse = random_points(1000, 1000.0, 4);
     SpatialIndex index = sized(dense);
     double dense_size = index.cell_size();
 
+    // Under Test.
     index.rebuild(sparse.size(),
                   [&](std::size_t slot) { return sparse[slot]; });
 
+    // Postconditions.
     CHECK(index.cell_size() > dense_size);
   }
 
   SECTION("ShouldKeepCellSizeGivenPointsThatSpanNothing") {
+    // Preconditions.
     std::vector<Coordinates> same(5, Coordinates{3.0, 3.0, 3.0});
     std::vector<Coordinates> one{{7.0, 7.0, 7.0}};
 
+    // Postconditions.
     CHECK(sized(same).cell_size() == 1.0);
     CHECK(sized(one).cell_size() == 1.0);
   }
 
   SECTION("ShouldIgnoreInfinitePointsGivenSizingCells") {
+    // Preconditions.
     std::vector<Coordinates> points;
     for (int x = 0; x < 10; ++x) {
       points.push_back({10.0 * x, 0.0, 0.0});
     }
     points.push_back({std::numeric_limits<double>::infinity(), 0.0, 0.0});
+
+    // Under Test.
     SpatialIndex index = sized(points);
 
+    // Postconditions.
     CHECK_THAT(index.cell_size(), WithinRel(9.0, 1e-12));
     CHECK(within(index, {0.0, 0.0, 0.0}, 15.0) ==
           std::vector<std::uint32_t>{0, 1});

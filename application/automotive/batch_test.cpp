@@ -68,10 +68,13 @@ TEST_CASE("BatchAgainstEsminiAndNuPlan") {
   REQUIRE(scenario::count_permutations(distribution) == PERMUTATIONS);
 
   SECTION("ShouldNumberPermutationsAsEsmini") {
+    // Preconditions.
     // Each permutation's values, in order; numbers equal as numbers, since
     // esmini writes a range's values to six decimals.
     std::vector<std::vector<Row>> esmini =
         load_by_permutation("esmini_parameters.csv");
+
+    // Under Test.
     for (std::size_t i = 0; i < PERMUTATIONS; ++i) {
       std::vector<scenario::ParameterAssignment> ours =
           scenario::find_permutation(distribution, i);
@@ -92,6 +95,7 @@ TEST_CASE("BatchAgainstEsminiAndNuPlan") {
   std::vector<RunRecord> runs = record_runs(distribution);
 
   SECTION("ShouldMatchEsminiRuns") {
+    // Preconditions.
     // Every entity at every step, its box from the vehicle the permutation
     // chose: positions as cut-in's own are, 1.1 mm on e6mini's curves at
     // most; speeds to esmini's log's six decimals.
@@ -100,6 +104,8 @@ TEST_CASE("BatchAgainstEsminiAndNuPlan") {
     double position = 0.0;
     double speed = 0.0;
     double box = 0.0;
+
+    // Under Test.
     for (std::size_t i = 0; i < PERMUTATIONS; ++i) {
       std::map<std::string, std::vector<const Row*>> by_time;
       for (const Row& row : esmini[i]) {
@@ -124,6 +130,8 @@ TEST_CASE("BatchAgainstEsminiAndNuPlan") {
         }
       }
     }
+
+    // Postconditions.
     CAPTURE(position, speed, box);
     CHECK(position < 1.5e-3);
     CHECK(speed < 1e-6);
@@ -131,6 +139,7 @@ TEST_CASE("BatchAgainstEsminiAndNuPlan") {
   }
 
   SECTION("ShouldMeasureAsNuPlan") {
+    // Preconditions.
     // At every sample, simon's time to collision and gap on its own runs,
     // and nuPlan's on esmini's: every time to collision the same, and the
     // gaps as close as the runs are.
@@ -141,6 +150,8 @@ TEST_CASE("BatchAgainstEsminiAndNuPlan") {
     int compared = 0;
     int agree = 0;
     double gap = 0.0;
+
+    // Under Test.
     for (std::size_t i = 0; i < PERMUTATIONS; ++i) {
       RunMeasures measures = measure_run(runs[i]);
       REQUIRE(measures.times_to_collision.size() == nuplan[i].size());
@@ -169,16 +180,21 @@ TEST_CASE("BatchAgainstEsminiAndNuPlan") {
             !verdict.at("min_ttc").empty());
       CHECK(std::abs(measures.min_gap - number(verdict, "min_gap")) < 1.5e-3);
     }
+
+    // Postconditions.
     CAPTURE(compared, agree, gap);
     CHECK(agree == compared);
     CHECK(gap < 1.5e-3);
   }
 
   SECTION("ShouldRunTheSameOnAnyThreads") {
+    // Under Test.
     // Each run on its own world: the same measures, exactly, on one thread
     // or many.
     std::vector<BatchRun> alone = run_batch(distribution, 1, 50ms, LIMIT);
     std::vector<BatchRun> together = run_batch(distribution, 4, 50ms, LIMIT);
+
+    // Postconditions.
     REQUIRE(alone.size() == PERMUTATIONS);
     REQUIRE(together.size() == PERMUTATIONS);
     for (std::size_t i = 0; i < PERMUTATIONS; ++i) {

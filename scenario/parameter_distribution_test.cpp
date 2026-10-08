@@ -13,6 +13,7 @@ namespace simon::scenario {
 
 TEST_CASE("ParameterDistribution") {
   SECTION("ShouldStepRangesToTheirUpperLimit") {
+    // Under Test.
     auto distribution = format::parse_parameter_distribution(
         R"(<OpenSCENARIO><ParameterValueDistribution>
              <ScenarioFile filepath="s.xosc"/>
@@ -25,6 +26,8 @@ TEST_CASE("ParameterDistribution") {
              </Deterministic>
            </ParameterValueDistribution></OpenSCENARIO>)",
         "here");
+
+    // Postconditions.
     REQUIRE(distribution);
     CHECK(distribution->scenario == "here/s.xosc");
     REQUIRE(count_permutations(*distribution) == 7);
@@ -33,20 +36,28 @@ TEST_CASE("ParameterDistribution") {
   }
 
   SECTION("ShouldRefuseStochasticDistributions") {
+    // Under Test.
     auto distribution = format::parse_parameter_distribution(
         R"(<OpenSCENARIO><ParameterValueDistribution>
              <ScenarioFile filepath="s.xosc"/>
              <Stochastic numberOfTestRuns="5"/>
            </ParameterValueDistribution></OpenSCENARIO>)",
         "here");
+
+    // Postconditions.
     CHECK_FALSE(distribution);
   }
 
   SECTION("ShouldRefuseAssigningUndeclaredParameters") {
+    // Preconditions.
     std::vector<ParameterAssignment> assignments = {
         {.name = "Nonesuch", .value = "1"}};
+
+    // Under Test.
     auto read = format::load_openscenario("3rd_party/esmini/xosc/cut-in.xosc",
                                           assignments);
+
+    // Postconditions.
     CHECK_FALSE(read);
   }
 }

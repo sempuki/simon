@@ -102,11 +102,15 @@ TEST_CASE("Tree") {
   };
 
   SECTION("ShouldEqualDirectSumGivenNoCellsUnopened") {
+    // Preconditions.
     scenario.gravity = GravityMethod::TREE;
     scenario.opening_angle = 0.0;
 
+    // Under Test.
     Spread spread =
         compute_spread(errors_against_direct(compute_accelerations(scenario)));
+
+    // Postconditions.
     CHECK(spread.worst < 1e-13);  // Measured: 4e-15, the sums' order.
   }
 
@@ -114,8 +118,11 @@ TEST_CASE("Tree") {
   // percentile of 1.6% to its 1.7%. The two trees' cells differ, since
   // REBOUND's root is a cube about the origin and simon's bounds the bodies.
   SECTION("ShouldErrLikeReboundGivenOpeningAngles") {
+    // Preconditions.
     scenario.gravity = GravityMethod::TREE;
     Spread last;
+
+    // Under Test.
     for (double angle : ANGLES) {
       scenario.opening_angle = angle;
       Spread ours = compute_spread(
@@ -141,6 +148,7 @@ TEST_CASE("Tree") {
 // 256 bodies of a Plummer sphere on the tree at an opening angle of 0.5, for
 // ten crossing times of 128 steps.
 TEST_CASE("TreeMomentum") {
+  // Preconditions.
   const gravity::Plummer plummer{.mass = 1e10 * SOLAR_MASS,
                                  .scale = KILOPARSEC};
   Scenario scenario{.softening = 0.05 * KILOPARSEC,
@@ -151,15 +159,16 @@ TEST_CASE("TreeMomentum") {
       plummer.mass, gravity::compute_plummer_energy(plummer));
   Year step = std::chrono::round<Year>(std::chrono::duration<double>(
       crossing.numerical_value_in(second) / 128.0));
-
   Simulation start{scenario};
   REQUIRE(start.configure());
   Mechanics before = measure_mechanics(start.world(), scenario.softening);
   Simulation simulation{scenario};
   engine::BatchDriver driver{Timing{.max_step = step}, Depend(simulation)};
 
+  // Under Test.
   REQUIRE(driver.run(BasicTimePoint<Year>{} + 1280 * step));
 
+  // Postconditions.
   Mechanics after = measure_mechanics(simulation.world(), scenario.softening);
   double scale_momentum = plummer.mass.numerical_value_in(kilogram) *
                           std::sqrt(gravity::GRAVITATIONAL_CONSTANT *

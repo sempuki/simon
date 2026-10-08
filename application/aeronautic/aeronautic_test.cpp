@@ -95,13 +95,16 @@ TEST_CASE("Autopilot") {
   Scheduler scheduler;
 
   SECTION("ShouldHoldAltitudeAndSpeedGivenTargetsAhead") {
+    // Preconditions.
     Entity aircraft = create(
         level(5000.0, 200.0, 0.0),
         route_to(meters(0.0, 500000.0, 6000.0), 220.0 * meter_per_second),
         InOut(world));
 
+    // Under Test.
     fly_for(3min, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     const AirState& state = state_of(world, aircraft);
     CHECK(std::abs(aircraft::altitude_of(state).numerical_value_in(meter) -
                    6000.0) < 20.0);
@@ -111,13 +114,16 @@ TEST_CASE("Autopilot") {
   }
 
   SECTION("ShouldTurnToWaypointGivenWaypointBehind") {
+    // Preconditions.
     Entity aircraft = create(
         level(5000.0, 200.0, 0.0),
         route_to(meters(0.0, -500000.0, 5000.0), 200.0 * meter_per_second),
         InOut(world));
 
+    // Under Test.
     fly_for(90s, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     const AirState& state = state_of(world, aircraft);
     double heading = radians(state.heading);
     CHECK(std::abs(std::remainder(heading - PI, 2.0 * PI)) < 0.05);
@@ -132,20 +138,24 @@ TEST_CASE("Route") {
   Scheduler scheduler;
 
   SECTION("ShouldReachEveryWaypointGivenClosedRoute") {
+    // Preconditions.
     Route route{.speed = 200.0 * meter_per_second};
     route.waypoints = {meters(0.0, 30000.0, 5000.0),
                        meters(30000.0, 30000.0, 6000.0),
                        meters(30000.0, 0.0, 5000.0), meters(0.0, 0.0, 4000.0)};
     Entity aircraft = create(level(5000.0, 200.0, 0.0), route, InOut(world));
 
+    // Under Test.
     fly_for(15min, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     CHECK(world.store_of<Route>().component_of(aircraft).reached >= 4);
   }
 }
 
 TEST_CASE("Fidelity") {
   SECTION("ShouldAgreeGivenSinglePassAndRungeKutta") {
+    // Preconditions.
     World world;
     build_small_world(Out(world));
     Scheduler scheduler;
@@ -158,8 +168,10 @@ TEST_CASE("Fidelity") {
     Entity precise =
         create<archetype::PreciseAircraft>(start, route, InOut(world));
 
+    // Under Test.
     fly_for(5min, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     // The two fly the same route by different integrators: close, but not
     // the same.
     double apart =
@@ -183,10 +195,14 @@ TEST_CASE("Simulation") {
   };
 
   SECTION("ShouldRepeatGivenSameSeed") {
+    // Preconditions.
     Scenario scenario{.seed = 7, .aircraft = 50, .precise = 10, .rigid = 5};
+
+    // Under Test.
     auto [first, first_reached] = run(scenario);
     auto [second, second_reached] = run(scenario);
 
+    // Postconditions.
     REQUIRE(first.size() == 50);
     REQUIRE(first.size() == second.size());
     for (std::size_t i = 0; i < first.size(); ++i) {
@@ -198,8 +214,10 @@ TEST_CASE("Simulation") {
   }
 
   SECTION("ShouldStayAirborneGivenDefaultScenario") {
+    // Under Test.
     auto [states, reached] = run(Scenario{.aircraft = 100, .precise = 20});
 
+    // Postconditions.
     for (const AirState& state : states) {
       double altitude = aircraft::altitude_of(state).numerical_value_in(meter);
       CHECK(altitude > 2500.0);
@@ -210,6 +228,7 @@ TEST_CASE("Simulation") {
   }
 
   SECTION("ShouldFlyRoutesGivenRigidAircraftAmongPointMass") {
+    // Preconditions.
     // Point-mass and rigid aircraft fly the same kind of routes in one
     // world; the rigid ones stay in the routes' envelope throughout.
     Simulation simulation{
@@ -219,6 +238,8 @@ TEST_CASE("Simulation") {
     double highest = 0.0;
     double slowest = 1e9;
     double fastest = 0.0;
+
+    // Under Test.
     for (TimePoint time{}; time < TimePoint{5min}; time += DT) {
       REQUIRE(simulation.step(Step{.time = time, .dt = DT}));
       const World& world = simulation.world();
@@ -234,6 +255,8 @@ TEST_CASE("Simulation") {
             fastest = std::max(fastest, speed);
           });
     }
+
+    // Postconditions.
     CAPTURE(lowest, highest, slowest, fastest);
     CHECK(lowest > 2500.0);
     CHECK(highest < 9500.0);
@@ -245,6 +268,7 @@ TEST_CASE("Simulation") {
   }
 
   SECTION("ShouldFlyRoutesGivenRigidFightersAmongPointMass") {
+    // Preconditions.
     // F-16s fly the same routes through their fly-by-wire, at the world's
     // 20 ms step, and stay in the routes' envelope throughout.
     Simulation simulation{
@@ -254,6 +278,8 @@ TEST_CASE("Simulation") {
     double highest = 0.0;
     double slowest = 1e9;
     double fastest = 0.0;
+
+    // Under Test.
     for (TimePoint time{}; time < TimePoint{5min}; time += DT) {
       REQUIRE(simulation.step(Step{.time = time, .dt = DT}));
       const World& world = simulation.world();
@@ -269,6 +295,8 @@ TEST_CASE("Simulation") {
             fastest = std::max(fastest, speed);
           });
     }
+
+    // Postconditions.
     CAPTURE(lowest, highest, slowest, fastest);
     CHECK(lowest > 2500.0);
     CHECK(highest < 9500.0);
@@ -278,6 +306,7 @@ TEST_CASE("Simulation") {
   }
 
   SECTION("ShouldFlyRoutesGivenWindAndTurbulence") {
+    // Preconditions.
     // A 15 m/s wind, and turbulence exceeded once in a thousand hours at
     // altitude, for 737s, F-16s and point-mass aircraft alike.
     Scenario scenario{
@@ -294,6 +323,8 @@ TEST_CASE("Simulation") {
     double highest = 0.0;
     double slowest = 1e9;
     double fastest = 0.0;
+
+    // Under Test.
     for (TimePoint time{}; time < TimePoint{5min}; time += DT) {
       REQUIRE(simulation.step(Step{.time = time, .dt = DT}));
       const World& world = simulation.world();
@@ -309,6 +340,8 @@ TEST_CASE("Simulation") {
             fastest = std::max(fastest, speed);
           });
     }
+
+    // Postconditions.
     CAPTURE(lowest, highest, slowest, fastest);
     CHECK(lowest > 2500.0);
     CHECK(highest < 9500.0);
@@ -320,6 +353,7 @@ TEST_CASE("Simulation") {
   }
 
   SECTION("ShouldDriftWithWindGivenPointMassAircraft") {
+    // Preconditions.
     // The same aircraft, from the same seed, in still air and in a wind:
     // point-mass aircraft fly the same through the air, and the wind carries
     // them by its speed times the time. Within a second FollowRoute steers
@@ -338,9 +372,13 @@ TEST_CASE("Simulation") {
           });
       return result;
     };
+
+    // Under Test.
     std::vector<Position> still = positions({});
     std::vector<Position> windy =
         positions({.north_east_down = meters_per_second(9.0, -12.0, 0.0)});
+
+    // Postconditions.
     REQUIRE(still.size() == windy.size());
     for (std::size_t i = 0; i < still.size(); ++i) {
       // North 9 m/s and east -12 m/s for 1 s: x east, y north.
@@ -397,18 +435,20 @@ TEST_CASE("RigidAircraft") {
   build_small_world(Out(world));
 
   SECTION("ShouldFollowItsBodyGivenFlatEarth") {
+    // Preconditions.
     aircraft::Earth earth = aircraft::Earth::flat();
     Entity aircraft = rigid_737(earth, *data, InOut(world));
     Scheduler scheduler = scheduler_for(earth);
 
+    // Under Test.
     fly_rigid(10s, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     const RigidBody& body = world.store_of<RigidBody>().component_of(aircraft);
     const AirState& state = state_of(world, aircraft);
     AirState expected = earth.air_state(body, 10.0 * second);
     CHECK(state.position == expected.position);
     CHECK(state.speed == expected.speed);
-
     // About 2 km north, without engines: gliding, not tumbling.
     QuantityVector where = state.position.numerical_value_in(meter);
     CHECK(std::abs(where.eigen().y() - 1950.0) < 100.0);
@@ -417,6 +457,7 @@ TEST_CASE("RigidAircraft") {
   }
 
   SECTION("ShouldAgreeWithFlatEarthGivenRoundEarthOverShortFlight") {
+    // Preconditions.
     // Over 10 s the Earth's rotation, curvature and gravity move a 737 a
     // few meters from where a flat Earth puts it.
     aircraft::Earth flat = aircraft::Earth::flat();
@@ -428,9 +469,11 @@ TEST_CASE("RigidAircraft") {
     Scheduler flat_scheduler = scheduler_for(flat);
     Scheduler round_scheduler = scheduler_for(round);
 
+    // Under Test.
     fly_rigid(10s, InOut(flat_scheduler), InOut(world));
     fly_rigid(10s, InOut(round_scheduler), InOut(round_world));
 
+    // Postconditions.
     double apart = aircraft::distance(state_of(world, on_flat),
                                       state_of(round_world, on_round))
                        .numerical_value_in(meter);
@@ -439,13 +482,16 @@ TEST_CASE("RigidAircraft") {
   }
 
   SECTION("ShouldBurnFuelGivenEnginesRunning") {
+    // Preconditions.
     aircraft::Earth earth = aircraft::Earth::flat();
     Entity aircraft = rigid_737(earth, *data, InOut(world));
     Scheduler scheduler = scheduler_for(earth);
     Mass start = aircraft::compute_mass_balance(*data).properties.mass;
 
+    // Under Test.
     fly_rigid(10s, InOut(scheduler), InOut(world));
 
+    // Postconditions.
     // Two engines at about 0.5 kg/s each, for 10 s.
     Mass burned =
         start -
@@ -457,6 +503,7 @@ TEST_CASE("RigidAircraft") {
   }
 
   SECTION("ShouldLeavePointMassAircraftAloneGivenSharedWorld") {
+    // Preconditions.
     AirState start = level(5000.0, 200.0, 0.0);
     Route route =
         route_to(meters(0.0, 500000.0, 5000.0), 200.0 * meter_per_second);
@@ -468,9 +515,11 @@ TEST_CASE("RigidAircraft") {
     Scheduler shared;
     Scheduler single;
 
+    // Under Test.
     fly_rigid(10s, InOut(shared), InOut(world));
     fly_rigid(10s, InOut(single), InOut(alone));
 
+    // Postconditions.
     CHECK(state_of(world, point_mass).position ==
           state_of(alone, by_itself).position);
   }

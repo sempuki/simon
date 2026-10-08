@@ -104,8 +104,11 @@ TEST_CASE("KinematicSingleTrackAgainstCommonRoad") {
   REQUIRE(by_id.size() == 3);
 
   SECTION("ShouldMatchRatesGivenStatesOnAndPastLimits") {
+    // Preconditions.
     double largest = 0.0;
     int rows = 0;
+
+    // Under Test.
     for (const Row& row : load_rows("commonroad_rates.csv")) {
       const vehicle::VehicleParameters& vehicle =
           by_id.at(static_cast<int>(number(row, "vehicle")));
@@ -132,15 +135,20 @@ TEST_CASE("KinematicSingleTrackAgainstCommonRoad") {
       }
       ++rows;
     }
+
+    // Postconditions.
     CAPTURE(largest);
     CHECK(rows == 1200);
     CHECK(largest < 1e-15);
   }
 
   SECTION("ShouldMatchPathsGivenRungeKutta4") {
+    // Preconditions.
     // The same Runge-Kutta 4 at 0.05 s agrees with CommonRoad's to rounding,
     // and is within millimeters of the path converged at 0.0005 s.
     std::vector<Row> rows = load_rows("commonroad_paths.csv");
+
+    // Under Test.
     for (const auto& [id, vehicle] : by_id) {
       CAPTURE(id);
       std::vector<KinematicSingleTrack> theirs;

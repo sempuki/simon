@@ -26,10 +26,13 @@ auto load(std::string_view file) -> road::Map {
 
 TEST_CASE("RoadDrawing") {
   SECTION("ShouldCoverTheRingsLanes") {
+    // Under Test.
+    RoadDrawing drawing = draw_roads(load("ring.xodr"), 1.0);
+
+    // Postconditions.
     // Two half circles of radius 100 m, two 3.5 m lanes each way: an
     // annulus from 93 m to 107 m, drawn as 315 chords a half, each turning
     // pi / 315. The inscribed polygon's area is the chords' triangles'.
-    RoadDrawing drawing = draw_roads(load("ring.xodr"), 1.0);
     double area = 0.0;
     for (const LaneStrip& strip : drawing.lanes) {
       if (strip.type == "driving") {
@@ -45,6 +48,7 @@ TEST_CASE("RoadDrawing") {
   }
 
   SECTION("ShouldDrawEveryLane") {
+    // Preconditions.
     // Every lane of every lane section of CARLA's Town01, each border
     // sampled at the same s.
     road::Map network = load("Town01.xodr");
@@ -54,7 +58,11 @@ TEST_CASE("RoadDrawing") {
         lanes += section.left.size() + section.right.size();
       }
     }
+
+    // Under Test.
     RoadDrawing drawing = draw_roads(network, 2.0);
+
+    // Postconditions.
     CHECK(drawing.lanes.size() == lanes);
     for (const LaneStrip& strip : drawing.lanes) {
       REQUIRE(strip.inner.size() == strip.outer.size());
@@ -63,8 +71,11 @@ TEST_CASE("RoadDrawing") {
   }
 
   SECTION("ShouldMeetAcrossRoadLinks") {
-    // Each ring half's driving lanes end where the next half's start.
+    // Under Test.
     RoadDrawing drawing = draw_roads(load("ring.xodr"), 1.0);
+
+    // Postconditions.
+    // Each ring half's driving lanes end where the next half's start.
     double worst = 0.0;
     for (const LaneStrip& a : drawing.lanes) {
       double nearest = 1e9;

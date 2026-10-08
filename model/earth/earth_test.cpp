@@ -21,6 +21,7 @@ constexpr double DEGREE = std::numbers::pi / 180.0;
 
 TEST_CASE("Geodetic") {
   SECTION("ShouldRoundTripGivenAnyPlaceAndAltitude") {
+    // Under Test.
     for (double latitude = -89.0; latitude <= 89.0; latitude += 7.3) {
       for (double altitude : {-500.0, 0.0, 6000.0, 100000.0}) {
         Geodetic where{.latitude = latitude * DEGREE * radian,
@@ -41,6 +42,7 @@ TEST_CASE("Geodetic") {
   }
 
   SECTION("ShouldMatchIterationGivenHighLatitude") {
+    // Preconditions.
     // Bowring's fixed-point iteration, run to convergence, as an independent
     // reference (see model/REFERENCES.md).
     QuantityVector xyz =
@@ -61,36 +63,56 @@ TEST_CASE("Geodetic") {
       latitude = std::atan2(
           z, p * (1.0 - ECCENTRICITY_SQUARED * normal / (normal + height)));
     }
+
+    // Under Test.
     Geodetic found = convert_fixed_to_geodetic(xyz * meter);
+
+    // Postconditions.
     CHECK_THAT(found.altitude.numerical_value_in(meter),
                WithinAbs(height, 1e-6));
     CHECK_THAT(radians(found.latitude), WithinAbs(latitude, 1e-12));
   }
 
   SECTION("ShouldLieOnAxesGivenEquatorAndPole") {
+    // Under Test.
     QuantityVector equator =
         convert_geodetic_to_fixed(Geodetic{}).numerical_value_in(meter);
+
+    // Postconditions.
     CHECK(equator.is_approximately(QuantityVector{SEMIMAJOR_AXIS, 0.0, 0.0}));
+
+    // Under Test.
     QuantityVector pole =
         convert_geodetic_to_fixed(Geodetic{.latitude = 90.0 * DEGREE * radian})
             .numerical_value_in(meter);
+
+    // Postconditions.
     CHECK_THAT(pole.eigen().z(), WithinAbs(SEMIMINOR_AXIS, 1e-6));
   }
 }
 
 TEST_CASE("Gravitation") {
   SECTION("ShouldMatchWgs84GivenEquatorAndPole") {
+    // Preconditions.
     // Effective gravity is 9.7803253 m/s^2 at the equator and 9.8321849 at
     // the poles (WGS84); gravitation is that plus the centrifugal part.
     double centrifugal = ROTATION_RATE * ROTATION_RATE * SEMIMAJOR_AXIS;
+
+    // Under Test.
     double equator =
         magnitude(compute_gravitation(convert_geodetic_to_fixed(Geodetic{}))
                       .numerical_value_in(meter_per_second_squared));
+
+    // Postconditions.
     CHECK_THAT(equator - centrifugal, WithinRel(9.7803253, 1e-4));
+
+    // Under Test.
     double pole =
         magnitude(compute_gravitation(convert_geodetic_to_fixed(Geodetic{
                                           .latitude = 90.0 * DEGREE * radian}))
                       .numerical_value_in(meter_per_second_squared));
+
+    // Postconditions.
     CHECK_THAT(pole, WithinRel(9.8321849, 1e-4));
   }
 }

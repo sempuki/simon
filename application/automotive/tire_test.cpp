@@ -77,12 +77,15 @@ TEST_CASE("MagicFormulaTireAgainstChrono") {
   };
 
   SECTION("ShouldMatchForcesWhereChronoKeepsTheFormula") {
-    // Without camber and inside the clamp, the forces differ only by
-    // Chrono's 0.1 in each B, relative to the load.
+    // Preconditions.
     double longitudinal = 0.0;
     double lateral = 0.0;
     double aligning = 0.0;
     int compared = 0;
+
+    // Under Test.
+    // Without camber and inside the clamp, the forces differ only by
+    // Chrono's 0.1 in each B, relative to the load.
     for (const Row& row : rows) {
       if (number(row, "gamma") != 0.0 || !unclamped(tire, row)) {
         continue;
@@ -106,6 +109,8 @@ TEST_CASE("MagicFormulaTireAgainstChrono") {
       }
       ++compared;
     }
+
+    // Postconditions.
     CAPTURE(compared, longitudinal, lateral, aligning);
     CHECK(compared > 400);
     CHECK(longitudinal < 1e-4);
@@ -114,6 +119,7 @@ TEST_CASE("MagicFormulaTireAgainstChrono") {
   }
 
   SECTION("ShouldDepartWhereChronoDeparts") {
+    // Preconditions.
     // Beyond the clamp, with camber, and by the friction ellipsis, Chrono's
     // forces differ from the formula: by up to 7.7% of the load beyond the
     // clamp, 0.48% at a camber of 0.03 rad, and 60% where the ellipsis
@@ -121,6 +127,8 @@ TEST_CASE("MagicFormulaTireAgainstChrono") {
     double clamped = 0.0;
     double cambered = 0.0;
     double ellipsis = 0.0;
+
+    // Under Test.
     for (const Row& row : rows) {
       vehicle::TireForce force = force_of(row);
       double load = number(row, "load");
@@ -138,6 +146,8 @@ TEST_CASE("MagicFormulaTireAgainstChrono") {
                       relative(fy, number(row, "ellipsis_fy"), load)});
       }
     }
+
+    // Postconditions.
     CAPTURE(clamped, cambered, ellipsis);
     CHECK(clamped > 0.05);
     CHECK(cambered > 0.003);

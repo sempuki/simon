@@ -102,15 +102,19 @@ auto position_errors(std::string_view table) -> Largest {
 
 TEST_CASE("OpenDriveAgainstLibOpenDrive") {
   SECTION("ShouldMatchPositionsGivenLinesArcsAndSpirals") {
+    // Under Test.
     // Through elevation and superelevation, on and off the surface, to
     // rounding.
     Largest largest = position_errors("libopendrive_positions.csv");
+
+    // Postconditions.
     CAPTURE(largest["curves.xodr"], largest["Town01.xodr"]);
     CHECK(largest["curves.xodr"] < 1e-12);
     CHECK(largest["Town01.xodr"] < 1e-12);
   }
 
   SECTION("ShouldFollowArcLengthGivenParamPoly3") {
+    // Under Test.
     // s is arc length. simon finds it to rounding, as an independent
     // quadrature does; libOpenDRIVE's table of chords, made to 1 cm, is 5.4 mm
     // off at most.
@@ -134,12 +138,15 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
           std::max(theirs, std::hypot(number(row, "x") - number(truth, "x"),
                                       number(row, "y") - number(truth, "y")));
     }
+
+    // Postconditions.
     CAPTURE(ours, theirs);
     CHECK(ours < 1e-9);
     CHECK(theirs < 0.05);
   }
 
   SECTION("ShouldMatchLaneBorders") {
+    // Under Test.
     Largest largest;
     for (const Row& row : load_rows("libopendrive_borders.csv")) {
       double border =
@@ -149,6 +156,8 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
       double& most = largest[row.at("file")];
       most = std::max(most, std::abs(border - number(row, "t")));
     }
+
+    // Postconditions.
     for (const auto& [file, most] : largest) {
       CAPTURE(file, most);
       CHECK(most < 1e-12);
@@ -156,6 +165,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
   }
 
   SECTION("ShouldMatchLaneGraph") {
+    // Preconditions.
     // Every edge, by road id, lane section start and lane id, in each file.
     using Edge = std::tuple<std::string, std::string, double, int, std::string,
                             double, int>;
@@ -168,6 +178,8 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
           static_cast<int>(number(row, "from_lane")), row.at("to_road"),
           number(row, "to_section"), static_cast<int>(number(row, "to_lane")));
     }
+
+    // Under Test.
     std::set<Edge> ours;
     for (const std::string& file : files) {
       const road::Map& network = find_network(file);
@@ -180,11 +192,14 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
                      to.lane_sections[edge.to.section].s0, edge.to.lane);
       }
     }
+
+    // Postconditions.
     CHECK(theirs.size() == EDGES);
     CHECK(ours == theirs);
   }
 
   SECTION("ShouldMatchSignals") {
+    // Under Test.
     // Every field as read, every validity, and where each stands, to
     // rounding.
     std::map<std::string, std::set<std::pair<int, int>>, std::less<>> theirs;
@@ -218,6 +233,8 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
           Vector3{number(row, "x"), number(row, "y"), number(row, "z")};
       farthest = std::max(farthest, apart.norm());
     }
+
+    // Postconditions.
     for (const auto& [key, validities] : theirs) {
       std::vector<std::string> cells = split_cells(key);
       Row row{{"file", cells[0]}, {"road", cells[1]}, {"id", cells[2]}};
@@ -234,6 +251,7 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
   }
 
   SECTION("ShouldMatchObjectOutlines") {
+    // Under Test.
     // Each corner of each crosswalk, in road coordinates or turned, pitched
     // and rolled in its own frame, on a road that climbs and leans, to
     // rounding.
@@ -268,12 +286,15 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
           Vector3{number(row, "x"), number(row, "y"), number(row, "z")};
       farthest = std::max(farthest, apart.norm());
     }
+
+    // Postconditions.
     CAPTURE(farthest);
     CHECK(objects.size() == 7);
     CHECK(farthest < 1e-12);
   }
 
   SECTION("ShouldMatchJunctionPrioritiesAndControllers") {
+    // Preconditions.
     std::set<std::string> theirs;
     std::set<std::string> files;
     for (const Row& row : load_rows("libopendrive_successors.csv")) {
@@ -284,6 +305,8 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
                     row.at("kind") + "," + row.at("first") + "," +
                     row.at("second") + "," + row.at("third"));
     }
+
+    // Under Test.
     std::set<std::string> ours;
     for (const std::string& file : files) {
       for (const road::Junction& junction : find_network(file).junctions) {
@@ -299,11 +322,14 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
         }
       }
     }
+
+    // Postconditions.
     CHECK(theirs.size() == 7);
     CHECK(ours == theirs);
   }
 
   SECTION("ShouldFindLaneGivenLaneMiddle") {
+    // Under Test.
     // libOpenDRIVE keys lanes by outer border, so where a lane has no width
     // and shares its neighbor's border, it can give that lane for a point in
     // the neighbor's middle. That is the only way the two may differ.
@@ -322,6 +348,8 @@ TEST_CASE("OpenDriveAgainstLibOpenDrive") {
               road::compute_lane_border(road, s, inner));
       }
     }
+
+    // Postconditions.
     CHECK(differ == 1);
   }
 }

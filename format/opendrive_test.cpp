@@ -98,7 +98,10 @@ auto edited(std::string_view from, std::string_view to) -> std::string {
 
 TEST_CASE("OpenDrive") {
   SECTION("ShouldReadRoadGivenDocument") {
+    // Under Test.
     auto network = parse_opendrive(ROAD);
+
+    // Postconditions.
     REQUIRE(network);
     const Road* road = network->find_road("7");
     REQUIRE(road);
@@ -129,7 +132,10 @@ TEST_CASE("OpenDrive") {
   }
 
   SECTION("ShouldReadSignalsGivenRoad") {
+    // Under Test.
     auto network = parse_opendrive(ROAD);
+
+    // Postconditions.
     REQUIRE(network);
     const Road& road = *network->find_road("7");
     REQUIRE(road.signals.size() == 2);
@@ -157,7 +163,10 @@ TEST_CASE("OpenDrive") {
   }
 
   SECTION("ShouldReadObjectsGivenRoad") {
+    // Under Test.
     auto network = parse_opendrive(ROAD);
+
+    // Postconditions.
     REQUIRE(network);
     const Road& road = *network->find_road("7");
     REQUIRE(road.objects.size() == 1);
@@ -181,7 +190,10 @@ TEST_CASE("OpenDrive") {
   }
 
   SECTION("ShouldReadControllersAndPrioritiesGivenNetwork") {
+    // Under Test.
     auto network = parse_opendrive(ROAD);
+
+    // Postconditions.
     REQUIRE(network);
     REQUIRE(network->controllers.size() == 1);
     const SignalController& controller = network->controllers[0];
@@ -200,92 +212,128 @@ TEST_CASE("OpenDrive") {
   }
 
   SECTION("ShouldRefuseGivenUnknownOrientation") {
+    // Under Test.
     auto network = parse_opendrive(
         edited(R"(orientation="+")", R"(orientation="sideways")"));
+
+    // Postconditions.
     REQUIRE_FALSE(network);
     CHECK_THAT(std::string{network.error().message()},
                ContainsSubstring("sideways"));
   }
 
   SECTION("ShouldRefuseGivenUnknownDynamic") {
+    // Under Test.
     auto network =
         parse_opendrive(edited(R"(dynamic="yes")", R"(dynamic="maybe")"));
+
+    // Postconditions.
     REQUIRE_FALSE(network);
     CHECK_THAT(std::string{network.error().message()},
                ContainsSubstring("maybe"));
   }
 
   SECTION("ShouldRefuseGivenValidityBackward") {
+    // Under Test.
     auto network = parse_opendrive(
         edited(R"(fromLane="-1" toLane="1")", R"(fromLane="1" toLane="-1")"));
+
+    // Postconditions.
     REQUIRE_FALSE(network);
     CHECK_THAT(std::string{network.error().message()},
                ContainsSubstring("fromLane after toLane"));
   }
 
   SECTION("ShouldRefuseGivenMixedCorners") {
+    // Under Test.
     auto network =
         parse_opendrive(edited(R"(<cornerLocal u="2" v="-3" z="0"/>)",
                                R"(<cornerRoad s="96" t="-3"/>)"));
+
+    // Postconditions.
     REQUIRE_FALSE(network);
     CHECK_THAT(std::string{network.error().message()},
                ContainsSubstring("mixes"));
   }
 
   SECTION("ShouldRefuseGivenPriorityWithoutLow") {
+    // Under Test.
     auto network = parse_opendrive(edited(R"( low="10")", ""));
+
+    // Postconditions.
     REQUIRE_FALSE(network);
     CHECK_THAT(std::string{network.error().message()},
                ContainsSubstring("needs high and low"));
   }
 
   SECTION("ShouldRefuseGivenUnknownContactPoint") {
+    // Under Test.
     auto network = parse_opendrive(
         edited(R"(contactPoint="end"/>)", R"(contactPoint="middle"/>)"));
+
+    // Postconditions.
     REQUIRE_FALSE(network);
     CHECK_THAT(std::string{network.error().message()},
                ContainsSubstring("middle"));
   }
 
   SECTION("ShouldSayWhereGivenMissingAttribute") {
+    // Under Test.
     auto network = parse_opendrive(edited(R"(curvature="0.01")", ""));
+
+    // Postconditions.
     REQUIRE_FALSE(network);
     CHECK_THAT(std::string{network.error().message()},
                ContainsSubstring("line 11") && ContainsSubstring("curvature"));
   }
 
   SECTION("ShouldRefuseGivenBadNumber") {
+    // Under Test.
     auto network = parse_opendrive(edited(R"(a="3.5")", R"(a="wide")"));
+
+    // Postconditions.
     REQUIRE_FALSE(network);
     CHECK_THAT(std::string{network.error().message()},
                ContainsSubstring("not a finite number"));
   }
 
   SECTION("ShouldRefuseGivenPoly3") {
+    // Under Test.
     auto network = parse_opendrive(edited("<line/>", R"(<poly3 a="0"/>)"));
+
+    // Postconditions.
     REQUIRE_FALSE(network);
     CHECK_THAT(std::string{network.error().message()},
                ContainsSubstring("deprecated"));
   }
 
   SECTION("ShouldRefuseGivenLaneBorders") {
+    // Under Test.
     auto network = parse_opendrive(edited(R"(<width sOffset="0" a="1"/>)",
                                           R"(<border sOffset="0" a="1"/>)"));
+
+    // Postconditions.
     REQUIRE_FALSE(network);
     CHECK_THAT(std::string{network.error().message()},
                ContainsSubstring("widths"));
   }
 
   SECTION("ShouldRefuseGivenGapInLaneIds") {
+    // Under Test.
     auto network =
         parse_opendrive(edited(R"(<lane id="-2")", R"(<lane id="-3")"));
+
+    // Postconditions.
     REQUIRE_FALSE(network);
     CHECK_THAT(std::string{network.error().message()},
                ContainsSubstring("without a gap"));
   }
 
   SECTION("ShouldRefuseGivenMalformedXml") {
+    // Under Test.
     auto network = parse_opendrive("<OpenDRIVE><road>");
+
+    // Postconditions.
     REQUIRE_FALSE(network);
     CHECK_FALSE(load_opendrive("no/such/file.xodr"));
   }

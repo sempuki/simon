@@ -32,7 +32,10 @@ auto load(std::string_view name) -> osc::Scenario {
 
 TEST_CASE("OpenScenario") {
   SECTION("ShouldEvaluateExpressionsGivenParameters") {
+    // Preconditions.
     std::vector<osc::Parameter> parameters{{.name = "Speed", .value = "20"}};
+
+    // Postconditions.
     CHECK(format::evaluate_expression("250/3.6", parameters).value() ==
           250.0 / 3.6);
     CHECK(format::evaluate_expression("-($Speed + 4) * 2 % 7", parameters)
@@ -44,7 +47,10 @@ TEST_CASE("OpenScenario") {
   }
 
   SECTION("ShouldReadEntitiesFromTheCatalog") {
+    // Under Test.
     osc::Scenario scenario = load("cut-in_simple.xosc");
+
+    // Postconditions.
     CHECK(scenario.road_network.ends_with("esmini/xodr/straight_500m.xodr"));
     REQUIRE(scenario.entities.size() == 2);
     const osc::Entity* ego = scenario.find_entity("Ego");
@@ -59,7 +65,10 @@ TEST_CASE("OpenScenario") {
   }
 
   SECTION("ShouldReadTheStoryboard") {
+    // Under Test.
     osc::Scenario scenario = load("cut-in_simple.xosc");
+
+    // Postconditions.
     const osc::Storyboard& storyboard = scenario.storyboard;
     REQUIRE(storyboard.init.size() == 2);
     const auto& teleport =
@@ -74,7 +83,6 @@ TEST_CASE("OpenScenario") {
     CHECK(relative.dt == 3.1);
     REQUIRE(relative.orientation.has_value());
     CHECK(!relative.orientation->relative);
-
     REQUIRE(storyboard.stories.size() == 1);
     const osc::Act& act = storyboard.stories[0].acts[0];
     REQUIRE(act.groups.size() == 1);
@@ -99,6 +107,7 @@ TEST_CASE("OpenScenario") {
   }
 
   SECTION("ShouldReadEveryScenario") {
+    // Postconditions.
     for (std::string_view name :
          {"cut-in_simple.xosc", "cut-in.xosc", "lane_change_simple.xosc",
           "traffic_lights.xosc"}) {
@@ -108,14 +117,16 @@ TEST_CASE("OpenScenario") {
   }
 
   SECTION("ShouldReadPedestriansRoutesTrajectoriesAndSignals") {
+    // Under Test.
     osc::Scenario scenario = load("traffic_lights.xosc");
+
+    // Postconditions.
     const osc::Entity* walker = scenario.find_entity("Pedestrian_1");
     REQUIRE(walker != nullptr);
     CHECK(walker->kind == osc::Entity::Kind::PEDESTRIAN);
     CHECK(walker->vehicle.dimensions[0] == 0.6);
     CHECK(walker->vehicle.max_speed == 1e10);
     CHECK(scenario.find_entity("Ego")->kind == osc::Entity::Kind::VEHICLE);
-
     const osc::Storyboard& storyboard = scenario.storyboard;
     REQUIRE(storyboard.global_init.size() == 3);
     const auto& red =
@@ -127,7 +138,6 @@ TEST_CASE("OpenScenario") {
     REQUIRE(route.route.waypoints.size() == 2);
     CHECK(std::get<osc::LanePosition>(route.route.waypoints[1].position).road ==
           "2");
-
     const osc::Act& act = storyboard.stories[0].acts[0];
     const osc::Event& walk = act.groups[1].maneuvers[0].events[0];
     const auto& follow = std::get<osc::FollowTrajectoryAction>(
@@ -147,6 +157,7 @@ TEST_CASE("OpenScenario") {
   }
 
   SECTION("ShouldReadTrafficSignalControllers") {
+    // Preconditions.
     constexpr std::string_view CONTROLLED = R"(<OpenSCENARIO>
       <RoadNetwork>
         <LogicFile filepath="road.xodr"/>
@@ -165,7 +176,11 @@ TEST_CASE("OpenScenario") {
       <Entities/>
       <Storyboard><Init><Actions/></Init></Storyboard>
     </OpenSCENARIO>)";
+
+    // Under Test.
     auto scenario = format::parse_openscenario(CONTROLLED, ".");
+
+    // Postconditions.
     REQUIRE(scenario.has_value());
     REQUIRE(scenario->signal_controllers.size() == 2);
     const osc::TrafficSignalController& main = scenario->signal_controllers[0];
@@ -178,6 +193,7 @@ TEST_CASE("OpenScenario") {
   }
 
   SECTION("ShouldRefuseWhatItDoesNotRun") {
+    // Preconditions.
     constexpr std::string_view ROUTED = R"(<OpenSCENARIO>
       <RoadNetwork><LogicFile filepath="road.xodr"/></RoadNetwork>
       <Entities/>
@@ -185,10 +201,6 @@ TEST_CASE("OpenScenario") {
         <RoutingAction/>
       </PrivateAction></Private></Actions></Init></Storyboard>
     </OpenSCENARIO>)";
-    auto scenario = format::parse_openscenario(ROUTED, ".");
-    REQUIRE(!scenario.has_value());
-    CHECK(scenario.error().message().find("RoutingAction") !=
-          std::string::npos);
     // A trajectory steered toward rather than held to.
     constexpr std::string_view FOLLOWED = R"(<OpenSCENARIO>
       <RoadNetwork><LogicFile filepath="road.xodr"/></RoadNetwork>
@@ -204,12 +216,25 @@ TEST_CASE("OpenScenario") {
         </FollowTrajectoryAction></RoutingAction>
       </PrivateAction></Private></Actions></Init></Storyboard>
     </OpenSCENARIO>)";
+
+    // Under Test.
+    auto scenario = format::parse_openscenario(ROUTED, ".");
+
+    // Postconditions.
+    REQUIRE(!scenario.has_value());
+    CHECK(scenario.error().message().find("RoutingAction") !=
+          std::string::npos);
+
+    // Under Test.
     auto followed = format::parse_openscenario(FOLLOWED, ".");
+
+    // Postconditions.
     REQUIRE(!followed.has_value());
     CHECK(followed.error().message().find("follow") != std::string::npos);
   }
 
   SECTION("ShouldRefuseRouteStrategiesButShortest") {
+    // Preconditions.
     auto routed = [](std::string_view strategy) {
       return std::string{R"(<OpenSCENARIO>
       <RoadNetwork><LogicFile filepath="road.xodr"/></RoadNetwork>
@@ -225,8 +250,12 @@ TEST_CASE("OpenScenario") {
       </PrivateAction></Private></Actions></Init></Storyboard>
     </OpenSCENARIO>)";
     };
-    CHECK(format::parse_openscenario(routed("shortest"), ".").has_value());
+
+    // Under Test.
     auto fastest = format::parse_openscenario(routed("fastest"), ".");
+
+    // Postconditions.
+    CHECK(format::parse_openscenario(routed("shortest"), ".").has_value());
     REQUIRE(!fastest.has_value());
     CHECK(fastest.error().message().find("fastest") != std::string::npos);
   }

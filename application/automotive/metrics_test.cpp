@@ -34,7 +34,10 @@ TEST_CASE("MetricsAgainstNuPlan") {
   REQUIRE(runs.size() == 3);
 
   SECTION("ShouldMatchComfortSignals") {
+    // Preconditions.
     double largest = 0.0;
+
+    // Under Test.
     for (const auto& [scenario, rows] : runs) {
       std::vector<traffic::DrivingSample> samples;
       for (const Row& row : rows) {
@@ -60,6 +63,8 @@ TEST_CASE("MetricsAgainstNuPlan") {
         }
       }
     }
+
+    // Postconditions.
     CAPTURE(largest);
     // nuPlan rounds each signal to 8 decimals: a value on a rounding's edge
     // can land a unit either side, and a jerk carries it through its
@@ -68,8 +73,11 @@ TEST_CASE("MetricsAgainstNuPlan") {
   }
 
   SECTION("ShouldMatchTimeToCollision") {
+    // Preconditions.
     int compared = 0;
     int agree = 0;
+
+    // Under Test.
     for (const auto& [scenario, rows] : runs) {
       // The other vehicle's place at each time, from esmini's runs.
       std::map<std::string, std::vector<Row>> others;
@@ -119,6 +127,8 @@ TEST_CASE("MetricsAgainstNuPlan") {
         }
       }
     }
+
+    // Postconditions.
     CAPTURE(compared, agree);
     CHECK(agree == compared);
   }

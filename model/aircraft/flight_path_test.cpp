@@ -36,9 +36,11 @@ TEST_CASE("PointMassRate") {
   earth::Air air = earth::standard_air(5000.0 * meter);
 
   SECTION("ShouldHoldPathGivenLevelUnbankedFlight") {
+    // Under Test.
     AirStateRate rate =
         compute_point_mass_rate(level(200.0, 0.0), FlightControls{}, JET, air);
 
+    // Postconditions.
     CHECK_THAT(rate.climb.numerical_value_in(radian_per_second),
                WithinAbs(0.0, 1e-12));
     CHECK_THAT(rate.turn.numerical_value_in(radian_per_second),
@@ -50,12 +52,16 @@ TEST_CASE("PointMassRate") {
   }
 
   SECTION("ShouldTurnAtCoordinatedRateGivenBankAndMatchingLoadFactor") {
+    // Preconditions.
     double bank = PI / 3.0;
     FlightControls controls{.load_factor = 1.0 / std::cos(bank),
                             .bank = bank * radian};
+
+    // Under Test.
     AirStateRate rate =
         compute_point_mass_rate(level(200.0, 0.0), controls, JET, air);
 
+    // Postconditions.
     CHECK_THAT(rate.climb.numerical_value_in(radian_per_second),
                WithinAbs(0.0, 1e-12));
     CHECK_THAT(rate.turn.numerical_value_in(radian_per_second),
@@ -63,6 +69,7 @@ TEST_CASE("PointMassRate") {
   }
 
   SECTION("ShouldBalanceThrustAndDragGivenTrimThrottle") {
+    // Preconditions.
     // Drag at 200 m/s and 5 km, in level flight, from the drag polar.
     double rho = air.density.numerical_value_in(kilogram_per_cubic_meter);
     double qs = 0.5 * rho * 200.0 * 200.0 * 50.0;
@@ -71,9 +78,11 @@ TEST_CASE("PointMassRate") {
     double throttle = drag / (100000.0 * rho / 1.225);
     FlightControls controls{.throttle = throttle};
 
+    // Under Test.
     AirStateRate rate =
         compute_point_mass_rate(level(200.0, 0.0), controls, JET, air);
 
+    // Postconditions.
     CHECK_THAT(rate.acceleration.numerical_value_in(meter_per_second_squared),
                WithinAbs(0.0, 1e-9));
   }
@@ -81,18 +90,20 @@ TEST_CASE("PointMassRate") {
 
 TEST_CASE("Fly") {
   SECTION("ShouldMoveAlongHeadingGivenSteadyFlight") {
+    // Preconditions.
     AirState state = level(100.0, PI / 2.0);  // East.
     AirStateRate rate{.velocity = compute_velocity(state)};
 
+    // Under Test.
     AirState next = fly(state, rate, 2s);
 
+    // Postconditions.
     CHECK(next.position.numerical_value_in(meter).is_approximately(
         QuantityVector{200.0, 0.0, 5000.0}, 1e-9));
   }
 
   SECTION("ShouldMoveAlongNewVelocityGivenClimbingTurn") {
-    // The position follows the velocity at the end of the step, to first
-    // order in the step.
+    // Preconditions.
     AirState state = level(200.0, 0.4);
     state.flight_path_angle = 0.1 * radian;
     FlightControls controls{
@@ -100,31 +111,41 @@ TEST_CASE("Fly") {
     AirStateRate rate = compute_point_mass_rate(
         state, controls, JET, earth::standard_air(5000.0 * meter));
 
+    // Under Test.
     AirState next = fly(state, rate, 20ms);
+
+    // Postconditions.
+    // The position follows the velocity at the end of the step, to first
+    // order in the step.
     QuantityVector expected =
         (state.position + compute_velocity(next) * (0.02 * second))
             .numerical_value_in(meter);
-
     CHECK(next.position.numerical_value_in(meter).is_approximately(expected,
                                                                    1e-3));
   }
 
   SECTION("ShouldWrapHeadingGivenTurnPastSouth") {
+    // Preconditions.
     AirState state = level(100.0, 3.0);
     AirStateRate rate{.turn = 0.5 * radian_per_second};
 
+    // Under Test.
     AirState next = fly(state, rate, 1s);
 
+    // Postconditions.
     CHECK_THAT(radians(next.heading), WithinAbs(3.5 - 2.0 * PI, 1e-12));
   }
 
   SECTION("ShouldMatchAdvanceGivenNoChangeInVelocity") {
+    // Preconditions.
     AirState state = level(100.0, 0.3);
     AirStateRate rate{.velocity = compute_velocity(state)};
 
+    // Under Test.
     AirState flown = fly(state, rate, 500ms);
     AirState advanced = advance(state, rate, 500ms);
 
+    // Postconditions.
     CHECK(flown.position.numerical_value_in(meter).is_approximately(
         advanced.position.numerical_value_in(meter), 1e-9));
   }
@@ -132,32 +153,45 @@ TEST_CASE("Fly") {
 
 TEST_CASE("AutopilotLaws") {
   SECTION("ShouldClimbAtMostSteepestGivenFarBelowAltitude") {
+    // Under Test.
     Angle gamma = compute_climb_command(level(200.0, 0.0), 9000.0 * meter,
                                         0.2 * per_second, 0.25 * radian);
+
+    // Postconditions.
     CHECK(radians(gamma) == 0.25);
   }
 
   SECTION("ShouldClimbGentlyGivenNearAltitude") {
+    // Under Test.
     Angle gamma = compute_climb_command(level(200.0, 0.0), 5100.0 * meter,
                                         0.2 * per_second, 0.25 * radian);
+
+    // Postconditions.
     CHECK_THAT(radians(gamma), WithinRel(std::asin(20.0 / 200.0), 1e-12));
   }
 
   SECTION("ShouldHoldOneGGivenLevelPathAndNoBank") {
+    // Under Test.
     double n = compute_load_factor_command(level(200.0, 0.0), 0.0 * radian,
                                            0.0 * radian, 1.0 * per_second);
+
+    // Postconditions.
     CHECK_THAT(n, WithinAbs(1.0, 1e-12));
   }
 
   SECTION("ShouldTurnTheShortWayGivenTargetAcrossSouth") {
+    // Under Test.
     // From 170 degrees to -170 degrees is 20 degrees to the right.
     Angle bank = compute_bank_command(level(200.0, 170.0 * PI / 180.0),
                                       -170.0 * PI / 180.0 * radian,
                                       0.5 * per_second, 1.0 * radian);
+
+    // Postconditions.
     CHECK(radians(bank) > 0.0);
   }
 
   SECTION("ShouldMeasureBearingFromNorthTowardEast") {
+    // Postconditions.
     CHECK_THAT(radians(compute_bearing(meters(0, 0, 0), meters(10, 0, 0))),
                WithinAbs(PI / 2.0, 1e-12));
     CHECK_THAT(radians(compute_bearing(meters(0, 0, 0), meters(0, 10, 0))),

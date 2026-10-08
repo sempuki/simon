@@ -34,6 +34,7 @@ TEST_CASE("ConstraintsAgainstMuJoCo") {
     // run, as MuJoCo's to rounding. Where a contact starts exactly touching,
     // or a stack's boxes slip, rounding alone moves MuJoCo's own run far,
     // and the spread it measures says how far.
+    // Preconditions.
     std::map<std::string, Run, std::less<>> runs =
         load_runs("mujoco_constraints.csv");
     using Solver = articulated::Physics::Solver;
@@ -91,6 +92,8 @@ TEST_CASE("ConstraintsAgainstMuJoCo") {
     auto local = load_local_steps();
     auto spreads = load_spreads();
     auto solved = load_solved_runs();
+
+    // Under Test.
     for (Case& c : cases) {
       CAPTURE(c.name);
       c.scenario.model = c.file == "humanoid" ? std::string{HUMANOID}
@@ -113,6 +116,7 @@ TEST_CASE("ConstraintsAgainstPhysics") {
   const std::vector<Solver> solvers{Solver::NEWTON, Solver::PGS};
 
   SECTION("ShouldSolveTreesApartGivenNoContactBetweenThem") {
+    // Preconditions.
     // The box and the log touch only the floor, so each is its own
     // island; a stack's boxes touch each other, so they are one.
     auto islands = [](const std::string& file) {
@@ -127,15 +131,24 @@ TEST_CASE("ConstraintsAgainstPhysics") {
       std::ranges::sort(found);
       return found;
     };
-    CHECK(islands("sliding.xml") == std::vector<std::uint32_t>{0, 1});
-    CHECK(islands("boxes.xml") == std::vector<std::uint32_t>{0, 0, 0, 0, 0});
+
+    // Under Test.
+    std::vector<std::uint32_t> sliding = islands("sliding.xml");
+    std::vector<std::uint32_t> stack = islands("boxes.xml");
+
+    // Postconditions.
+    CHECK(sliding == std::vector<std::uint32_t>{0, 1});
+    CHECK(stack == std::vector<std::uint32_t>{0, 0, 0, 0, 0});
   }
 
   SECTION("ShouldComeToRestGivenAFallenHumanoid") {
+    // Preconditions.
     // MuJoCo's humanoid falls from standing, slumps, and lies on the
     // floor, as MuJoCo's does: 0.070 m high at 20 s, still settling.
     Simulation simulation{Scenario{.model = std::string{HUMANOID}}};
     REQUIRE(simulation.configure());
+
+    // Under Test.
     step_for(InOut(simulation), 20.0);
     std::vector<double> q = simulation.read_qpos();
     std::vector<double> v = simulation.read_qvel();
@@ -143,12 +156,15 @@ TEST_CASE("ConstraintsAgainstPhysics") {
     for (double x : v) {
       speed = std::max(speed, std::abs(x));
     }
+
+    // Postconditions.
     CAPTURE(q[2], speed);
     CHECK(q[2] < 0.1);
     CHECK(speed < 0.1);
   }
 
   SECTION("ShouldSlideAsFarAsCoulombFrictionAllows") {
+    // Under Test.
     for (Solver solver : solvers) {
       Simulation simulation{
           Scenario{.model = std::string{MODELS} + "sliding.xml",
@@ -164,6 +180,7 @@ TEST_CASE("ConstraintsAgainstPhysics") {
   }
 
   SECTION("ShouldRollAtFiveSeventhsOfItsSpeed") {
+    // Under Test.
     for (Solver solver : solvers) {
       Simulation simulation{
           Scenario{.model = std::string{MODELS} + "rolling.xml",
@@ -180,6 +197,7 @@ TEST_CASE("ConstraintsAgainstPhysics") {
   }
 
   SECTION("ShouldRestGivenAStack") {
+    // Under Test.
     for (Solver solver : solvers) {
       Simulation simulation{Scenario{.model = std::string{MODELS} + "boxes.xml",
                                      .solver = solver}};

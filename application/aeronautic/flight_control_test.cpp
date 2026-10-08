@@ -64,6 +64,7 @@ TEST_CASE("FlightControl737") {
   REQUIRE(rows.size() > 800);
 
   SECTION("ShouldMatchJsbsimGivenRecordedCommandsAndState") {
+    // Preconditions.
     // Kinematic blocks start where JSBSim's first frame left them.
     aircraft::FlightSignals signals;
     for (const aircraft::FlightBlock& block : controls.blocks) {
@@ -74,9 +75,10 @@ TEST_CASE("FlightControl737") {
         signals.values[*block.output] = start;
       }
     }
-
     double worst = 0.0;
     std::string where;
+
+    // Under Test.
     for (std::size_t i = 1; i < rows.size(); ++i) {
       const Row& row = rows[i];
       for (aircraft::FlightSignal command : COMMANDS) {
@@ -94,15 +96,22 @@ TEST_CASE("FlightControl737") {
         }
       }
     }
+
+    // Postconditions.
     CAPTURE(worst, where);
     CHECK(worst < 1e-12);
   }
 
   SECTION("ShouldSettleKinematicBlocksGivenCommands") {
+    // Preconditions.
     aircraft::FlightSignals signals;
     signals[aircraft::FlightSignal::FLAPS_COMMAND] = 0.5;
     signals[aircraft::FlightSignal::GEAR_COMMAND] = 1.0;
+
+    // Under Test.
     aircraft::settle_flight_controls(controls, InOut(signals));
+
+    // Postconditions.
     CHECK(signals.values[*aircraft::find_signal(controls, "flaps_norm")] ==
           0.5);
     CHECK(signals.values[*find_signal(controls, "gear")] == 1.0);
@@ -132,9 +141,12 @@ TEST_CASE("FlightControlF16") {
   REQUIRE(checked.size() > 60);
 
   SECTION("ShouldMatchJsbsimGivenRecordedCommandsAndState") {
+    // Preconditions.
     aircraft::FlightSignals signals;
     double worst = 0.0;
     std::string where;
+
+    // Under Test.
     for (std::size_t i = 0; i < rows.size(); ++i) {
       const Row& row = rows[i];
       bool first = i == 0 || row.at("run") != rows[i - 1].at("run");
@@ -173,6 +185,8 @@ TEST_CASE("FlightControlF16") {
         }
       }
     }
+
+    // Postconditions.
     CAPTURE(worst, where);
     CHECK(worst < 1e-12);
   }

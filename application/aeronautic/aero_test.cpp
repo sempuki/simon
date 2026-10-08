@@ -61,7 +61,10 @@ auto check_against_jsbsim(std::string_view path, std::string_view reference)
   constexpr double TOLERANCE = 1e-12;
 
   SECTION("ShouldMatchJsbsimGivenWindAxisForces") {
+    // Preconditions.
     double worst = 0.0;
+
+    // Under Test.
     for (const Row& row : rows) {
       aircraft::AeroSums sums = aircraft->aero(read_inputs(row, *aircraft));
       double scale = std::max(std::abs(row.at("lift")), 1.0);
@@ -69,13 +72,18 @@ auto check_against_jsbsim(std::string_view path, std::string_view reference)
       worst = worse(worst, sums[1], row.at("side"), scale);
       worst = worse(worst, sums[2], row.at("lift"), scale);
     }
+
+    // Postconditions.
     CAPTURE(worst);
     CHECK(worst < TOLERANCE);
   }
 
   SECTION("ShouldMatchJsbsimGivenBodyLoadsAboutCenterOfMass") {
+    // Preconditions.
     double worst_force = 0.0;
     double worst_moment = 0.0;
+
+    // Under Test.
     for (const Row& row : rows) {
       aircraft::AeroSums sums = aircraft->aero(read_inputs(row, *aircraft));
 
@@ -105,6 +113,8 @@ auto check_against_jsbsim(std::string_view path, std::string_view reference)
       worst_moment = std::max(
           worst_moment, magnitude(moment - expected_moment) / moment_scale);
     }
+
+    // Postconditions.
     CAPTURE(worst_force, worst_moment);
     CHECK(worst_force < TOLERANCE);
     CHECK(worst_moment < TOLERANCE);

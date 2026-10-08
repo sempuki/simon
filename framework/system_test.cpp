@@ -217,11 +217,16 @@ TEST_CASE("Period") {
   testing::build_small_world(Out(world));
 
   SECTION("ShouldRunOnlyInStepsHoldingABoundaryGivenPeriod") {
+    // Preconditions.
     Scheduler<TestWorld, SystemList<Tally>> scheduler;
     scheduler.set_period<Tally>(milliseconds{100});
+
+    // Under Test.
     for (const Step& step : steps_of(milliseconds{50}, 5)) {
       scheduler.step(step, InOut(world));
     }
+
+    // Postconditions.
     const auto& runs = scheduler.system<Tally>().runs;
     CHECK(times_of(runs) ==
           std::vector<TimePoint>{TimePoint{}, TimePoint{milliseconds{100}},
@@ -233,57 +238,90 @@ TEST_CASE("Period") {
   }
 
   SECTION("ShouldStartAtPhaseGivenPhase") {
+    // Preconditions.
     Scheduler<TestWorld, SystemList<Tally>> scheduler;
     scheduler.set_period<Tally>(milliseconds{100}, milliseconds{50});
+
+    // Under Test.
     for (const Step& step : steps_of(milliseconds{50}, 5)) {
       scheduler.step(step, InOut(world));
     }
+
+    // Postconditions.
     CHECK(times_of(scheduler.system<Tally>().runs) ==
           std::vector<TimePoint>{TimePoint{milliseconds{50}},
                                  TimePoint{milliseconds{150}}});
   }
 
   SECTION("ShouldRunOnceWithWholeSpanGivenStepPastSeveralBoundaries") {
+    // Preconditions.
     Scheduler<TestWorld, SystemList<Tally>> scheduler;
     scheduler.set_period<Tally>(milliseconds{100});
+
+    // Under Test.
     scheduler.step(Step{.time = TimePoint{}, .dt = milliseconds{50}},
                    InOut(world));
     scheduler.step(
         Step{.time = TimePoint{milliseconds{50}}, .dt = milliseconds{300}},
         InOut(world));
+
+    // Postconditions.
     const auto& runs = scheduler.system<Tally>().runs;
     REQUIRE(runs.size() == 2u);
     CHECK(runs[1].dt == milliseconds{50});
   }
 
   SECTION("ShouldUseDeclaredPeriodUntilClearedGivenPeriodOnType") {
+    // Preconditions.
     Scheduler<TestWorld, SystemList<Paced>> scheduler;
+
+    // Postconditions.
     CHECK(scheduler.period_of<Paced>() == milliseconds{200});
     CHECK(Scheduler<TestWorld, SystemList<Paced>>::describe().contains(
         "period: 200000000ns"));
+
+    // Under Test.
     scheduler.clear_period<Paced>();
     for (const Step& step : steps_of(milliseconds{50}, 3)) {
       scheduler.step(step, InOut(world));
     }
+
+    // Postconditions.
     CHECK(scheduler.system<Paced>().runs.size() == 3u);
   }
 
   SECTION("ShouldTellTimelineNextBoundaryGivenAttached") {
+    // Preconditions.
     Timeline timeline;
     Scheduler<TestWorld, SystemList<Tally, Paced>> scheduler;
+
+    // Under Test.
     scheduler.attach(Depend(timeline));
+
+    // Postconditions.
     // Tally runs every step, so the simulation always has work.
     CHECK(timeline.continuous());
+
+    // Under Test.
     scheduler.set_period<Tally>(milliseconds{100}, milliseconds{30});
+
+    // Postconditions.
     CHECK_FALSE(timeline.continuous());
     // Boundaries count from time zero, so Paced is due there already.
     CHECK(timeline.earliest() == TimePoint{});
 
+    // Under Test.
     scheduler.step(Step{.time = TimePoint{}, .dt = milliseconds{30}},
                    InOut(world));
+
+    // Postconditions.
     // Paced ran at 0 and is next due at 200 ms; Tally first at 30 ms.
     CHECK(timeline.earliest() == TimePoint{milliseconds{30}});
+
+    // Under Test.
     scheduler.clear_period<Tally>();
+
+    // Postconditions.
     CHECK(timeline.continuous());
     CHECK(timeline.earliest() == TimePoint{milliseconds{200}});
   }
@@ -291,6 +329,7 @@ TEST_CASE("Period") {
 
 TEST_CASE("BytesPerEntity") {
   SECTION("ShouldCountOwnerAndNamedComponentsGivenSystem") {
+    // Postconditions.
     // Integrate names Position and const Velocity.
     STATIC_CHECK(bytes_per_entity_v<Integrate> ==
                  sizeof(Entity) + sizeof(Position) + sizeof(Velocity));
@@ -304,15 +343,18 @@ TEST_CASE("System") {
   testing::build_small_world(Out(world));
 
   SECTION("ShouldRunForDriverWithOptionalPointerGivenMixedComponents") {
+    // Preconditions.
     // x holds (a), y holds (b), z holds (a, b).
     Entity x = *world.create<Body>().with(Position{}).build();
     [[maybe_unused]] Entity y = *world.create<Body>().with(Velocity{}).build();
     Entity z = *world.create<Body>().with(Position{}).with(Velocity{}).build();
     world.sync();
-
     Scheduler<TestWorld, SystemList<Record>> scheduler;
+
+    // Under Test.
     scheduler.step(STEP, InOut(world));
 
+    // Postconditions.
     auto& seen = scheduler.system<Record>().seen;
     REQUIRE(seen.size() == 2u);
     CHECK(seen[0] == std::pair{x, false});
@@ -320,6 +362,7 @@ TEST_CASE("System") {
   }
 
   SECTION("ShouldSkipOwnersOfExcludedComponentGivenEveryArchetype") {
+    // Preconditions.
     // A launcher cannot have a Velocity, an interceptor always has one, and a
     // body may.
     Entity launcher =
@@ -331,10 +374,12 @@ TEST_CASE("System") {
     Entity still = *world.create<Body>().with(Position{}).build();
     auto _ = *world.create<Body>().with(Position{}).with(Velocity{}).build();
     world.sync();
-
     Scheduler<TestWorld, SystemList<RecordStill>> scheduler;
+
+    // Under Test.
     scheduler.step(STEP, InOut(world));
 
+    // Postconditions.
     // The launcher's segment, then the segment of archetypes that only allow
     // Position.
     CHECK(scheduler.system<RecordStill>().seen ==
@@ -342,30 +387,37 @@ TEST_CASE("System") {
   }
 
   SECTION("ShouldSkipEntityGivenExcludedComponentAttachedLater") {
+    // Preconditions.
     Entity body = *world.create<Body>().with(Position{}).build();
     world.sync();
     Scheduler<TestWorld, SystemList<RecordStill>> scheduler;
 
+    // Under Test.
     scheduler.step(STEP, InOut(world));
     REQUIRE(world.change(body).attach(Velocity{}).build());
     world.sync();
     scheduler.step(STEP, InOut(world));
 
+    // Postconditions.
     CHECK(scheduler.system<RecordStill>().seen == std::vector<Entity>{body});
   }
 
   SECTION("ShouldWriteDrivingComponentGivenStep") {
+    // Preconditions.
     Entity entity =
         *world.create<Body>().with(Position{1.0}).with(Velocity{2.0}).build();
     world.sync();
-
     Scheduler<TestWorld, SystemList<Integrate>> scheduler;
+
+    // Under Test.
     scheduler.step(STEP, InOut(world));
 
+    // Postconditions.
     CHECK(world.store_of<Position>().component_of(entity).x == 2.0);
   }
 
   SECTION("ShouldQueryMovedPositionsGivenSystemWroteSpatialComponent") {
+    // Preconditions.
     Entity entity =
         *world.create<Body>().with(Position{1.0}).with(Velocity{2.0}).build();
     world.sync();
@@ -376,15 +428,18 @@ TEST_CASE("System") {
       return found;
     };
     REQUIRE(found_near(1.0) == std::vector<Entity>{entity});
-
     Scheduler<TestWorld, SystemList<Integrate>> scheduler;
+
+    // Under Test.
     scheduler.step(STEP, InOut(world));
 
+    // Postconditions.
     CHECK(found_near(1.0).empty());
     CHECK(found_near(2.0) == std::vector<Entity>{entity});
   }
 
   SECTION("ShouldPassEachEntitysOwnSiblingGivenArchetypesAndChurn") {
+    // Preconditions.
     // Interceptors require both components, so their Velocity is found at the
     // same slot. Launchers cannot have one, and bodies may.
     std::vector<Entity> interceptors;
@@ -405,10 +460,12 @@ TEST_CASE("System") {
                 .with(Velocity{4.0})
                 .build());
     world.sync();
-
     Scheduler<TestWorld, SystemList<CheckSiblings>> scheduler;
+
+    // Under Test.
     scheduler.step(STEP, InOut(world));
 
+    // Postconditions.
     const CheckSiblings& check = scheduler.system<CheckSiblings>();
     CHECK(check.with == 5);
     CHECK(check.matched == 5);
@@ -416,85 +473,105 @@ TEST_CASE("System") {
   }
 
   SECTION("ShouldSkipLoopAndResolveGivenPrepareReturnsFalse") {
+    // Preconditions.
     REQUIRE(world.create<Body>().with(Health{1.0}).build());
     world.sync();
     Scheduler<TestWorld, SystemList<Skippable>> scheduler;
 
+    // Under Test.
     scheduler.system<Skippable>().run = false;
     scheduler.step(STEP, InOut(world));
+
+    // Postconditions.
     CHECK(scheduler.system<Skippable>().called == 0);
     CHECK_FALSE(scheduler.system<Skippable>().resolved);
 
+    // Under Test.
     scheduler.system<Skippable>().run = true;
     scheduler.step(STEP, InOut(world));
+
+    // Postconditions.
     CHECK(scheduler.system<Skippable>().called == 1);
     CHECK(scheduler.system<Skippable>().resolved);
   }
 
   SECTION("ShouldReadOtherEntitiesGivenDeclaredLookup") {
+    // Preconditions.
     Entity target = *world.create<Body>().with(Position{10.0}).build();
     Entity chaser =
         *world.create<Body>().with(Position{4.0}).with(Velocity{}).build();
     world.sync();
-
     Scheduler<TestWorld, SystemList<Chase>> scheduler;
     scheduler.system<Chase>().target = target;
+
+    // Under Test.
     scheduler.step(STEP, InOut(world));
 
+    // Postconditions.
     CHECK(world.store_of<Velocity>().component_of(chaser).x == 6.0);
   }
 
   SECTION("ShouldSeeEarlierSystemsCommandsGivenSyncBetweenSystems") {
+    // Preconditions.
     REQUIRE(world.create<Body>().with(Health{0.0}).build());
     REQUIRE(world.create<Body>().with(Health{1.0}).build());
     world.sync();
-
     Scheduler<TestWorld, SystemList<Cull, Count>> scheduler;
+
+    // Under Test.
     scheduler.step(STEP, InOut(world));
 
+    // Postconditions.
     CHECK(scheduler.system<Count>().count == 1);
     CHECK(scheduler.system<Count>().resolved);
     CHECK(world.size() == 1u);
   }
 
   SECTION("ShouldDestroySelectedGivenQueryFormInPrepare") {
+    // Preconditions.
     REQUIRE(world.create<Body>().with(Position{1.0}).build());
     REQUIRE(world.create<Body>().with(Position{1.5}).with(Health{}).build());
     Entity distant = *world.create<Body>().with(Position{9.0}).build();
     world.sync();
-
     Scheduler<TestWorld, SystemList<ClearOrigin>> scheduler;
+
+    // Under Test.
     scheduler.step(STEP, InOut(world));
 
+    // Postconditions.
     CHECK(scheduler.system<ClearOrigin>().destroyed == 2u);
     CHECK(world.size() == 1u);
     CHECK(world.alive(distant));
   }
 
   SECTION("ShouldThrowGivenComponentOfMissingComponent") {
+    // Preconditions.
     Entity bare = *world.create<Body>().build();
     Entity placed = *world.create<Body>().with(Position{2.0}).build();
     world.sync();
-
     ProjectedWorld<Chase, TestWorld> access{Depend(world)};
 
+    // Postconditions.
     CHECK(access.component_of<Position>(placed).x == 2.0);
     CHECK(access.maybe_component_of<Position>(bare) == nullptr);
     CHECK_THROWS_AS(access.component_of<Position>(bare), std::logic_error);
   }
 
   SECTION("ShouldRunLambdaWithStateGivenCallableSystem") {
+    // Preconditions.
     REQUIRE(world.create<Body>().with(Health{1.0}).build());
     REQUIRE(world.create<Body>().with(Health{2.0}).build());
     world.sync();
-
     auto count = system<const Health>(
         [seen = 0](auto&, Entity, const Health&) mutable { return ++seen; });
     Scheduler<TestWorld, SystemList<decltype(count)>> scheduler{
         SystemList{count}};
+
+    // Under Test.
     scheduler.step(STEP, InOut(world));
     scheduler.step(STEP, InOut(world));
 
+    // Postconditions.
     // The capture persists across steps: two entities, two steps.
     auto& lambda = scheduler.system<decltype(count)>().callable();
     int unused_world = 0;
@@ -502,11 +579,11 @@ TEST_CASE("System") {
   }
 
   SECTION("ShouldReadOtherEntitiesGivenLambdaWithLookups") {
+    // Preconditions.
     Entity target = *world.create<Body>().with(Position{10.0}).build();
     Entity chaser =
         *world.create<Body>().with(Position{4.0}).with(Velocity{}).build();
     world.sync();
-
     auto chase = system<Velocity, const Position>(
         TypeList<Position>{}, [target](auto& world, Entity, Velocity& velocity,
                                        const Position* mine) {
@@ -516,37 +593,46 @@ TEST_CASE("System") {
         });
     Scheduler<TestWorld, SystemList<decltype(chase)>> scheduler{
         SystemList{chase}};
+
+    // Under Test.
     scheduler.step(STEP, InOut(world));
 
+    // Postconditions.
     CHECK(world.store_of<Velocity>().component_of(chaser).x == 6.0);
   }
 
   SECTION("ShouldRunInOrderGivenMixedStructAndLambdaSystems") {
+    // Preconditions.
     Entity entity =
         *world.create<Body>().with(Position{0.0}).with(Velocity{1.0}).build();
     world.sync();
-
     auto double_velocity = system<Velocity>(
         [](auto&, Entity, Velocity& velocity) { velocity.x *= 2.0; });
     using Schedule =
         SystemList<decltype(double_velocity), SystemList<Integrate>>;
     Scheduler<TestWorld, Schedule> scheduler{
         Schedule{double_velocity, SystemList<Integrate>{}}};
+
+    // Under Test.
     scheduler.step(STEP, InOut(world));
 
+    // Postconditions.
     CHECK(world.store_of<Velocity>().component_of(entity).x == 2.0);
     CHECK(world.store_of<Position>().component_of(entity).x ==
           1.0);  // 2.0 * 0.5
   }
 
   SECTION("ShouldCreateChildrenGivenSystemThatSpawns") {
+    // Preconditions.
     Entity launcher =
         *world.create<testing::Launcher>().with(Position{3.0}).build();
     world.sync();
-
     Scheduler<TestWorld, SystemList<Spawn>> scheduler;
+
+    // Under Test.
     scheduler.step(STEP, InOut(world));
 
+    // Postconditions.
     REQUIRE(world.store_of<Position>().size() == 2u);
     Entity child;
     world.store_of<Position>().for_each([&](Entity owner, const Position&) {
@@ -557,12 +643,16 @@ TEST_CASE("System") {
   }
 
   SECTION("ShouldFlattenInOrderGivenNestedSchedules") {
+    // Preconditions.
     using Nested = SystemList<Integrate, SystemList<Cull, Count>>;
+
+    // Postconditions.
     static_assert(std::is_same_v<flattened_list_t<Nested>,
                                  TypeList<Integrate, Cull, Count>>);
   }
 
   SECTION("ShouldBeInvalidOnlyGivenSystemBeforeItsAfter") {
+    // Postconditions.
     static_assert(is_valid_schedule_v<SystemList<Cull, Count>>);
     static_assert(!is_valid_schedule_v<SystemList<Count, Cull>>);
     static_assert(
@@ -571,28 +661,32 @@ TEST_CASE("System") {
   }
 
   SECTION("ShouldNameSystemsBySchedulePositionGivenNestedSchedule") {
+    // Preconditions.
     using Scheduled =
         Scheduler<TestWorld, SystemList<Integrate, SystemList<Cull, Count>>>;
+
+    // Postconditions.
     static_assert(Scheduled::name_of<Integrate>() == Name{Kind::SYSTEM, 0});
     static_assert(Scheduled::name_of<Count>() == Name{Kind::SYSTEM, 2});
     CHECK(Scheduled::describe(1).contains("/world/1/system/2 "));
   }
 
   SECTION("ShouldDeriveReadsAndWritesGivenSystemDeclaration") {
+    // Under Test.
+    std::string text = Scheduler<TestWorld, SystemList<Integrate>>::describe();
+    std::string still =
+        Scheduler<TestWorld, SystemList<RecordStill>>::describe();
+
+    // Postconditions.
     static_assert(
         std::is_same_v<write_list_of_t<Integrate>, TypeList<Position>>);
     static_assert(
         std::is_same_v<read_list_of_t<Integrate>, TypeList<Velocity>>);
     static_assert(
         std::is_same_v<allow_component_list_of_t<Chase>, TypeList<Position>>);
-
-    std::string text = Scheduler<TestWorld, SystemList<Integrate>>::describe();
     CHECK(text.contains("writes: simon::framework::testing::Position"));
     CHECK(text.contains("reads: simon::framework::testing::Velocity"));
     CHECK(text.contains("excludes: -"));
-
-    std::string still =
-        Scheduler<TestWorld, SystemList<RecordStill>>::describe();
     CHECK(still.contains("excludes: simon::framework::testing::Velocity"));
   }
 }
