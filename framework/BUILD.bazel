@@ -25,6 +25,7 @@ cc_library(
         "spatial_index.hpp",
         "component_store.hpp",
         "system.hpp",
+        "timeline.hpp",
         "type_list.hpp",
         "world.hpp",
         "world_builder.hpp",
@@ -82,6 +83,7 @@ cc_test(
     "spatial_index",
     "component_store",
     "system",
+    "timeline",
     "world",
 ]]
 

@@ -57,6 +57,34 @@ struct Recorder final {
   std::optional<TimePoint> fail_at;
 };
 
+// A timeline that is due at the times it is given, the earliest still ahead.
+struct FakeTimeline final {
+  auto earliest() const -> std::optional<TimePoint> {
+    std::optional<TimePoint> first;
+    for (TimePoint time : due) {
+      if (time > *now && (!first || time < *first)) {
+        first = time;
+      }
+    }
+    return first;
+  }
+  std::vector<TimePoint> due;
+  const TimePoint* now = nullptr;
+};
+
+// A Recorder whose work falls due at set times.
+struct TimedRecorder final {
+  auto step(const Step& step) -> PhaseResult {
+    now = step.time + step.dt;
+    return recorder.step(step);
+  }
+  auto timeline() const -> const FakeTimeline& { return timeline_; }
+
+  Recorder recorder;
+  TimePoint now{};
+  FakeTimeline timeline_{.now = &now};
+};
+
 // A wall clock the test moves by hand.
 struct FakeClock final {
   using duration = std::chrono::nanoseconds;
@@ -90,6 +118,17 @@ TEST_CASE("Driver") {
           std::vector<Duration>{30ms, 30ms, 30ms, 10ms});
     CHECK(driver.now() == TimePoint{100ms});
     CHECK(recorder.steps.back().time == TimePoint{90ms});
+  }
+
+  SECTION("ShouldEndStepsAtDueTimesGivenTimeline") {
+    TimedRecorder timed;
+    timed.timeline_.due = {TimePoint{45ms}, TimePoint{60ms}};
+    Driver landing{Timing{.max_step = 30ms}, Depend(timed)};
+    REQUIRE(landing.start());
+    REQUIRE(landing.advance_to(TimePoint{100ms}) == Flow::CONTINUE);
+
+    CHECK(step_lengths(timed.recorder) ==
+          std::vector<Duration>{30ms, 15ms, 15ms, 30ms, 10ms});
   }
 
   SECTION("ShouldThrowGivenAdvanceBeforeStart") {

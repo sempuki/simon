@@ -168,7 +168,125 @@ struct ClearOrigin final  //
   std::expected<std::size_t, Status> destroyed;
 };
 
+// Records when it runs and the step it gets, and skips its loop.
+struct Tally final  //
+    : System<const Health> {
+  using SystemWorld = ProjectedWorld<Tally, TestWorld>;
+  auto prepare(SystemWorld&, Step step) -> bool {
+    runs.push_back(step);
+    return false;
+  }
+  auto operator()(SystemWorld&, Entity, const Health&) -> void {}
+  std::vector<Step> runs;
+};
+
+// Tally at a declared period.
+struct Paced final  //
+    : System<const Health> {
+  using SystemWorld = ProjectedWorld<Paced, TestWorld>;
+  static constexpr Duration PERIOD = std::chrono::milliseconds{200};
+  auto prepare(SystemWorld&, Step step) -> bool {
+    runs.push_back(step);
+    return false;
+  }
+  auto operator()(SystemWorld&, Entity, const Health&) -> void {}
+  std::vector<Step> runs;
+};
+
+auto times_of(const std::vector<Step>& runs) -> std::vector<TimePoint> {
+  std::vector<TimePoint> times;
+  for (const Step& run : runs) {
+    times.push_back(run.time);
+  }
+  return times;
+}
+
+auto steps_of(Duration dt, int count) -> std::vector<Step> {
+  std::vector<Step> steps;
+  for (int i = 0; i < count; ++i) {
+    steps.push_back(Step{.time = TimePoint{} + i * dt, .dt = dt});
+  }
+  return steps;
+}
+
 }  // namespace
+
+TEST_CASE("Period") {
+  using std::chrono::milliseconds;
+  TestWorld world;
+  testing::build_small_world(Out(world));
+
+  SECTION("ShouldRunOnlyInStepsHoldingABoundaryGivenPeriod") {
+    Scheduler<TestWorld, SystemList<Tally>> scheduler;
+    scheduler.set_period<Tally>(milliseconds{100});
+    for (const Step& step : steps_of(milliseconds{50}, 5)) {
+      scheduler.step(step, InOut(world));
+    }
+    const auto& runs = scheduler.system<Tally>().runs;
+    CHECK(times_of(runs) ==
+          std::vector<TimePoint>{TimePoint{}, TimePoint{milliseconds{100}},
+                                 TimePoint{milliseconds{200}}});
+    // Its period on the first run, the time since its last after.
+    for (const Step& run : runs) {
+      CHECK(run.dt == milliseconds{100});
+    }
+  }
+
+  SECTION("ShouldStartAtPhaseGivenPhase") {
+    Scheduler<TestWorld, SystemList<Tally>> scheduler;
+    scheduler.set_period<Tally>(milliseconds{100}, milliseconds{50});
+    for (const Step& step : steps_of(milliseconds{50}, 5)) {
+      scheduler.step(step, InOut(world));
+    }
+    CHECK(times_of(scheduler.system<Tally>().runs) ==
+          std::vector<TimePoint>{TimePoint{milliseconds{50}},
+                                 TimePoint{milliseconds{150}}});
+  }
+
+  SECTION("ShouldRunOnceWithWholeSpanGivenStepPastSeveralBoundaries") {
+    Scheduler<TestWorld, SystemList<Tally>> scheduler;
+    scheduler.set_period<Tally>(milliseconds{100});
+    scheduler.step(Step{.time = TimePoint{}, .dt = milliseconds{50}},
+                   InOut(world));
+    scheduler.step(
+        Step{.time = TimePoint{milliseconds{50}}, .dt = milliseconds{300}},
+        InOut(world));
+    const auto& runs = scheduler.system<Tally>().runs;
+    REQUIRE(runs.size() == 2u);
+    CHECK(runs[1].dt == milliseconds{50});
+  }
+
+  SECTION("ShouldUseDeclaredPeriodUntilClearedGivenPeriodOnType") {
+    Scheduler<TestWorld, SystemList<Paced>> scheduler;
+    CHECK(scheduler.period_of<Paced>() == milliseconds{200});
+    CHECK(Scheduler<TestWorld, SystemList<Paced>>::describe().contains(
+        "period: 200000000ns"));
+    scheduler.clear_period<Paced>();
+    for (const Step& step : steps_of(milliseconds{50}, 3)) {
+      scheduler.step(step, InOut(world));
+    }
+    CHECK(scheduler.system<Paced>().runs.size() == 3u);
+  }
+
+  SECTION("ShouldTellTimelineNextBoundaryGivenAttached") {
+    Timeline timeline;
+    Scheduler<TestWorld, SystemList<Tally, Paced>> scheduler;
+    scheduler.attach(Depend(timeline));
+    // Tally runs every step, so the simulation always has work.
+    CHECK(timeline.continuous());
+    scheduler.set_period<Tally>(milliseconds{100}, milliseconds{30});
+    CHECK_FALSE(timeline.continuous());
+    CHECK(timeline.earliest() == std::nullopt);  // Neither has stepped.
+
+    scheduler.step(Step{.time = TimePoint{}, .dt = milliseconds{30}},
+                   InOut(world));
+    // Paced ran at 0 and is next due at 200 ms; Tally first at 30 ms.
+    CHECK(timeline.earliest() == TimePoint{milliseconds{30}});
+    scheduler.clear_period<Tally>();
+    CHECK(timeline.continuous());
+    CHECK(timeline.earliest() == TimePoint{milliseconds{200}});
+  }
+}
 
 TEST_CASE("BytesPerEntity") {
   SECTION("ShouldCountOwnerAndNamedComponentsGivenSystem") {

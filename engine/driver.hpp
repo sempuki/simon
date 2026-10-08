@@ -4,7 +4,9 @@
 
 #include <algorithm>
 #include <chrono>
+#include <concepts>
 #include <expected>
+#include <optional>
 #include <thread>
 
 #include "base/core.hpp"
@@ -29,6 +31,16 @@ struct BasicTiming final {
 };
 
 using Timing = BasicTiming<>;
+
+// A simulation that says when it next has work, through a timeline whose
+// `earliest()` is the next due time (see framework/timeline.hpp). Its driver
+// ends each step there.
+template <typename SimulationType>
+concept HasTimeline = requires(const SimulationType& simulation) {
+  {
+    simulation.timeline().earliest()
+  } -> std::same_as<std::optional<BasicTimePoint<tick_of_t<SimulationType>>>>;
+};
 
 // The lifecycle and `advance_to`, shared by every driver.
 template <Simulation SimulationType>
@@ -64,12 +76,19 @@ class Driver final {
     return Flow::CONTINUE;
   }
 
-  // Steps toward `target`, at most `max_step` at a time, landing exactly on it.
+  // Steps toward `target`, at most `max_step` at a time, landing exactly on it,
+  // and on each time the simulation's timeline says work is due.
   // Stops early, and for good, when a step returns Flow::STOP or an error.
   auto advance_to(TimePoint target) -> PhaseResult {
     CHECK_PRECONDITION(phase_ == Phase::RUNNING);
     while (now_ < target) {
       Duration dt = std::min(max_step_, target - now_);
+      if constexpr (HasTimeline<SimulationType>) {
+        if (std::optional<TimePoint> due = simulation_->timeline().earliest();
+            due && *due > now_) {
+          dt = std::min(dt, *due - now_);
+        }
+      }
       PhaseResult result = simulation_->step(Step{.time = now_, .dt = dt});
       now_ += dt;
       if (!result || *result == Flow::STOP) {
