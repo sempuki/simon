@@ -11,8 +11,8 @@
 #include <string_view>
 #include <vector>
 
+#include "model/road/placement.hpp"
 #include "model/road/road.hpp"
-#include "model/road/road_placement.hpp"
 #include "scenario/openscenario.hpp"
 
 // Runs an OpenSCENARIO storyboard (see model/REFERENCES.md): its elements'

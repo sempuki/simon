@@ -27,7 +27,7 @@ cc_library(
         "//framework:continuous",
         "//model/earth:atmosphere",
         "//model:control",
-        "//model/aircraft:aircraft_data",
+        "//model/aircraft:definition",
         "//model/aircraft:flight_path",
         "//core:random",
         "//model/aircraft:rigid_aircraft",
@@ -96,7 +96,7 @@ cc_test(
         "//format:aircraft_file",
         ":testing",
         "//model/aircraft:aerodynamics",
-        "//model/aircraft:aircraft_data",
+        "//model/aircraft:definition",
         "//core:units",
         "@lib//base:testing",
     ],
@@ -114,7 +114,7 @@ cc_test(
     deps = [
         "//format:aircraft_file",
         ":testing",
-        "//model/aircraft:aircraft_data",
+        "//model/aircraft:definition",
         "//model/earth:earth",
         "//model/aircraft:rigid_aircraft",
         "//model:rigid_body",
@@ -136,7 +136,7 @@ cc_test(
     deps = [
         "//format:aircraft_file",
         ":testing",
-        "//model/aircraft:aircraft_data",
+        "//model/aircraft:definition",
         "//model/aircraft:turbine",
         "//core:units",
         "@lib//base:testing",
@@ -156,7 +156,7 @@ cc_test(
     deps = [
         "//format:aircraft_file",
         ":testing",
-        "//model/aircraft:aircraft_data",
+        "//model/aircraft:definition",
         "//model/aircraft:flight_control",
         "//core:units",
         "@lib//base:testing",
@@ -289,7 +289,7 @@ cc_test(
     deps = [
         "//format:aircraft_file",
         ":testing",
-        "//model/aircraft:aircraft_data",
+        "//model/aircraft:definition",
         "//model/earth:atmosphere",
         "//model/aircraft:rigid_aircraft",
         "//model/aircraft:trim",

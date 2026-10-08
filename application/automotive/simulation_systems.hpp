@@ -22,8 +22,8 @@
 #include "model/road/lane_graph.hpp"
 #include "model/road/road.hpp"
 #include "model/road/walking_graph.hpp"
+#include "model/traffic/signals.hpp"
 #include "model/traffic/traffic.hpp"
-#include "model/traffic/traffic_control.hpp"
 
 namespace simon::automotive {
 

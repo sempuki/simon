@@ -1,6 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-#include "model/traffic/traffic_control.hpp"
+#include "model/traffic/signals.hpp"
 
 #include <chrono>
 #include <cmath>

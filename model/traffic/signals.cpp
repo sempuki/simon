@@ -3,7 +3,7 @@
 // OR GPL-2.0-or-later) and MovSim (GPL-3.0-or-later); translated to C++ and
 // changed. See NOTICE.md.
 
-#include "model/traffic/traffic_control.hpp"
+#include "model/traffic/signals.hpp"
 
 #include <algorithm>
 #include <limits>

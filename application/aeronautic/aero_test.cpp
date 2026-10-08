@@ -13,7 +13,7 @@
 #include "core/units.hpp"
 #include "format/aircraft_file.hpp"
 #include "model/aircraft/aerodynamics.hpp"
-#include "model/aircraft/aircraft_data.hpp"
+#include "model/aircraft/definition.hpp"
 #include "model/aircraft/flight_control.hpp"
 
 // The 737's and the F-16's aerodynamics, converted from JSBSim by

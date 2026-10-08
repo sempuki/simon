@@ -5,7 +5,7 @@
 #pragma once
 
 #include "core/units.hpp"
-#include "model/aircraft/aircraft_data.hpp"
+#include "model/aircraft/definition.hpp"
 
 // A running turbine, as JSBSim models one (FGTurbine; see
 // model/REFERENCES.md): its spools turn toward speeds the throttle sets, at

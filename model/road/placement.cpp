@@ -1,6 +1,6 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
-#include "model/road/road_placement.hpp"
+#include "model/road/placement.hpp"
 
 #include <algorithm>
 #include <cmath>

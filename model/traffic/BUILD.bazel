@@ -14,16 +14,16 @@ cc_library(
     deps = [
         "//model/road:lane_graph",
         "//model/road:road",
-        ":traffic_control",
+        ":signals",
         "//core:units",
     ],
 )
 
 
 cc_library(
-    name = "traffic_control",
-    srcs = ["traffic_control.cpp"],
-    hdrs = ["traffic_control.hpp"],
+    name = "signals",
+    srcs = ["signals.cpp"],
+    hdrs = ["signals.hpp"],
     copts = COPTS,
     deps = [
         "//model/road:lane_graph",
@@ -62,5 +62,5 @@ cc_library(
         "@lib//base:testing",
     ],
 ) for test in [
-    "traffic_control",
+    "signals",
 ]]

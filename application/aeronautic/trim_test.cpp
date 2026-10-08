@@ -10,7 +10,7 @@
 #include "base/testing.hpp"
 #include "core/units.hpp"
 #include "format/aircraft_file.hpp"
-#include "model/aircraft/aircraft_data.hpp"
+#include "model/aircraft/definition.hpp"
 #include "model/aircraft/rigid_aircraft.hpp"
 #include "model/aircraft/trim.hpp"
 #include "model/earth/atmosphere.hpp"

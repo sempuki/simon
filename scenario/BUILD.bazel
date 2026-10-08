@@ -20,7 +20,7 @@ cc_library(
     deps = [
         ":openscenario",
         "//model/road:road",
-        "//model/road:road_placement",
+        "//model/road:placement",
         "//core:units",
     ],
 )

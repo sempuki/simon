@@ -7,7 +7,7 @@ carried into the output's header.
 
   python tools/jsbsim/convert.py <aircraft.xml> <engine directory> <output>
 
-The output is plain text in SI units, read by model/aircraft_data.hpp. It
+The output is plain text in SI units, read by model/aircraft/definition.hpp. It
 holds the aircraft's metrics and eye point, its mass balance and point
 masses, fuel tanks, engines, flight controls and aerodynamics. Locations stay
 in JSBSim's structural frame (x aft, y right, z up) but in meters.

@@ -8,7 +8,7 @@
 
 #include "core/argument.hpp"
 #include "core/units.hpp"
-#include "model/aircraft/aircraft_data.hpp"
+#include "model/aircraft/definition.hpp"
 #include "model/aircraft/frames.hpp"
 #include "model/aircraft/mass_balance.hpp"
 #include "model/aircraft/turbine.hpp"

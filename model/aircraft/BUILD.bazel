@@ -32,8 +32,8 @@ cc_library(
 
 
 cc_library(
-    name = "aircraft_data",
-    hdrs = ["aircraft_data.hpp"],
+    name = "definition",
+    hdrs = ["definition.hpp"],
     copts = COPTS,
     deps = [
         ":aerodynamics",
@@ -50,7 +50,7 @@ cc_library(
     copts = COPTS,
     deps = [
         ":aerodynamics",
-        ":aircraft_data",
+        ":definition",
         "//core:units",
     ],
 )
@@ -78,7 +78,7 @@ cc_library(
     hdrs = ["mass_balance.hpp"],
     copts = COPTS,
     deps = [
-        ":aircraft_data",
+        ":definition",
         "//model:rigid_body",
         "//core:units",
         "@lib//base:core",
@@ -92,7 +92,7 @@ cc_library(
     hdrs = ["propulsion.hpp"],
     copts = COPTS,
     deps = [
-        ":aircraft_data",
+        ":definition",
         "//model/earth:atmosphere",
         ":frames",
         ":mass_balance",
@@ -111,7 +111,7 @@ cc_library(
     hdrs = ["sensing.hpp"],
     copts = COPTS,
     deps = [
-        ":aircraft_data",
+        ":definition",
         "//model/earth:atmosphere",
         ":frames",
         ":mass_balance",
@@ -130,7 +130,7 @@ cc_library(
     copts = COPTS,
     deps = [
         ":aerodynamics",
-        ":aircraft_data",
+        ":definition",
         "//model/earth:atmosphere",
         ":frames",
         ":mass_balance",
@@ -164,7 +164,7 @@ cc_library(
     hdrs = ["trim.hpp"],
     copts = COPTS,
     deps = [
-        ":aircraft_data",
+        ":definition",
         "//model/earth:atmosphere",
         ":flight_control",
         ":rigid_aircraft",

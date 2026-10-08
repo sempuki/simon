@@ -7,7 +7,7 @@
 #include "core/argument.hpp"
 #include "core/units.hpp"
 #include "model/aircraft/aerodynamics.hpp"
-#include "model/aircraft/aircraft_data.hpp"
+#include "model/aircraft/definition.hpp"
 #include "model/aircraft/frames.hpp"
 #include "model/aircraft/mass_balance.hpp"
 #include "model/aircraft/propulsion.hpp"
@@ -17,7 +17,7 @@
 #include "model/rigid_body.hpp"
 
 // An aircraft as a rigid body (see rigid_body.hpp), flown by its control
-// surfaces through aerodynamics read from data (see aircraft_data.hpp). It is
+// surfaces through aerodynamics read from data (see definition.hpp). It is
 // the highest fidelity level (see "Choose fidelity per archetype" in
 // framework/Design.md), for the few aircraft whose handling matters. Its
 // frames, mass balance, engines and sensing have headers of their own, which

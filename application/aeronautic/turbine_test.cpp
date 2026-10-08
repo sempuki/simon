@@ -11,7 +11,7 @@
 #include "base/testing.hpp"
 #include "core/units.hpp"
 #include "format/aircraft_file.hpp"
-#include "model/aircraft/aircraft_data.hpp"
+#include "model/aircraft/definition.hpp"
 #include "model/aircraft/turbine.hpp"
 
 // The 737's turbines and the F-16's, converted from JSBSim, against

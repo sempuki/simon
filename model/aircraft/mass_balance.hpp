@@ -8,7 +8,7 @@
 #include <span>
 
 #include "core/units.hpp"
-#include "model/aircraft/aircraft_data.hpp"
+#include "model/aircraft/definition.hpp"
 #include "model/rigid_body.hpp"
 
 // An aircraft's fuel and mass balance: its mass, center of mass and inertia,

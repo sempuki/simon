@@ -89,7 +89,7 @@ https://github.com/esmini/esmini, version 3.8.2. Followed by
 Copyright (C) 2001-2026 German Aerospace Center (DLR) and others. Licensed
 under EPL-2.0 OR GPL-2.0-or-later; simon uses it under GPL-2.0-or-later,
 taken as GPL-3.0. https://eclipse.dev/sumo, version 1.27.1. `MSCFModel_IDM`
-and `MSLink` are followed by `model/traffic/traffic_control.{hpp,cpp}` and
+and `MSLink` are followed by `model/traffic/signals.{hpp,cpp}` and
 `model/traffic/right_of_way.cpp`.
 
 ## MovSim
@@ -98,7 +98,7 @@ Copyright (C) 2010, 2011, 2012 by Arne Kesting, Martin Treiber, Ralph Germ,
 Martin Budden. Licensed under the GNU General Public License, version 3 or
 (at your option) any later version. https://github.com/movsim/movsim. Its
 approach to yellow lights, `TrafficLightApproaching`, is followed by
-`model/traffic/traffic_control.{hpp,cpp}`.
+`model/traffic/signals.{hpp,cpp}`.
 
 ## JSBSim
 

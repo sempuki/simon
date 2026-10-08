@@ -11,7 +11,7 @@
 #include "core/units.hpp"
 #include "model/road/lane_graph.hpp"
 #include "model/road/road.hpp"
-#include "model/traffic/traffic_control.hpp"
+#include "model/traffic/signals.hpp"
 
 // Right of way in junctions (see model/REFERENCES.md): where two connecting
 // lanes cross or merge, which of them gives way, and the lanes that lead

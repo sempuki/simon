@@ -49,7 +49,7 @@ cc_library(
     deps = [
         ":format_error",
         ":text",
-        "//model/aircraft:aircraft_data",
+        "//model/aircraft:definition",
         "@lib//base:core",
         "@lib//base:status",
     ],

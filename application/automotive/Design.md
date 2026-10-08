@@ -263,7 +263,7 @@ signal's state, as text such as "on;off;off": set by signal actions, and by
 the controllers, each running its phases in turn from a delay after its
 reference's first phase and setting its signals' states as a phase begins.
 A controller action moves a controller's cycle so that the phase starts
-then; a signal action holds until the next phase changes that signal. `model/road/road_placement` places a
+then; a signal action holds until the next phase changes that signal. `model/road/placement` places a
 vehicle by road, lane, s and offset, either way along any lane, and moves it
 along its path at its t, s changing by the distance over 1 - kappa t. In the
 ECS, `RunStoryboard` evaluates the storyboard and gives each vehicle its
@@ -518,7 +518,7 @@ is read and sorted by s along each lane:
 
 ### Traffic lights
 
-`model/traffic/traffic_control` builds a network's signal groups, one per OpenDRIVE
+`model/traffic/signals` builds a network's signal groups, one per OpenDRIVE
 `<controller>`, and a stop line on each driving lane a controlled traffic
 light holds for: the lanes its orientation runs on, narrowed by its
 validities. Each group is a `SignalController` entity holding a fixed-time
