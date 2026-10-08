@@ -1,6 +1,7 @@
 # Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 load("@lib//bazel:copts.bzl", "COPTS")
+load("//application:viewer.bzl", "application_viewer")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
@@ -398,57 +399,27 @@ VIEWER_DATA = glob(["roads/*.xodr"]) + [
     "//3rd_party:esmini",
 ]
 
-cc_binary(
-    name = "viewer",
-    srcs = ["viewer.cpp"],
-    copts = COPTS,
-    data = VIEWER_DATA,
+application_viewer(
     deps = VIEWER_DEPS,
+    data = VIEWER_DATA,
+    tests = {
+        "viewer_signals_test": [
+            "application/automotive/roads/signalized.xodr",
+            "30",
+            "1",
+            "80",
+            "--frames=60",
+        ],
+        "viewer_traffic_test": [
+            "3rd_party/carla/Town01.xodr",
+            "60",
+            "1",
+            "--frames=60",
+        ],
+        "viewer_scenario_test": [
+            "3rd_party/esmini/xosc/cut-in.xosc",
+            "--frames=60",
+        ],
+    },
 )
 
-cc_test(
-    name = "viewer_signals_test",
-    size = "small",
-    srcs = ["viewer.cpp"],
-    args = [
-        "application/automotive/roads/signalized.xodr",
-        "30",
-        "1",
-        "80",
-        "--frames=60",
-    ],
-    copts = COPTS,
-    data = VIEWER_DATA,
-    env = {"SDL_VIDEODRIVER": "dummy"},
-    deps = VIEWER_DEPS,
-)
-
-cc_test(
-    name = "viewer_traffic_test",
-    size = "small",
-    srcs = ["viewer.cpp"],
-    args = [
-        "3rd_party/carla/Town01.xodr",
-        "60",
-        "1",
-        "--frames=60",
-    ],
-    copts = COPTS,
-    data = VIEWER_DATA,
-    env = {"SDL_VIDEODRIVER": "dummy"},
-    deps = VIEWER_DEPS,
-)
-
-cc_test(
-    name = "viewer_scenario_test",
-    size = "small",
-    srcs = ["viewer.cpp"],
-    args = [
-        "3rd_party/esmini/xosc/cut-in.xosc",
-        "--frames=60",
-    ],
-    copts = COPTS,
-    data = VIEWER_DATA,
-    env = {"SDL_VIDEODRIVER": "dummy"},
-    deps = VIEWER_DEPS,
-)

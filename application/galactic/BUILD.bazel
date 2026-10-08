@@ -1,6 +1,7 @@
 # Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 load("@lib//bazel:copts.bzl", "COPTS")
+load("//application:viewer.bzl", "application_viewer")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
@@ -133,10 +134,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
-    name = "viewer",
-    srcs = ["viewer.cpp"],
-    copts = COPTS,
+application_viewer(
     deps = [
         ":galactic_library",
         "//application:viewing",
@@ -148,29 +146,12 @@ cc_binary(
         "//3rd_party:implot",
         "@lib//base:core",
     ],
-)
-
-cc_test(
-    name = "viewer_test",
-    size = "small",
-    srcs = ["viewer.cpp"],
-    args = [
-        "200",
-        "--frames=60",
-    ],
-    copts = COPTS,
-    env = {"SDL_VIDEODRIVER": "dummy"},
-    deps = [
-        ":galactic_library",
-        "//application:viewing",
-        "//engine:driver",
-        "//core:argument",
-        "//core:math",
-        "//model/gravity:gravity",
-        "//3rd_party:imgui",
-        "//3rd_party:implot",
-        "@lib//base:core",
-    ],
+    tests = {
+        "viewer_test": [
+            "200",
+            "--frames=60",
+        ],
+    },
 )
 
 cc_test(

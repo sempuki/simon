@@ -1,6 +1,7 @@
 # Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 load("@lib//bazel:copts.bzl", "COPTS")
+load("//application:viewer.bzl", "application_viewer")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
@@ -165,37 +166,16 @@ VIEWER_DEPS = [
 
 VIEWER_DATA = glob(["models/*.xml"]) + ["//3rd_party:mujoco"]
 
-cc_binary(
-    name = "viewer",
-    srcs = ["viewer.cpp"],
-    copts = COPTS,
-    data = VIEWER_DATA,
+application_viewer(
     deps = VIEWER_DEPS,
-)
-
-cc_test(
-    name = "viewer_humanoid_test",
-    size = "small",
-    srcs = ["viewer.cpp"],
-    args = ["--frames=60"],
-    copts = COPTS,
     data = VIEWER_DATA,
-    env = {"SDL_VIDEODRIVER": "dummy"},
-    deps = VIEWER_DEPS,
-)
-
-cc_test(
-    name = "viewer_collisions_test",
-    size = "small",
-    srcs = ["viewer.cpp"],
-    args = [
-        "application/robotic/models/sliding.xml",
-        "--frames=60",
-    ],
-    copts = COPTS,
-    data = VIEWER_DATA,
-    env = {"SDL_VIDEODRIVER": "dummy"},
-    deps = VIEWER_DEPS,
+    tests = {
+        "viewer_humanoid_test": ["--frames=60"],
+        "viewer_collisions_test": [
+            "application/robotic/models/sliding.xml",
+            "--frames=60",
+        ],
+    },
 )
 
 cc_test(
