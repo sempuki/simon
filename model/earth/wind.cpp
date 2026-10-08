@@ -7,6 +7,8 @@
 #include <cstddef>
 #include <numbers>
 
+#include "core/random.hpp"
+
 namespace simon::earth {
 
 namespace {
@@ -70,11 +72,8 @@ auto high_altitude(Turbulence turbulence, double feet) -> FeetScales {
 // SplitMix64: the same everywhere for the same seed, and needing no state
 // but the count.
 auto uniform(std::uint64_t seed, std::uint64_t n) -> double {
-  std::uint64_t z = seed + (n + 1) * 0x9e3779b97f4a7c15ULL;
-  z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
-  z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
-  z ^= z >> 31;
-  return (static_cast<double>(z >> 11) + 1.0) * 0x1.0p-53;
+  return (static_cast<double>(compute_split_mix(seed, n) >> 11) + 1.0) *
+         0x1.0p-53;
 }
 
 // Six standard normal numbers for a step, by Box and Muller's transform (see
@@ -82,10 +81,10 @@ auto uniform(std::uint64_t seed, std::uint64_t n) -> double {
 auto normals(std::uint64_t seed, std::uint64_t step) -> std::array<double, 6> {
   std::array<double, 6> result{};
   for (std::size_t i = 0; i < 3; ++i) {
-    double radius = std::sqrt(-2.0 * std::log(uniform(seed, 6 * step + 2 * i)));
-    double angle = 2.0 * std::numbers::pi * uniform(seed, 6 * step + 2 * i + 1);
-    result[2 * i] = radius * std::cos(angle);
-    result[2 * i + 1] = radius * std::sin(angle);
+    auto [first, second] = transform_box_muller(
+        uniform(seed, 6 * step + 2 * i), uniform(seed, 6 * step + 2 * i + 1));
+    result[2 * i] = first;
+    result[2 * i + 1] = second;
   }
   return result;
 }

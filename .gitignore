@@ -45,3 +45,9 @@ compile_commands.json
 
 # The clangd mirror: 2nd_party/lib/bazel/lsp_mirror.py
 .lsp/
+
+# Dear ImGui window layout, per user
+imgui.ini
+
+# Images the docs show, which a global *.png ignore would hide
+!documents/images/*.png

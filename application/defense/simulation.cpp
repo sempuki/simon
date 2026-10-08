@@ -100,10 +100,7 @@ auto create_site(Position origin, Depend<World> world) -> SiteBuilder {
 
 auto build_scenario(const Scenario& scenario, InOut<World> world)
     -> std::expected<Entity, framework::Status> {
-  if (scenario.sites < 1) {
-    return std::unexpected(lib::raise(framework::BuildError::ENTITY_NOT_ALIVE,
-                                      "A scenario needs at least one site."));
-  }
+  CHECK_PRECONDITION(scenario.sites >= 1);
   auto count = [](int value) {
     return static_cast<std::size_t>(std::max(value, 0));
   };

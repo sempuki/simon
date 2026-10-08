@@ -218,13 +218,6 @@ TEST_CASE("DefenseSimulation") {
     CHECK(simulation.world().store_of<WeaponsHold>().size() == 3u);
   }
 
-  SECTION("ShouldFailConfigureGivenNoSites") {
-    for (int sites : {0, -1}) {
-      Simulation simulation{Scenario{.sites = sites}};
-      CHECK_FALSE(simulation.configure().has_value());
-    }
-  }
-
   SECTION("ShouldLeaveNothingOfSiteGivenWorldRefusesADrone") {
     Scenario scenario{.radars = 3, .launchers = 3, .drones = 10};
     World world;

@@ -3,6 +3,7 @@
 // MPL-2.0; translated to C++ and changed. See NOTICE.md.
 
 #include "scenario/storyboard.hpp"
+#include "core/units.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -951,12 +952,12 @@ auto StoryboardPlayer::locate(const Position& position,
       return travel;
     }
     if (orientation->relative) {
-      return std::remainder(travel + orientation->h, 2.0 * std::numbers::pi);
+      return wrap(travel + orientation->h);
     }
     double road =
         compute_plan_point(network.roads[placement.road], placement.s * meter)
             .heading;
-    return std::remainder(orientation->h - road, 2.0 * std::numbers::pi);
+    return wrap(orientation->h - road);
   };
   // The lane at (s, t), and t's offset from its middle.
   auto place_at = [&](std::size_t road, double s, double t) {

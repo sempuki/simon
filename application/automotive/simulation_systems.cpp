@@ -3,6 +3,7 @@
 // MPL-2.0; translated to C++ and changed. See NOTICE.md.
 
 #include "application/automotive/simulation_systems.hpp"
+#include "core/units.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -344,7 +345,7 @@ auto MoveOnRoad::operator()(SystemWorld&, Entity,          //
         .x = at.x,
         .y = at.y,
         .z = road::compute_placement_pose(roads, placement).z,
-        .heading = std::remainder(heading, 2.0 * std::numbers::pi)};
+        .heading = wrap(heading)};
     if (ended) {
       motion.trajectory.reset();
     }

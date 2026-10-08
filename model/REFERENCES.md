@@ -31,8 +31,8 @@ full where it first appears, and as "above" after.
 | `earth/wind.cpp` | The air's rotation in gusts: q = -dw/dx and r = dv/dx, the negative of MIL-F-8785's rotary gusts, which perturb the aircraft's rates relative to the air | M. M. Madden, "Verifying implementation of the Dryden turbulence model and MIL-F-8785 gust gradient", AIAA Modeling and Simulation Technologies Conference, 2018, equations 6 to 8; MIL-F-8785C, above |
 | `earth/wind.cpp` | Sampling a filter driven by white noise exactly over a step | C. F. Van Loan, "Computing integrals involving the matrix exponential", *IEEE Transactions on Automatic Control* 23(3), 1978, pp. 395-404 |
 | `earth/wind.cpp` | A lag whose input moves in a straight line over a step | The triangle-hold equivalent, G. F. Franklin, J. D. Powell and M. L. Workman, *Digital Control of Dynamic Systems*, 3rd edition, Addison-Wesley, 1998, section 6.3.2 |
-| `earth/wind.cpp`, `application/automotive/simulation_systems.hpp` | SplitMix64 | G. L. Steele Jr., D. Lea and C. H. Flood, "Fast splittable pseudorandom number generators", OOPSLA 2014, pp. 453-472; its constants as in S. Vigna's [splitmix64.c](https://prng.di.unimi.it/splitmix64.c) |
-| `earth/wind.cpp`, `core/random.hpp` | Normal numbers from uniform ones | G. E. P. Box and M. E. Muller, "A note on the generation of random normal deviates", *Annals of Mathematical Statistics* 29(2), 1958, pp. 610-611 |
+| `core/random.hpp` | SplitMix64 | G. L. Steele Jr., D. Lea and C. H. Flood, "Fast splittable pseudorandom number generators", OOPSLA 2014, pp. 453-472; its constants as in S. Vigna's [splitmix64.c](https://prng.di.unimi.it/splitmix64.c) |
+| `core/random.hpp` | Normal numbers from uniform ones | G. E. P. Box and M. E. Muller, "A note on the generation of random normal deviates", *Annals of Mathematical Statistics* 29(2), 1958, pp. 610-611 |
 
 ## Aircraft
 

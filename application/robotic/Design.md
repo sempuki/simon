@@ -6,11 +6,11 @@ the framework can carry the first kind of system it has not yet carried, a
 solve that couples entities: contacts tie bodies together, and each step
 solves them at once. MuJoCo (Todorov, Erez and Tassa, "MuJoCo: A physics
 engine for model-based control", IROS 2012; Apache-2.0) is the reference.
-It is being built in eight steps (see the [Roadmap](#roadmap)); models read
-and compiled as MuJoCo compiles them, their dynamics without constraints,
-their actuators and control, their contacts, the constraint solver,
-MuJoCo's humanoid, scale against MuJoCo with a viewer, and four robots of
-MuJoCo Menagerie are done.
+It has models read and compiled as MuJoCo compiles them, their dynamics
+without constraints, their actuators and control, their contacts, the
+constraint solver, MuJoCo's humanoid, scale against MuJoCo with a viewer,
+and four robots of MuJoCo Menagerie; what comes next is in the
+[Roadmap](#roadmap).
 
 ## Choices
 
@@ -53,11 +53,19 @@ Each choice says what it is, why, and where it comes from.
    Runge–Kutta 4 later, opt in.
 8. **MJCF first,** MuJoCo's format, its example models Apache-2.0; URDF
    later.
-9. **Matched to rounding without contact,** as aeronautic against JSBSim; with
-   contact, to the solver's tolerance over a short horizon, since contact
-   is chaotic, and by physical checks beyond: a box sliding as far as
-   Coulomb friction gives, a stack at rest within a set penetration, energy
-   kept where nothing takes it away.
+9. **Held to MuJoCo's accuracy.** A compiled model is within 1e-12 of
+   MuJoCo's, and so are the contacts at a pose, except where rounding
+   moves MuJoCo's own contacts farther, which then bounds them. Each step
+   from MuJoCo's own states lands within how far nudging that state by a
+   few units in the last place moves MuJoCo's step, and each whole run
+   within how far such rounding moves MuJoCo's own run (the tests allow
+   ten times either); contact is chaotic, so that spread can grow large.
+   Where a constraint solver stops elsewhere than MuJoCo's, simon's step
+   and run are no farther than MuJoCo's from the ones solved to
+   convergence. Without constraints, each run is no farther than MuJoCo's
+   from Runge–Kutta 4 at a fiftieth of the timestep. Physical checks go
+   beyond: a box sliding as far as Coulomb friction gives, a sphere rolling
+   at five sevenths of its speed, a stack at rest within a set penetration.
 
 ## Models
 
@@ -69,11 +77,11 @@ radians; orientations by quaternion, axis and angle, Euler angles on moving
 or fixed axes, x and y axes, or z axis; capsules, cylinders, boxes and
 ellipsoids by `fromto`; each geom's mass from its density or mass and its
 moments from its shape; a body's inertia combined from its geoms by the
-parallel axis theorem and put on principal axes by Jacobi rotations kept
-as a quaternion, or given explicitly, a full tensor turned to the body's
-axes first; joints' limits from their ranges, positions at rest and spring
-references; and each degree of freedom's place in the tree. Anything that
-would change how a model moves and that simon does not yet run is refused:
+parallel axis theorem and put on principal axes by a symmetric
+eigensolver, kept as a quaternion, or given explicitly, a full tensor
+turned to the body's axes first; joints' limits from their ranges,
+positions at rest and spring references; and each degree of freedom's
+place in the tree. Anything that would change how a model moves and that simon does not yet run is refused:
 spatial tendons and tendon springs, equalities, meshes that collide or
 give their body mass, explicit contact pairs, actuators other than motors, position and velocity servos and
 general actuators with fixed gains, and integrators other than Euler. Fixed
@@ -83,7 +91,7 @@ model are kept, unread. A model may include other files, as Menagerie's
 scenes include their robots. What only shows a model is left out. A body's inertial frame
 and a geom's frame within 1e-6 of the body's frame, or of the inertial
 frame, are snapped to it, as MuJoCo snaps them; poses in the world then
-come from the same arithmetic.
+take the same shortcuts as MuJoCo's.
 
 `model_test` compiles eleven test models with every compiler feature (a
 pendulum, a double pendulum, a cart-pole, a tumbling free body of three
@@ -91,7 +99,10 @@ offset geoms, a model of default classes and every orientation, a stack of
 boxes, an actuated arm, a model of every primitive pair, a rolling sphere,
 sliding bodies and limited joints) and MuJoCo's humanoid, with its tendons
 and exclusions, and checks every compiled value against MuJoCo's
-(`reference/mujoco_models.py`): every one is equal, to the last bit.
+(`reference/mujoco_models.py`): every one is within 1e-12, relative where
+it is larger than 1, and the largest differs by 7e-16. Quaternions are
+compared up to their sign, and inertial frames by the tensor they give,
+since principal axes are defined only up to their signs.
 
 ## Dynamics
 
@@ -132,20 +143,25 @@ forces between them.
 
 `dynamics_test` steps six cases with constraints off, and checks every
 position and velocity at every step against MuJoCo
-(`reference/mujoco_dynamics.py`):
+(`reference/mujoco_dynamics.py`, `reference/mujoco_checks.py`). One step
+from each of 50 of MuJoCo's states lands within how far nudging that state
+by a few units in the last place moves MuJoCo's step there. Each whole run
+stays within how far such rounding moves MuJoCo's own run by each step.
+The largest differences from MuJoCo over each run are:
 
 | Case | Steps | Position | Velocity |
 |---|---:|---:|---:|
-| A pendulum | 2,000 | equal | equal |
-| A double pendulum, chaotic | 3,000 | equal | equal |
-| A free body of three geoms, tumbling without gravity | 2,000 | 2.0e-15 m | 3.8e-15 m/s |
-| Ball, slide and hinge joints with springs, implicit dampers and armature | 1,000 | 8.9e-16 | 1.0e-14 |
-| A cart-pole pushed by its motor | 200 | equal | equal |
-| Five boxes falling, five trees | 500 | equal | equal |
+| A pendulum | 2,000 | 7.3e-15 | 2.7e-14 |
+| A double pendulum, chaotic | 3,000 | 7.5e-15 | 5.2e-14 |
+| A free body of three geoms, tumbling without gravity | 2,000 | 4.1e-15 m | 2.3e-14 m/s |
+| Ball, slide and hinge joints with springs, implicit dampers and armature | 1,000 | 3.6e-15 | 1.1e-14 |
+| A cart-pole pushed by its motor | 200 | 5.6e-17 | 2.7e-15 |
+| Five boxes falling, five trees | 500 | 1.2e-15 | 0 |
 
-Where only hinges and slides move, every step equals MuJoCo's to the last
-bit; where a quaternion is in play, its integration and normalization part
-from MuJoCo's by an ulp or two.
+Each is smaller than how far rounding moves MuJoCo's own run by its end.
+Against Runge–Kutta 4 at a fiftieth of the timestep, each run's largest
+error, from 0.004 for the pendulum to 0.13 for the cart-pole, equals
+MuJoCo's to four figures.
 
 ## Control
 
@@ -172,8 +188,11 @@ servos, one geared and one taking its gain from a default class, a
 velocity servo with damping and a general actuator against its force range,
 for 3 s; and the cart-pole balanced from 0.2 rad by the discrete linear
 quadratic regulator of MuJoCo's own linearization, for 15 s, the pole
-upright within a microradian at the end. Both are equal to MuJoCo's to the
-last bit.
+upright within a microradian at the end. Each step from 50 of MuJoCo's
+states, and each run, are held to how far rounding moves MuJoCo's. The arm
+stays within 2.2e-16 of MuJoCo's positions and 2.7e-15 of its velocities,
+and the cart-pole within 6.9e-17 and 6.7e-16, its pole at 1.3e-8 rad at
+the end.
 
 ## Contacts
 
@@ -212,10 +231,17 @@ a box that cannot move and an arm whose links overlap their parents with a
 body welded to one, at 400 random poses, and checks every contact against
 MuJoCo's (`reference/mujoco_contacts.py`): all 5,465 contacts are there,
 between the same geoms, and every distance, position, frame, dimension,
-friction and soft parameter is equal to MuJoCo's to the last bit. It poses
-`models/convex.xml`, two ellipsoids, a sphere, two capsules (one with a
-margin), two cylinders and a box over the floor, at 400 random poses too:
-all 1,903 of MuJoCo's contacts, each equal to the last bit.
+friction and soft parameter is within 4e-14 of MuJoCo's, inside the test's
+1e-12. It poses `models/convex.xml`, two ellipsoids, a sphere, two
+capsules (one with a margin), two cylinders and a box over the floor, at
+400 random poses too. At 4 of them, nudging the pose by a few units in the
+last place changes which contacts MuJoCo finds, so which there are is
+rounding's to choose. At the other 396, all 1,876 of MuJoCo's contacts are
+there, each value within 1e-12 of MuJoCo's or within how far rounding
+moves MuJoCo's own contacts at that pose. Where a box's edge meets a
+cylinder's, or where EPA stops within its tolerance (which halving that
+tolerance shows), rounding moves MuJoCo's contacts by up to 3.3 cm, and
+the largest difference from MuJoCo's is as large.
 
 ## Constraints
 
@@ -250,39 +276,50 @@ island's accelerations, or, where any dof of the model is damped, at its
 smooth and constraint forces through M + h B, as MuJoCo does.
 
 `constraint_test` checks twenty-one cases against MuJoCo, every position and
-velocity at every step (`reference/mujoco_constraints.py`):
+velocity at every step (`reference/mujoco_constraints.py`,
+`reference/mujoco_checks.py`). One step from each of 50 of MuJoCo's states,
+and each whole run, land within how far rounding moves MuJoCo's own. Where
+simon's solver stops elsewhere than MuJoCo's, the step or run is held
+instead to being no farther than MuJoCo's from the one solved to
+convergence, by Newton's method to a tolerance of 1e-15. The largest
+differences from MuJoCo over each run are:
 
 | Case | Steps | Newton, position | Newton, velocity | PGS, position | PGS, velocity |
 |---|---:|---:|---:|---:|---:|
-| A sphere dropped, sliding, then rolling | 1,500 | 9.1e-13 m | 6.4e-12 m/s | 5.4e-15 | 7.5e-14 |
+| A sphere dropped, sliding, then rolling | 1,500 | 4.8e-13 m | 8.4e-12 m/s | 5.9e-15 | 5.3e-14 |
 | A box sliding to rest; a capsule rolling with torsional and rolling friction | 1,000 | 1.7e-14 | 9.8e-14 | 3.9e-7 | 1.1e-5 |
-| Five boxes stacked at rest | 1,000 (PGS 200) | 4.9e-16 | 3.8e-14 | 5.4e-9 | 6.9e-7 |
-| Hinge, ball and slide limits, a margin, dry friction | 1,500 | 6.7e-15 | 4.8e-14 | 6.7e-15 | 5.7e-14 |
-| MuJoCo's humanoid falling from standing | 400 | 1.3e-13 | 1.1e-11 | 6.4e-14 | 5.2e-12 |
-| The humanoid falling, its 21 motors held at controls | 400 | 2.8e-13 | 7.6e-12 | | |
-| The sphere, elliptic cone | 1,500 | 3.1e-14 | 1.5e-13 | 5.8e-15 | 2.8e-14 |
+| Five boxes stacked at rest | 1,000 | 8.3e-16 | 8.1e-14 | 6.9e-4 | 1.9e-2 |
+| Hinge, ball and slide limits, a margin, dry friction | 1,500 | 5.4e-14 | 1.2e-11 | 8.4e-15 | 5.4e-13 |
+| MuJoCo's humanoid falling from standing | 400 | 2.8e-13 | 2.3e-11 | 1.3e-13 | 1.0e-11 |
+| The humanoid falling, its 21 motors held at controls | 400 | 1.3e-12 | 2.7e-11 | | |
+| The sphere, elliptic cone | 1,500 | 2.6e-12 | 1.2e-10 | 2.3e-15 | 2.7e-14 |
 | The box and capsule, elliptic cone | 1,000 | 1.1e-7 | 6.6e-6 | 2.5e-7 | 1.1e-5 |
 | The stack, elliptic cone | 1,000 | 0 | 3.8e-17 | | |
-| The driven humanoid, elliptic cone | 400 | 3.6e-13 | 2.0e-11 | | |
-| The actuated arm, implicitfast | 1,500 | equal | equal | | |
-| The tumbling free body, implicitfast | 1,000 | 7.8e-16 | 8.9e-16 | | |
-| The sphere, implicitfast | 1,500 | 1.7e-14 | 9.2e-14 | | |
-| The driven humanoid, implicitfast | 400 | 2.8e-13 | 7.6e-12 | | |
+| The driven humanoid, elliptic cone | 400 | 3.8e-13 | 2.2e-11 | | |
+| The actuated arm, implicitfast | 1,500 | 2.2e-16 | 1.9e-15 | | |
+| The tumbling free body, implicitfast | 1,000 | 4.3e-15 | 4.9e-15 | | |
+| The sphere, implicitfast | 1,500 | 1.9e-14 | 1.0e-13 | | |
+| The driven humanoid, implicitfast | 400 | 1.3e-12 | 2.7e-11 | | |
 
 Newton's method converges, and so matches MuJoCo to rounding grown over
 the run, but where a body comes to stick, the tolerance it stops at can
-tip it a step apart from MuJoCo's: the capsule, on the elliptic cone. Projected Gauss–Seidel stops at its tolerance; where a sweep ends
-a step earlier or later than MuJoCo's, by rounding, the two part by its
-tolerance, and a stack's resting contacts then come and go apart, so the
-stack is compared over 0.4 s.
+tip it a step apart from MuJoCo's: the capsule, on the elliptic cone.
+There simon's positions stay within 8.3e-7 of the converged run's, and
+MuJoCo's within 9.4e-7. Projected Gauss–Seidel stops at its tolerance; where a sweep
+ends a step earlier or later than MuJoCo's, by rounding, the two part by
+its tolerance, as the box and capsule do on either cone, each as far from
+the converged run as MuJoCo's. A stack's resting contacts come and go by
+rounding alone under PGS: nudging MuJoCo's own run moves its positions by
+up to 1.8e-3 and its velocities by 8.4e-2, and simon's stays within 6.9e-4
+and 1.9e-2 of MuJoCo's.
 
 It also checks physics, by both solvers: the box slides 0.5078 m from 2 m/s
 where Coulomb friction of 0.4 gives 0.5097 m; a sphere sliding at 2 m/s on
 the floor rolls at 1.4279 m/s, within 0.05% of five sevenths of 2 m/s, its
-spin matching; the stack rests within 2.1 mm of its height, still to 1e-12
-m/s by Newton's method, and within 5 mm/s by PGS, as MuJoCo's own PGS
-leaves it. MuJoCo's humanoid, falling for 20 s, lies on the floor 0.070 m
-high, as MuJoCo's does, its tendons and limits holding.
+spin matching; the stack rests within 2.1 mm of its height, still to 1e-11
+m/s by Newton's method, and within 1 mm/s by PGS. MuJoCo's humanoid,
+falling for 20 s, lies on the floor 0.070 m high, as MuJoCo's does, its
+tendons and limits holding.
 
 ## Menagerie
 
@@ -292,11 +329,13 @@ the elliptic cone with impratio 100, its hips cylinders against its legs'
 capsules and its joints with dry friction; Unitree's H1, a tree of 20
 bodies, falling; Universal Robots' UR5e under implicitfast; and ANYbotics'
 ANYmal C, standing. `model_test` compiles each to MuJoCo's values, all
-equal to the last bit but the meshes' frames and sizes, which come from
-their shapes; `menagerie_test` steps each from its home keyframe, its
-actuators held at the keyframe's controls, for 1,000 steps
-(`reference/mujoco_menagerie.py`): Go1, H1 and ANYmal C within 1e-12 m/s
-of MuJoCo, UR5e within 2e-15.
+within 1e-12 but the meshes' frames and sizes, which come from their
+shapes; `menagerie_test` steps each from its home keyframe, its actuators
+held at the keyframe's controls, for 1,000 steps
+(`reference/mujoco_menagerie.py`), each step from MuJoCo's states and each
+run within how far rounding moves MuJoCo's own. Go1 stays within 4.5e-13
+m/s of MuJoCo, H1 within 1.2e-12, ANYmal C within 5.2e-13 and UR5e within
+1.7e-15, each less than how far rounding moves MuJoCo's own run by its end.
 
 Others need what is not here yet: meshes that collide or give their body
 mass (Barkour, Spot, OP3, the Allegro hand), and actuator attributes MuJoCo
@@ -312,10 +351,10 @@ rest, the bodies landing partway through:
 
 | Scene | simon | MuJoCo | Ratio |
 |---|---:|---:|---:|
-| 1,000 loose boxes, spheres and capsules falling onto the floor | 1.45 ms/step | 1.36 | 1.07 |
-| 10,000 of them | 17.8 | 15.1 | 1.18 |
-| 100 humanoids falling, 2 m apart | 2.49 | 2.21 | 1.13 |
-| 1,000 humanoids | 31.4 | 26.2 | 1.20 |
+| 1,000 loose boxes, spheres and capsules falling onto the floor | 1.56 ms/step | 1.36 | 1.15 |
+| 10,000 of them | 18.3 | 15.1 | 1.21 |
+| 100 humanoids falling, 2 m apart | 2.58 | 2.21 | 1.17 |
+| 1,000 humanoids | 31.5 | 26.2 | 1.20 |
 
 Both end with the same contacts, 19,111 for the 10,000 bodies and 8,000 for
 the humanoids, and take about as many solver iterations an island, 1.1 to
@@ -351,11 +390,11 @@ of the step, and pauses, restarts and speeds the run.
    friction, Newton and PGS, by island; a sphere rolling, a box sliding, a
    stack, against MuJoCo and physics.
 6. Done: MuJoCo's humanoid, with its fixed tendons and contact exclusions,
-   compiled to the last bit and stepped within 1e-11 of MuJoCo through its
-   fall. The Apache-2.0 models of MuJoCo Menagerie move to step 8: each uses
-   the elliptic cone, implicitfast, cylinders that only the convex collider
-   handles, or meshes.
-7. Done: ten thousand loose bodies and a thousand humanoids within 1.2x of
+   compiled within 1e-12 of MuJoCo and stepped through its fall within how
+   far rounding moves MuJoCo's own. The Apache-2.0 models of MuJoCo
+   Menagerie move to step 8: each uses the elliptic cone, implicitfast,
+   cylinders that only the convex collider handles, or meshes.
+7. Done: ten thousand loose bodies and a thousand humanoids within 1.25x of
    MuJoCo on one thread, and the viewer. Islands in parallel wait on the
    framework running `prepare` on more than one thread.
 8. Done: implicitfast, the elliptic cone and impratio, MuJoCo's convex

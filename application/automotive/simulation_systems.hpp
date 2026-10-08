@@ -69,12 +69,7 @@ inline auto choose_next_lane(const Network& network, const LaneKey& lane,
   if (driving.empty()) {
     return std::nullopt;
   }
-  // SplitMix64 of the seed and the turn (see model/REFERENCES.md).
-  std::uint64_t z = seed + (std::uint64_t{turns} + 1) * 0x9e3779b97f4a7c15ULL;
-  z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
-  z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
-  z ^= z >> 31;
-  return driving[z % driving.size()];
+  return driving[compute_split_mix(seed, turns) % driving.size()];
 }
 
 // The driving lane beside `lane` in its section, to the right of travel if
@@ -1025,11 +1020,7 @@ inline auto plan_walk(const Network& network, std::uint32_t node,
                       std::uint64_t seed, std::uint32_t trip)
     -> std::vector<road::Leg> {
   // SplitMix64 of the seed and the trip (see model/REFERENCES.md).
-  std::uint64_t z = seed + (std::uint64_t{trip} + 1) * 0x9e3779b97f4a7c15ULL;
-  z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
-  z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
-  z ^= z >> 31;
-  Random random{z};
+  Random random{compute_split_mix(seed, trip)};
   std::span<const std::uint32_t> component = network.walking_components;
   for (int attempt = 0; attempt < 100; ++attempt) {
     auto goal = static_cast<std::uint32_t>(

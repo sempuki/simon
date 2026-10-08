@@ -13,6 +13,7 @@
 #include <thread>
 #include <utility>
 
+#include "core/units.hpp"
 #include "model/collision.hpp"
 #include "model/traffic/driving_metrics.hpp"
 
@@ -126,8 +127,7 @@ auto measure_run(const RunRecord& run) -> RunMeasures {
                                   .speed = now.speed};
     if (k > 0) {
       const RunSample& before = run.samples[k - 1][0];
-      double turn =
-          std::remainder(now.heading - before.heading, 2.0 * std::numbers::pi);
+      double turn = wrap(now.heading - before.heading);
       sample.acceleration_x = (now.speed - before.speed) / run.step;
       sample.acceleration_y = now.speed * turn / run.step;
     }

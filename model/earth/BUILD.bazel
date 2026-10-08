@@ -35,6 +35,7 @@ cc_library(
         "//core:units",
         "//core:argument",
         "//core:math",
+        "//core:random",
         "//3rd_party:eigen",
     ],
 )
