@@ -69,14 +69,14 @@ instead of an `if` per call:
 
 ```cpp
 RETURN_IF_UNEXPECTED(build_world(scenario_, lib::Out(world_)));
-RETURN_OR_ASSIGN(asset_, build_scenario(scenario_, lib::InOut(world_)));
+RETURN_OR_ASSIGN_TO(asset_, build_scenario(scenario_, lib::InOut(world_)));
 ```
 
 `RETURN_IF_UNEXPECTED` returns the error, if any, from the enclosing function.
-`RETURN_OR_ASSIGN` does the same and otherwise moves the value into an existing
-variable or a new declaration (`Entity asset`). The enclosing function must
-return a `std::expected` whose error type the error converts to.
-`RETURN_OR_ASSIGN` expands to several statements, so it goes only where a
+`RETURN_OR_ASSIGN_TO` does the same and otherwise moves the value into an
+existing variable or a new declaration (`Entity asset`). The enclosing function
+must return a `std::expected` whose error type the error converts to.
+`RETURN_OR_ASSIGN_TO` expands to several statements, so it goes only where a
 statement can, at most once per line.
 
 **Functions declare a trailing return type:** `auto f(X) -> Y`, `void` ones
@@ -660,7 +660,7 @@ entity's Name number is not given again, so later Names skip it:
 
 ```cpp
 auto transaction = world_->transaction();
-RETURN_OR_ASSIGN(Entity asset, world_->create<archetype::Asset>("asset")...build());
+RETURN_OR_ASSIGN_TO(Entity asset, world_->create<archetype::Asset>("asset")...build());
 RETURN_IF_UNEXPECTED(world_->create<archetype::Radar>()...build());
 transaction.commit();
 ```

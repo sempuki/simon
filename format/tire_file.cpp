@@ -206,7 +206,7 @@ auto parse_tire_file(std::string_view text)
 
 auto load_tire_file(const std::string& path)
     -> std::expected<MagicFormulaTire, lib::Status> {
-  RETURN_OR_ASSIGN(std::string text, read_text_file(path));
+  RETURN_OR_ASSIGN_TO(std::string text, read_text_file(path));
   return parse_tire_file(text);
 }
 

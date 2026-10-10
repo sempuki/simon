@@ -195,11 +195,11 @@ auto build_scenario(const Scenario& scenario, const RigidTypes& types,
   // holds anywhere, on any heading.
   std::optional<aircraft::Trim> airliner_trim;
   if (airliners > 0) {
-    RETURN_OR_ASSIGN(airliner_trim, trim_in_cruise(*types.airliner, earth));
+    RETURN_OR_ASSIGN_TO(airliner_trim, trim_in_cruise(*types.airliner, earth));
   }
   std::optional<aircraft::Trim> fighter_trim;
   if (fighters > 0) {
-    RETURN_OR_ASSIGN(fighter_trim, trim_in_cruise(*types.fighter, earth));
+    RETURN_OR_ASSIGN_TO(fighter_trim, trim_in_cruise(*types.fighter, earth));
   }
 
   auto transaction = world->transaction();
@@ -247,13 +247,13 @@ auto build_scenario(const Scenario& scenario, const RigidTypes& types,
 auto Simulation::configure() -> engine::PhaseResult {
   scheduler_.attach(Depend(timeline_));
   if (scenario_.rigid > 0) {
-    RETURN_OR_ASSIGN(aircraft::Definition loaded,
-                     format::load_aircraft(scenario_.rigid_aircraft));
+    RETURN_OR_ASSIGN_TO(aircraft::Definition loaded,
+                        format::load_aircraft(scenario_.rigid_aircraft));
     airliner_ = std::make_unique<aircraft::Definition>(std::move(loaded));
   }
   if (scenario_.fighters > 0) {
-    RETURN_OR_ASSIGN(aircraft::Definition loaded,
-                     format::load_aircraft(scenario_.fighter_aircraft));
+    RETURN_OR_ASSIGN_TO(aircraft::Definition loaded,
+                        format::load_aircraft(scenario_.fighter_aircraft));
     fighter_ = std::make_unique<aircraft::Definition>(std::move(loaded));
   }
   RETURN_IF_UNEXPECTED(build_world(scenario_, Out(world_)));

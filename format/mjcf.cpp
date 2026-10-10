@@ -219,7 +219,7 @@ class Reader final {
   auto read(std::string_view text)
       -> std::expected<articulated::Scene, lib::Status> {
     RETURN_IF_UNEXPECTED(document_.load(std::string{text}));
-    RETURN_OR_ASSIGN(pugi::xml_node root, document_.find_root("mujoco"));
+    RETURN_OR_ASSIGN_TO(pugi::xml_node root, document_.find_root("mujoco"));
     articulated::Scene model{.name = root.attribute("model").as_string()};
     // The compiler's settings and the defaults come first, wherever they
     // stand.
@@ -352,7 +352,7 @@ class Reader final {
                     InOut<Integer> into) const
       -> std::expected<void, lib::Status> {
     double value = 0.0;
-    RETURN_OR_ASSIGN(bool read, read_number(node, name, InOut(value)));
+    RETURN_OR_ASSIGN_TO(bool read, read_number(node, name, InOut(value)));
     if (read) {
       *into = static_cast<Integer>(value);
     }
@@ -392,32 +392,32 @@ class Reader final {
       -> std::expected<void, lib::Status> {
     int given = 0;
     std::array<double, 4> quat = into->quat;
-    RETURN_OR_ASSIGN(bool has_quat, read_array(node, "quat", InOut(quat)));
+    RETURN_OR_ASSIGN_TO(bool has_quat, read_array(node, "quat", InOut(quat)));
     if (has_quat) {
       into->kind = Orientation::Kind::QUAT;
       into->quat = quat;
       ++given;
     }
-    RETURN_OR_ASSIGN(bool has_axis,
-                     read_array(node, "axisangle", InOut(into->axis_angle)));
+    RETURN_OR_ASSIGN_TO(bool has_axis,
+                        read_array(node, "axisangle", InOut(into->axis_angle)));
     if (has_axis) {
       into->kind = Orientation::Kind::AXIS_ANGLE;
       ++given;
     }
-    RETURN_OR_ASSIGN(bool has_xy,
-                     read_array(node, "xyaxes", InOut(into->xy_axes)));
+    RETURN_OR_ASSIGN_TO(bool has_xy,
+                        read_array(node, "xyaxes", InOut(into->xy_axes)));
     if (has_xy) {
       into->kind = Orientation::Kind::XY_AXES;
       ++given;
     }
-    RETURN_OR_ASSIGN(bool has_z,
-                     read_array(node, "zaxis", InOut(into->z_axis)));
+    RETURN_OR_ASSIGN_TO(bool has_z,
+                        read_array(node, "zaxis", InOut(into->z_axis)));
     if (has_z) {
       into->kind = Orientation::Kind::Z_AXIS;
       ++given;
     }
-    RETURN_OR_ASSIGN(bool has_euler,
-                     read_array(node, "euler", InOut(into->euler)));
+    RETURN_OR_ASSIGN_TO(bool has_euler,
+                        read_array(node, "euler", InOut(into->euler)));
     if (has_euler) {
       into->kind = Orientation::Kind::EULER;
       ++given;
@@ -678,13 +678,13 @@ class Reader final {
     RETURN_IF_UNEXPECTED(read_array(node, "pos", InOut(geom.pos)));
     RETURN_IF_UNEXPECTED(read_orientation(node, InOut(spec->orientation)));
     std::array<double, 6> fromto{};
-    RETURN_OR_ASSIGN(bool has_fromto,
-                     read_array(node, "fromto", InOut(fromto)));
+    RETURN_OR_ASSIGN_TO(bool has_fromto,
+                        read_array(node, "fromto", InOut(fromto)));
     if (has_fromto) {
       spec->fromto = fromto;
     }
     double mass = 0.0;
-    RETURN_OR_ASSIGN(bool has_mass, read_number(node, "mass", InOut(mass)));
+    RETURN_OR_ASSIGN_TO(bool has_mass, read_number(node, "mass", InOut(mass)));
     if (has_mass) {
       spec->mass = mass;
     }
@@ -835,7 +835,7 @@ class Reader final {
       actuator.gain[0] = kp;
       actuator.bias[1] = -kp;
       double kv = 0.0;
-      RETURN_OR_ASSIGN(bool has_kv, read_number(node, "kv", InOut(kv)));
+      RETURN_OR_ASSIGN_TO(bool has_kv, read_number(node, "kv", InOut(kv)));
       if (has_kv) {
         if (kv < 0) {
           return fail(node, "kv cannot be negative");
@@ -888,16 +888,16 @@ class Reader final {
     }
     RETURN_IF_UNEXPECTED(read_array(node, "pos", InOut(spec.pos)));
     RETURN_IF_UNEXPECTED(read_orientation(node, InOut(spec.orientation)));
-    RETURN_OR_ASSIGN(bool has_mass,
-                     read_number(node, "mass", InOut(spec.mass)));
+    RETURN_OR_ASSIGN_TO(bool has_mass,
+                        read_number(node, "mass", InOut(spec.mass)));
     if (!has_mass) {
       return fail(node, "needs a mass");
     }
-    RETURN_OR_ASSIGN(bool diagonal,
-                     read_array(node, "diaginertia", InOut(spec.diagonal)));
+    RETURN_OR_ASSIGN_TO(bool diagonal,
+                        read_array(node, "diaginertia", InOut(spec.diagonal)));
     std::array<double, 6> full{};
-    RETURN_OR_ASSIGN(bool has_full,
-                     read_array(node, "fullinertia", InOut(full)));
+    RETURN_OR_ASSIGN_TO(bool has_full,
+                        read_array(node, "fullinertia", InOut(full)));
     if (has_full) {
       spec.full = full;
     }
@@ -916,8 +916,8 @@ class Reader final {
     for (pugi::xml_node child : node.children()) {
       std::string_view kind = child.name();
       if (kind == "geom") {
-        RETURN_OR_ASSIGN(const Defaults* defaults,
-                         find_defaults(child, classes));
+        RETURN_OR_ASSIGN_TO(const Defaults* defaults,
+                            find_defaults(child, classes));
         GeomSpec geom = defaults->geom;
         geom.geom.name.clear();
         RETURN_IF_UNEXPECTED(apply_geom(child, InOut(geom)));
@@ -925,8 +925,8 @@ class Reader final {
       } else if (kind == "joint" || kind == "freejoint") {
         JointSpec joint;
         if (kind == "joint") {
-          RETURN_OR_ASSIGN(const Defaults* defaults,
-                           find_defaults(child, classes));
+          RETURN_OR_ASSIGN_TO(const Defaults* defaults,
+                              find_defaults(child, classes));
           joint = defaults->joint;
           joint.joint.name.clear();
           RETURN_IF_UNEXPECTED(apply_joint(child, InOut(joint)));
@@ -944,7 +944,7 @@ class Reader final {
         }
         body->joints.push_back(std::move(joint));
       } else if (kind == "inertial") {
-        RETURN_OR_ASSIGN(body->inertial, read_inertial(child));
+        RETURN_OR_ASSIGN_TO(body->inertial, read_inertial(child));
       } else if (kind == "body") {
         BodySpec spec{.name = child.attribute("name").as_string()};
         for (pugi::xml_attribute attribute : child.attributes()) {
@@ -1029,7 +1029,7 @@ class Reader final {
         kind != "general") {
       return refuse(node);
     }
-    RETURN_OR_ASSIGN(const Defaults* defaults, find_defaults(node, "main"));
+    RETURN_OR_ASSIGN_TO(const Defaults* defaults, find_defaults(node, "main"));
     ActuatorSpec actuator = defaults->actuator;
     actuator.actuator.name.clear();
     actuator.joint.clear();
@@ -1137,7 +1137,7 @@ class Reader final {
       geom.pos = {(f[0] + f[3]) / 2, (f[1] + f[4]) / 2, (f[2] + f[5]) / 2};
       geom.quat = rotate_z_to(v);
     } else {
-      RETURN_OR_ASSIGN(geom.quat, resolve(spec.orientation));
+      RETURN_OR_ASSIGN_TO(geom.quat, resolve(spec.orientation));
     }
     // A mesh only shows the model: it may neither collide nor weigh, as
     // its shape is not read.
@@ -1273,7 +1273,7 @@ class Reader final {
     model->bodies[index].first_geom =
         static_cast<std::uint32_t>(model->geoms.size());
     for (const GeomSpec& spec : body.geoms) {
-      RETURN_OR_ASSIGN(auto compiled, compile_geom(spec, false));
+      RETURN_OR_ASSIGN_TO(auto compiled, compile_geom(spec, false));
       compiled.first.body = index;
       model->geoms.push_back(compiled.first);
     }
@@ -1291,7 +1291,7 @@ class Reader final {
     articulated::Body body{
         .name = spec.name, .parent = parent, .pos = spec.pos};
     body.root = parent == 0 ? index : model->bodies[parent].root;
-    RETURN_OR_ASSIGN(body.quat, resolve(spec.orientation));
+    RETURN_OR_ASSIGN_TO(body.quat, resolve(spec.orientation));
 
     // An explicit inertial, a full tensor turned to the body's axes and
     // found on its principal axes.
@@ -1321,7 +1321,7 @@ class Reader final {
         body.inertia = moments;
         quat = axes;
       } else if (inertial.orientation.kind != Orientation::Kind::QUAT) {
-        RETURN_OR_ASSIGN(quat, resolve(inertial.orientation));
+        RETURN_OR_ASSIGN_TO(quat, resolve(inertial.orientation));
       }
       body.inertial_quat = quat;
       inertial_defined = true;
@@ -1334,8 +1334,8 @@ class Reader final {
     for (const GeomSpec& geom_spec : spec.geoms) {
       bool in_group = geom_spec.group >= compiler_.inertia_groups[0] &&
                       geom_spec.group <= compiler_.inertia_groups[1];
-      RETURN_OR_ASSIGN(auto compiled,
-                       compile_geom(geom_spec, infer && in_group));
+      RETURN_OR_ASSIGN_TO(auto compiled,
+                          compile_geom(geom_spec, infer && in_group));
       geoms.push_back(compiled);
     }
     if (compiler_.from_geom == CompilerSpec::FromGeom::YES ||

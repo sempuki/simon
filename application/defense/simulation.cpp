@@ -42,11 +42,11 @@ auto SiteBuilder::build() && -> std::expected<Entity, framework::Status> {
   constexpr double TURN = 2.0 * std::numbers::pi;
   // Any early return rolls back the entities created so far.
   auto transaction = world_->transaction();
-  RETURN_OR_ASSIGN(Entity asset, world_->create<archetype::Asset>("asset")
-                                     .with(Kinematics{.position = origin_})
-                                     .with(asset_health_)
-                                     .with(Asset{})
-                                     .build());
+  RETURN_OR_ASSIGN_TO(Entity asset, world_->create<archetype::Asset>("asset")
+                                        .with(Kinematics{.position = origin_})
+                                        .with(asset_health_)
+                                        .with(Asset{})
+                                        .build());
   for (std::size_t i = 0; i < radars_.count; ++i) {
     double bearing =
         TURN * static_cast<double>(i) / static_cast<double>(radars_.count);
@@ -121,7 +121,7 @@ auto build_scenario(const Scenario& scenario, InOut<World> world)
     if (scenario.radars_in_turn) {
       watched = std::move(watched).scanning_in_turn();
     }
-    RETURN_OR_ASSIGN(
+    RETURN_OR_ASSIGN_TO(
         Entity asset,
         std::move(watched)
             .defended_by(count(scenario.launchers),
@@ -150,7 +150,7 @@ auto Simulation::configure() -> engine::PhaseResult {
   scheduler_.attach(Depend(timeline_));
   events_.attach(Depend(timeline_));
   RETURN_IF_UNEXPECTED(build_world(scenario_, Out(world_)));
-  RETURN_OR_ASSIGN(asset_, build_scenario(scenario_, InOut(world_)));
+  RETURN_OR_ASSIGN_TO(asset_, build_scenario(scenario_, InOut(world_)));
   stock_ = remaining_interceptors();
   for (std::size_t hold = 0; hold < scenario_.holds.size(); ++hold) {
     events_.start_timer(scenario_.holds[hold].from,

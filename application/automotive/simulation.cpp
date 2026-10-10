@@ -72,7 +72,7 @@ auto driving_lanes(const Network& network, double margin) -> std::vector<Room> {
 
 auto load_network(const std::string& path)
     -> std::expected<Network, framework::Status> {
-  RETURN_OR_ASSIGN(road::Map roads, format::load_opendrive(path));
+  RETURN_OR_ASSIGN_TO(road::Map roads, format::load_opendrive(path));
   road::LaneGraph graph = road::build_lane_graph(roads);
   road::LaneGraph driving = road::build_lane_graph(roads, "driving");
   traffic::Signals signals = traffic::build_signals(roads);
@@ -305,7 +305,7 @@ auto keep_road_order(const Network& network, InOut<World> world) -> void {
 Simulation::Simulation(Scenario scenario) : scenario_{std::move(scenario)} {}
 
 auto Simulation::configure() -> engine::PhaseResult {
-  RETURN_OR_ASSIGN(Network network, load_network(scenario_.roads));
+  RETURN_OR_ASSIGN_TO(Network network, load_network(scenario_.roads));
   network.vehicles_yield = scenario_.vehicles_yield;
   network_ = std::make_unique<Network>(std::move(network));
   scheduler_ = std::make_unique<Scheduler>(make_schedule(*network_));

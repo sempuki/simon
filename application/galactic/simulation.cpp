@@ -26,23 +26,23 @@ auto build_bodies(const Scenario& scenario, Out<World> world,
           .build(world));
   bodies->clear();
   for (const BodyStart& start : scenario.bodies) {
-    RETURN_OR_ASSIGN(Entity body,
-                     world->create<Body>()
-                         .with(Kinematics{.position = start.position,
-                                          .velocity = start.velocity})
-                         .with(PointMass{.mass = start.mass})
-                         .with(Gravity{})
-                         .build());
+    RETURN_OR_ASSIGN_TO(Entity body,
+                        world->create<Body>()
+                            .with(Kinematics{.position = start.position,
+                                             .velocity = start.velocity})
+                            .with(PointMass{.mass = start.mass})
+                            .with(Gravity{})
+                            .build());
     bodies->push_back(body);
   }
   test_particles->clear();
   for (const BodyStart& start : scenario.test_particles) {
-    RETURN_OR_ASSIGN(Entity particle,
-                     world->create<TestParticle>()
-                         .with(Kinematics{.position = start.position,
-                                          .velocity = start.velocity})
-                         .with(Gravity{})
-                         .build());
+    RETURN_OR_ASSIGN_TO(Entity particle,
+                        world->create<TestParticle>()
+                            .with(Kinematics{.position = start.position,
+                                             .velocity = start.velocity})
+                            .with(Gravity{})
+                            .build());
     test_particles->push_back(particle);
   }
   world->sync();

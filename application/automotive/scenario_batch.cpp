@@ -99,7 +99,7 @@ auto record_run(const std::string& path,
                 .boxes = convert_entities_to_boxes(simulation.scenario())};
   for (std::size_t k = 0; k < limit; ++k) {
     Step now{.time = TimePoint{} + k * step, .dt = step};
-    RETURN_OR_ASSIGN(engine::Flow flow, simulation.step(now));
+    RETURN_OR_ASSIGN_TO(engine::Flow flow, simulation.step(now));
     // The step on which the storyboard stops is not sampled, as esmini
     // does not log it.
     if (flow == engine::Flow::STOP || !simulation.player().running()) {

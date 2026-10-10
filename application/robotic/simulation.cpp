@@ -231,8 +231,8 @@ auto start_control(const Mechanics& mechanics, std::uint32_t t,
 }  // namespace
 
 auto Simulation::configure() -> engine::PhaseResult {
-  RETURN_OR_ASSIGN(articulated::Scene model,
-                   format::load_mjcf(scenario_.model));
+  RETURN_OR_ASSIGN_TO(articulated::Scene model,
+                      format::load_mjcf(scenario_.model));
   if (scenario_.solver) {
     model.physics.solver = *scenario_.solver;
   }

@@ -28,18 +28,18 @@ class Parser final {
  public:
   auto parse(std::string_view text) -> std::expected<road::Map, lib::Status> {
     RETURN_IF_UNEXPECTED(document_.load(std::string{text}));
-    RETURN_OR_ASSIGN(pugi::xml_node root, document_.find_root("OpenDRIVE"));
+    RETURN_OR_ASSIGN_TO(pugi::xml_node root, document_.find_root("OpenDRIVE"));
     road::Map network;
     for (pugi::xml_node node : root.children("road")) {
-      RETURN_OR_ASSIGN(Road road, read_road(node));
+      RETURN_OR_ASSIGN_TO(Road road, read_road(node));
       network.roads.push_back(std::move(road));
     }
     for (pugi::xml_node node : root.children("junction")) {
-      RETURN_OR_ASSIGN(Junction junction, read_junction(node));
+      RETURN_OR_ASSIGN_TO(Junction junction, read_junction(node));
       network.junctions.push_back(std::move(junction));
     }
     for (pugi::xml_node node : root.children("controller")) {
-      RETURN_OR_ASSIGN(SignalController controller, read_controller(node));
+      RETURN_OR_ASSIGN_TO(SignalController controller, read_controller(node));
       network.controllers.push_back(std::move(controller));
     }
     return network;
@@ -86,7 +86,7 @@ class Parser final {
     }
     if (kind == "road") {
       link.kind = road::Link::Kind::ROAD;
-      RETURN_OR_ASSIGN(
+      RETURN_OR_ASSIGN_TO(
           link.contact,
           read_contact(node, node.attribute("contactPoint").as_string()));
     } else if (kind == "junction") {
@@ -104,7 +104,7 @@ class Parser final {
     if (!node || !node.attribute(name)) {
       return std::optional<int>{};
     }
-    RETURN_OR_ASSIGN(double id, read_number(node, name));
+    RETURN_OR_ASSIGN_TO(double id, read_number(node, name));
     if (static_cast<int>(id) != id) {
       return fail(node, std::string{name} + " is not a whole number");
     }
@@ -128,14 +128,15 @@ class Parser final {
           connection.connecting_road.empty()) {
         return fail(connection_node, "needs incomingRoad and connectingRoad");
       }
-      RETURN_OR_ASSIGN(
+      RETURN_OR_ASSIGN_TO(
           connection.contact,
           read_contact(connection_node,
                        connection_node.attribute("contactPoint").as_string()));
       for (pugi::xml_node link_node : connection_node.children("laneLink")) {
-        RETURN_OR_ASSIGN(std::optional<int> from,
-                         read_lane_id(link_node, "from"));
-        RETURN_OR_ASSIGN(std::optional<int> to, read_lane_id(link_node, "to"));
+        RETURN_OR_ASSIGN_TO(std::optional<int> from,
+                            read_lane_id(link_node, "from"));
+        RETURN_OR_ASSIGN_TO(std::optional<int> to,
+                            read_lane_id(link_node, "to"));
         if (!from || !to) {
           return fail(link_node, "needs from and to");
         }
@@ -159,8 +160,8 @@ class Parser final {
         return fail(controller_node, "needs id");
       }
       controller.type = controller_node.attribute("type").as_string();
-      RETURN_OR_ASSIGN(controller.sequence,
-                       read_count(controller_node, "sequence"));
+      RETURN_OR_ASSIGN_TO(controller.sequence,
+                          read_count(controller_node, "sequence"));
       junction.controllers.push_back(std::move(controller));
     }
     return junction;
@@ -174,7 +175,7 @@ class Parser final {
       return fail(node, "needs id");
     }
     controller.name = node.attribute("name").as_string();
-    RETURN_OR_ASSIGN(controller.sequence, read_count(node, "sequence"));
+    RETURN_OR_ASSIGN_TO(controller.sequence, read_count(node, "sequence"));
     for (pugi::xml_node control_node : node.children("control")) {
       SignalController::Control control{
           .signal = control_node.attribute("signalId").as_string(),
@@ -190,7 +191,7 @@ class Parser final {
   // The whole number in `node`'s attribute `name`, 0 if it has none.
   auto read_count(pugi::xml_node node, const char* name) const
       -> std::expected<std::uint32_t, lib::Status> {
-    RETURN_OR_ASSIGN(double count, read_number(node, name, 0.0));
+    RETURN_OR_ASSIGN_TO(double count, read_number(node, name, 0.0));
     if (count < 0.0 || count != std::floor(count) ||
         count > std::numeric_limits<std::uint32_t>::max()) {
       return fail(node, std::string{name} + " is not a count");
@@ -219,10 +220,10 @@ class Parser final {
                        InOut<std::vector<LaneValidity>> validities) const
       -> std::expected<void, lib::Status> {
     for (pugi::xml_node validity_node : node.children("validity")) {
-      RETURN_OR_ASSIGN(std::optional<int> from,
-                       read_lane_id(validity_node, "fromLane"));
-      RETURN_OR_ASSIGN(std::optional<int> to,
-                       read_lane_id(validity_node, "toLane"));
+      RETURN_OR_ASSIGN_TO(std::optional<int> from,
+                          read_lane_id(validity_node, "fromLane"));
+      RETURN_OR_ASSIGN_TO(std::optional<int> to,
+                          read_lane_id(validity_node, "toLane"));
       if (!from || !to) {
         return fail(validity_node, "needs fromLane and toLane");
       }
@@ -242,21 +243,21 @@ class Parser final {
       return fail(node, "needs id");
     }
     signal.name = node.attribute("name").as_string();
-    RETURN_OR_ASSIGN(signal.s, read_number(node, "s"));
-    RETURN_OR_ASSIGN(signal.t, read_number(node, "t"));
-    RETURN_OR_ASSIGN(signal.z_offset, read_number(node, "zOffset", 0.0));
+    RETURN_OR_ASSIGN_TO(signal.s, read_number(node, "s"));
+    RETURN_OR_ASSIGN_TO(signal.t, read_number(node, "t"));
+    RETURN_OR_ASSIGN_TO(signal.z_offset, read_number(node, "zOffset", 0.0));
     std::string_view dynamic = node.attribute("dynamic").as_string("no");
     if (dynamic != "yes" && dynamic != "no") {
       return fail(
           node, "dynamic `" + std::string{dynamic} + "` is neither yes nor no");
     }
     signal.dynamic = dynamic == "yes";
-    RETURN_OR_ASSIGN(signal.orientation, read_orientation(node));
+    RETURN_OR_ASSIGN_TO(signal.orientation, read_orientation(node));
     signal.country = node.attribute("country").as_string();
     signal.type = node.attribute("type").as_string();
     signal.subtype = node.attribute("subtype").as_string();
     if (node.attribute("value")) {
-      RETURN_OR_ASSIGN(double value, read_number(node, "value"));
+      RETURN_OR_ASSIGN_TO(double value, read_number(node, "value"));
       signal.value = value;
     }
     signal.unit = node.attribute("unit").as_string();
@@ -276,18 +277,19 @@ class Parser final {
       road::RoadObject::Corner corner;
       if (kind == "cornerRoad") {
         road = true;
-        RETURN_OR_ASSIGN(corner.first, read_number(corner_node, "s"));
-        RETURN_OR_ASSIGN(corner.second, read_number(corner_node, "t"));
-        RETURN_OR_ASSIGN(corner.up, read_number(corner_node, "dz", 0.0));
+        RETURN_OR_ASSIGN_TO(corner.first, read_number(corner_node, "s"));
+        RETURN_OR_ASSIGN_TO(corner.second, read_number(corner_node, "t"));
+        RETURN_OR_ASSIGN_TO(corner.up, read_number(corner_node, "dz", 0.0));
       } else if (kind == "cornerLocal") {
         local = true;
-        RETURN_OR_ASSIGN(corner.first, read_number(corner_node, "u"));
-        RETURN_OR_ASSIGN(corner.second, read_number(corner_node, "v"));
-        RETURN_OR_ASSIGN(corner.up, read_number(corner_node, "z", 0.0));
+        RETURN_OR_ASSIGN_TO(corner.first, read_number(corner_node, "u"));
+        RETURN_OR_ASSIGN_TO(corner.second, read_number(corner_node, "v"));
+        RETURN_OR_ASSIGN_TO(corner.up, read_number(corner_node, "z", 0.0));
       } else {
         continue;
       }
-      RETURN_OR_ASSIGN(corner.height, read_number(corner_node, "height", 0.0));
+      RETURN_OR_ASSIGN_TO(corner.height,
+                          read_number(corner_node, "height", 0.0));
       outline.corners.push_back(corner);
     }
     if (road && local) {
@@ -308,23 +310,23 @@ class Parser final {
     object.name = node.attribute("name").as_string();
     object.type = node.attribute("type").as_string("none");
     object.subtype = node.attribute("subtype").as_string();
-    RETURN_OR_ASSIGN(object.s, read_number(node, "s"));
-    RETURN_OR_ASSIGN(object.t, read_number(node, "t"));
-    RETURN_OR_ASSIGN(object.z_offset, read_number(node, "zOffset", 0.0));
-    RETURN_OR_ASSIGN(object.heading, read_number(node, "hdg", 0.0));
-    RETURN_OR_ASSIGN(object.pitch, read_number(node, "pitch", 0.0));
-    RETURN_OR_ASSIGN(object.roll, read_number(node, "roll", 0.0));
-    RETURN_OR_ASSIGN(object.length, read_number(node, "length", 0.0));
-    RETURN_OR_ASSIGN(object.width, read_number(node, "width", 0.0));
-    RETURN_OR_ASSIGN(object.height, read_number(node, "height", 0.0));
-    RETURN_OR_ASSIGN(object.orientation, read_orientation(node));
+    RETURN_OR_ASSIGN_TO(object.s, read_number(node, "s"));
+    RETURN_OR_ASSIGN_TO(object.t, read_number(node, "t"));
+    RETURN_OR_ASSIGN_TO(object.z_offset, read_number(node, "zOffset", 0.0));
+    RETURN_OR_ASSIGN_TO(object.heading, read_number(node, "hdg", 0.0));
+    RETURN_OR_ASSIGN_TO(object.pitch, read_number(node, "pitch", 0.0));
+    RETURN_OR_ASSIGN_TO(object.roll, read_number(node, "roll", 0.0));
+    RETURN_OR_ASSIGN_TO(object.length, read_number(node, "length", 0.0));
+    RETURN_OR_ASSIGN_TO(object.width, read_number(node, "width", 0.0));
+    RETURN_OR_ASSIGN_TO(object.height, read_number(node, "height", 0.0));
+    RETURN_OR_ASSIGN_TO(object.orientation, read_orientation(node));
     // OpenDRIVE 1.4 puts one outline in the object, 1.5 on several in
     // <outlines>.
     pugi::xml_node outlines =
         node.child("outlines") ? node.child("outlines") : node;
     for (pugi::xml_node outline_node : outlines.children("outline")) {
-      RETURN_OR_ASSIGN(road::RoadObject::Outline outline,
-                       read_outline(outline_node));
+      RETURN_OR_ASSIGN_TO(road::RoadObject::Outline outline,
+                          read_outline(outline_node));
       object.outlines.push_back(std::move(outline));
     }
     RETURN_IF_UNEXPECTED(read_validities(node, InOut(object.validities)));
@@ -334,10 +336,10 @@ class Parser final {
   auto read_cubic(pugi::xml_node node) const
       -> std::expected<Cubic, lib::Status> {
     Cubic cubic;
-    RETURN_OR_ASSIGN(cubic.a, read_number(node, "a", 0.0));
-    RETURN_OR_ASSIGN(cubic.b, read_number(node, "b", 0.0));
-    RETURN_OR_ASSIGN(cubic.c, read_number(node, "c", 0.0));
-    RETURN_OR_ASSIGN(cubic.d, read_number(node, "d", 0.0));
+    RETURN_OR_ASSIGN_TO(cubic.a, read_number(node, "a", 0.0));
+    RETURN_OR_ASSIGN_TO(cubic.b, read_number(node, "b", 0.0));
+    RETURN_OR_ASSIGN_TO(cubic.c, read_number(node, "c", 0.0));
+    RETURN_OR_ASSIGN_TO(cubic.d, read_number(node, "d", 0.0));
     return cubic;
   }
 
@@ -348,8 +350,8 @@ class Parser final {
       -> std::expected<void, lib::Status> {
     for (pugi::xml_node node : parent.children(name)) {
       CubicProfile::Piece piece;
-      RETURN_OR_ASSIGN(piece.start, read_number(node, "s"));
-      RETURN_OR_ASSIGN(piece.cubic, read_cubic(node));
+      RETURN_OR_ASSIGN_TO(piece.start, read_number(node, "s"));
+      RETURN_OR_ASSIGN_TO(piece.cubic, read_cubic(node));
       profile->pieces.push_back(piece);
     }
     std::ranges::stable_sort(profile->pieces, {}, &CubicProfile::Piece::start);
@@ -359,11 +361,11 @@ class Parser final {
   auto read_geometry(pugi::xml_node node) const
       -> std::expected<PlanGeometry, lib::Status> {
     PlanGeometry geometry;
-    RETURN_OR_ASSIGN(geometry.s0, read_number(node, "s"));
-    RETURN_OR_ASSIGN(geometry.x0, read_number(node, "x"));
-    RETURN_OR_ASSIGN(geometry.y0, read_number(node, "y"));
-    RETURN_OR_ASSIGN(geometry.heading, read_number(node, "hdg"));
-    RETURN_OR_ASSIGN(geometry.length, read_number(node, "length"));
+    RETURN_OR_ASSIGN_TO(geometry.s0, read_number(node, "s"));
+    RETURN_OR_ASSIGN_TO(geometry.x0, read_number(node, "x"));
+    RETURN_OR_ASSIGN_TO(geometry.y0, read_number(node, "y"));
+    RETURN_OR_ASSIGN_TO(geometry.heading, read_number(node, "hdg"));
+    RETURN_OR_ASSIGN_TO(geometry.length, read_number(node, "length"));
     if (geometry.length < 0.0) {
       return fail(node, "has a negative length");
     }
@@ -379,23 +381,24 @@ class Parser final {
       geometry.shape = LineGeometry{};
     } else if (kind == "arc") {
       ArcGeometry arc;
-      RETURN_OR_ASSIGN(arc.curvature, read_number(shape, "curvature"));
+      RETURN_OR_ASSIGN_TO(arc.curvature, read_number(shape, "curvature"));
       geometry.shape = arc;
     } else if (kind == "spiral") {
       SpiralGeometry spiral;
-      RETURN_OR_ASSIGN(spiral.curvature_start, read_number(shape, "curvStart"));
-      RETURN_OR_ASSIGN(spiral.curvature_end, read_number(shape, "curvEnd"));
+      RETURN_OR_ASSIGN_TO(spiral.curvature_start,
+                          read_number(shape, "curvStart"));
+      RETURN_OR_ASSIGN_TO(spiral.curvature_end, read_number(shape, "curvEnd"));
       geometry.shape = spiral;
     } else if (kind == "paramPoly3") {
       ParamPoly3Geometry curve;
-      RETURN_OR_ASSIGN(curve.u.a, read_number(shape, "aU", 0.0));
-      RETURN_OR_ASSIGN(curve.u.b, read_number(shape, "bU", 0.0));
-      RETURN_OR_ASSIGN(curve.u.c, read_number(shape, "cU", 0.0));
-      RETURN_OR_ASSIGN(curve.u.d, read_number(shape, "dU", 0.0));
-      RETURN_OR_ASSIGN(curve.v.a, read_number(shape, "aV", 0.0));
-      RETURN_OR_ASSIGN(curve.v.b, read_number(shape, "bV", 0.0));
-      RETURN_OR_ASSIGN(curve.v.c, read_number(shape, "cV", 0.0));
-      RETURN_OR_ASSIGN(curve.v.d, read_number(shape, "dV", 0.0));
+      RETURN_OR_ASSIGN_TO(curve.u.a, read_number(shape, "aU", 0.0));
+      RETURN_OR_ASSIGN_TO(curve.u.b, read_number(shape, "bU", 0.0));
+      RETURN_OR_ASSIGN_TO(curve.u.c, read_number(shape, "cU", 0.0));
+      RETURN_OR_ASSIGN_TO(curve.u.d, read_number(shape, "dU", 0.0));
+      RETURN_OR_ASSIGN_TO(curve.v.a, read_number(shape, "aV", 0.0));
+      RETURN_OR_ASSIGN_TO(curve.v.b, read_number(shape, "bV", 0.0));
+      RETURN_OR_ASSIGN_TO(curve.v.c, read_number(shape, "cV", 0.0));
+      RETURN_OR_ASSIGN_TO(curve.v.d, read_number(shape, "dV", 0.0));
       std::string_view range =
           shape.attribute("pRange").as_string("normalized");
       if (range == "arcLength") {
@@ -416,7 +419,7 @@ class Parser final {
   auto read_lane(pugi::xml_node node) const
       -> std::expected<Lane, lib::Status> {
     Lane lane;
-    RETURN_OR_ASSIGN(double id, read_number(node, "id"));
+    RETURN_OR_ASSIGN_TO(double id, read_number(node, "id"));
     lane.id = static_cast<int>(id);
     if (lane.id != id) {
       return fail(node, "id is not a whole number");
@@ -426,18 +429,19 @@ class Parser final {
       return fail(node.child("border"),
                   "is not supported; give lanes by their widths");
     }
-    RETURN_OR_ASSIGN(
+    RETURN_OR_ASSIGN_TO(
         lane.predecessor,
         read_lane_id(node.child("link").child("predecessor"), "id"));
-    RETURN_OR_ASSIGN(lane.successor,
-                     read_lane_id(node.child("link").child("successor"), "id"));
+    RETURN_OR_ASSIGN_TO(
+        lane.successor,
+        read_lane_id(node.child("link").child("successor"), "id"));
     for (pugi::xml_node width_node : node.children("width")) {
       Lane::Width width;
-      RETURN_OR_ASSIGN(width.start, read_number(width_node, "sOffset", 0.0));
+      RETURN_OR_ASSIGN_TO(width.start, read_number(width_node, "sOffset", 0.0));
       if (width.start < 0.0) {
         return fail(width_node, "has a negative sOffset");
       }
-      RETURN_OR_ASSIGN(width.cubic, read_cubic(width_node));
+      RETURN_OR_ASSIGN_TO(width.cubic, read_cubic(width_node));
       lane.widths.push_back(width);
     }
     std::ranges::stable_sort(lane.widths, {}, &Lane::Width::start);
@@ -451,7 +455,7 @@ class Parser final {
       -> std::expected<void, lib::Status> {
     lanes->clear();
     for (pugi::xml_node node : side.children("lane")) {
-      RETURN_OR_ASSIGN(Lane lane, read_lane(node));
+      RETURN_OR_ASSIGN_TO(Lane lane, read_lane(node));
       if (lane.id * sign <= 0) {
         return fail(node, "id " + std::to_string(lane.id) +
                               " is on the wrong side of the center");
@@ -477,15 +481,16 @@ class Parser final {
       return fail(node, "needs id");
     }
     road.junction = node.attribute("junction").as_string("-1");
-    RETURN_OR_ASSIGN(road.length, read_number(node, "length"));
-    RETURN_OR_ASSIGN(road.predecessor,
-                     read_road_link(node.child("link").child("predecessor")));
-    RETURN_OR_ASSIGN(road.successor,
-                     read_road_link(node.child("link").child("successor")));
+    RETURN_OR_ASSIGN_TO(road.length, read_number(node, "length"));
+    RETURN_OR_ASSIGN_TO(
+        road.predecessor,
+        read_road_link(node.child("link").child("predecessor")));
+    RETURN_OR_ASSIGN_TO(road.successor,
+                        read_road_link(node.child("link").child("successor")));
 
     for (pugi::xml_node geometry :
          node.child("planView").children("geometry")) {
-      RETURN_OR_ASSIGN(PlanGeometry read, read_geometry(geometry));
+      RETURN_OR_ASSIGN_TO(PlanGeometry read, read_geometry(geometry));
       road.plan.push_back(std::move(read));
     }
     if (road.plan.empty()) {
@@ -503,7 +508,7 @@ class Parser final {
         read_profile(lanes, "laneOffset", InOut(road.lane_offset)));
     for (pugi::xml_node section_node : lanes.children("laneSection")) {
       LaneSection section;
-      RETURN_OR_ASSIGN(section.s0, read_number(section_node, "s"));
+      RETURN_OR_ASSIGN_TO(section.s0, read_number(section_node, "s"));
       RETURN_IF_UNEXPECTED(
           read_side(section_node.child("left"), 1, Out(section.left)));
       RETURN_IF_UNEXPECTED(
@@ -516,12 +521,12 @@ class Parser final {
     std::ranges::stable_sort(road.lane_sections, {}, &LaneSection::s0);
     for (pugi::xml_node signal_node :
          node.child("signals").children("signal")) {
-      RETURN_OR_ASSIGN(Signal signal, read_signal(signal_node));
+      RETURN_OR_ASSIGN_TO(Signal signal, read_signal(signal_node));
       road.signals.push_back(std::move(signal));
     }
     for (pugi::xml_node object_node :
          node.child("objects").children("object")) {
-      RETURN_OR_ASSIGN(road::RoadObject object, read_object(object_node));
+      RETURN_OR_ASSIGN_TO(road::RoadObject object, read_object(object_node));
       road.objects.push_back(std::move(object));
     }
     return road;
@@ -539,7 +544,7 @@ auto parse_opendrive(std::string_view text)
 
 auto load_opendrive(const std::string& path)
     -> std::expected<road::Map, lib::Status> {
-  RETURN_OR_ASSIGN(std::string text, read_text_file(path));
+  RETURN_OR_ASSIGN_TO(std::string text, read_text_file(path));
   return parse_opendrive(text);
 }
 

@@ -212,7 +212,7 @@ class World<SpatialType,                  //
   // commit() rolls back, so an early return undoes the group:
   //
   //   auto transaction = world.transaction();
-  //   RETURN_OR_ASSIGN(Entity asset, world.create<Asset>().build());
+  //   RETURN_OR_ASSIGN_TO(Entity asset, world.create<Asset>().build());
   //   RETURN_IF_UNEXPECTED(world.create<Radar>().under(asset).build());
   //   transaction.commit();
   //

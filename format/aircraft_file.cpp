@@ -152,7 +152,7 @@ class Parser final {
     }
     std::vector<double> result;
     for (std::size_t i = 1; i < current.words.size(); ++i) {
-      RETURN_OR_ASSIGN(double value, number(current.words[i]));
+      RETURN_OR_ASSIGN_TO(double value, number(current.words[i]));
       result.push_back(value);
     }
     ++at_;
@@ -188,7 +188,7 @@ class Parser final {
   template <std::size_t Count>
   auto read_numbers(Out<std::array<double, Count>> out)
       -> std::expected<void, lib::Status> {
-    RETURN_OR_ASSIGN(std::vector<double> read, values(Count));
+    RETURN_OR_ASSIGN_TO(std::vector<double> read, values(Count));
     std::ranges::copy(read, out->begin());
     return {};
   }
@@ -289,10 +289,10 @@ class Parser final {
     if (header.words.size() < 2 || header.words.size() > 3) {
       return fail("`table` takes one or two inputs");
     }
-    RETURN_OR_ASSIGN(AeroInput row, input(header.words[1], data));
+    RETURN_OR_ASSIGN_TO(AeroInput row, input(header.words[1], data));
     std::optional<AeroInput> column;
     if (header.words.size() == 3) {
-      RETURN_OR_ASSIGN(column, input(header.words[2], data));
+      RETURN_OR_ASSIGN_TO(column, input(header.words[2], data));
     }
     ++at_;
 
@@ -304,7 +304,7 @@ class Parser final {
         return fail("a table of two variables starts with `columns`");
       }
       for (std::size_t i = 1; i < line().words.size(); ++i) {
-        RETURN_OR_ASSIGN(double value, number(line().words[i]));
+        RETURN_OR_ASSIGN_TO(double value, number(line().words[i]));
         columns.push_back(value);
       }
       ++at_;
@@ -316,7 +316,7 @@ class Parser final {
                     std::to_string(width) + " values");
       }
       for (std::size_t i = 0; i < line().words.size(); ++i) {
-        RETURN_OR_ASSIGN(double value, number(line().words[i]));
+        RETURN_OR_ASSIGN_TO(double value, number(line().words[i]));
         (i == 0 ? rows : values).push_back(value);
       }
       ++at_;
@@ -355,17 +355,17 @@ class Parser final {
     while (!done() && line().words[0] != "end") {
       std::string_view key = line().words[0];
       if (key == "constant") {
-        RETURN_OR_ASSIGN(std::vector<double> value, values(1));
+        RETURN_OR_ASSIGN_TO(std::vector<double> value, values(1));
         term.constant = value[0];
       } else if (key == "factor") {
         if (line().words.size() != 2) {
           return fail("`factor` takes one input");
         }
-        RETURN_OR_ASSIGN(AeroInput factor, input(line().words[1], data));
+        RETURN_OR_ASSIGN_TO(AeroInput factor, input(line().words[1], data));
         term.factors.push_back(factor);
         ++at_;
       } else if (key == "table") {
-        RETURN_OR_ASSIGN(AeroTable read, table(data));
+        RETURN_OR_ASSIGN_TO(AeroTable read, table(data));
         term.tables.push_back(std::move(read));
       } else {
         return fail("unknown term entry `" + std::string{key} + "`");
@@ -390,7 +390,7 @@ class Parser final {
 
     // One value on the current line.
     auto scalar = [&](Out<double> out) -> std::expected<void, lib::Status> {
-      RETURN_OR_ASSIGN(std::vector<double> value, values(1));
+      RETURN_OR_ASSIGN_TO(std::vector<double> value, values(1));
       *out = value[0];
       return {};
     };
@@ -448,7 +448,7 @@ class Parser final {
         if (done() || line().words[0] != "table") {
           return fail("`" + std::string{key} + "` is followed by a table");
         }
-        RETURN_OR_ASSIGN(AeroTable read, table(data));
+        RETURN_OR_ASSIGN_TO(AeroTable read, table(data));
         (key == "idle_thrust"              ? turbine.idle_thrust
          : key == "military_thrust_factor" ? turbine.military_thrust_factor
                                            : turbine.max_thrust_factor) =
@@ -521,7 +521,7 @@ class Parser final {
         ++at_;
         continue;
       }
-      RETURN_OR_ASSIGN(NamedBlock read, block());
+      RETURN_OR_ASSIGN_TO(NamedBlock read, block());
       named.push_back(std::move(read));
     }
     if (done()) {
@@ -670,7 +670,7 @@ class Parser final {
     NamedInput named{.name = std::string{negated ? name.substr(1) : name},
                      .negated = negated};
     if (words.size() == at + 2) {
-      RETURN_OR_ASSIGN(named.scale, number(words[at + 1]));
+      RETURN_OR_ASSIGN_TO(named.scale, number(words[at + 1]));
     }
     return named;
   }
@@ -764,7 +764,7 @@ class Parser final {
       const std::vector<std::string_view>& words = line().words;
       if (key == "input" || key == "output" || key == "trigger" ||
           key == "push") {
-        RETURN_OR_ASSIGN(NamedInput read, named_input(1));
+        RETURN_OR_ASSIGN_TO(NamedInput read, named_input(1));
         if (key == "input") {
           named.inputs.push_back(std::move(read));
         } else if (key == "output") {
@@ -790,8 +790,8 @@ class Parser final {
         std::vector<double> xs;
         std::vector<double> ys;
         while (!done() && line().words[0] != "end") {
-          RETURN_OR_ASSIGN(double x, number(line().words[0]));
-          RETURN_OR_ASSIGN(std::vector<double> row, values(1));
+          RETURN_OR_ASSIGN_TO(double x, number(line().words[0]));
+          RETURN_OR_ASSIGN_TO(std::vector<double> row, values(1));
           xs.push_back(x);
           ys.push_back(row[0]);
         }
@@ -814,7 +814,7 @@ class Parser final {
         continue;
       }
       if (key == "test") {
-        RETURN_OR_ASSIGN(NamedTest read, test());
+        RETURN_OR_ASSIGN_TO(NamedTest read, test());
         named.tests.push_back(std::move(read));
         continue;
       }
@@ -865,7 +865,7 @@ class Parser final {
           key == "clip" || key == "domain" || key == "range" || key == "setting"
               ? 2
               : 1;
-      RETURN_OR_ASSIGN(std::vector<double> v, values(count));
+      RETURN_OR_ASSIGN_TO(std::vector<double> v, values(count));
       if (key == "clip") {
         block.clip = std::pair{v[0], v[1]};
       } else if (key == "domain") {
@@ -980,7 +980,7 @@ auto parse_aircraft(std::string_view text)
 
 auto load_aircraft(const std::string& path)
     -> std::expected<aircraft::Definition, lib::Status> {
-  RETURN_OR_ASSIGN(std::string text, read_text_file(path));
+  RETURN_OR_ASSIGN_TO(std::string text, read_text_file(path));
   return parse_aircraft(text);
 }
 
