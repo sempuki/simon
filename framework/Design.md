@@ -43,101 +43,18 @@ and handle rules are the point of the project.
 
 ## Conventions
 
-**Reference arguments are marked at the call site** with `lib`'s wrappers:
+simon follows the conventions every project that uses lib shares, in lib's
+[Conventions.md](https://github.com/sempuki/lib/blob/main/Conventions.md)
+(`2nd_party/lib/Conventions.md` in a checkout). The framework adds two
+exceptions for a system's call operator.
 
-| Wrapper | The callee | Call site |
-|---|---|---|
-| `Out<T>` | writes the argument, and may ignore it | `parse(text, Out(result))` |
-| `InOut<T>` | reads and writes the argument | `scheduler.step(step, InOut(world))` |
-| `Depend<T>` | keeps a reference that can dangle | `BatchDriver{timing, Depend(simulation)}` |
+**A system's call operator takes its parameters in the order the framework
+sets,** which overrides the `(In..., InOut..., Out)` order.
 
-Call sites write `Out(x)`, `InOut(x)` or `Depend(x)` and let class template
-argument deduction find the type; only parameters name it.
-
-**Parameters read inputs first, then what the callee writes or keeps, then what
-it only writes:** `(In..., InOut..., Out)`, with `Depend` among the `InOut`s.
-`integrate_midpoint(acceleration, dt, InOut(kinematics))`,
-`scheduler.step(step, InOut(world))`, `BatchDriver{timing, Depend(simulation)}`.
-A system's call operator is the exception: the framework sets its order.
-
-**Return a value or write an `Out`, whichever suits the type.** An `Out`
-parameter fills an object the caller already owns, so it suits types that are
-large or never move, such as a world.
-
-**Errors are `std::expected<T, lib::Status>`, propagated with `lib`'s macros**
-instead of an `if` per call:
-
-```cpp
-RETURN_IF_UNEXPECTED(build_world(scenario_, lib::Out(world_)));
-RETURN_OR_ASSIGN_TO(asset_, build_scenario(scenario_, lib::InOut(world_)));
-```
-
-`RETURN_IF_UNEXPECTED` returns the error, if any, from the enclosing function.
-`RETURN_OR_ASSIGN_TO` does the same and otherwise moves the value into an
-existing variable or a new declaration (`Entity asset`). The enclosing function
-must return a `std::expected` whose error type the error converts to.
-`RETURN_OR_ASSIGN_TO` expands to several statements, so it goes only where a
-statement can, at most once per line.
-
-**Functions declare a trailing return type:** `auto f(X) -> Y`, `void` ones
-included (`auto integrate_midpoint(..., InOut<Kinematics> kinematics) ->
-void`). Constructors, destructors and conversion operators cannot, and lambdas keep their deduced returns. lib's
-`.clang-tidy`, which simon and volcano link to, checks it with
-`modernize-use-trailing-return-type`; that check skips `void` functions.
-
-**A getter that may return null is named `maybe_*`:**
-`maybe_component_of<Health>(entity)` returns a pointer, null if the entity has
-no Health. Its non-null counterpart drops the prefix, `component_of`, and
-returns a reference.
-
-**Headers hold what must be inline; `.cpp` files hold the rest.** Templates,
-and code on hot paths that the inliner must see (a system's call operator,
-`Vector3`, the spatial index's per-query helpers), stay in headers. Setup,
-string formatting and once-a-step code (`build_scenario`, the site builder's
-`build()`, `Simulation`, name parsing) go in `.cpp` files.
-
-**A class has one `public:` section, then one `protected:`, then one
-`private:`.** Compile-time checks and aliases may come first, before
-`public:`, unlabeled.
-
-**Every pointer is initialized,** `Type* pointer = nullptr;`, even when a
-constructor always sets it.
-
-**Implementation details live in a namespace named `internal`.**
-
-**Unused names say so without comments.** Leave a parameter unnamed when its
-type says what it is, as a system's `(SystemWorld&, Entity, ...)` does; no
-compiler warns about an unnamed parameter. Name it with `[[maybe_unused]]`
-when the name carries meaning the type does not, or when only some
-instantiations use it. Never write `/*name*/`. Bind a result kept only to be
-ignored, such as a builder's refusal, to C++26's `_`, which may be declared
-again in the same scope: `auto _ = world.destroy(self).build();`. `_` does not
-apply to parameters, which C++26 leaves out because they can be unnamed.
-
-A plain `T&` parameter is only for what the language or the framework decides:
-operators, and a system's call operator, whose entity-components arrive by
-reference with constness declared in `System<...>`. Computing wrappers from
-that constness would be awkward, and an `In<T>` for const parameters would stray
-too far from common C++. `const T&` needs no wrapper.
-
-**Template type parameters end with `Type`** (or `Types` for a pack):
-`ComponentType`, `ComponentTypes...`, `WorldType`. Concepts are named for the
-property they check, as adjectives where they read well: `Spatial`,
-`Archetypal`.
-
-**Types that are lists of types end with `List`:** `TypeList<...>`,
-`SystemList<...>` (a schedule), `ComponentList`, `AllowComponentList`,
-`SequenceAfterSystemList`. Metafunctions that produce one say so:
-`write_list_of_t<SystemType>`.
-
-**Accessors are named for what they return, never `get`:** `component_of` and
-`maybe_component_of` (the `maybe_` form returns a pointer that may be null),
-`store_of`, `name_of`. Where arguments of different strong types ask different
-questions, one name is overloaded: `find_name_of(Identity)` and
-`find_name_of(Alias)`.
-
-A class that takes `Depend<T>` stores a plain pointer, so its hot path does not
-pay for `CheckedPointer`'s null check on every access.
+**A system's entity-components arrive as plain `T&`,** with their constness
+declared in `System<...>`. Computing wrappers from that constness would be
+awkward, and an `In<T>` for const parameters would stray too far from common
+C++.
 
 ## Terminology
 
