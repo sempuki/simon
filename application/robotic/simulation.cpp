@@ -12,6 +12,7 @@
 #include <utility>
 
 #include "core/argument.hpp"
+#include "core/status.hpp"
 #include "format/mjcf.hpp"
 
 namespace simon::robotic {
@@ -287,7 +288,7 @@ auto Simulation::configure() -> engine::PhaseResult {
   auto transaction = world_.transaction();
   // Each tree in the smallest archetype it fits.
   auto create = [&]<typename ArchetypeType, typename Capacity>(
-                    std::uint32_t t) -> std::expected<void, lib::Status> {
+                    std::uint32_t t) -> std::expected<void, Status> {
     RETURN_IF_UNEXPECTED(
         world_.create<ArchetypeType>()
             .with(TreeBound{})

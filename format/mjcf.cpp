@@ -23,6 +23,7 @@
 #include "base/core.hpp"
 #include "core/argument.hpp"
 #include "core/math.hpp"
+#include "core/status.hpp"
 #include "format/text.hpp"
 #include "format/xml.hpp"
 #include "pugixml.hpp"
@@ -217,7 +218,7 @@ auto create_index_by_name(const std::vector<ItemType>& items) -> NameIndex {
 class Reader final {
  public:
   auto read(std::string_view text)
-      -> std::expected<articulated::Scene, lib::Status> {
+      -> std::expected<articulated::Scene, Status> {
     RETURN_IF_UNEXPECTED(document_.load(std::string{text}));
     RETURN_OR_ASSIGN_TO(pugi::xml_node root, document_.find_root("mujoco"));
     articulated::Scene model{.name = root.attribute("model").as_string()};
@@ -296,7 +297,7 @@ class Reader final {
   // rest left as they were, as MuJoCo reads a partial vector.
   auto read_numbers(pugi::xml_node node, std::string_view name,
                     std::span<double> into) const
-      -> std::expected<bool, lib::Status> {
+      -> std::expected<bool, Status> {
     pugi::xml_attribute attribute = node.attribute(name);
     if (!attribute) {
       return false;
@@ -331,26 +332,26 @@ class Reader final {
   template <std::size_t N>
   auto read_array(pugi::xml_node node, std::string_view name,
                   InOut<std::array<double, N>> into) const
-      -> std::expected<bool, lib::Status> {
+      -> std::expected<bool, Status> {
     return read_numbers(node, name, *into);
   }
 
   auto read_array(pugi::xml_node node, std::string_view name,
                   InOut<Vector3> into) const
-      -> std::expected<bool, lib::Status> {
+      -> std::expected<bool, Status> {
     return read_numbers(node, name, std::span<double>{into->data(), 3});
   }
 
   auto read_number(pugi::xml_node node, std::string_view name,
                    InOut<double> into) const
-      -> std::expected<bool, lib::Status> {
+      -> std::expected<bool, Status> {
     return read_numbers(node, name, std::span<double>{&*into, 1});
   }
 
   template <typename Integer>
   auto read_integer(pugi::xml_node node, std::string_view name,
                     InOut<Integer> into) const
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     double value = 0.0;
     RETURN_OR_ASSIGN_TO(bool read, read_number(node, name, InOut(value)));
     if (read) {
@@ -360,7 +361,7 @@ class Reader final {
   }
 
   auto read_flag(pugi::xml_node node, std::string_view name,
-                 InOut<bool> into) const -> std::expected<void, lib::Status> {
+                 InOut<bool> into) const -> std::expected<void, Status> {
     pugi::xml_attribute attribute = node.attribute(name);
     if (!attribute) {
       return {};
@@ -375,7 +376,7 @@ class Reader final {
 
   auto read_limited(pugi::xml_node node, std::string_view name,
                     InOut<Limited> into) const
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     pugi::xml_attribute attribute = node.attribute(name);
     if (!attribute) {
       return {};
@@ -389,7 +390,7 @@ class Reader final {
 
   // The one orientation the element gives, if any.
   auto read_orientation(pugi::xml_node node, InOut<Orientation> into) const
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     int given = 0;
     std::array<double, 4> quat = into->quat;
     RETURN_OR_ASSIGN_TO(bool has_quat, read_array(node, "quat", InOut(quat)));
@@ -430,7 +431,7 @@ class Reader final {
 
   // The quaternion an orientation gives (ResolveOrientation).
   auto resolve(const Orientation& orientation) const
-      -> std::expected<Quaternion, lib::Status> {
+      -> std::expected<Quaternion, Status> {
     double degree = compiler_.degree ? PI / 180.0 : 1.0;
     switch (orientation.kind) {
       case Orientation::Kind::QUAT:
@@ -485,7 +486,7 @@ class Reader final {
     return Quaternion::Identity();
   }
 
-  auto read_compiler(pugi::xml_node node) -> std::expected<void, lib::Status> {
+  auto read_compiler(pugi::xml_node node) -> std::expected<void, Status> {
     for (pugi::xml_attribute attribute : node.attributes()) {
       std::string_view name = attribute.name();
       std::string_view value = attribute.as_string();
@@ -534,7 +535,7 @@ class Reader final {
   }
 
   auto read_option(pugi::xml_node node, Out<Physics> physics)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     for (pugi::xml_attribute attribute : node.attributes()) {
       std::string_view name = attribute.name();
       std::string_view value = attribute.as_string();
@@ -587,7 +588,7 @@ class Reader final {
 
   // A default class and those under it, each starting from its parent's.
   auto read_defaults(pugi::xml_node node, const Defaults& parent)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     std::string name = node.attribute("class").as_string("main");
     Defaults defaults = parent;
     for (pugi::xml_node child : node.children()) {
@@ -621,7 +622,7 @@ class Reader final {
   // The defaults of the class an element names, or else of the class it
   // inherits.
   auto find_defaults(pugi::xml_node node, const std::string& inherited) const
-      -> std::expected<const Defaults*, lib::Status> {
+      -> std::expected<const Defaults*, Status> {
     std::string name = node.attribute("class").as_string(inherited.c_str());
     auto found = defaults_.find(name);
     if (found == defaults_.end()) {
@@ -633,7 +634,7 @@ class Reader final {
   //-- Elements ----------------------------------------------------------------
 
   auto apply_geom(pugi::xml_node node, InOut<GeomSpec> spec) const
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     articulated::Geometry& geom = spec->geom;
     for (pugi::xml_attribute attribute : node.attributes()) {
       std::string_view name = attribute.name();
@@ -706,7 +707,7 @@ class Reader final {
   }
 
   auto apply_joint(pugi::xml_node node, InOut<JointSpec> spec) const
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     Joint& joint = spec->joint;
     for (pugi::xml_attribute attribute : node.attributes()) {
       std::string_view name = attribute.name();
@@ -786,7 +787,7 @@ class Reader final {
   // An actuator's attributes, and its kind's gain and bias, as MuJoCo's
   // mjs_setToMotor, mjs_setToPosition and mjs_setToVelocity set them.
   auto apply_actuator(pugi::xml_node node, InOut<ActuatorSpec> spec) const
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     std::string_view kind = node.name();
     Actuator& actuator = spec->actuator;
     for (pugi::xml_attribute attribute : node.attributes()) {
@@ -875,7 +876,7 @@ class Reader final {
   }
 
   auto read_inertial(pugi::xml_node node)
-      -> std::expected<InertialSpec, lib::Status> {
+      -> std::expected<InertialSpec, Status> {
     InertialSpec spec;
     for (pugi::xml_attribute attribute : node.attributes()) {
       std::string_view name = attribute.name();
@@ -910,7 +911,7 @@ class Reader final {
   // A body's elements, those that take a class inheriting `inherited`.
   auto read_body_contents(pugi::xml_node node, const std::string& inherited,
                           Out<BodySpec> body)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     std::string classes =
         node.attribute("childclass").as_string(inherited.c_str());
     for (pugi::xml_node child : node.children()) {
@@ -974,7 +975,7 @@ class Reader final {
 
   // A fixed tendon and its joints' coefficients; spatial tendons, which
   // wrap around sites and geoms, and tendon springs are refused.
-  auto read_tendon(pugi::xml_node node) -> std::expected<void, lib::Status> {
+  auto read_tendon(pugi::xml_node node) -> std::expected<void, Status> {
     if (std::string_view{node.name()} != "fixed") {
       return refuse(node);
     }
@@ -1023,7 +1024,7 @@ class Reader final {
     return {};
   }
 
-  auto read_actuator(pugi::xml_node node) -> std::expected<void, lib::Status> {
+  auto read_actuator(pugi::xml_node node) -> std::expected<void, Status> {
     std::string_view kind = node.name();
     if (kind != "motor" && kind != "position" && kind != "velocity" &&
         kind != "general") {
@@ -1110,7 +1111,7 @@ class Reader final {
   // A geom's frame and size from fromto or its orientation, and its mass
   // and inertia if `infer` (mjCGeom::Compile).
   auto compile_geom(GeomSpec spec, bool infer)
-      -> std::expected<std::pair<articulated::Geometry, double>, lib::Status> {
+      -> std::expected<std::pair<articulated::Geometry, double>, Status> {
     articulated::Geometry geom = spec.geom;
     double mass = 0.0;
     if (spec.fromto) {
@@ -1165,7 +1166,7 @@ class Reader final {
 
   // Every body, depth first, the world first.
   auto compile(const BodySpec& world, Out<articulated::Scene> model)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     model->bodies.push_back(articulated::Body{.name = "world"});
     std::vector<std::uint32_t> last_dof{Dof::NONE};  // By body.
     RETURN_IF_UNEXPECTED(compile_world_geoms(world, 0, model));
@@ -1269,7 +1270,7 @@ class Reader final {
   // The world's geoms, which carry no mass.
   auto compile_world_geoms(const BodySpec& body, std::uint32_t index,
                            Out<articulated::Scene> model)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     model->bodies[index].first_geom =
         static_cast<std::uint32_t>(model->geoms.size());
     for (const GeomSpec& spec : body.geoms) {
@@ -1286,7 +1287,7 @@ class Reader final {
   auto compile_body(const BodySpec& spec, std::uint32_t parent,
                     Out<std::vector<std::uint32_t>> last_dof,
                     Out<articulated::Scene> model)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     auto index = static_cast<std::uint32_t>(model->bodies.size());
     articulated::Body body{
         .name = spec.name, .parent = parent, .pos = spec.pos};
@@ -1544,7 +1545,7 @@ class Reader final {
 }  // namespace
 
 auto parse_mjcf(std::string_view text)
-    -> std::expected<articulated::Scene, lib::Status> {
+    -> std::expected<articulated::Scene, Status> {
   return Reader{}.read(text);
 }
 
@@ -1554,7 +1555,7 @@ namespace {
 // the file it names, found beside the model, as MuJoCo's include does;
 // included files may include others.
 auto expand_includes(pugi::xml_node node, const std::filesystem::path& folder,
-                     int depth) -> std::expected<void, lib::Status> {
+                     int depth) -> std::expected<void, Status> {
   if (depth > 16) {
     return Failure{
         lib::raise(FormatError::MALFORMED, "includes nested too deeply")};
@@ -1589,7 +1590,7 @@ auto expand_includes(pugi::xml_node node, const std::filesystem::path& folder,
 }  // namespace
 
 auto load_mjcf(const std::string& path)
-    -> std::expected<articulated::Scene, lib::Status> {
+    -> std::expected<articulated::Scene, Status> {
   pugi::xml_document document;
   if (!document.load_file(path.c_str())) {
     return Failure{lib::raise(FormatError::UNREADABLE, "cannot open " + path)};

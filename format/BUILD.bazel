@@ -12,6 +12,7 @@ cc_library(
     hdrs = ["format_error.hpp"],
     copts = COPTS,
     deps = [
+        "//core:status",
         "@lib//base:status",
     ],
 )
@@ -22,6 +23,7 @@ cc_library(
     hdrs = ["text.hpp"],
     copts = COPTS,
     deps = [
+        "//core:status",
         "//core:text",
         ":format_error",
         "@lib//base:status",
@@ -34,11 +36,12 @@ cc_library(
     hdrs = ["xml.hpp"],
     copts = COPTS,
     deps = [
+        "//3rd_party:pugixml",
+        "//core:status",
         ":format_error",
         ":text",
         "@lib//base:core",
         "@lib//base:status",
-        "//3rd_party:pugixml",
     ],
 )
 
@@ -49,9 +52,10 @@ cc_library(
     copts = COPTS,
     deps = [
         "//core:argument",
+        "//core:status",
+        "//model/aircraft:definition",
         ":format_error",
         ":text",
-        "//model/aircraft:definition",
         "@lib//base:core",
         "@lib//base:status",
     ],
@@ -63,14 +67,15 @@ cc_library(
     hdrs = ["opendrive.hpp"],
     copts = COPTS,
     deps = [
+        "//3rd_party:pugixml",
         "//core:argument",
+        "//core:status",
+        "//model/road:road",
         ":format_error",
         ":text",
         ":xml",
-        "//model/road:road",
         "@lib//base:core",
         "@lib//base:status",
-        "//3rd_party:pugixml",
     ],
 )
 
@@ -80,15 +85,16 @@ cc_library(
     hdrs = ["mjcf.hpp"],
     copts = COPTS,
     deps = [
+        "//3rd_party:pugixml",
         "//core:argument",
         "//core:math",
+        "//core:status",
+        "//model/articulated:articulated",
         ":format_error",
         ":text",
         ":xml",
-        "//model/articulated:articulated",
         "@lib//base:core",
         "@lib//base:status",
-        "//3rd_party:pugixml",
     ],
 )
 
@@ -98,15 +104,16 @@ cc_library(
     hdrs = ["openscenario.hpp"],
     copts = COPTS,
     deps = [
+        "//3rd_party:pugixml",
         "//core:argument",
+        "//core:status",
+        "//scenario:openscenario",
+        "//scenario:parameter_distribution",
         ":format_error",
         ":text",
         ":xml",
-        "//scenario:openscenario",
-        "//scenario:parameter_distribution",
         "@lib//base:core",
         "@lib//base:status",
-        "//3rd_party:pugixml",
     ],
 )
 
@@ -116,9 +123,10 @@ cc_library(
     hdrs = ["tire_file.hpp"],
     copts = COPTS,
     deps = [
+        "//core:status",
+        "//model/vehicle:tire",
         ":format_error",
         ":text",
-        "//model/vehicle:tire",
         "@lib//base:core",
         "@lib//base:status",
     ],

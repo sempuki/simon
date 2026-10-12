@@ -8,6 +8,7 @@
 
 #include "base/status.hpp"
 #include "format/format_error.hpp"  // IWYU pragma: export
+#include "core/status.hpp"
 #include "model/aircraft/definition.hpp"
 
 // Reads an aircraft from the file tools/jsbsim/convert.py writes from a
@@ -17,10 +18,10 @@ namespace simon::format {
 
 // Reads the aircraft that `text` describes.
 auto parse_aircraft(std::string_view text)
-    -> std::expected<aircraft::Definition, lib::Status>;
+    -> std::expected<aircraft::Definition, Status>;
 
 // Reads the aircraft in the file at `path`.
 auto load_aircraft(const std::string& path)
-    -> std::expected<aircraft::Definition, lib::Status>;
+    -> std::expected<aircraft::Definition, Status>;
 
 }  // namespace simon::format

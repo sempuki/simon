@@ -31,6 +31,7 @@
 #include "application/defense/simulation.hpp"
 #include "base/core.hpp"
 #include "core/argument.hpp"
+#include "core/status.hpp"
 #include "framework/benchmarking.hpp"
 
 namespace simon::defense {
@@ -64,10 +65,10 @@ auto measure(int drones, int maximum_steps, bool budgeted, bool in_turn)
   Scenario scenario = make_scenario(drones);
   scenario.radars_in_turn = in_turn;
   World world;
-  std::expected<void, framework::Status> built =
+  std::expected<void, Status> built =
       build_world(scenario, Out(world));
   CHECK_POSTCONDITION(built.has_value());
-  std::expected<Entity, framework::Status> built_asset =
+  std::expected<Entity, Status> built_asset =
       build_scenario(scenario, InOut(world));
   CHECK_POSTCONDITION(built_asset.has_value());
   Entity asset = *built_asset;

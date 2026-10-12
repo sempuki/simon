@@ -18,16 +18,17 @@ cc_library(
     ],
     copts = COPTS,
     deps = [
+        "//core:argument",
+        "//core:math",
+        "//core:random",
+        "//core:status",
+        "//core:units",
         "//engine:driver",
         "//engine:lifecycle",
         "//framework",
-        "//core:argument",
-        "//core:math",
         "//model/gravity:galaxy",
         "//model/gravity:gravity",
         "//model:kinematics",
-        "//core:random",
-        "//core:units",
     ],
 )
 

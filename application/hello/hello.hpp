@@ -9,6 +9,7 @@
 
 #include "base/core.hpp"
 #include "core/argument.hpp"
+#include "core/status.hpp"
 #include "engine/lifecycle.hpp"
 #include "framework/archetype.hpp"
 #include "framework/system.hpp"
@@ -184,7 +185,7 @@ struct Scenario final {
 
 // Builds in `world` a world holding `balls` balls.
 auto build_world(std::size_t balls, Out<World> world)
-    -> std::expected<void, framework::Status>;
+    -> std::expected<void, Status>;
 
 // Computes the most balls the scenario's box holds: one to a cell.
 auto compute_capacity(const Scenario& scenario) -> std::size_t;
@@ -193,7 +194,7 @@ auto compute_capacity(const Scenario& scenario) -> std::size_t;
 // over the cells, each at a random place in its cell with a random radius and
 // velocity. Fails if the cells are fewer than the balls.
 auto build_balls(const Scenario& scenario, InOut<World> world)
-    -> std::expected<void, framework::Status>;
+    -> std::expected<void, Status>;
 
 using Momentum = units::quantity<kilogram * meter_per_second, QuantityVector>;
 using Energy = units::quantity<units::si::joule, double>;

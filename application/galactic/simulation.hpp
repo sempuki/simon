@@ -14,6 +14,7 @@
 #include "application/galactic/simulation_systems.hpp"
 #include "core/argument.hpp"
 #include "core/math.hpp"
+#include "core/status.hpp"
 #include "core/units.hpp"
 #include "engine/driver.hpp"
 #include "engine/lifecycle.hpp"
@@ -56,7 +57,7 @@ struct Scenario final {
 auto build_bodies(const Scenario& scenario, Out<World> world,
                   Out<std::vector<Entity>> bodies,
                   Out<std::vector<Entity>> test_particles)
-    -> std::expected<void, framework::Status>;
+    -> std::expected<void, Status>;
 
 // Toomre and Toomre's restricted encounter: a `victim` mass with their disk
 // of test particles, and a bare `companion`, on a parabolic orbit that passes

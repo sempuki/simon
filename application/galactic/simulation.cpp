@@ -11,13 +11,14 @@
 #include "core/argument.hpp"
 #include "core/math.hpp"
 #include "core/random.hpp"
+#include "core/status.hpp"
 
 namespace simon::galactic {
 
 auto build_bodies(const Scenario& scenario, Out<World> world,
                   Out<std::vector<Entity>> bodies,
                   Out<std::vector<Entity>> test_particles)
-    -> std::expected<void, framework::Status> {
+    -> std::expected<void, Status> {
   RETURN_IF_UNEXPECTED(
       World::set_up()
           .numbered(1)

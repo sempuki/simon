@@ -9,6 +9,7 @@
 #include <expected>
 
 #include "base/status.hpp"
+#include "core/status.hpp"
 #include "core/units.hpp"
 #include "model/aircraft/definition.hpp"
 #include "model/aircraft/flight_control.hpp"
@@ -82,7 +83,7 @@ inline constexpr std::size_t TRIM_ERROR_COUNT =
 // Trims `aircraft` for `condition` over `earth`, at time zero.
 auto trim(const Definition& aircraft, const FlightCondition& condition,
           const Earth& earth, const earth::StandardAirTable& air)
-    -> std::expected<Trim, lib::Status>;
+    -> std::expected<Trim, Status>;
 
 }  // namespace simon::aircraft
 

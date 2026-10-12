@@ -13,6 +13,7 @@
 #include "application/automotive/simulation_systems.hpp"
 #include "base/core.hpp"
 #include "core/argument.hpp"
+#include "core/status.hpp"
 #include "engine/lifecycle.hpp"
 #include "model/traffic/traffic.hpp"
 
@@ -62,7 +63,7 @@ struct Scenario final {
 // Reads the network a scenario drives on, links its lanes, and finds its
 // stop lines and the conflicts in its junctions.
 auto load_network(const std::string& path)
-    -> std::expected<Network, framework::Status>;
+    -> std::expected<Network, Status>;
 
 // Whether vehicles on `network` need their tactical state: whether it has
 // lights or conflicts in its junctions.
@@ -70,7 +71,7 @@ auto is_tactical(const Network& network) -> bool;
 
 // Builds in `world` the world a scenario needs on `network`.
 auto build_world(const Scenario& scenario, const Network& network,
-                 Out<World> world) -> std::expected<void, framework::Status>;
+                 Out<World> world) -> std::expected<void, Status>;
 
 // The fixed-time plan of each of `network`'s signal groups, by group.
 auto plan_signals(const Scenario& scenario, const Network& network)
@@ -80,7 +81,7 @@ auto plan_signals(const Scenario& scenario, const Network& network)
 // signal group.
 auto build_scenario(const Scenario& scenario, const Network& network,
                     InOut<World> world)
-    -> std::expected<void, framework::Status>;
+    -> std::expected<void, Status>;
 
 // The automotive simulation: reads the network and builds the scenario when
 // configured, and drives until the driver stops. Any driver can run it.

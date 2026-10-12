@@ -40,18 +40,19 @@ cc_library(
     ],
     copts = COPTS,
     deps = [
+        "//core:argument",
+        "//core:lie",
+        "//core:math",
+        "//core:status",
+        "//core:units",
         "//engine:lifecycle",
         "//format:mjcf",
         "//framework",
-        "//core:lie",
-        "//core:argument",
-        "//core:math",
         "//model/articulated:articulated",
         "//model/articulated:collision",
         "//model/articulated:constraint",
         "//model/articulated:dynamics",
         "//model:kinematics",
-        "//core:units",
     ],
 )
 

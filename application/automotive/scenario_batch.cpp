@@ -14,6 +14,7 @@
 #include <utility>
 
 #include "core/math.hpp"
+#include "core/status.hpp"
 #include "core/units.hpp"
 #include "model/collision.hpp"
 #include "model/traffic/driving_metrics.hpp"
@@ -92,7 +93,7 @@ auto measure_sample(std::span<const RunSample> samples,
 auto record_run(const std::string& path,
                 std::vector<scenario::ParameterAssignment> assignments,
                 Duration step, std::size_t limit)
-    -> std::expected<RunRecord, lib::Status> {
+    -> std::expected<RunRecord, Status> {
   ScenarioSimulation simulation{path, std::move(assignments)};
   RETURN_IF_UNEXPECTED(simulation.configure());
   RunRecord run{.step = std::chrono::duration<double>(step).count(),

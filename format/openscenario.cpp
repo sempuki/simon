@@ -16,6 +16,7 @@
 
 #include "base/core.hpp"
 #include "core/argument.hpp"
+#include "core/status.hpp"
 #include "format/text.hpp"
 #include "format/xml.hpp"
 #include "pugixml.hpp"
@@ -40,7 +41,7 @@ class Expression final {
   Expression(std::string_view text, const std::vector<Parameter>& parameters)
       : text_{text}, parameters_{&parameters} {}
 
-  auto evaluate() -> std::expected<double, lib::Status> {
+  auto evaluate() -> std::expected<double, Status> {
     auto value = parse_expression();
     skip_space();
     if (value && at_ < text_.size()) {
@@ -70,7 +71,7 @@ class Expression final {
     return false;
   }
 
-  auto parse_expression() -> std::expected<double, lib::Status> {
+  auto parse_expression() -> std::expected<double, Status> {
     auto value = parse_term();
     while (value) {
       if (take('+')) {
@@ -92,7 +93,7 @@ class Expression final {
     return value;
   }
 
-  auto parse_term() -> std::expected<double, lib::Status> {
+  auto parse_term() -> std::expected<double, Status> {
     auto value = parse_unary();
     while (value) {
       char op = 0;
@@ -116,7 +117,7 @@ class Expression final {
     return value;
   }
 
-  auto parse_unary() -> std::expected<double, lib::Status> {
+  auto parse_unary() -> std::expected<double, Status> {
     if (take('-')) {
       auto value = parse_unary();
       if (value) {
@@ -127,7 +128,7 @@ class Expression final {
     return parse_primary();
   }
 
-  auto parse_primary() -> std::expected<double, lib::Status> {
+  auto parse_primary() -> std::expected<double, Status> {
     skip_space();
     if (take('(')) {
       auto value = parse_expression();
@@ -185,7 +186,7 @@ class Parser final {
          std::span<const ParameterAssignment> assignments)
       : directory_{std::move(directory)}, assignments_{assignments} {}
 
-  auto parse(std::string_view text) -> std::expected<Scenario, lib::Status> {
+  auto parse(std::string_view text) -> std::expected<Scenario, Status> {
     RETURN_IF_UNEXPECTED(document_.load(std::string{text}));
     RETURN_OR_ASSIGN_TO(pugi::xml_node root,
                         document_.find_root("OpenSCENARIO"));
@@ -243,7 +244,7 @@ class Parser final {
   }
 
   // Replaces the values of the declarations the assignments name.
-  auto assign(pugi::xml_node declarations) -> std::expected<void, lib::Status> {
+  auto assign(pugi::xml_node declarations) -> std::expected<void, Status> {
     for (const ParameterAssignment& assignment : assignments_) {
       pugi::xml_node declaration = declarations.find_child_by_attribute(
           "ParameterDeclaration", "name", assignment.name.c_str());
@@ -259,7 +260,7 @@ class Parser final {
   // Adds a scope's declarations to `parameters`, each value resolved in the
   // scope so far.
   auto declare(pugi::xml_node declarations, Out<std::vector<Parameter>> into)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     for (pugi::xml_node node : declarations.children("ParameterDeclaration")) {
       std::vector<Parameter> visible = scope_;
       visible.insert(visible.end(), into->begin(), into->end());
@@ -279,7 +280,7 @@ class Parser final {
 
   // An attribute's text, its parameter or expression resolved.
   auto read_text(pugi::xml_node node, std::string_view name) const
-      -> std::expected<std::string, lib::Status> {
+      -> std::expected<std::string, Status> {
     pugi::xml_attribute attribute = node.attribute(name);
     if (!attribute) {
       return fail(node, "needs " + std::string{name});
@@ -310,7 +311,7 @@ class Parser final {
   }
 
   auto read_number(pugi::xml_node node, std::string_view name) const
-      -> std::expected<double, lib::Status> {
+      -> std::expected<double, Status> {
     RETURN_OR_ASSIGN_TO(std::string text, read_text(node, name));
     std::optional<double> value = parse_number(text);
     if (!value) {
@@ -322,7 +323,7 @@ class Parser final {
 
   auto read_number_or(pugi::xml_node node, std::string_view name,
                       double otherwise) const
-      -> std::expected<double, lib::Status> {
+      -> std::expected<double, Status> {
     if (!node.attribute(name)) {
       return otherwise;
     }
@@ -330,7 +331,7 @@ class Parser final {
   }
 
   auto read_flag(pugi::xml_node node, std::string_view name,
-                 bool otherwise) const -> std::expected<bool, lib::Status> {
+                 bool otherwise) const -> std::expected<bool, Status> {
     if (!node.attribute(name)) {
       return otherwise;
     }
@@ -341,7 +342,7 @@ class Parser final {
   //-- Catalogs ---------------------------------------------------------------
 
   auto read_catalogs(pugi::xml_node locations)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     for (pugi::xml_node location : locations.children()) {
       RETURN_OR_ASSIGN_TO(std::string path,
                           read_text(location.child("Directory"), "path"));
@@ -388,7 +389,7 @@ class Parser final {
   //-- Traffic signals --------------------------------------------------------
 
   auto read_signal_controllers(pugi::xml_node signals)
-      -> std::expected<std::vector<TrafficSignalController>, lib::Status> {
+      -> std::expected<std::vector<TrafficSignalController>, Status> {
     std::vector<TrafficSignalController> controllers;
     for (pugi::xml_node node : signals.children()) {
       if (std::string_view{node.name()} != "TrafficSignalController") {
@@ -440,7 +441,7 @@ class Parser final {
   //-- Entities ---------------------------------------------------------------
 
   auto read_entity(pugi::xml_node object)
-      -> std::expected<Entity, lib::Status> {
+      -> std::expected<Entity, Status> {
     if (std::string_view{object.name()} != "ScenarioObject") {
       return refuse(object);
     }
@@ -501,7 +502,7 @@ class Parser final {
   }
 
   auto read_box(pugi::xml_node box, InOut<Vehicle> vehicle) const
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     RETURN_OR_ASSIGN_TO(vehicle->center[0],
                         read_number(box.child("Center"), "x"));
     RETURN_OR_ASSIGN_TO(vehicle->center[1],
@@ -520,7 +521,7 @@ class Parser final {
   // A pedestrian, as a vehicle with its box and esmini's limits for it:
   // 1e10 on speed and on each change of speed, none in effect.
   auto read_pedestrian(pugi::xml_node node)
-      -> std::expected<Vehicle, lib::Status> {
+      -> std::expected<Vehicle, Status> {
     constexpr double UNLIMITED = 1e10;
     Vehicle pedestrian{.name = node.attribute("name").as_string(),
                        .max_speed = UNLIMITED,
@@ -532,7 +533,7 @@ class Parser final {
   }
 
   auto read_vehicle(pugi::xml_node node)
-      -> std::expected<Vehicle, lib::Status> {
+      -> std::expected<Vehicle, Status> {
     Vehicle vehicle{.name = node.attribute("name").as_string()};
     RETURN_IF_UNEXPECTED(read_box(node.child("BoundingBox"), InOut(vehicle)));
     pugi::xml_node performance = node.child("Performance");
@@ -562,7 +563,7 @@ class Parser final {
   //-- Positions --------------------------------------------------------------
 
   auto read_orientation(pugi::xml_node node)
-      -> std::expected<std::optional<Orientation>, lib::Status> {
+      -> std::expected<std::optional<Orientation>, Status> {
     pugi::xml_node orientation = node.child("Orientation");
     if (!orientation) {
       return std::nullopt;
@@ -577,7 +578,7 @@ class Parser final {
   }
 
   auto read_position(pugi::xml_node position)
-      -> std::expected<Position, lib::Status> {
+      -> std::expected<Position, Status> {
     pugi::xml_node node = position.first_child();
     std::string_view kind = node.name();
     if (kind == "WorldPosition") {
@@ -630,7 +631,7 @@ class Parser final {
   //-- Actions ----------------------------------------------------------------
 
   auto read_dynamics(pugi::xml_node node)
-      -> std::expected<TransitionDynamics, lib::Status> {
+      -> std::expected<TransitionDynamics, Status> {
     TransitionDynamics dynamics;
     RETURN_OR_ASSIGN_TO(std::string shape, read_text(node, "dynamicsShape"));
     RETURN_OR_ASSIGN_TO(DynamicsShape parsed, read_shape(node, shape));
@@ -651,7 +652,7 @@ class Parser final {
   }
 
   auto read_shape(pugi::xml_node node, std::string_view shape) const
-      -> std::expected<DynamicsShape, lib::Status> {
+      -> std::expected<DynamicsShape, Status> {
     if (shape == "step") {
       return DynamicsShape::STEP;
     }
@@ -668,7 +669,7 @@ class Parser final {
   }
 
   auto read_private_action(pugi::xml_node action)
-      -> std::expected<PrivateAction, lib::Status> {
+      -> std::expected<PrivateAction, Status> {
     pugi::xml_node kind = action.first_child();
     std::string_view name = kind.name();
     if (name == "LongitudinalAction") {
@@ -770,7 +771,7 @@ class Parser final {
   }
 
   auto read_assign_route(pugi::xml_node node)
-      -> std::expected<PrivateAction, lib::Status> {
+      -> std::expected<PrivateAction, Status> {
     pugi::xml_node route = node.child("Route");
     if (!route) {
       return refuse(node.first_child());
@@ -803,7 +804,7 @@ class Parser final {
   // A polyline followed without timing, held to the line: the only kind
   // simon follows.
   auto read_follow_trajectory(pugi::xml_node node)
-      -> std::expected<PrivateAction, lib::Status> {
+      -> std::expected<PrivateAction, Status> {
     pugi::xml_node trajectory = node.child("Trajectory");
     if (!trajectory) {
       return refuse(node.first_child());
@@ -849,7 +850,7 @@ class Parser final {
   }
 
   auto read_global_action(pugi::xml_node global)
-      -> std::expected<GlobalAction, lib::Status> {
+      -> std::expected<GlobalAction, Status> {
     if (global.child("ParameterAction")) {
       return read_parameter_action(global.child("ParameterAction"));
     }
@@ -875,7 +876,7 @@ class Parser final {
   }
 
   auto read_parameter_action(pugi::xml_node node)
-      -> std::expected<ParameterAction, lib::Status> {
+      -> std::expected<ParameterAction, Status> {
     ParameterAction action;
     RETURN_OR_ASSIGN_TO(action.parameter, read_text(node, "parameterRef"));
     pugi::xml_node change = node.first_child();
@@ -898,7 +899,7 @@ class Parser final {
   //-- Conditions -------------------------------------------------------------
 
   auto read_rule(pugi::xml_node node) const
-      -> std::expected<Rule, lib::Status> {
+      -> std::expected<Rule, Status> {
     RETURN_OR_ASSIGN_TO(std::string rule, read_text(node, "rule"));
     if (rule == "greaterThan") {
       return Rule::GREATER_THAN;
@@ -927,7 +928,7 @@ class Parser final {
   // freespace, only along the road, as bounding boxes are not yet measured
   // otherwise.
   auto read_relative_distance(pugi::xml_node node) const
-      -> std::expected<RelativeDistance, lib::Status> {
+      -> std::expected<RelativeDistance, Status> {
     RelativeDistance distance;
     RETURN_OR_ASSIGN_TO(distance.freespace,
                         read_flag(node, "freespace", false));
@@ -961,7 +962,7 @@ class Parser final {
   }
 
   auto read_entity_condition(pugi::xml_node node)
-      -> std::expected<EntityConditionKind, lib::Status> {
+      -> std::expected<EntityConditionKind, Status> {
     std::string_view kind = node.name();
     if (kind == "SpeedCondition") {
       SpeedCondition speed;
@@ -1024,7 +1025,7 @@ class Parser final {
   }
 
   auto read_value_condition(pugi::xml_node node)
-      -> std::expected<ValueCondition, lib::Status> {
+      -> std::expected<ValueCondition, Status> {
     std::string_view kind = node.name();
     if (kind == "SimulationTimeCondition") {
       SimulationTimeCondition time;
@@ -1094,7 +1095,7 @@ class Parser final {
   }
 
   auto read_condition(pugi::xml_node node)
-      -> std::expected<Condition, lib::Status> {
+      -> std::expected<Condition, Status> {
     Condition condition{.name = node.attribute("name").as_string()};
     RETURN_OR_ASSIGN_TO(condition.delay, read_number_or(node, "delay", 0.0));
     RETURN_OR_ASSIGN_TO(std::string edge, read_text(node, "conditionEdge"));
@@ -1131,7 +1132,7 @@ class Parser final {
 
   // A trigger, or none if it has no conditions.
   auto read_trigger(pugi::xml_node node)
-      -> std::expected<std::optional<Trigger>, lib::Status> {
+      -> std::expected<std::optional<Trigger>, Status> {
     if (!node || !node.child("ConditionGroup")) {
       return std::nullopt;
     }
@@ -1150,7 +1151,7 @@ class Parser final {
   //-- Storyboard -------------------------------------------------------------
 
   auto read_storyboard(pugi::xml_node node)
-      -> std::expected<Storyboard, lib::Status> {
+      -> std::expected<Storyboard, Status> {
     Storyboard storyboard;
     for (pugi::xml_node actions :
          node.child("Init").child("Actions").children()) {
@@ -1179,7 +1180,7 @@ class Parser final {
     return storyboard;
   }
 
-  auto read_story(pugi::xml_node node) -> std::expected<Story, lib::Status> {
+  auto read_story(pugi::xml_node node) -> std::expected<Story, Status> {
     std::vector<Parameter> outer = scope_;
     std::vector<Parameter> local;
     RETURN_IF_UNEXPECTED(
@@ -1198,7 +1199,7 @@ class Parser final {
     return story;
   }
 
-  auto read_act(pugi::xml_node node) -> std::expected<Act, lib::Status> {
+  auto read_act(pugi::xml_node node) -> std::expected<Act, Status> {
     Act act{.name = node.attribute("name").as_string()};
     for (pugi::xml_node group : node.children("ManeuverGroup")) {
       ManeuverGroup read{.name = group.attribute("name").as_string()};
@@ -1224,7 +1225,7 @@ class Parser final {
   }
 
   auto read_maneuver(pugi::xml_node node)
-      -> std::expected<Maneuver, lib::Status> {
+      -> std::expected<Maneuver, Status> {
     Maneuver maneuver{.name = node.attribute("name").as_string()};
     for (pugi::xml_node event : node.children("Event")) {
       Event read{.name = event.attribute("name").as_string()};
@@ -1267,19 +1268,19 @@ class Parser final {
 
 auto evaluate_expression(std::string_view text,
                          const std::vector<Parameter>& parameters)
-    -> std::expected<double, lib::Status> {
+    -> std::expected<double, Status> {
   return Expression{text, parameters}.evaluate();
 }
 
 auto parse_openscenario(std::string_view text, const std::string& directory,
                         std::span<const ParameterAssignment> assignments)
-    -> std::expected<Scenario, lib::Status> {
+    -> std::expected<Scenario, Status> {
   return Parser{directory, assignments}.parse(text);
 }
 
 auto load_openscenario(const std::string& path,
                        std::span<const ParameterAssignment> assignments)
-    -> std::expected<Scenario, lib::Status> {
+    -> std::expected<Scenario, Status> {
   RETURN_OR_ASSIGN_TO(std::string text, read_text_file(path));
   return parse_openscenario(
       text, std::filesystem::path{path}.parent_path().string(), assignments);
@@ -1287,7 +1288,7 @@ auto load_openscenario(const std::string& path,
 
 auto parse_parameter_distribution(std::string_view text,
                                   const std::string& directory)
-    -> std::expected<ParameterDistribution, lib::Status> {
+    -> std::expected<ParameterDistribution, Status> {
   XmlDocument document;
   RETURN_IF_UNEXPECTED(document.load(std::string{text}));
   RETURN_OR_ASSIGN_TO(pugi::xml_node scenario,
@@ -1374,7 +1375,7 @@ auto parse_parameter_distribution(std::string_view text,
 }
 
 auto load_parameter_distribution(const std::string& path)
-    -> std::expected<ParameterDistribution, lib::Status> {
+    -> std::expected<ParameterDistribution, Status> {
   RETURN_OR_ASSIGN_TO(std::string text, read_text_file(path));
   return parse_parameter_distribution(
       text, std::filesystem::path{path}.parent_path().string());

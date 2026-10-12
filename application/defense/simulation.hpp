@@ -14,6 +14,7 @@
 #include "base/core.hpp"
 #include "core/argument.hpp"
 #include "core/random.hpp"
+#include "core/status.hpp"
 #include "engine/event_queue.hpp"
 #include "engine/lifecycle.hpp"
 #include "framework/timeline.hpp"
@@ -89,7 +90,7 @@ enum class Outcome { UNDECIDED, BLUE_WINS, RED_WINS };
 // asset, radars and launchers, every drone with its track and blast, and every
 // interceptor with its blast.
 auto build_world(const Scenario& scenario, Out<World> world)
-    -> std::expected<void, framework::Status>;
+    -> std::expected<void, Status>;
 
 // A point `radius` from the origin at `bearing` radians from east.
 auto on_ring(Length radius, double bearing) -> Position;
@@ -159,7 +160,7 @@ class [[nodiscard]] SiteBuilder final {
   // Creates the site and returns its asset, atomically: if the world refuses
   // any entity, nothing of the site is planned, and build() returns the
   // world's Status. Draws from the random generator are not undone.
-  auto build() && -> std::expected<Entity, framework::Status>;
+  auto build() && -> std::expected<Entity, Status>;
 
  private:
   template <typename UnitType>
@@ -188,7 +189,7 @@ auto create_site(Position origin, Depend<World> world) -> SiteBuilder;
 // Builds every site of a scenario on a square grid, the first at the origin,
 // and returns the first site's asset.
 auto build_scenario(const Scenario& scenario, InOut<World> world)
-    -> std::expected<Entity, framework::Status>;
+    -> std::expected<Entity, Status>;
 
 //-- Operator commands
 //----------------------------------------------------------
@@ -200,18 +201,18 @@ auto build_scenario(const Scenario& scenario, InOut<World> world)
 // Holds every launcher in `sector`, so none engages until freed. Launchers
 // already held, or held by a command still pending, are skipped.
 auto hold_weapons(const Sector& sector, InOut<World> world)
-    -> std::expected<std::size_t, framework::Status>;
+    -> std::expected<std::size_t, Status>;
 
 // Frees every held launcher in `sector` to engage again, except those inside
 // any sector of `keeping`, which stay held without being freed and held again.
 auto free_weapons(const Sector& sector, std::span<const Sector> keeping,
                   InOut<World> world)
-    -> std::expected<std::size_t, framework::Status>;
+    -> std::expected<std::size_t, Status>;
 
 // Destroys every interceptor in flight in `sector`. The tracks they were
 // engaging stay engaged until their engagements lapse.
 auto destruct_interceptors(const Sector& sector, InOut<World> world)
-    -> std::expected<std::size_t, framework::Status>;
+    -> std::expected<std::size_t, Status>;
 
 // The defense simulation: builds the scenario when configured, and stops when
 // red is defeated or the asset is destroyed. Any driver can run it.
@@ -244,11 +245,11 @@ class Simulation final {
   // Operator commands on the simulation's world; see hold_weapons,
   // free_weapons and destruct_interceptors.
   auto hold_weapons(const Sector& sector)
-      -> std::expected<std::size_t, framework::Status>;
+      -> std::expected<std::size_t, Status>;
   auto free_weapons(const Sector& sector)
-      -> std::expected<std::size_t, framework::Status>;
+      -> std::expected<std::size_t, Status>;
   auto destruct_interceptors(const Sector& sector)
-      -> std::expected<std::size_t, framework::Status>;
+      -> std::expected<std::size_t, Status>;
 
  private:
   auto remaining_interceptors() const -> std::uint32_t;

@@ -36,9 +36,10 @@ cc_library(
     ],
     copts = COPTS,
     deps = [
-        "//core:coordinates",
-        "//core:time",
         "//core:argument",
+        "//core:coordinates",
+        "//core:status",
+        "//core:time",
         "@lib//base:core",
         "@lib//base:status",
     ],

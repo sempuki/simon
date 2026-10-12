@@ -8,6 +8,7 @@
 
 #include "base/status.hpp"
 #include "format/format_error.hpp"  // IWYU pragma: export
+#include "core/status.hpp"
 #include "model/vehicle/tire.hpp"
 
 // Reads a Magic Formula 5.2 tire from a TNO tire property file (.tir), as
@@ -20,10 +21,10 @@ namespace simon::format {
 
 // Reads the tire that `text` describes.
 auto parse_tire_file(std::string_view text)
-    -> std::expected<vehicle::MagicFormulaTire, lib::Status>;
+    -> std::expected<vehicle::MagicFormulaTire, Status>;
 
 // Reads the tire in the file at `path`.
 auto load_tire_file(const std::string& path)
-    -> std::expected<vehicle::MagicFormulaTire, lib::Status>;
+    -> std::expected<vehicle::MagicFormulaTire, Status>;
 
 }  // namespace simon::format

@@ -11,6 +11,7 @@
 #include "Eigen/Dense"
 #include "core/argument.hpp"
 #include "core/math.hpp"
+#include "core/status.hpp"
 
 template <>
 const std::array<lib::StatusConditionEntry, simon::aircraft::TRIM_ERROR_COUNT>
@@ -152,7 +153,7 @@ class Trimmer final {
     return trim;
   }
 
-  auto solve() const -> std::expected<Trim, lib::Status> {
+  auto solve() const -> std::expected<Trim, Status> {
     Vector6 x = Eigen::Map<const Vector6>(START.data());
     Vector6 r;
     evaluate(x, &r);
@@ -227,7 +228,7 @@ class Trimmer final {
 
 auto trim(const Definition& aircraft, const FlightCondition& condition,
           const Earth& earth, const earth::StandardAirTable& air)
-    -> std::expected<Trim, lib::Status> {
+    -> std::expected<Trim, Status> {
   return Trimmer{aircraft, condition, earth, air}.solve();
 }
 

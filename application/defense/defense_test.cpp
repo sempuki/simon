@@ -7,6 +7,7 @@
 #include "application/defense/simulation.hpp"
 #include "base/testing.hpp"
 #include "core/argument.hpp"
+#include "core/status.hpp"
 #include "engine/driver.hpp"
 
 namespace simon::defense {
@@ -18,7 +19,7 @@ using namespace std::chrono_literals;
 constexpr Duration DT = 10ms;
 // Builds a world holding 16 of each archetype, for testing systems alone.
 auto build_small_world(Out<World> world) -> void {
-  std::expected<void, framework::Status> built =
+  std::expected<void, Status> built =
       World::set_up()
           .numbered(1)
           .holding<archetype::Asset>(16)
@@ -284,7 +285,7 @@ TEST_CASE("DefenseSimulation") {
                 .build(Out(world)));
 
     // Under Test.
-    std::expected<Entity, framework::Status> asset =
+    std::expected<Entity, Status> asset =
         build_scenario(scenario, InOut(world));
     world.sync();
 
@@ -306,7 +307,7 @@ TEST_CASE("DefenseSimulation") {
     REQUIRE(build_world(scenario, Out(world)));
 
     // Under Test.
-    std::expected<Entity, framework::Status> first =
+    std::expected<Entity, Status> first =
         build_scenario(scenario, InOut(world));
 
     // Postconditions.

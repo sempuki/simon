@@ -9,6 +9,7 @@
 
 #include "base/status.hpp"
 #include "core/text.hpp"  // IWYU pragma: export
+#include "core/status.hpp"
 #include "format/format_error.hpp"
 
 // What every reader does with text: reads a file whole, and says on which
@@ -17,7 +18,7 @@ namespace simon::format {
 
 // The whole of the file at `path`; UNREADABLE if it cannot be opened.
 auto read_text_file(const std::string& path)
-    -> std::expected<std::string, lib::Status>;
+    -> std::expected<std::string, Status>;
 
 // The line that `offset` into `text` falls on, counted from 1.
 auto find_line(std::string_view text, std::ptrdiff_t offset) -> std::size_t;

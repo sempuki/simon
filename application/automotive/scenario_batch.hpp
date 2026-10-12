@@ -12,6 +12,7 @@
 
 #include "application/automotive/scenario_simulation.hpp"
 #include "base/status.hpp"
+#include "core/status.hpp"
 #include "core/time.hpp"
 #include "scenario/openscenario.hpp"
 #include "scenario/parameter_distribution.hpp"
@@ -72,7 +73,7 @@ struct RunRecord final {
 auto record_run(const std::string& path,
                 std::vector<scenario::ParameterAssignment> assignments,
                 Duration step, std::size_t limit)
-    -> std::expected<RunRecord, lib::Status>;
+    -> std::expected<RunRecord, Status>;
 
 // nuPlan's measures of a run's ego, and how near it came to the others.
 struct RunMeasures final {
@@ -102,7 +103,7 @@ auto measure_run(const RunRecord& run) -> RunMeasures;
 struct BatchRun final {
   std::size_t permutation = 0;
   std::vector<scenario::ParameterAssignment> assignments;
-  std::expected<RunMeasures, lib::Status> measures;
+  std::expected<RunMeasures, Status> measures;
 };
 
 // Plays every permutation of `distribution` on `threads` threads, each as

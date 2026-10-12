@@ -15,6 +15,7 @@
 #include "application/aeronautic/testing.hpp"
 #include "base/testing.hpp"
 #include "core/argument.hpp"
+#include "core/status.hpp"
 
 // Measures the drift of simon's point-mass model from JSBSim's 737 flying the
 // same maneuvers. reference/jsbsim_737.py flew them and recorded the controls a
@@ -147,7 +148,7 @@ auto create(const AirState& state, InOut<World> world) -> Entity {
                      .with(Handling{})
                      .with(Autopilot{})
                      .with(Route{});
-  std::expected<Entity, framework::Status> entity;
+  std::expected<Entity, Status> entity;
   if constexpr (std::is_same_v<ArchetypeType, archetype::PreciseAircraft>) {
     entity = std::move(builder).with(AirStateRate{}).build();
   } else {

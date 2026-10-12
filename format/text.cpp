@@ -1,6 +1,7 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "format/text.hpp"
+#include "core/status.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -9,7 +10,7 @@
 namespace simon::format {
 
 auto read_text_file(const std::string& path)
-    -> std::expected<std::string, lib::Status> {
+    -> std::expected<std::string, Status> {
   std::ifstream file{path};
   if (!file) {
     return Failure{lib::raise(FormatError::UNREADABLE, "cannot open " + path)};

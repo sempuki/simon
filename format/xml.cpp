@@ -5,11 +5,12 @@
 #include <optional>
 #include <utility>
 
+#include "core/status.hpp"
 #include "format/text.hpp"
 
 namespace simon::format {
 
-auto XmlDocument::load(std::string text) -> std::expected<void, lib::Status> {
+auto XmlDocument::load(std::string text) -> std::expected<void, Status> {
   text_ = std::move(text);
   pugi::xml_parse_result result =
       document_.load_buffer(text_.data(), text_.size());
@@ -21,7 +22,7 @@ auto XmlDocument::load(std::string text) -> std::expected<void, lib::Status> {
 }
 
 auto XmlDocument::find_root(std::string_view name) const
-    -> std::expected<pugi::xml_node, lib::Status> {
+    -> std::expected<pugi::xml_node, Status> {
   pugi::xml_node root = document_.child(name);
   if (!root) {
     return Failure{lib::raise(FormatError::MALFORMED,
@@ -39,7 +40,7 @@ auto XmlDocument::find_line(pugi::xml_node node) const -> std::size_t {
 }
 
 auto XmlDocument::read_number(pugi::xml_node node, std::string_view name) const
-    -> std::expected<double, lib::Status> {
+    -> std::expected<double, Status> {
   pugi::xml_attribute attribute = node.attribute(name);
   if (!attribute) {
     return fail(node, "needs " + std::string{name});
