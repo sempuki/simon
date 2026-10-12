@@ -19,14 +19,15 @@ cc_library(
     copts = COPTS,
     deps = [
         "//core:argument",
+        "//core:random",
+        "//core:status",
+        "//core:units",
         "//engine:event_queue",
         "//engine:lifecycle",
         "//engine:rate_gate",
         "//framework",
         "//model:guidance",
         "//model:kinematics",
-        "//core:random",
-        "//core:units",
         "@lib//base:core",
     ],
 )
@@ -38,8 +39,9 @@ cc_test(
     copts = COPTS,
     deps = [
         "//core:argument",
-        ":defense_library",
+        "//core:status",
         "//engine:driver",
+        ":defense_library",
         "@lib//base:testing",
     ],
 )
@@ -78,9 +80,10 @@ cc_binary(
     copts = COPTS,
     deps = [
         "//core:argument",
-        ":defense_library",
+        "//core:status",
         "//framework",
         "//framework:benchmarking",
+        ":defense_library",
         "@lib//base:core",
     ],
 )

@@ -17,6 +17,7 @@
 
 #include "base/core.hpp"
 #include "core/argument.hpp"
+#include "core/status.hpp"
 #include "core/time.hpp"
 #include "engine/driver.hpp"
 #include "engine/event_queue.hpp"
@@ -62,7 +63,7 @@ struct Decay final : System<Health> {
 class IdleSimulation final {
  public:
   auto configure() -> PhaseResult {
-    std::expected<void, framework::Status> built =
+    std::expected<void, Status> built =
         TestWorld::set_up().numbered(1).holding<Body>(BODIES).build(
             Out(world_));
     RETURN_IF_UNEXPECTED(built);

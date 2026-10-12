@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "core/random.hpp"
+#include "core/status.hpp"
 #include "format/opendrive.hpp"
 
 namespace simon::automotive {
@@ -71,7 +72,7 @@ auto driving_lanes(const Network& network, double margin) -> std::vector<Room> {
 }  // namespace
 
 auto load_network(const std::string& path)
-    -> std::expected<Network, framework::Status> {
+    -> std::expected<Network, Status> {
   RETURN_OR_ASSIGN_TO(road::Map roads, format::load_opendrive(path));
   road::LaneGraph graph = road::build_lane_graph(roads);
   road::LaneGraph driving = road::build_lane_graph(roads, "driving");
@@ -106,7 +107,7 @@ auto is_tactical(const Network& network) -> bool {
 }
 
 auto build_world(const Scenario& scenario, const Network& network,
-                 Out<World> world) -> std::expected<void, framework::Status> {
+                 Out<World> world) -> std::expected<void, Status> {
   std::size_t vehicles = count(scenario.vehicles);
   bool tactical = is_tactical(network);
   return World::set_up()
@@ -144,7 +145,7 @@ auto plan_signals(const Scenario& scenario, const Network& network)
 
 auto build_scenario(const Scenario& scenario, const Network& network,
                     InOut<World> world)
-    -> std::expected<void, framework::Status> {
+    -> std::expected<void, Status> {
   double spacing = (scenario.length + scenario.following.minimum_gap)
                        .numerical_value_in(meter) +
                    5.0;

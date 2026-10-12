@@ -14,6 +14,13 @@ cc_library(
 )
 
 cc_library(
+    name = "status",
+    hdrs = ["status.hpp"],
+    copts = COPTS,
+    deps = ["@lib//base:status"],
+)
+
+cc_library(
     name = "math",
     hdrs = ["math.hpp"],
     copts = COPTS,

@@ -516,7 +516,7 @@ only then emits commands.
   absent, permitted by the entity's archetype and its store has room, a
   component to detach is present and not required by the archetype, an alias is
   non-empty and not already given, an alias to take was given. A refused
-  utterance returns a `lib::Status` whose condition is a `BuildError`
+  utterance returns a `Status` whose condition is a `BuildError`
   (compare with `status == lib::watch(BuildError::ALIAS_NOT_GIVEN)`), and
   emits nothing. Because every command was validated this way, applying
   commands at a sync point cannot fail halfway through a batch.
@@ -535,7 +535,7 @@ only then emits commands.
   `Entity` can be stored, and children can be created under it, before the
   commands are applied.
 
-`lib::Status` keeps each incident's message in a ring buffer of 16 per
+`Status` keeps each incident's message in a ring buffer of 16 per
 condition domain, and that buffer is not thread-safe. Inspect a returned
 `Status` where it is returned, or keep a `detach_copy()`. The simulation is
 single-threaded today; this needs revisiting before it is not.

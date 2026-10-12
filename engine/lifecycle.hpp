@@ -6,11 +6,10 @@
 #include <expected>
 
 #include "base/status.hpp"
+#include "core/status.hpp"
 #include "core/time.hpp"
 
 namespace simon::engine {
-
-using lib::Status;
 
 // Whether a simulation wants to keep going. Errors are Statuses, never Flow.
 enum class Flow { CONTINUE, STOP };

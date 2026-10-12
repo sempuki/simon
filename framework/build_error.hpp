@@ -6,10 +6,9 @@
 #include <cstddef>
 
 #include "base/status.hpp"
+#include "core/status.hpp"
 
 namespace simon::framework {
-
-using lib::Status;
 
 // The reasons a builder refuses an utterance. `build()` returns one of these
 // as a Status and emits nothing. Compare with `status == lib::watch(error)`.

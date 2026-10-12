@@ -8,6 +8,7 @@
 
 #include "base/status.hpp"
 #include "format/format_error.hpp"  // IWYU pragma: export
+#include "core/status.hpp"
 #include "model/road/road.hpp"
 
 // Reads roads from ASAM OpenDRIVE files (see model/REFERENCES.md): each
@@ -25,10 +26,10 @@ namespace simon::format {
 
 // Reads the road network that `text` describes.
 auto parse_opendrive(std::string_view text)
-    -> std::expected<road::Map, lib::Status>;
+    -> std::expected<road::Map, Status>;
 
 // Reads the road network in the file at `path`.
 auto load_opendrive(const std::string& path)
-    -> std::expected<road::Map, lib::Status>;
+    -> std::expected<road::Map, Status>;
 
 }  // namespace simon::format

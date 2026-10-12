@@ -15,11 +15,12 @@ cc_library(
     copts = COPTS,
     deps = [
         "//core:argument",
-        "//framework",
-        "//engine:lifecycle",
-        "//model:kinematics",
         "//core:random",
+        "//core:status",
         "//core:units",
+        "//engine:lifecycle",
+        "//framework",
+        "//model:kinematics",
     ],
 )
 

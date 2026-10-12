@@ -12,6 +12,7 @@
 #include "base/testing.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 #include "core/argument.hpp"
+#include "core/status.hpp"
 #include "engine/driver.hpp"
 #include "format/aircraft_file.hpp"
 
@@ -26,7 +27,7 @@ constexpr Duration DT = 20ms;
 constexpr double PI = std::numbers::pi;
 
 auto build_small_world(Out<World> world) -> void {
-  std::expected<void, framework::Status> built =
+  std::expected<void, Status> built =
       World::set_up()
           .numbered(1)
           .holding<archetype::Aircraft>(4)
@@ -64,7 +65,7 @@ auto create(const AirState& state, const Route& route, InOut<World> world)
                                      .speed = route.speed,
                                      .throttle_integral = 0.3})
                      .with(route);
-  std::expected<Entity, framework::Status> entity;
+  std::expected<Entity, Status> entity;
   if constexpr (std::is_same_v<ArchetypeType, archetype::PreciseAircraft>) {
     entity = std::move(builder).with(AirStateRate{}).build();
   } else {

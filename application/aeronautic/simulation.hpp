@@ -11,6 +11,7 @@
 #include "application/aeronautic/simulation_systems.hpp"
 #include "base/core.hpp"
 #include "core/argument.hpp"
+#include "core/status.hpp"
 #include "engine/lifecycle.hpp"
 #include "framework/timeline.hpp"
 #include "model/aircraft/trim.hpp"
@@ -74,7 +75,7 @@ auto trim_in_cruise(const aircraft::Definition& data,
                     const aircraft::Earth& earth,
                     Length altitude = 6000.0 * meter,
                     Speed speed = 200.0 * meter_per_second)
-    -> std::expected<aircraft::Trim, framework::Status>;
+    -> std::expected<aircraft::Trim, Status>;
 
 // Creates a rigid aircraft of type `data` over `earth`, trimmed by `trim`,
 // at `x` and `y` in the world's local frame, at the trim's altitude, and
@@ -87,7 +88,7 @@ auto create_rigid_aircraft(
     const aircraft::Trim& trim, const SurfaceGains& gains, Length x, Length y,
     Angle heading, const Route& route, InOut<World> world,
     const earth::WindField& wind = {}, std::uint64_t seed = 0)
-    -> std::expected<Entity, framework::Status>;
+    -> std::expected<Entity, Status>;
 
 // The rigid aircraft types a scenario flies, read once: null where it flies
 // none of that type.
@@ -98,14 +99,14 @@ struct RigidTypes final {
 
 // Builds in `world` the world a scenario needs.
 auto build_world(const Scenario& scenario, Out<World> world)
-    -> std::expected<void, framework::Status>;
+    -> std::expected<void, Status>;
 
 // Creates every aircraft of a scenario, with its route, flying level toward
 // its first waypoint at its route's speed; rigid aircraft, of `types`, start
 // at their trim's altitude and speed.
 auto build_scenario(const Scenario& scenario, const RigidTypes& types,
                     InOut<World> world)
-    -> std::expected<void, framework::Status>;
+    -> std::expected<void, Status>;
 
 // The flight simulation: builds the scenario when configured, and flies until
 // the driver stops. Any driver can run it.

@@ -26,6 +26,7 @@
 #include "application/aeronautic/simulation_systems.hpp"
 #include "base/core.hpp"
 #include "core/argument.hpp"
+#include "core/status.hpp"
 #include "format/aircraft_file.hpp"
 #include "framework/benchmarking.hpp"
 
@@ -60,7 +61,7 @@ auto measure(int aircraft, bool round, int steps,
                               ? aircraft::Earth::round(earth::wgs84::Geodetic{})
                               : aircraft::Earth::flat();
   World world;
-  std::expected<void, framework::Status> built =
+  std::expected<void, Status> built =
       World::set_up()
           .numbered(1)
           .holding<archetype::RigidAircraft>(static_cast<std::size_t>(aircraft))

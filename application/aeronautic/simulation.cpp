@@ -1,6 +1,7 @@
 // Copyright 2026 -- CONTRIBUTORS. See LICENSE.
 
 #include "application/aeronautic/simulation.hpp"
+#include "core/status.hpp"
 #include "format/aircraft_file.hpp"
 
 #include <algorithm>
@@ -45,7 +46,7 @@ auto split_fleet(const Scenario& scenario) -> Fleet {
 // Builds `builder`'s entity with a Wind if `field` is not still.
 template <typename BuilderType>
 auto build_in(BuilderType builder, const earth::WindField& field)
-    -> std::expected<Entity, framework::Status> {
+    -> std::expected<Entity, Status> {
   if (earth::is_still(field)) {
     return std::move(builder).build();
   }
@@ -55,7 +56,7 @@ auto build_in(BuilderType builder, const earth::WindField& field)
 template <typename ArchetypeType>
 auto create_aircraft(const Scenario& scenario, const AirState& state,
                      const Route& route, InOut<World> world)
-    -> std::expected<void, framework::Status> {
+    -> std::expected<void, Status> {
   // Roughly trimmed for level flight, so the autopilot starts near its work.
   constexpr double TRIM_THROTTLE = 0.3;
   auto created =
@@ -95,7 +96,7 @@ Simulation::Simulation(Scenario scenario)
 
 auto trim_in_cruise(const aircraft::Definition& data,
                     const aircraft::Earth& earth, Length altitude, Speed speed)
-    -> std::expected<aircraft::Trim, framework::Status> {
+    -> std::expected<aircraft::Trim, Status> {
   aircraft::FlightCondition condition{
       .position = meters(0.0, 0.0, altitude.numerical_value_in(meter)),
       .speed = speed,
@@ -111,7 +112,7 @@ auto create_rigid_aircraft(const aircraft::Definition& data,
                            Angle heading, const Route& route,
                            InOut<World> world, const earth::WindField& wind,
                            std::uint64_t seed)
-    -> std::expected<Entity, framework::Status> {
+    -> std::expected<Entity, Status> {
   Time start = 0.0 * second;
   Length altitude = earth.altitude(trim.body, start);
   Speed speed{magnitude(earth.air_velocity(trim.body).numerical_value_in(
@@ -165,7 +166,7 @@ auto create_rigid_aircraft(const aircraft::Definition& data,
 }
 
 auto build_world(const Scenario& scenario, Out<World> world)
-    -> std::expected<void, framework::Status> {
+    -> std::expected<void, Status> {
   auto [simple, precise, airliners, fighters] = split_fleet(scenario);
   bool still = earth::is_still(scenario.wind);
   return World::set_up()
@@ -179,7 +180,7 @@ auto build_world(const Scenario& scenario, Out<World> world)
 
 auto build_scenario(const Scenario& scenario, const RigidTypes& types,
                     InOut<World> world)
-    -> std::expected<void, framework::Status> {
+    -> std::expected<void, Status> {
   auto [simple, precise, airliners, fighters] = split_fleet(scenario);
   CHECK_PRECONDITION(airliners == 0 || types.airliner);
   CHECK_PRECONDITION(fighters == 0 || types.fighter);

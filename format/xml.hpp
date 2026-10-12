@@ -9,6 +9,7 @@
 
 #include "base/core.hpp"
 #include "base/status.hpp"
+#include "core/status.hpp"
 #include "format/format_error.hpp"
 #include "pugixml.hpp"
 
@@ -27,11 +28,11 @@ class XmlDocument final {
   ~XmlDocument() = default;
 
   // Reads `text`; MALFORMED, with the line, if it is not XML.
-  auto load(std::string text) -> std::expected<void, lib::Status>;
+  auto load(std::string text) -> std::expected<void, Status>;
 
   // The document's element `name`; MALFORMED if it has none.
   auto find_root(std::string_view name) const
-      -> std::expected<pugi::xml_node, lib::Status>;
+      -> std::expected<pugi::xml_node, Status>;
 
   // The document node, which holds the root element.
   auto node() const -> pugi::xml_node { return document_; }
@@ -45,7 +46,7 @@ class XmlDocument final {
   // The number in `node`'s attribute `name`; MALFORMED if it has none, or
   // it is not a finite number.
   auto read_number(pugi::xml_node node, std::string_view name) const
-      -> std::expected<double, lib::Status>;
+      -> std::expected<double, Status>;
 
   // A MALFORMED failure: "line N: <node> why".
   auto fail(pugi::xml_node node, std::string_view why) const -> Failure;

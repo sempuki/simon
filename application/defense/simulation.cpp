@@ -2,6 +2,7 @@
 
 #include "application/defense/simulation.hpp"
 #include "core/argument.hpp"
+#include "core/status.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -13,7 +14,7 @@
 namespace simon::defense {
 
 auto build_world(const Scenario& scenario, Out<World> world)
-    -> std::expected<void, framework::Status> {
+    -> std::expected<void, Status> {
   auto count = [](int value) {
     return static_cast<std::size_t>(std::max(value, 0));
   };
@@ -38,7 +39,7 @@ auto on_ring(Length radius, double bearing) -> Position {
   return meters(length * std::cos(bearing), length * std::sin(bearing), 0.0);
 }
 
-auto SiteBuilder::build() && -> std::expected<Entity, framework::Status> {
+auto SiteBuilder::build() && -> std::expected<Entity, Status> {
   constexpr double TURN = 2.0 * std::numbers::pi;
   // Any early return rolls back the entities created so far.
   auto transaction = world_->transaction();
@@ -99,7 +100,7 @@ auto create_site(Position origin, Depend<World> world) -> SiteBuilder {
 }
 
 auto build_scenario(const Scenario& scenario, InOut<World> world)
-    -> std::expected<Entity, framework::Status> {
+    -> std::expected<Entity, Status> {
   CHECK_PRECONDITION(scenario.sites >= 1);
   auto count = [](int value) {
     return static_cast<std::size_t>(std::max(value, 0));
@@ -176,7 +177,7 @@ auto Simulation::step(const Step& step) -> engine::PhaseResult {
 }
 
 auto hold_weapons(const Sector& sector, InOut<World> world)
-    -> std::expected<std::size_t, framework::Status> {
+    -> std::expected<std::size_t, Status> {
   return world->change()
       .each<archetype::Launcher>()
       .within(Kinematics{.position = sector.center}, sector.radius)
@@ -187,7 +188,7 @@ auto hold_weapons(const Sector& sector, InOut<World> world)
 
 auto free_weapons(const Sector& sector, std::span<const Sector> keeping,
                   InOut<World> world)
-    -> std::expected<std::size_t, framework::Status> {
+    -> std::expected<std::size_t, Status> {
   const auto& kinematics = world->store_of<Kinematics>();
   return world->change()
       .each<archetype::Launcher>()
@@ -204,7 +205,7 @@ auto free_weapons(const Sector& sector, std::span<const Sector> keeping,
 }
 
 auto destruct_interceptors(const Sector& sector, InOut<World> world)
-    -> std::expected<std::size_t, framework::Status> {
+    -> std::expected<std::size_t, Status> {
   return world->destroy()
       .each<archetype::Interceptor>()
       .within(Kinematics{.position = sector.center}, sector.radius)
@@ -212,17 +213,17 @@ auto destruct_interceptors(const Sector& sector, InOut<World> world)
 }
 
 auto Simulation::hold_weapons(const Sector& sector)
-    -> std::expected<std::size_t, framework::Status> {
+    -> std::expected<std::size_t, Status> {
   return defense::hold_weapons(sector, InOut(world_));
 }
 
 auto Simulation::free_weapons(const Sector& sector)
-    -> std::expected<std::size_t, framework::Status> {
+    -> std::expected<std::size_t, Status> {
   return defense::free_weapons(sector, {}, InOut(world_));
 }
 
 auto Simulation::destruct_interceptors(const Sector& sector)
-    -> std::expected<std::size_t, framework::Status> {
+    -> std::expected<std::size_t, Status> {
   return defense::destruct_interceptors(sector, InOut(world_));
 }
 

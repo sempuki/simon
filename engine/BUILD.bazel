@@ -11,6 +11,7 @@ cc_library(
     hdrs = ["lifecycle.hpp"],
     copts = COPTS,
     deps = [
+        "//core:status",
         "//framework",
         "@lib//base:status",
     ],
@@ -71,13 +72,14 @@ cc_binary(
     ],
     copts = COPTS,
     deps = [
-        ":driver",
-        ":event_queue",
-        ":lifecycle",
         "//core:argument",
+        "//core:status",
         "//core:time",
         "//framework",
         "//framework:benchmarking",
+        ":driver",
+        ":event_queue",
+        ":lifecycle",
         "@lib//base:core",
     ],
 )

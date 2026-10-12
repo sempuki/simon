@@ -27,6 +27,7 @@
 #include "application/aeronautic/simulation.hpp"
 #include "base/core.hpp"
 #include "core/argument.hpp"
+#include "core/status.hpp"
 #include "format/aircraft_file.hpp"
 #include "framework/benchmarking.hpp"
 
@@ -52,7 +53,7 @@ auto measure(int aircraft, Fidelity fidelity, int steps,
     scenario.rigid = std::max(aircraft / 1000, 1);
   }
   World world;
-  std::expected<void, framework::Status> built =
+  std::expected<void, Status> built =
       build_world(scenario, Out(world));
   CHECK_POSTCONDITION(built.has_value());
   built =

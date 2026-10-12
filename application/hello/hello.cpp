@@ -8,6 +8,7 @@
 
 #include "core/argument.hpp"
 #include "core/random.hpp"
+#include "core/status.hpp"
 
 namespace simon::hello {
 
@@ -100,7 +101,7 @@ auto append_wall_contacts(const Springiness& springiness, const Box& box,
 }
 
 auto build_world(std::size_t balls, Out<World> world)
-    -> std::expected<void, framework::Status> {
+    -> std::expected<void, Status> {
   return World::set_up().numbered(1).holding<Ball>(balls).build(world);
 }
 
@@ -114,7 +115,7 @@ auto compute_capacity(const Scenario& scenario) -> std::size_t {
 }
 
 auto build_balls(const Scenario& scenario, InOut<World> world)
-    -> std::expected<void, framework::Status> {
+    -> std::expected<void, Status> {
   std::size_t cells = compute_capacity(scenario);
   if (scenario.balls > cells) {
     return std::unexpected(

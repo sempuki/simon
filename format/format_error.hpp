@@ -7,6 +7,7 @@
 #include <expected>
 
 #include "base/status.hpp"
+#include "core/status.hpp"
 
 // What every reader in format/ says when it cannot read a file.
 namespace simon::format {
@@ -23,7 +24,7 @@ inline constexpr std::size_t FORMAT_ERROR_COUNT =
     static_cast<std::size_t>(FormatError::COUNT);
 
 // The error a reader returns.
-using Failure = std::unexpected<lib::Status>;
+using Failure = std::unexpected<Status>;
 
 }  // namespace simon::format
 

@@ -10,6 +10,7 @@
 
 #include "base/status.hpp"
 #include "format/format_error.hpp"  // IWYU pragma: export
+#include "core/status.hpp"
 #include "model/articulated/articulated.hpp"
 
 // Reads articulated models from MJCF, MuJoCo's XML format (see
@@ -30,11 +31,11 @@ namespace simon::format {
 
 // Reads and compiles the model that `text` describes.
 auto parse_mjcf(std::string_view text)
-    -> std::expected<articulated::Scene, lib::Status>;
+    -> std::expected<articulated::Scene, Status>;
 
 // Reads and compiles the model in the file at `path`, its includes expanded
 // in place, so that a failure's line counts in the expanded text.
 auto load_mjcf(const std::string& path)
-    -> std::expected<articulated::Scene, lib::Status>;
+    -> std::expected<articulated::Scene, Status>;
 
 }  // namespace simon::format

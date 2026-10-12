@@ -10,6 +10,7 @@
 
 #include "base/status.hpp"
 #include "format/format_error.hpp"  // IWYU pragma: export
+#include "core/status.hpp"
 #include "scenario/openscenario.hpp"
 #include "scenario/parameter_distribution.hpp"
 
@@ -30,13 +31,13 @@ namespace simon::format {
 auto parse_openscenario(
     std::string_view text, const std::string& directory,
     std::span<const scenario::ParameterAssignment> assignments = {})
-    -> std::expected<scenario::Scenario, lib::Status>;
+    -> std::expected<scenario::Scenario, Status>;
 
 // Reads the scenario in the file at `path`.
 auto load_openscenario(
     const std::string& path,
     std::span<const scenario::ParameterAssignment> assignments = {})
-    -> std::expected<scenario::Scenario, lib::Status>;
+    -> std::expected<scenario::Scenario, Status>;
 
 // Reads the parameter value distribution that `text` describes, its
 // scenario's path from `directory`. Deterministic distributions only: value
@@ -46,16 +47,16 @@ auto load_openscenario(
 // distributions are refused.
 auto parse_parameter_distribution(std::string_view text,
                                   const std::string& directory)
-    -> std::expected<scenario::ParameterDistribution, lib::Status>;
+    -> std::expected<scenario::ParameterDistribution, Status>;
 
 // Reads the parameter value distribution in the file at `path`.
 auto load_parameter_distribution(const std::string& path)
-    -> std::expected<scenario::ParameterDistribution, lib::Status>;
+    -> std::expected<scenario::ParameterDistribution, Status>;
 
 // The value of the expression `text` (the body of ${...}) with
 // `parameters`' values; MALFORMED if it is not an expression.
 auto evaluate_expression(std::string_view text,
                          const std::vector<scenario::Parameter>& parameters)
-    -> std::expected<double, lib::Status>;
+    -> std::expected<double, Status>;
 
 }  // namespace simon::format

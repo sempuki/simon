@@ -8,6 +8,7 @@
 #include <optional>
 
 #include "base/core.hpp"
+#include "core/status.hpp"
 #include "format/text.hpp"
 
 namespace simon::format {
@@ -146,7 +147,7 @@ auto upper(std::string_view text) -> std::string {
 }  // namespace
 
 auto parse_tire_file(std::string_view text)
-    -> std::expected<MagicFormulaTire, lib::Status> {
+    -> std::expected<MagicFormulaTire, Status> {
   MagicFormulaTire tire;
   bool has_format = false;
   bool has_radius = false;
@@ -205,7 +206,7 @@ auto parse_tire_file(std::string_view text)
 }
 
 auto load_tire_file(const std::string& path)
-    -> std::expected<MagicFormulaTire, lib::Status> {
+    -> std::expected<MagicFormulaTire, Status> {
   RETURN_OR_ASSIGN_TO(std::string text, read_text_file(path));
   return parse_tire_file(text);
 }

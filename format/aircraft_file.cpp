@@ -10,6 +10,7 @@
 
 #include "base/core.hpp"
 #include "core/argument.hpp"
+#include "core/status.hpp"
 #include "format/text.hpp"
 
 namespace simon::format {
@@ -62,7 +63,7 @@ class Parser final {
  public:
   explicit Parser(std::vector<Line> lines) : lines_{std::move(lines)} {}
 
-  auto parse() -> std::expected<aircraft::Definition, lib::Status> {
+  auto parse() -> std::expected<aircraft::Definition, Status> {
     if (done() || line().words.size() != 2 ||
         line().words[0] != "simon-aircraft" || line().words[1] != "1") {
       return fail("expected the header `simon-aircraft 1`");
@@ -144,7 +145,7 @@ class Parser final {
 
   // The words after the key on the current line, if there are `count`.
   auto values(std::size_t count)
-      -> std::expected<std::vector<double>, lib::Status> {
+      -> std::expected<std::vector<double>, Status> {
     const Line& current = line();
     if (current.words.size() != count + 1) {
       return fail("`" + std::string{current.words[0]} + "` takes " +
@@ -160,7 +161,7 @@ class Parser final {
   }
 
   auto number(std::string_view word) const
-      -> std::expected<double, lib::Status> {
+      -> std::expected<double, Status> {
     std::optional<double> value = parse_number(word);
     if (!value) {
       return fail("`" + std::string{word} + "` is not a finite number");
@@ -169,7 +170,7 @@ class Parser final {
   }
 
   // The words after the key, joined by single spaces.
-  auto read_text(Out<std::string> out) -> std::expected<void, lib::Status> {
+  auto read_text(Out<std::string> out) -> std::expected<void, Status> {
     const std::vector<std::string_view>& words = line().words;
     if (words.size() < 2) {
       return fail("`" + std::string{words[0]} + "` takes some words");
@@ -187,21 +188,21 @@ class Parser final {
 
   template <std::size_t Count>
   auto read_numbers(Out<std::array<double, Count>> out)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     RETURN_OR_ASSIGN_TO(std::vector<double> read, values(Count));
     std::ranges::copy(read, out->begin());
     return {};
   }
 
   auto read_location(Out<Displacement> out)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     std::array<double, 3> xyz{};
     RETURN_IF_UNEXPECTED(read_numbers(Out(xyz)));
     *out = meters(xyz[0], xyz[1], xyz[2]);
     return {};
   }
 
-  auto read_mass(Out<Mass> out) -> std::expected<void, lib::Status> {
+  auto read_mass(Out<Mass> out) -> std::expected<void, Status> {
     std::array<double, 1> value{};
     RETURN_IF_UNEXPECTED(read_numbers(Out(value)));
     *out = value[0] * kilogram;
@@ -209,7 +210,7 @@ class Parser final {
   }
 
   auto read_metrics(InOut<aircraft::Definition> data)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     std::array<double, 3> value{};
     RETURN_IF_UNEXPECTED(read_numbers(Out(value)));
     data->wing_area = value[0] * square_meter;
@@ -219,7 +220,7 @@ class Parser final {
   }
 
   auto append_point_mass(InOut<aircraft::Definition> data)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     std::array<double, 4> value{};
     RETURN_IF_UNEXPECTED(read_numbers(Out(value)));
     data->point_masses.push_back(PointMass{
@@ -230,7 +231,7 @@ class Parser final {
   }
 
   auto append_tank(InOut<aircraft::Definition> data)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     std::array<double, 5> value{};
     RETURN_IF_UNEXPECTED(read_numbers(Out(value)));
     data->tanks.push_back(FuelTank{
@@ -245,7 +246,7 @@ class Parser final {
   // flight controls must already have named, or `|signal|` for its magnitude.
   // The aerodynamics read each signal from their own slot.
   auto input(std::string_view name, InOut<aircraft::Definition> data) const
-      -> std::expected<AeroInput, lib::Status> {
+      -> std::expected<AeroInput, Status> {
     if (std::optional<AeroVariable> found = find_aero_variable(name)) {
       return aero_input(*found);
     }
@@ -284,7 +285,7 @@ class Parser final {
   // breakpoint and value per line, or for two a `columns` line and then a
   // row breakpoint and its values per line, then `end`.
   auto table(InOut<aircraft::Definition> data)
-      -> std::expected<AeroTable, lib::Status> {
+      -> std::expected<AeroTable, Status> {
     const Line& header = line();
     if (header.words.size() < 2 || header.words.size() > 3) {
       return fail("`table` takes one or two inputs");
@@ -340,7 +341,7 @@ class Parser final {
   }
 
   auto append_term(InOut<aircraft::Definition> data)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     const Line& header = line();
     if (header.words.size() != 3) {
       return fail("`term` takes an axis and a name");
@@ -380,7 +381,7 @@ class Parser final {
   }
 
   auto append_engine(InOut<aircraft::Definition> data)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     const Line& header = line();
     if (header.words.size() != 3 || header.words[1] != "turbine") {
       return fail("`engine` takes `turbine` and a name");
@@ -389,7 +390,7 @@ class Parser final {
     ++at_;
 
     // One value on the current line.
-    auto scalar = [&](Out<double> out) -> std::expected<void, lib::Status> {
+    auto scalar = [&](Out<double> out) -> std::expected<void, Status> {
       RETURN_OR_ASSIGN_TO(std::vector<double> value, values(1));
       *out = value[0];
       return {};
@@ -508,7 +509,7 @@ class Parser final {
   // `signal <name>`: one nothing writes, which holds zero. A block is
   // `block <kind> <name>`, its entries, then `end`.
   auto read_flight_controls(InOut<aircraft::Definition> data)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     ++at_;
     std::vector<std::string> declared;
     std::vector<NamedBlock> named;
@@ -598,7 +599,7 @@ class Parser final {
 
   // Finds each signal `each` reads by name, and marks the fixed ones read.
   static auto resolve(InOut<FlightControlData> controls, InOut<NamedBlock> each)
-      -> std::expected<void, lib::Status> {
+      -> std::expected<void, Status> {
     std::string missing;
     auto signal = [&](const std::string& name) -> std::size_t {
       std::optional<std::size_t> found = find_signal(*controls, name);
@@ -659,7 +660,7 @@ class Parser final {
   // `<name> [<scale>]` from word `at` of the current line, the name maybe
   // negated.
   auto named_input(std::size_t at) const
-      -> std::expected<NamedInput, lib::Status> {
+      -> std::expected<NamedInput, Status> {
     const std::vector<std::string_view>& words = line().words;
     if (words.size() != at + 1 && words.size() != at + 2) {
       return fail("`" + std::string{words[0]} +
@@ -689,7 +690,7 @@ class Parser final {
 
   // `test <and|or> <value>`, then `condition <signal> <comparison> <operand>`
   // lines, then `end`.
-  auto test() -> std::expected<NamedTest, lib::Status> {
+  auto test() -> std::expected<NamedTest, Status> {
     const std::vector<std::string_view>& words = line().words;
     if (words.size() != 3 || (words[1] != "and" && words[1] != "or")) {
       return fail("expected `test <and|or> <value>`");
@@ -731,7 +732,7 @@ class Parser final {
     return named;
   }
 
-  auto block() -> std::expected<NamedBlock, lib::Status> {
+  auto block() -> std::expected<NamedBlock, Status> {
     const Line& header = line();
     if (header.words.size() != 3 || header.words[0] != "block") {
       return fail("expected `block <kind> <name>`");
@@ -974,12 +975,12 @@ class Parser final {
 }  // namespace
 
 auto parse_aircraft(std::string_view text)
-    -> std::expected<aircraft::Definition, lib::Status> {
+    -> std::expected<aircraft::Definition, Status> {
   return Parser{split_lines(text)}.parse();
 }
 
 auto load_aircraft(const std::string& path)
-    -> std::expected<aircraft::Definition, lib::Status> {
+    -> std::expected<aircraft::Definition, Status> {
   RETURN_OR_ASSIGN_TO(std::string text, read_text_file(path));
   return parse_aircraft(text);
 }
